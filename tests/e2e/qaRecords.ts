@@ -48,6 +48,8 @@ export async function readyGame(page: Page) {
 
 export async function clickMove(page: Page, from: string, to: string) {
   await readyGame(page)
-  await square(page, from).click()
+  const source = square(page, from)
+  const selected = (await source.getAttribute('class'))?.split(' ').includes('mark-selected')
+  if (!selected) await source.click()
   await square(page, to).click()
 }

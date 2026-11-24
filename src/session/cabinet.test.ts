@@ -44,7 +44,7 @@ let extraStores: database.GameStore[]
 
 beforeEach(async () => {
   // Keep fake IndexedDB's real asynchronous tasks; control only presentation/worker deadlines.
-  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'performance'] })
   const preferences = new Map<string, string>()
   vi.stubGlobal('localStorage', {
     getItem: (key: string) => preferences.get(key) ?? null,
@@ -282,18 +282,44 @@ describe('Cabinet live audio delivery', () => {
     expect(cabinet.getSnapshot().audioCue?.events).toContainEqual(expect.objectContaining({ type: 'move', from: 'c7', to: 'c5' }))
   })
 
-  it('delivers the first AI move once for a human playing black and ignores duplicate worker replies', async () => {
+  it.each([0, .8])('paces the opening AI move and ignores duplicate replies (random=%s)', async random => {
+    vi.spyOn(Math, 'random').mockReturnValue(random)
     const ids = observeCues()
     await cabinet.startGame({ mode: 'practice', human: 'black', level: 4, provenance: 'standard' })
     expect(cabinet.getSnapshot().audioCue).toBeNull()
     const worker = TestWorker.instances.at(-1)!
     worker.reply(move('e2', 'e4'))
+    worker.reply(move('d2', 'd4'))
+    const wait = Math.ceil(330 + random * 310)
+    await vi.advanceTimersByTimeAsync(wait - 1)
+    expect(cabinet.getSnapshot().game?.record.cursor).toBe(0)
+    expect(cabinet.getSnapshot().thinking).toBe(true)
+    await vi.advanceTimersByTimeAsync(1)
     await settled(cabinet)
     expect(cabinet.getSnapshot().audioCue?.human).toBe('black')
     expect(cabinet.getSnapshot().audioCue?.events).toContainEqual(expect.objectContaining({ type: 'move', from: 'e2', to: 'e4' }))
     worker.reply(move('e2', 'e4'))
     expect(ids).toHaveLength(1)
     expect(cabinet.getSnapshot().game?.record.cursor).toBe(1)
+  })
+
+  it('uses the actual search time once it already exceeds the reading pause', async () => {
+    await cabinet.startGame({ mode: 'practice', human: 'black', level: 4, provenance: 'standard' })
+    await vi.advanceTimersByTimeAsync(850)
+    TestWorker.instances.at(-1)!.reply(move('e2', 'e4'))
+    await settled(cabinet)
+    expect(cabinet.getSnapshot().game?.record.cursor).toBe(1)
+  })
+
+  it('cancels a queued AI answer on leaving and does not save it', async () => {
+    await cabinet.startGame({ mode: 'practice', human: 'black', level: 4, provenance: 'standard' })
+    const id = cabinet.getSnapshot().game!.record.id
+    TestWorker.instances.at(-1)!.reply(move('e2', 'e4'))
+    expect(cabinet.getSnapshot().thinking).toBe(true)
+    await cabinet.home()
+    await vi.advanceTimersByTimeAsync(1000)
+    expect((await store.getMatch(id))?.cursor).toBe(0)
+    expect(cabinet.getSnapshot().audioCue).toBeNull()
   })
 
   it('ignores a late AI answer after leaving its session', async () => {
@@ -367,6 +393,14 @@ describe('Cabinet shared die presentation timeline', () => {
     expect(cabinet.getSnapshot().rollPhase).toBe('idle')
     expect(cabinet.getSnapshot().animating).toBe(false)
     expect(TestWorker.instances).toHaveLength(1)
+    TestWorker.instances[0].reply(move('a8', 'a7'))
+    const readableUntil = roll.reveal + (reduced ? 650 : 840)
+    await vi.advanceTimersByTimeAsync(readableUntil - plan.end - 1)
+    expect(cabinet.getSnapshot().game?.record.cursor).toBe(1)
+    expect(cabinet.getSnapshot().rollId).toBe(committed.game?.record.actions[0].id)
+    await vi.advanceTimersByTimeAsync(800)
+    await settled(cabinet)
+    expect(cabinet.getSnapshot().game?.record.cursor).toBe(2)
   })
 
   it.each([false, true])('cancels both die timers and the transient cue when undo interrupts a throw (reduced=%s)', async reduced => {

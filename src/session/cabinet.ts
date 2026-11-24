@@ -90,6 +90,8 @@ export class Cabinet {
   private generation = 0;
   private worker: Worker | null = null;
   private workerDeadline: ReturnType<typeof setTimeout> | undefined;
+  private replyTimer: ReturnType<typeof setTimeout> | undefined;
+  private workerReply: { game: GameSession; next: GameSession; readyAt: number } | undefined;
   private scheduled: ReturnType<typeof setTimeout> | undefined;
   private presentationTimers: ReturnType<typeof setTimeout>[] = [];
   private fastForwardPresentation: (() => void) | undefined;
@@ -251,6 +253,8 @@ export class Cabinet {
     this.worker?.terminate();
     this.worker = null;
     clearTimeout(this.workerDeadline);
+    clearTimeout(this.replyTimer);
+    this.workerReply = undefined;
   }
 
   private invalidate() {
@@ -411,7 +415,8 @@ export class Cabinet {
     const { events } = game.current;
     const { human, mode } = game.record.config;
     const royal = mode === 'tutorial' ? null : royalAction(game.state, events, human, this.shortMotion);
-    const plan = actionPlan(events, Boolean(action.roll), this.shortMotion, Boolean(royal));
+    const plan = actionPlan(events, Boolean(action.roll), this.shortMotion, Boolean(royal),
+      { deferUnrolledBloodlust: mode !== 'tutorial' });
     const audioCue = { id: `${game.record.id}/${action.id}`, events, human, startedAt, royal, plan, playback };
     const showsMotion = action.command.type === 'move' || action.command.type === 'endTurn';
     if (!showsMotion) { this.patch({ audioCue }); return; }
@@ -626,7 +631,30 @@ export class Cabinet {
     clearTimeout(this.scheduled);
     if (!this.data.ready || this.data.storageProblem) return;
     const { view, busy, game, learning, animating, teachingReturning, royalCue, thinking, searchFailed } = this.data;
-    if (busy || animating || teachingReturning || royalCue || thinking || searchFailed) return;
+    if (busy || animating || teachingReturning || royalCue || searchFailed) return;
+    if (view === 'game' && game?.record.status === 'open' && game.record.config.level
+      && game.record.config.human !== game.state.side) {
+      const reply = this.workerReply;
+      if (reply?.game === game) {
+        clearTimeout(this.replyTimer);
+        const remaining = Math.ceil(reply.readyAt - performance.now());
+        if (remaining > 0) {
+          this.replyTimer = setTimeout(() => this.pump(), remaining);
+          return;
+        }
+        this.workerReply = undefined;
+        this.patch({ thinking: false });
+        void this.run(async () => {
+          await this.persist(game, reply.next, () => this.present(reply.next));
+        }).then(ok => {
+          if (!ok && this.data.game === game && this.data.view === 'game' && !this.data.storageProblem) {
+            this.stopWorker();
+            this.patch({ thinking: false, searchFailed: true });
+          }
+        });
+      } else if (!thinking) this.search(game);
+      return;
+    }
     if (view === 'learn' && learning && !learning.pendingTeaching && instruction(learning)?.kind === 'script' && this.data.error !== 'tutorialBroken') {
       const generation = this.generation;
       this.scheduled = setTimeout(() => {
@@ -637,13 +665,17 @@ export class Cabinet {
         });
       }, this.shortMotion ? 100 : 320);
     }
-    if (view === 'game' && game?.record.status === 'open' && game.record.config.level
-      && game.record.config.human !== game.state.side) this.search(game);
   }
 
   private search(game: GameSession) {
     const preset = getPreset(game.record.config.level ?? 0);
     if (!preset) return;
+    // Search runs during the pause. Presentation jitter never touches the saved die stream.
+    const thinkMs = this.shortMotion ? 210 + Math.random() * 220 : 330 + Math.random() * 310;
+    const cue = this.data.audioCue?.events === game.current.events ? this.data.audioCue : null;
+    const reveal = cue?.plan.promotion?.surgeAt ?? cue?.plan.escalationAt ?? cue?.plan.roll?.reveal;
+    const readableUntil = cue && reveal !== undefined ? cue.startedAt + reveal + (cue.plan.reduced ? 650 : 840) : 0;
+    const readyAt = Math.max(performance.now() + thinkMs, readableUntil);
     const request: SearchRequest = {
       type: 'search', requestId: newId(), gameId: game.record.id, gameRevision: game.record.revision,
       sessionGeneration: this.generation, rulesVersion: game.state.rulesVersion, engineVersion: ENGINE_VERSION,
@@ -663,8 +695,9 @@ export class Cabinet {
     try {
       const worker = new Worker(new URL('../engine/search.worker.ts', import.meta.url), { type: 'module' });
       this.worker = worker;
-      worker.onerror = failed;
-      worker.onmessageerror = failed;
+      const failWorker = () => { if (this.worker === worker) failed(); };
+      worker.onerror = failWorker;
+      worker.onmessageerror = failWorker;
       worker.onmessage = ({ data }: MessageEvent<SearchResponse>) => {
         if (this.worker !== worker || !current()) return;
         const matches = data && data.requestId === request.requestId && data.gameId === request.gameId
@@ -678,17 +711,10 @@ export class Cabinet {
         } catch { failed(); return; }
         this.stopWorker();
         this.attempts = 0;
-        this.patch({ thinking: false });
-        void this.run(async () => {
-          await this.persist(game, next, () => this.present(next));
-        }).then(ok => {
-          if (!ok && current()) {
-            this.stopWorker();
-            this.patch({ thinking: false, searchFailed: true });
-          }
-        });
+        this.workerReply = { game, next, readyAt };
+        this.pump();
       };
-      this.workerDeadline = setTimeout(failed, preset.maxTimeMs + 2500);
+      this.workerDeadline = setTimeout(failWorker, preset.maxTimeMs + 2500);
       worker.postMessage(request);
     } catch { failed(); }
   }

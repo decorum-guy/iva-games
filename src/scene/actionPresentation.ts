@@ -41,7 +41,9 @@ export function isCaptureReaction(event: GameEvent) {
   return event.type === 'reaction' || (event.type === 'affliction' && event.cause === 'bloodlust')
 }
 
-export function actionPlan(events: readonly GameEvent[], rolled: boolean, reduced: boolean, royal: boolean): ActionPlan {
+export function actionPlan(events: readonly GameEvent[], rolled: boolean, reduced: boolean, royal: boolean,
+  { deferUnrolledBloodlust = false } = {},
+): ActionPlan {
   const promotionIndex = events.findIndex(event => event.type === 'promotion')
   const event = events[promotionIndex]
   const forming = event?.type === 'promotion'
@@ -56,7 +58,9 @@ export function actionPlan(events: readonly GameEvent[], rolled: boolean, reduce
       item.type === 'remove' || (item.type === 'affliction' && item.cause === 'shame'))
     const base = roll ? Math.max(roll.start + getDieThrowDuration(reduced), roll.reveal + (reduced ? 165 : 240)) : reduced ? 75 : 330
     const hold = aftermath ? (roll?.reveal ?? 0) + (reduced ? 304 : roll ? 487 : 560) : 0
-    const escalationAt = roll && reactions.length > 1 ? roll.reveal + (reduced ? 100 : 200) : null
+    const bloodlust = reactions.some(event => event.type === 'affliction')
+    const escalationAt = !bloodlust ? null : roll ? roll.reveal + (reduced ? 100 : 200)
+      : deferUnrolledBloodlust ? reduced ? 95 : Math.ceil(travel + 70) : null
     return { reduced, roll, escalationAt,
       end: Math.max(hold, escalationAt === null ? 0 : escalationAt + (reduced ? 130 : 215),
         royal ? royalLeadIn(events, base, roll?.settle ?? null, reduced) : base), promotion: null }

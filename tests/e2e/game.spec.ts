@@ -8,6 +8,7 @@ import type { Profile } from '../../src/rating/elo';
 import { createMatch } from '../../src/session/match';
 import type { MatchRecord } from '../../src/session/match';
 import { nextDie } from '../../src/session/random';
+import { clickMove } from './qaRecords';
 
 const hotseat = { mode: 'hotseat', level: null, human: null, provenance: 'standard' } as const;
 const playfield = (page: Page) => page.getByTestId('playfield');
@@ -18,12 +19,6 @@ const cycle = [move('g1', 'f3'), move('g8', 'f6'), move('f3', 'g1'), move('f6', 
 async function ready(page: Page) {
   await expect(playfield(page)).toHaveAttribute('data-busy', 'false');
   await expect(playfield(page)).toHaveAttribute('data-animating', 'false');
-}
-
-async function clickMove(page: Page, from: string, to: string) {
-  await ready(page);
-  await cell(page, from).click();
-  await cell(page, to).click();
 }
 
 async function open(page: Page) {

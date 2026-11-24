@@ -63,7 +63,7 @@ export function App() {
   const sounded = useRef<string | undefined>(undefined);
   const soundedRoyal = useRef<string | undefined>(undefined);
   const [modal, setModal] = useState<Modal | null>(null);
-  const [selection, setSelection] = useState<{ key: string; id: string } | null>(null);
+  const [selection, setSelection] = useState<{ key: string; id: string | null; clearedAt?: string; pickedFor?: string } | null>(null);
   const [promotion, setPromotion] = useState<{ key: string; move: Move } | null>(null);
   const [review, setReview] = useState<{ key: string; cursor: number } | null>(null);
   const [flip, setFlip] = useState(false);
@@ -87,8 +87,9 @@ export function App() {
   const currentAction = session?.record.actions[(session?.record.cursor ?? 0) - 1];
   const latest = session?.current.events ?? noEvents;
   const holdingPromotion = reviewing === null && Boolean(lesson?.pendingTeaching?.beforeFormation) && !snap.animating;
-  const livePromotion = reviewing === null && live && currentAction &&
-    live.id === `${session?.record.id}/${currentAction.id}` ? live.plan.promotion : null;
+  const liveAction = reviewing === null && live && currentAction &&
+    live.id === `${session?.record.id}/${currentAction.id}` ? live : null;
+  const livePromotion = liveAction?.plan.promotion ?? null;
   // Restored checkpoints show the committed pawn reaction with no roll or audio replay.
   const savedPromotion = useMemo(() => holdingPromotion && !livePromotion && currentAction
     ? actionPlan(latest, Boolean(currentAction.roll), reduced, false).promotion : null,
@@ -97,8 +98,13 @@ export function App() {
   const promotionStage = plannedPromotion ? holdingPromotion ? 'reaction' : snap.promotionStage : null;
   const focusedFormation = promotionStage === 'formation' && live?.playback === 'formation';
   const awaitingReaction = reviewing === null && snap.awaitingReaction;
+  const stagedBloodlust = liveAction?.plan.escalationAt != null;
+  const waitingForBloodlust = stagedBloodlust && snap.waitingForBloodlust;
+  const concealingResult = awaitingReaction || (waitingForBloodlust && !liveAction?.plan.roll);
+  const bloodlustResult = !lesson && !promotionStage && !concealingResult && !waitingForBloodlust
+    && liveAction?.events.find(event => event.type === 'affliction' && event.cause === 'bloodlust');
   const displayedActor = promotionStage && plannedPromotion ? plannedPromotion.event.piece.side
-    : snap.animating && live?.plan.roll && currentAction ? currentAction.actor : actor;
+    : snap.animating && (liveAction?.plan.roll || stagedBloodlust) && currentAction ? currentAction.actor : actor;
   const formation = useMemo<PromotionCue | undefined>(() => {
     if (promotionStage !== 'formation' || !plannedPromotion || !live) return undefined;
     const { event, formationAt } = plannedPromotion;
@@ -116,12 +122,15 @@ export function App() {
   // A required observation owns the screen until the learner acknowledges it.
   // Do not leak the next opponent move or exercise into that explanation.
   const step = lesson && !beat ? instruction(lesson) : null;
+  const selectionStep = lesson && step ? `${lesson.lesson}/${lesson.position}/${step.id}` : undefined;
   const moves = useMemo(() => session && !position.outcome ? session.legal() : [], [session, position.outcome]);
   const guidance = useMemo(() => lesson ? guideCommands(lesson) : [], [lesson]);
   const active = Boolean(session && !position.outcome && reviewing === null);
   const humanActing = config?.mode === 'hotseat' || config?.human === actor;
-  const boosted = active && !awaitingReaction && position.phase === 'bonus';
-  const selectedId = selection?.key === snap.motionKey ? selection.id : boosted ? position.bonusPieceId : null;
+  const boosted = active && !concealingResult && position.phase === 'bonus';
+  const currentSelection = selection?.key === snap.motionKey &&
+    (selection.id !== null || selection.clearedAt === currentAction?.id);
+  const selectedId = currentSelection ? selection.id : boosted ? position.bonusPieceId : null;
   const selected = position.pieces.find(piece => piece.id === selectedId);
   const tutorialMode = !lesson ? 'none' : beat ? 'result' : lesson.complete ? 'complete' : step?.kind ?? 'position-complete';
   const teachingMove = !lesson || step?.kind === 'move' || step?.kind === 'illegal';
@@ -138,16 +147,16 @@ export function App() {
     if (promotionStage && plannedPromotion) {
       return projectPromotion(position, session.review(session.record.cursor - 1).state, plannedPromotion, promotionStage);
     }
-    if (awaitingReaction) return maskRollResult(position, session.review(session.record.cursor - 1).state);
-    return snap.waitingForBloodlust && liveRoll ? maskBloodlust(position, latest) : position;
-  }, [promotionStage, plannedPromotion, awaitingReaction, session, position, snap.waitingForBloodlust, liveRoll, latest]);
+    if (concealingResult) return maskRollResult(position, session.review(session.record.cursor - 1).state);
+    return waitingForBloodlust ? maskBloodlust(position, latest) : position;
+  }, [promotionStage, plannedPromotion, concealingResult, session, position, waitingForBloodlust, latest]);
   const boardEvents = useMemo(() => {
     if (reviewing !== null) return noEvents;
     if (plannedPromotion) return promotionEvents(plannedPromotion, promotionStage);
-    if (!liveRoll && !awaitingReaction) return latest;
-    const slice = rollSceneEvents(latest, awaitingReaction ? 'concealed' : 'revealed');
-    return snap.waitingForBloodlust ? slice.filter(event => event.type !== 'affliction' || event.cause !== 'bloodlust') : slice;
-  }, [reviewing, plannedPromotion, promotionStage, liveRoll, latest, awaitingReaction, snap.waitingForBloodlust]);
+    if (!liveRoll && !concealingResult && !stagedBloodlust) return latest;
+    const slice = rollSceneEvents(latest, concealingResult ? 'concealed' : 'revealed');
+    return waitingForBloodlust ? slice.filter(event => event.type !== 'affliction' || event.cause !== 'bloodlust') : slice;
+  }, [reviewing, plannedPromotion, promotionStage, liveRoll, latest, concealingResult, stagedBloodlust, waitingForBloodlust]);
   const displayedPiece = boardPosition.pieces.find(piece => piece.id === selectedId);
   const inspectionKey = lesson && step?.kind === 'inspect'
     ? `${snap.motionKey}/${lesson.lesson}/${lesson.position}/${step.id}` : null;
@@ -170,8 +179,8 @@ export function App() {
       ? [command.promotion] : []) as Promotion[] : undefined;
   const lastMove = [...latest].reverse().find(event => event.type === 'move');
   const kingThreat = isInCheck(position);
-  const showThreat = kingThreat && !awaitingReaction && !promotionStage && !snap.royalPending;
-  const readyForResult = !lesson && !awaitingReaction && !promotionStage && !snap.royalPending;
+  const showThreat = kingThreat && !concealingResult && !promotionStage && !snap.royalPending;
+  const readyForResult = !lesson && !concealingResult && !promotionStage && !snap.royalPending;
   const defeatedKing = readyForResult && reviewing === null && position.outcome?.reason === 'checkmate'
     ? position.pieces.find(piece => piece.type === 'king' && piece.side === position.side)?.id : undefined;
   const captures = useMemo(() => session
@@ -277,12 +286,22 @@ export function App() {
     }
   }
 
+  function clearSelection() {
+    setSelection({ key: snap.motionKey, id: null, clearedAt: currentAction?.id });
+  }
+
   function useSquare(square: Square) {
     if (!session || snap.busy || animating || snap.teachingReturning || beat) return;
     const occupant = pieceAt(position, square);
-    if (lesson && step?.kind === 'inspect' && step.square === square) {
-      if (occupant) setSelection({ key: snap.motionKey, id: occupant.id });
+    if (lesson && step?.kind === 'inspect' && step.square === square && inspectionKey !== inspectedStep) {
+      if (occupant) setSelection({ key: snap.motionKey, id: occupant.id, pickedFor: selectionStep });
       setInspectedStep(inspectionKey);
+      return;
+    }
+    // A new guided step can ask the player to pick the same figure again.
+    if (selected?.square === square && (!lesson || selection?.pickedFor === selectionStep)) {
+      clearSelection();
+      cabinet.dismissError();
       return;
     }
     const directedMove = guidance.some(choice => choice.type === 'move' && choice.from === selected?.square && choice.to === square);
@@ -292,7 +311,7 @@ export function App() {
       enter({ type: 'move', from: selected.square, to: square });
       return;
     }
-    setSelection(occupant ? { key: snap.motionKey, id: occupant.id } : null);
+    setSelection(occupant ? { key: snap.motionKey, id: occupant.id, pickedFor: selectionStep } : null);
     cabinet.dismissError();
   }
 
@@ -408,7 +427,7 @@ export function App() {
             ? { events: plannedPromotion.contactEvents, startedAt: live.startedAt } : undefined}
           motionKey={`${snap.motionKey}/${reviewing ?? 'live'}`} onSquare={useSquare}
           onDragSquare={(from, to) => enter({ type: 'move', from, to })} onFailure={onFailure}
-          onClear={() => setSelection(null)} />
+          onClear={clearSelection} />
         <PlayerRow t={t} locale={settings.locale} side={nearSide} config={config} active={Boolean(active || promotionStage) && displayedActor === nearSide}
           teachingFocus={nearSide === teachingHudSide ? teachingHud : undefined}
           captures={captures} advantage={nearSide === 'white' ? balance : -balance} rating={snap.profile.rating}
@@ -476,8 +495,10 @@ export function App() {
                   step?.kind === 'inspect' ? 'tutorial.selectCue' : lesson.complete ? 'tutorial.finish' : !step ? 'tutorial.positionDone' : 'tutorial.readCue' : boosted ? 'game.bonus' :
                   config?.mode === 'practice' || config?.mode === 'rated' ? humanActing ? 'game.yourTurn' : 'game.thinking' :
                     actor === 'white' ? 'game.turn' : 'game.turnBlack')}</strong>
+                {bloodlustResult && bloodlustResult.type === 'affliction' && <span className="bloodlust-status" data-testid="bloodlust-result">
+                  {t('log.bloodlust', { square: bloodlustResult.piece.square })}</span>}
                 {showThreat && <span className="check-label">{t('game.check')}</span>}</div>
-              {!promotionStage && boosted && teachingMove && (!lesson || mayEnd) && <div className="bonus-action">
+              {!promotionStage && boosted && (lesson || humanActing) && teachingMove && (!lesson || mayEnd) && <div className="bonus-action">
                 <button type="button" className="button primary compact" disabled={!canInput || !mayEnd} data-testid="end-turn"
                   onClick={() => perform({ type: 'endTurn' })}>{t('game.endTurn')}</button>
                 {!lesson && <p>{t(mayEnd ? 'game.bonusHelp' : 'game.bonusRequired')}</p>}
@@ -512,7 +533,8 @@ export function App() {
             piece={displayedPiece} state={boardPosition} compact={!mobileDetails} />}
           <div className={`secondary-panel ${mobileDetails && !awaitingReaction ? '' : 'collapsed'}`}>
             {lesson && <Inspector t={t} locale={settings.locale} piece={displayedPiece} state={boardPosition} />}
-            <History t={t} session={session} latest={promotionStage || awaitingReaction ? boardEvents : latest} review={reviewing} concealLatest={awaitingReaction}
+            <History t={t} session={session} latest={promotionStage || concealingResult || waitingForBloodlust ? boardEvents : latest}
+              review={reviewing} concealLatest={concealingResult || waitingForBloodlust}
               onReview={cursor => setReview(cursor === null ? null : { key: snap.motionKey, cursor })} />
           </div>
           <div className="side-actions">

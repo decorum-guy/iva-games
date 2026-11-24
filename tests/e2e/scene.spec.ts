@@ -83,6 +83,13 @@ test('live 3D hotseat accepts pointer input, flips and recovers the same game af
   const id = (await game.getAttribute('data-game-id'))!
   expect(id).not.toBe('preview')
 
+  const knight = await cellCenter(canvas, 'b1')
+  const pickKnight = () => hasTouch ? page.touchscreen.tap(knight.x, knight.y) : page.mouse.click(knight.x, knight.y)
+  await pickKnight()
+  await expect(page.getByTestId('inspector')).toHaveAttribute('data-selected', 'b1')
+  await pickKnight()
+  await expect(page.getByTestId('inspector')).toHaveCount(0)
+
   if (hasTouch) {
     const from = await cellCenter(canvas, 'b1')
     const to = await cellCenter(canvas, 'c3')

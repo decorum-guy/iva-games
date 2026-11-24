@@ -242,6 +242,8 @@ h1, h2, h3, p { margin: 0; }
 }
 .turn-panel { padding: 12px 14px; }
 .turn-heading { display: flex; align-items: center; gap: 9px; font-size: .95rem; min-height: 25px; }
+.turn-heading:has(.bloodlust-status) { flex-wrap: wrap; row-gap: 3px; }
+.bloodlust-status { color: #fa8099; font-size: .84em; font-weight: 700; }
 .check-label { margin-left: auto; border-radius: 4px; padding: 3px 6px; color: #ffd1c6; background: #652f36; font-size: .75rem; }
 .bonus-action { padding-top: 9px; display: grid; gap: 8px; }
 .bonus-action .button { justify-self: start; }

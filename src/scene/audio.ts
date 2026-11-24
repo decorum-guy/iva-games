@@ -117,7 +117,9 @@ export function planSceneCues(events: readonly GameEvent[], options: SceneAudioO
   const at = roll ? roll.reveal / 1000 : cues.length ? (reduced ? .084 : .258) : .018
   const reactions = ending ? [] : events.filter(isCaptureReaction)
   const accent = ending ?? importantEffect(reactions.length ? reactions.slice(0, 1) : events, rolled)
-  if (accent) stateAccent(accent, at, reactions.length ? reactions : events)
+  if (accent && (accent !== 'bloodlust' || plan.escalationAt === null)) {
+    stateAccent(accent, at, reactions.length ? reactions : events)
+  }
   if (plan.escalationAt !== null && !ending) {
     cues.push(stateCue('bloodlust', plan.escalationAt / 1000 + (reduced ? .035 : .064), reactions))
   }
