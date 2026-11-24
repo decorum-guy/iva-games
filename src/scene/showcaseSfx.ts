@@ -30,7 +30,7 @@ export const showcaseSources = {
 export const QUEEN_SOUND_LEVEL = .90
 
 const royalContactWindows = {
-  royalCheck: [.70, .57], royalBreak: [.42, .36], royalGround: [.92, .92],
+  royalCheck: [.70, .57], royalBreak: [.62, .38], royalGround: [.92, .92],
 } as const satisfies Readonly<Record<RoyalContactSound, readonly [number, number]>>
 
 export function reactionSoundLevel(kind: CueKind, figure?: PieceType) {
