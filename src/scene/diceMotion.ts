@@ -46,7 +46,7 @@ export function getDiePresentationClock(reduced: boolean, startedAt: number, now
 type Point3 = readonly [number, number, number]
 type Rotation4 = readonly [number, number, number, number]
 
-export const DIE_CAMERA_POSITION: Point3 = [3.4, 7, 5.2]
+export const DIE_CAMERA_POSITION: Point3 = [3.4, 15, 5.2]
 export const DIE_CAMERA_TARGET: Point3 = [0, .85, 0]
 
 // The mesh and orientation tests use this same physical die convention.
@@ -157,4 +157,45 @@ export function sampleDieMotion(plan: DieMotionPlan, elapsedMs: number): DieMoti
     shadowOpacity: .38 / (1 + clearance * 1.9),
     phase: t === 1 ? 'settled' : 'throwing',
   }
+}
+
+/** Fit the whole throw, not just its final pose, into a compact dock. The
+ * camera stays fixed during the throw so the falling cube retains its weight. */
+export function frameDieThrow(plan: DieMotionPlan, aspect: number) {
+  const ratio = Number.isFinite(aspect) && aspect > 0 ? aspect : 1;
+  const position = new Vector3(...DIE_CAMERA_POSITION);
+  const target = new Vector3(...DIE_CAMERA_TARGET);
+  const forward = target.clone().sub(position).normalize();
+  const right = forward.clone().cross(new Vector3(0, 1, 0)).normalize();
+  const up = right.clone().cross(forward).normalize();
+  const point = new Vector3();
+  let left = Infinity, rightEdge = -Infinity, bottom = Infinity, top = -Infinity;
+  const include = (world: Vector3) => {
+    point.copy(world).sub(target);
+    const x = point.dot(right), y = point.dot(up);
+    left = Math.min(left, x); rightEdge = Math.max(rightEdge, x);
+    bottom = Math.min(bottom, y); top = Math.max(top, y);
+  };
+  const corner = new Vector3();
+  // Bounding corners conservatively contain the actual rounded mesh. The
+  // margin also covers extrema between samples and the soft contact shadow.
+  for (let frame = 0; frame <= 96; frame++) {
+    const pose = sampleDieMotion(plan, frame * plan.timing.motionMs / 96);
+    const rotation = new Quaternion(...pose.quaternion);
+    const translation = new Vector3(...pose.position);
+    for (const x of [-.5, .5]) for (const y of [-.5, .5]) for (const z of [-.5, .5]) {
+      include(corner.set(x, y, z).applyQuaternion(rotation).add(translation));
+    }
+    if (pose.clearance < .05) {
+      for (const x of [-.72, .72]) for (const z of [-.58, .58]) {
+        include(corner.set(pose.position[0] + x, 0, pose.position[2] + z));
+      }
+    }
+  }
+  const offset = right.multiplyScalar((left + rightEdge) / 2).add(up.multiplyScalar((bottom + top) / 2));
+  const height = Math.max(top - bottom, (rightEdge - left) / ratio) * 1.12;
+  return {
+    position: position.add(offset), target: target.add(offset),
+    width: height * ratio, height,
+  };
 }

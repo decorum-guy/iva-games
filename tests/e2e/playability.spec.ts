@@ -316,10 +316,126 @@ async function committedThrow(page: Page, face: DieFace, actor: Side, affliction
   await expect(playfield(page)).toHaveAttribute('data-animating', 'true')
   await page.clock.runFor(1)
   await expect(reveal).toHaveCount(0)
-  await expect(die).toHaveCount(0)
+  await expect(die).toHaveAttribute('data-phase', 'settled')
   await expect(playfield(page)).toHaveAttribute('data-dice', 'none')
   await ready(page)
 }
+
+async function dockIsClearOfBoard(page: Page) {
+  const dock = page.getByTestId('dice-dock')
+  await expect(dock).toBeInViewport({ ratio: 1 })
+  await expect(page.locator('.board-stage').getByTestId('dice-reveal')).toHaveCount(0)
+  const board = (await page.locator('.board-stage').boundingBox())!
+  const bounds = (await dock.boundingBox())!
+  const overlapX = Math.max(0, Math.min(board.x + board.width, bounds.x + bounds.width) - Math.max(board.x, bounds.x))
+  const overlapY = Math.max(0, Math.min(board.y + board.height, bounds.y + bounds.height) - Math.max(board.y, bounds.y))
+  expect(overlapX * overlapY).toBe(0)
+  const viewport = page.viewportSize()!
+  if (viewport.height > viewport.width) expect(bounds.y).toBeGreaterThanOrEqual(board.y + board.height)
+  else expect(bounds.x).toBeGreaterThanOrEqual(board.x + board.width)
+  await noDocumentScroll(page)
+}
+
+test('the dice dock leaves the board still and clear through a throw, language switch and resize', async ({ page }) => {
+  await page.clock.install({ time: new Date('2030-01-01T08:00:00Z') })
+  await open(page, 'ru', false)
+  await page.clock.pauseAt(new Date('2030-01-01T10:00:00Z'))
+  for (const [width, height] of [[1512, 715], [390, 844], [844, 390]]) {
+    await page.setViewportSize({ width, height })
+    const fixture = captureFixture('white', 6)
+    await restoreGame(page, fixture.before.record)
+    const before = await page.locator('.board-stage').boundingBox()
+    await cell(page, fixture.from).click()
+    if (width === 390) {
+      await page.locator('.toggle-sheet').click()
+      await page.locator('.piece-details > summary').click()
+      await page.locator('.history > details > summary').click()
+      await page.getByTestId('game-aside').evaluate(element => { element.scrollTop = element.scrollHeight })
+      expect(await page.getByTestId('game-aside').evaluate(element => element.scrollTop)).toBeGreaterThan(0)
+    }
+    await cell(page, fixture.to).click()
+    const die = page.getByTestId('die-throw')
+    await expect(die.locator('canvas')).toBeVisible()
+    const canvas = (await die.locator('canvas').elementHandle())!
+    await dockIsClearOfBoard(page)
+    expect(await page.locator('.board-stage').boundingBox()).toEqual(before)
+    await page.clock.runFor(740)
+    await page.getByTestId('lang-en').click()
+    expect(await canvas.evaluate(element => element.isConnected)).toBe(true)
+    await expect(page.getByTestId('dice-reveal')).toHaveAttribute('data-phase', 'throwing')
+    await page.setViewportSize({ width: height, height: width })
+    expect(await canvas.evaluate(element => element.isConnected)).toBe(true)
+    await page.setViewportSize({ width, height })
+    await dockIsClearOfBoard(page)
+    await page.clock.runFor(760)
+    expect(await canvas.evaluate(element => element.isConnected)).toBe(true)
+    await expect(page.getByTestId('dice-reveal')).toHaveAttribute('data-phase', 'settled')
+    await expect(page.getByTestId('roll')).toHaveAttribute('data-face', '6')
+    await expect(page.getByTestId('roll')).toContainText('6 · Berserk')
+    expect(await page.locator('.board-stage').boundingBox()).toEqual(before)
+    await page.clock.runFor(350)
+    await ready(page)
+    await expect(page.getByTestId('die-throw')).toHaveAttribute('data-phase', 'settled')
+    expect(await canvas.evaluate(element => element.isConnected)).toBe(true)
+    if (width === 390) {
+      const aside = page.getByTestId('game-aside')
+      await aside.evaluate(element => { element.scrollTop = 30 })
+      const scrolled = await aside.evaluate(element => element.scrollTop)
+      expect(scrolled).toBeGreaterThan(0)
+      await page.getByTestId('lang-ru').click()
+      expect(await aside.evaluate(element => element.scrollTop)).toBeCloseTo(scrolled, 0)
+      await page.getByTestId('lang-en').click()
+      await aside.evaluate(element => { element.scrollTop = 0 })
+    }
+    await visibleAction(page.getByTestId('end-turn'))
+    await dockIsClearOfBoard(page)
+    expect(await page.locator('.board-stage').boundingBox()).toEqual(before)
+    await page.reload()
+    await ready(page)
+    await expect(page.getByTestId('roll')).toContainText('6 · Berserk')
+    await expect(page.getByTestId('die-throw')).toHaveCount(0)
+    await dockIsClearOfBoard(page)
+  }
+})
+
+test('the tutorial dock remains visible with held explanations, primary action and countdown', async ({ page }) => {
+  await page.clock.install({ time: new Date('2030-01-01T08:00:00Z') })
+  await open(page, 'ru', false)
+  await page.clock.pauseAt(new Date('2030-01-01T10:00:00Z'))
+  for (const [width, height] of [[1512, 715], [390, 844], [844, 390]]) {
+    await page.setViewportSize({ width, height })
+    for (const lesson of [1, 2]) {
+      await restoreLesson(page, startLesson(lesson))
+      const before = await page.locator('.board-stage').boundingBox()
+      await cell(page, 'c3').click()
+      await cell(page, 'c4').click()
+      await expect(page.getByTestId('dice-reveal')).toHaveAttribute('data-phase', 'throwing')
+      await dockIsClearOfBoard(page)
+      expect(await page.locator('.board-stage').boundingBox()).toEqual(before)
+      await page.clock.runFor(1500)
+      await expect(page.getByTestId('teaching-cause')).toBeInViewport({ ratio: 1 })
+      await expect(page.getByTestId('teaching-rule')).toBeInViewport({ ratio: 1 })
+      await dockIsClearOfBoard(page)
+      expect(await page.locator('.board-stage').boundingBox()).toEqual(before)
+      await page.clock.runFor(350)
+      await ready(page)
+      await visibleAction(page.getByTestId('lesson-next'))
+      for (const locale of ['en', 'ru'] as const) {
+        await page.getByTestId(`lang-${locale}`).click()
+        await visibleAction(page.getByTestId('lesson-next'))
+        await dockIsClearOfBoard(page)
+      }
+      if (lesson === 2) {
+        await page.getByTestId('lesson-next').click()
+        await expect(page.getByTestId('tutorial')).toHaveAttribute('data-step', 'inspect-countdown')
+        await cell(page, 'c4').click()
+        await expect(page.getByTestId('flat-counter')).toBeInViewport({ ratio: 1 })
+        await visibleAction(page.getByTestId('lesson-next'))
+        await dockIsClearOfBoard(page)
+      }
+    }
+  }
+})
 
 test('real captures by either side show the committed 3D die in 2D, without replay on restore or undo', async ({ page }) => {
   await page.clock.install({ time: new Date('2030-01-01T08:00:00Z') })

@@ -3,9 +3,9 @@ import { OrthographicCamera, Quaternion, Vector3 } from 'three'
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js'
 import type { DieFace } from '../core/types'
 import {
-  createDieMotion, DIE_CAMERA_POSITION, DIE_CAMERA_TARGET, DIE_EDGE_RADIUS,
+  createDieMotion, DIE_CAMERA_POSITION, DIE_EDGE_RADIUS,
   DIE_FACE_NORMALS, DIE_PIPS, dieSupportHeight, getDieMotionTiming, getDiePresentationClock,
-  getDieThrowDuration, sampleDieMotion,
+  frameDieThrow, getDieThrowDuration, sampleDieMotion,
 } from './diceMotion'
 
 const faces = [1, 2, 3, 4, 5, 6] as const
@@ -111,32 +111,39 @@ describe('throw trajectory and shared timing', () => {
     }
   })
 
-  it.each(faces)('keeps the real rounded mesh above the floor and inside the portrait overlay for face %s', face => {
+  it.each(faces)('frames the real rounded mesh throughout the throw in each compact dock for face %s', face => {
     const geometry = new RoundedBoxGeometry(1, 1, 1, 5, DIE_EDGE_RADIUS)
     const positions = geometry.getAttribute('position')
-    // Match the component's 1.08 aspect and min(width,height)/4 camera zoom.
-    const camera = new OrthographicCamera(-2.16, 2.16, 2, -2, .1, 24)
-    camera.position.set(...DIE_CAMERA_POSITION)
-    camera.lookAt(...DIE_CAMERA_TARGET)
-    camera.updateProjectionMatrix()
-    camera.updateMatrixWorld()
     const point = new Vector3()
-    const plan = createDieMotion(face, keys[face % keys.length])
     try {
-      for (const time of [0, 180, 360, 560, 760, 920, 1080, 1200, 1320, 1410, 1500]) {
-        const pose = sampleDieMotion(plan, time)
-        const rotation = new Quaternion(...pose.quaternion)
-        const translation = new Vector3(...pose.position)
-        let lowest = Infinity
-        let largestScreenCoordinate = 0
-        for (let i = 0; i < positions.count; i++) {
-          point.fromBufferAttribute(positions, i).applyQuaternion(rotation).add(translation)
-          lowest = Math.min(lowest, point.y)
-          point.project(camera)
-          largestScreenCoordinate = Math.max(largestScreenCoordinate, Math.abs(point.x), Math.abs(point.y))
+      for (const [width, height, minimumBody] of [[108, 124, 50], [88, 96, 38], [62, 78, 28], [76, 72, 28]]) for (const reduced of [false, true]) {
+        const plan = createDieMotion(face, keys[face % keys.length], reduced)
+        const frame = frameDieThrow(plan, width / height)
+        const camera = new OrthographicCamera(-frame.width / 2, frame.width / 2, frame.height / 2, -frame.height / 2, .1, 24)
+        camera.position.copy(frame.position)
+        camera.lookAt(frame.target)
+        camera.updateProjectionMatrix()
+        camera.updateMatrixWorld()
+        for (let sample = 0; sample <= 120; sample++) {
+          const pose = sampleDieMotion(plan, sample * plan.timing.motionMs / 120)
+          const rotation = new Quaternion(...pose.quaternion)
+          const translation = new Vector3(...pose.position)
+          let lowest = Infinity
+          let largestScreenCoordinate = 0
+          let left = Infinity, right = -Infinity
+          for (let i = 0; i < positions.count; i++) {
+            point.fromBufferAttribute(positions, i).applyQuaternion(rotation).add(translation)
+            lowest = Math.min(lowest, point.y)
+            point.project(camera)
+            largestScreenCoordinate = Math.max(largestScreenCoordinate, Math.abs(point.x), Math.abs(point.y))
+            left = Math.min(left, point.x); right = Math.max(right, point.x)
+          }
+          expect(lowest).toBeGreaterThanOrEqual(-1e-6)
+          expect(largestScreenCoordinate).toBeLessThan(1)
+          // The compact dock must preserve a legible physical die, rather than
+          // retaining the old oversized stage around a tiny shrunken cube.
+          if (sample === 120) expect((right - left) * width / 2).toBeGreaterThan(minimumBody)
         }
-        expect(lowest).toBeGreaterThanOrEqual(-1e-6)
-        expect(largestScreenCoordinate).toBeLessThan(1)
       }
     } finally { geometry.dispose() }
   })

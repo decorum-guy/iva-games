@@ -8,8 +8,8 @@ import {
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js'
 import type { DieFace } from '../core/types'
 import {
-  createDieMotion, DIE_CAMERA_POSITION, DIE_CAMERA_TARGET, DIE_EDGE_RADIUS, DIE_FACE_NORMALS,
-  DIE_PIPS, getDiePresentationClock, sampleDieMotion,
+  createDieMotion, DIE_CAMERA_POSITION, DIE_EDGE_RADIUS, DIE_FACE_NORMALS,
+  DIE_PIPS, frameDieThrow, getDiePresentationClock, sampleDieMotion,
 } from './diceMotion'
 import type { DieMotionPlan } from './diceMotion'
 import './dieThrow.css'
@@ -53,18 +53,19 @@ function shadowTexture() {
   return new CanvasTexture(canvas)
 }
 
-function ThrowCamera() {
+function ThrowCamera({ plan }: { plan: DieMotionPlan }) {
   const camera = useThree(state => state.camera) as OrthographicCamera
   const size = useThree(state => state.size)
   const invalidate = useThree(state => state.invalidate)
   useLayoutEffect(() => {
-    camera.zoom = Math.min(size.width, size.height) / 4
-    camera.position.set(...DIE_CAMERA_POSITION)
-    camera.lookAt(...DIE_CAMERA_TARGET)
+    const frame = frameDieThrow(plan, size.width / size.height)
+    camera.zoom = size.height / frame.height
+    camera.position.copy(frame.position)
+    camera.lookAt(frame.target)
     camera.updateProjectionMatrix()
     camera.updateMatrixWorld()
     invalidate()
-  }, [camera, size.width, size.height, invalidate])
+  }, [camera, size.width, size.height, plan, invalidate])
   return null
 }
 
@@ -161,7 +162,7 @@ function DieThrowRun({ face, rollKey, reduced, quality, startedAt: suppliedStart
         camera={{ near: .1, far: 24, position: [...DIE_CAMERA_POSITION] }}
         gl={{ alpha: true, antialias: true, powerPreference: 'low-power' }}
         shadows={low ? false : 'percentage'} onCreated={({ gl }) => { gl.toneMappingExposure = .96 }}>
-        <ThrowCamera />
+        <ThrowCamera plan={plan} />
         <ContextGuard onFailure={() => setFailed(true)} />
         <hemisphereLight color="#fff3de" groundColor="#53667f" intensity={.80} />
         <directionalLight color="#fff2d9" intensity={2.2} position={[-3.2, 5.5, 4.5]} castShadow={!low}

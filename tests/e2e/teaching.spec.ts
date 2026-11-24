@@ -124,8 +124,9 @@ test.describe('the actual 3D reaction starts its explanation', () => {
       await expect(scene(page)).toHaveAttribute('data-camera-focus', 'c4')
       const boardBounds = (await stage(page).boundingBox())!
       const dieBounds = (await page.getByTestId('dice-reveal').boundingBox())!
-      expect(dieBounds.x).toBeGreaterThan(boardBounds.x + boardBounds.width * .6)
-      expect(dieBounds.y + dieBounds.height).toBeLessThan(boardBounds.y + boardBounds.height * .25)
+      expect(dieBounds.x).toBeGreaterThanOrEqual(boardBounds.x + boardBounds.width)
+      await expect(page.getByTestId('dice-dock')).toBeInViewport({ ratio: 1 })
+      await expect(stage(page).getByTestId('dice-reveal')).toHaveCount(0)
       await expect(page.getByTestId('lesson-next')).toBeDisabled()
       await page.clock.runFor(timing.holdMs + 5000)
       await ready(page)

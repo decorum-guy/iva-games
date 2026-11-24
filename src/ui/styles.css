@@ -247,13 +247,6 @@ h1, h2, h3, p { margin: 0; }
 .bonus-action .button { justify-self: start; }
 .bonus-action p, .field-note { font-size: .8rem; color: var(--quiet); line-height: 1.48; }
 .turn-panel > .button { margin-top: 8px; }
-.roll-card {
-  padding: 10px 13px; display: flex; align-items: center; gap: 14px; min-height: 76px;
-  background: linear-gradient(105deg, #2a2621, #1d2023 67%);
-}
-.roll-card > div:last-child { display: grid; gap: 2px; }
-.die-label, .roll-card small { color: var(--quiet); font-size: .73rem; }
-.die-result { font-weight: 800; font-size: .97rem; }
 .lesson-panel { padding: 14px; border-inline-start: 2px solid #a58b5c; }
 .lesson-meta { display: flex; justify-content: space-between; align-items: center; gap: 5px; color: var(--bronze); font-size: .73rem; font-weight: 760; }
 .lesson-track { display: flex; align-items: center; gap: 3px; }
@@ -429,9 +422,6 @@ input[type="checkbox"] { width: 20px; height: 20px; accent-color: var(--bronze);
   .lesson-target { font-size: .74rem; padding-top: 4px; }
   .lesson-tools { margin-block: 0 -6px; }
   .lesson-tools .text-button { min-height: 34px; }
-  .roll-card { padding: 5px 10px; min-height: 66px; }
-  .roll-card small, .die-label { font-size: .67rem; }
-  .die-result { font-size: .84rem; }
   .bonus-action { gap: 4px; padding-top: 5px; }
   .bonus-action p { font-size: .68rem; }
   .secondary-panel { gap: 6px; }
@@ -486,11 +476,20 @@ html.in-match, .in-match body { height: 100%; overflow: hidden; overscroll-behav
 .decision-row { display: flex; align-items: stretch; gap: 7px; min-width: 0; }
 .decision-row:empty { display: none; }
 .decision-row .turn-panel, .decision-row .result { flex: 1; min-width: 0; }
-.decision-row .roll-card { flex: 0 1 142px; gap: 6px; min-height: 58px; padding: 5px 7px; }
-.decision-row .roll-card .die-label { display: none; }
-.decision-row .roll-card .die-result { font-size: .77rem; }
-.decision-row .roll-card small { font-size: .64rem; }
-.decision-row .roll-card > div:first-child { flex-shrink: 0; }
+.decision-row .roll-dock { flex: 0 0 var(--dock-width); align-self: flex-start; }
+/* Keep the turn heading full-width. Bonus controls share the next row with the
+   die, so a compact dock cannot squeeze the status or its primary action. */
+.view-game .decision-row {
+  --dock-width: 204px;
+  display: grid; grid-template-columns: minmax(0, 1fr) var(--dock-width);
+  align-items: start; background: var(--panel); border: 1px solid var(--line); border-radius: 7px; padding: 8px;
+}
+.view-game .decision-row .turn-panel { display: contents; }
+.view-game .decision-row .turn-heading, .view-game .decision-row > .result,
+.view-game .decision-row .recovery-actions, .view-game .decision-row .finale-controls { grid-column: 1 / -1; }
+.view-game .decision-row .roll-dock { grid-column: 2; grid-row: 2; }
+.view-game .decision-row .bonus-action { grid-column: 1; grid-row: 2; }
+.view-game .decision-row .turn-panel > .button { grid-column: 1; grid-row: 2; }
 .view-learn .decision-row .turn-panel:not(:has(.bonus-action)):not(:has(.recovery-actions)) { padding-block: 8px; }
 .view-learn:not([data-tutorial-mode="script"]) .turn-panel:not(:has(.bonus-action)) { display: none; }
 .view-learn .decision-row:has(> .turn-panel:only-child:not(:has(.bonus-action))) { display: none; }
@@ -578,45 +577,41 @@ html.in-match, .in-match body { height: 100%; overflow: hidden; overscroll-behav
   }
   .flat-counter { bottom: auto; top: 50%; left: auto; right: calc((100cqw - 100cqh) / 4); transform: translate(50%, -50%); }
 }
+/* The same reserved slot hosts the live throw and its settled result. It is
+   always outside the board, including while the tutorial holds an explanation. */
+.roll-dock {
+  --dock-width: 204px; --dock-height: 136px; --die-width: 108px; --die-height: 124px;
+  width: var(--dock-width); height: var(--dock-height); min-width: 0; flex-shrink: 0;
+  position: relative;
+}
+.roll-dock[data-empty="true"] { visibility: hidden; }
+.roll-dock[data-empty="true"][data-reserved="false"] { display: none; }
+.roll-dock .roll-card {
+  height: 100%; padding: 4px; overflow: hidden;
+  background: radial-gradient(ellipse at 30% 65%, #343b42, #191f26 78%);
+  border-color: #665b48; box-shadow: inset 0 1px 0 #f2d5a51a;
+}
+.roll-dock[data-active="true"] .roll-card { border-color: #b99a67; }
 .dice-reveal {
-  --die-view-size: min(230px, calc(100cqh - 85px));
-  position: absolute; z-index: 12; left: 50%; top: 50%; transform: translate(-50%, -50%);
-  width: min(88%, 288px); display: grid; justify-items: center; gap: 0;
-  padding: 11px 16px 14px; pointer-events: none; color: #f2e9d8;
-  border: 1px solid #827258; border-radius: 14px;
-  background: radial-gradient(ellipse at 50% 60%, #343b42f2, #151b22fa 78%);
-  box-shadow: 0 16px 45px #04070b9e, inset 0 1px 0 #f2d5a526;
+  width: 100%; height: 100%; display: grid; column-gap: 4px;
+  grid-template-columns: var(--die-width) minmax(0, 1fr); grid-template-rows: 1fr 1fr;
+  align-content: center; pointer-events: none; color: #f2e9d8;
 }
-.dice-reveal :is(.remorse-die-throw, .dice-loading-face) { width: var(--die-view-size); }
-.dice-loading-face { aspect-ratio: 1.08; display: grid; place-items: center; }
-.dice-loading-face > .remorse-die { transform: scale(1.8); }
-.dice-loading-body { width: 58px; height: 58px; border-radius: 10px; background: #d6c8ad; border: 3px solid #eee0c5; box-shadow: inset -8px -8px 0 #9a8c7755, 0 12px 12px #0006; transform: rotate(-12deg); }
-.dice-actor { color: #c2b69e; font-size: .74rem; font-weight: 700; }
-.dice-caption { text-align: center; font-size: .99rem; min-height: 24px; }
-.dice-reveal[data-phase="settled"] { border-color: #dfbd83; }
-/* Move the settled die clear of the figure as the teaching camera approaches. */
-.dice-reveal[data-focus-dock] {
-  --dock-slot: 54px;
-  inset: 8px 8px auto auto; transform: none; width: min(49%, 160px);
-  grid-template-columns: var(--dock-slot) minmax(0, 1fr); grid-template-rows: 1fr 1fr;
-  min-height: 60px;
-  justify-items: start; column-gap: 6px; padding: 4px 7px; border-radius: 8px;
+.dice-stage {
+  grid-column: 1; grid-row: 1 / 3; width: var(--die-width); height: var(--die-height); align-self: center;
 }
-.dice-reveal[data-focus-dock="left"] { right: auto; left: 8px; }
-/* Scale the live canvas as a layer so the renderer keeps its settled frame. */
-.dice-reveal[data-focus-dock] :is(.remorse-die-throw, .dice-loading-face) {
-  position: absolute; top: 50%; left: calc(7px + var(--dock-slot) / 2); max-width: none;
-  transform: translate(-50%, -50%) scale(.29);
+.dice-stage :is(.remorse-die-throw, .dice-loading-face) { width: 100%; height: 100%; aspect-ratio: auto; }
+.dice-loading-face { display: grid; place-items: center; }
+.dice-loading-face > .remorse-die { transform: scale(1.12); }
+.dice-loading-body {
+  width: 32px; height: 32px; border-radius: 7px; background: #d6c8ad; border: 2px solid #eee0c5;
+  box-shadow: inset -5px -5px 0 #9a8c7755, 0 7px 8px #0006; transform: rotate(-12deg);
 }
-@container (max-height: 315px) {
-  .dice-reveal[data-focus-dock] :is(.remorse-die-throw, .dice-loading-face) {
-    transform: translate(-50%, -50%) scale(.40);
-  }
-}
-.dice-reveal[data-focus-dock] .dice-actor { grid-column: 2; grid-row: 1; align-self: end; font-size: .65rem; }
-.dice-reveal[data-focus-dock] .dice-caption {
-  grid-column: 2; grid-row: 2; min-height: 0; font-size: .76rem; text-align: start; line-height: 1.25;
-}
+.dice-actor { grid-column: 2; grid-row: 1; align-self: end; color: #c2b69e; font-size: .65rem; font-weight: 700; line-height: 1.3; }
+.dice-caption { grid-column: 2; grid-row: 2; align-self: start; padding-top: 4px; font-size: .74rem; line-height: 1.3; }
+.lesson-heading .roll-dock { width: 100%; margin-block: 6px 8px; }
+.lesson-heading .dice-caption { font-size: .88rem; }
+.lesson-heading .dice-actor { font-size: .72rem; }
 .cell.light { background: #a9b5bc; color: #283b48; }
 .cell .piece-icon.white { fill: #f3ead6; stroke: #34424a; stroke-width: .9; }
 .cell.mark-lesson::before { background: #315d776b; box-shadow: inset 0 0 0 2px #102633, inset 0 0 0 4px #f5d58b; }
@@ -647,7 +642,8 @@ html.in-match, .in-match body { height: 100%; overflow: hidden; overscroll-behav
   .decision-row { gap: 5px; }
   .decision-row .turn-panel { padding: 6px 9px; }
   .decision-row .turn-heading { font-size: .77rem; }
-  .decision-row .roll-card { flex-basis: 154px; min-height: 47px; padding: 3px 7px; }
+  .view-game .decision-row { --dock-width: 178px; padding: 6px; }
+  .roll-dock { --dock-width: 178px; --dock-height: 108px; --die-width: 88px; --die-height: 96px; }
   .view-learn .lesson-panel { padding: 8px 10px 5px; }
   .lesson-panel h2 { font-size: 1.48rem; margin-block: 4px; }
   .lesson-action-label { font-size: .73rem; margin-bottom: 5px; }
@@ -669,6 +665,7 @@ html.in-match, .in-match body { height: 100%; overflow: hidden; overscroll-behav
 @media (max-width: 740px) and (orientation: portrait) {
   /* Space for the turn, roll and inspector keeps the board still between taps. */
   .in-match .view-game { grid-template-rows: minmax(0, 1fr) min(320px, 46dvh); }
+  .in-match .view-learn { grid-template-rows: minmax(0, 1fr) min(360px, 46dvh); }
 }
 
 @media (max-height: 535px) and (orientation: landscape) {
@@ -688,13 +685,35 @@ html.in-match, .in-match body { height: 100%; overflow: hidden; overscroll-behav
   .in-match .lesson-panel p { font-size: .77rem; }
   .in-match .lesson-target { margin-top: 5px; }
   .in-match .lesson-tools .text-button { min-height: 30px; }
-  .view-game .decision-row:has(.bonus-action) .roll-card {
-    flex: 0 0 clamp(63px, 9vw, 95px); align-self: flex-start; flex-direction: column; gap: 3px; text-align: center;
+  .roll-dock { --dock-width: 148px; --dock-height: 88px; --die-width: 62px; --die-height: 78px; }
+  .view-game .decision-row { --dock-width: 148px; padding: 5px; }
+  .dice-actor { font-size: .62rem; }
+  .dice-caption { font-size: .68rem; padding-top: 3px; }
+  /* A full-width title stays readable; the compact die sits beside the lesson
+     paragraph instead of consuming an extra tall row on a short screen. */
+  .lesson-heading { display: contents; }
+  .lesson-heading .roll-dock {
+    float: right; width: 90px; height: 116px; margin: 3px 0 5px 9px;
+    --die-width: 76px; --die-height: 72px;
   }
+  .lesson-heading .dice-reveal { grid-template-columns: 1fr; grid-template-rows: 12px 72px minmax(0, 1fr); gap: 0; justify-items: center; }
+  .lesson-heading .dice-actor { grid-column: 1; grid-row: 1; align-self: center; font-size: .61rem; white-space: nowrap; }
+  .lesson-heading .dice-stage { grid-column: 1; grid-row: 2; }
+  .lesson-heading .dice-caption { grid-column: 1; grid-row: 3; align-self: center; padding: 0; text-align: center; font-size: .65rem; line-height: 1.1; }
+  .lesson-panel > .button.primary, .lesson-tools, .lesson-target, .lesson-dice-legend, .lesson-actions { clear: both; }
+  .lesson-panel > .button.primary { display: flex; }
+  .in-match .lesson-panel > .button.primary { min-height: 40px; margin-top: 7px; }
+  .in-match .lesson-tools .text-button { min-height: 28px; }
   .view-game .turn-panel:has(.bonus-action) { padding: 5px 7px; }
   .view-game .bonus-action { padding-top: 4px; gap: 4px; }
   .view-game .bonus-action .button { min-height: 36px; }
   .view-game .bonus-action p { font-size: .75rem; line-height: 1.25; }
+}
+
+@media (max-width: 650px) and (max-height: 375px) and (orientation: landscape) {
+  /* Here board size is already limited by height. Give long bonus labels and
+     explanations enough width instead of clipping them beside the dock. */
+  .in-match .playfield { grid-template-columns: minmax(0, 1fr) minmax(280px, 53%); }
 }
 
 

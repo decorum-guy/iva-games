@@ -1,4 +1,4 @@
-import { Component, useEffect, useState } from 'react';
+import { Component, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import type { Command, GameEvent, GameState, Piece } from '../core';
 import { countText, numberText } from '../i18n/catalog';
@@ -68,58 +68,63 @@ export function Inspector({ t, locale, piece, state, compact = false }: {
   </div>;
 }
 
-export function RollCard({ t, session, rollId, pending }: {
-  t: Translate; session: GameSession; rollId: string; pending: boolean;
+/** One reserved information slot; a live throw never covers or resizes the board. */
+export function RollDock({ t, session, rollId, reduced, low, pending, active, startedAt, reserve = true }: {
+  t: Translate; session: GameSession; rollId: string | null; reduced: boolean; low: boolean;
+  pending: boolean; active: boolean; startedAt?: number; reserve?: boolean;
 }) {
+  const dock = useRef<HTMLDivElement>(null);
+  const [Renderer, setRenderer] = useState(() => preparedDie);
+  useEffect(() => {
+    if (Renderer || !active) return;
+    let mounted = true;
+    void prepareDieRenderer().then(renderer => {
+      if (mounted && renderer) setRenderer(() => renderer);
+    });
+    return () => { mounted = false; };
+  }, [Renderer, active]);
+  useLayoutEffect(() => {
+    if (!active) return;
+    const node = dock.current;
+    const aside = node?.closest<HTMLElement>('.game-aside');
+    if (!node || !aside) return;
+    // An open history can leave this pane scrolled down. Reveal only the new
+    // throw inside its own pane; never scroll the document or replay a camera.
+    const bounds = node.getBoundingClientRect(), viewport = aside.getBoundingClientRect();
+    if (bounds.top < viewport.top + 3) aside.scrollTop += bounds.top - viewport.top - 3;
+    else if (bounds.bottom > viewport.bottom - 3) aside.scrollTop += bounds.bottom - viewport.bottom + 3;
+  }, [active, rollId]);
   const action = session.record.actions[session.record.cursor - 1];
-  if (!action || action.id !== rollId || !action.roll) return null;
-  const reaction = session.current.events.find((event): event is Extract<GameEvent, { type: 'reaction' }> => event.type === 'reaction' && event.face !== undefined);
-  return <div className="roll-card" data-testid="roll" data-face={action.roll.face} data-fixed={action.roll.fixed}>
-    {!pending && <ReactionDie face={action.roll.face} rollKey={`${session.record.id}/${rollId}`} reducedMotion
-      label={t('die.face', { face: action.roll.face })} />}
-    <div>
-      <span className="die-label">{t('die.label')}</span>
-      <strong className="die-result">{t(pending ? 'die.rolling' : !reaction || reaction.affliction === 'neutral' ? 'state.unaffected' : `state.${reaction.affliction}`)}</strong>
-      {!pending && <span className="sr-only" role="status">{t('die.face', { face: action.roll.face })}</span>}
+  const roll = action?.id === rollId ? action.roll : undefined;
+  if (!roll) return <div ref={dock} className="roll-dock" data-testid="dice-dock" data-empty="true" data-reserved={reserve} aria-hidden="true" />;
+  const reaction = session.current.events.find((event): event is Extract<GameEvent, { type: 'reaction' }> =>
+    event.type === 'reaction' && event.face !== undefined);
+  const result = t(!reaction || reaction.affliction === 'neutral' ? 'state.unaffected' : `state.${reaction.affliction}`);
+  const key = `${session.record.id}/${rollId}`;
+  const placeholder = <div className="dice-loading-face" aria-hidden="true">
+    {pending ? <span className="dice-loading-body" /> : <ReactionDie face={roll.face} rollKey={key} reducedMotion />}
+  </div>;
+  return <div ref={dock} className="roll-dock" data-testid="dice-dock" data-empty="false" data-active={active}>
+    <div className="roll-card" data-testid="roll" data-face={roll.face} data-fixed={roll.fixed}>
+      <div className="dice-reveal" data-testid={active ? 'dice-reveal' : undefined} data-actor={action.actor}
+        data-phase={pending ? 'throwing' : 'settled'}>
+        <span className="dice-actor">{t('die.actor', { side: t(`side.${action.actor}`) })}</span>
+        <div className="dice-stage">
+          {startedAt !== undefined && Renderer ? <DieLoadBoundary fallback={placeholder}>
+            <Renderer face={roll.face} rollKey={key} reduced={reduced} quality={low ? 'low' : 'high'} startedAt={startedAt} />
+          </DieLoadBoundary> : placeholder}
+        </div>
+        <strong className="dice-caption" role="status">{pending ? t('die.rolling') : `${roll.face} · ${result}`}</strong>
+      </div>
     </div>
   </div>;
 }
 
-export function RollReveal({ t, session, rollId, reduced, low, pending, startedAt, focusDock }: {
-  t: Translate; session: GameSession; rollId: string; reduced: boolean; low: boolean; pending: boolean; startedAt?: number;
-  focusDock?: 'left' | 'right';
-}) {
-  const [Renderer, setRenderer] = useState(() => preparedDie);
-  useEffect(() => {
-    if (Renderer) return;
-    let active = true;
-    void prepareDieRenderer().then(renderer => {
-      if (active && renderer) setRenderer(() => renderer);
-    });
-    return () => { active = false; };
-  }, [Renderer]);
-  const action = session.record.actions[session.record.cursor - 1];
-  if (!action?.roll || action.id !== rollId) return null;
-  const reaction = session.current.events.find((event): event is Extract<GameEvent, { type: 'reaction' }> =>
-    event.type === 'reaction' && event.face !== undefined);
-  const result = t(!reaction || reaction.affliction === 'neutral' ? 'state.unaffected' : `state.${reaction.affliction}`);
-  const placeholder = <div className="dice-loading-face" aria-hidden="true">
-    {pending ? <span className="dice-loading-body" /> : <ReactionDie face={action.roll.face} rollKey={rollId} reducedMotion />}
-  </div>;
-  return <div className="dice-reveal" data-testid="dice-reveal" data-actor={action.actor}
-    data-phase={pending ? 'throwing' : 'settled'} data-focus-dock={pending ? undefined : focusDock}>
-    <span className="dice-actor">{t('die.actor', { side: t(`side.${action.actor}`) })}</span>
-    {Renderer ? <DieLoadBoundary fallback={placeholder}>
-      <Renderer face={action.roll.face} rollKey={`${session.record.id}/${rollId}`} reduced={reduced} quality={low ? 'low' : 'high'} startedAt={startedAt} />
-    </DieLoadBoundary> : placeholder}
-    <strong className="dice-caption" role="status">{pending ? t('die.rolling') : `${action.roll.face} · ${result}`}</strong>
-  </div>;
-}
-
-export function LessonPanel({ t, locale, learning, guide, blocked, rolling = false, inspected = false, onAdvance, onHandoff, onNew, onRepeat, onRestart, onRestartAll }: {
+export function LessonPanel({ t, locale, learning, guide, blocked, rolling = false, inspected = false, dice, onAdvance, onHandoff, onNew, onRepeat, onRestart, onRestartAll }: {
   t: Translate; locale: Locale; learning: Learning; guide: readonly Command[]; blocked: boolean;
   rolling?: boolean;
   inspected?: boolean;
+  dice: ReactNode;
   onAdvance: () => void; onHandoff: () => void; onNew: () => void; onRepeat: () => void; onRestart: () => void;
   onRestartAll: () => void;
 }) {
@@ -153,7 +158,10 @@ export function LessonPanel({ t, locale, learning, guide, blocked, rolling = fal
         {LESSONS.map((item, index) => <i key={item.id} className={index <= learning.lesson ? 'reached' : ''} />)}
       </div>
     </div>
-    <h2>{complete ? t('tutorial.finish') : resultVisible ? beat!.title[locale] : feedback ? t('tutorial.choiceResult') : lesson.title[locale]}</h2>
+    <div className="lesson-heading">
+      <h2>{complete ? t('tutorial.finish') : resultVisible ? beat!.title[locale] : feedback ? t('tutorial.choiceResult') : lesson.title[locale]}</h2>
+      {dice}
+    </div>
     {!complete && !resultVisible && !feedback && <div className="lesson-action-label" role="status"><Icon name={read || inspected || !step ? 'check' : step.kind === 'inspect' ? 'info' : 'arrow'} />{t(rolling ? 'die.watch' : inspected ? 'tutorial.readCue' : actionTitle)}</div>}
     <p className="lesson-instruction" data-testid={resultVisible ? 'teaching-cause' : inspected ? 'counter-read' : feedback ? 'choice-feedback' : undefined}
       data-feedback={feedback?.kind} role={resultVisible ? 'status' : undefined}>{rolling ? t('die.rolling')

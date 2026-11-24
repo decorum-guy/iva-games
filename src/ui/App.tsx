@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
-import { canClaimRepetition, createInitialState, fileOf, isInCheck, opposite, pieceAt } from '../core';
+import { canClaimRepetition, createInitialState, isInCheck, opposite, pieceAt } from '../core';
 import type { Command, GameEvent, Move, Promotion, Side, Square } from '../core';
 import { translator } from '../i18n/catalog';
 import { Cabinet } from '../session/cabinet';
@@ -15,7 +15,7 @@ import {
 import type { Settings } from './Dialogs';
 import { PlayerRow } from './Hud';
 import { Icon, Seal } from './icons';
-import { History, Inspector, LessonPanel, PanelNotice, prepareDieRenderer, Result, RollCard, RollReveal } from './PlayPanel';
+import { History, Inspector, LessonPanel, PanelNotice, prepareDieRenderer, Result, RollDock } from './PlayPanel';
 import { materialBalance } from './projections';
 import { maskRollResult, rollSceneEvents } from './rollPresentation';
 
@@ -127,7 +127,6 @@ export function App() {
     // No historical-event scan: finishing an exercise must not replay its effect.
     return { ...target, key: `${snap.motionKey}/${lesson.lesson}/${lesson.position}/${identity}` };
   }, [lesson, beat, step, position.pieces, rollPending, snap.teachingReturning, snap.motionKey]);
-  const rollDock = tutorialFocus && ((fileOf(tutorialFocus.square) >= 4) !== reversed ? 'left' : 'right');
   const teachingHud = !rollPending ? beat?.hud ?? step?.hud : undefined;
   const activePromotion = promotion?.key === snap.motionKey ? promotion.move : null;
   const allowedPromotions = activePromotion && lesson ? guidance.flatMap(command =>
@@ -362,10 +361,7 @@ export function App() {
           royal={royal ?? undefined}
           motionKey={`${snap.motionKey}/${reviewing ?? 'live'}`} onSquare={useSquare}
           onDragSquare={(from, to) => enter({ type: 'move', from, to })} onFailure={onFailure}
-          onClear={() => setSelection(null)}
-          overlay={showRoll && snap.animating && snap.rollPhase !== 'idle' && <RollReveal t={t} session={session} rollId={snap.rollId!}
-            reduced={snap.rollReduced} low={low} pending={snap.rollPhase === 'throwing'}
-            startedAt={snap.rollStartedAt ?? undefined} focusDock={rollDock} />} />
+          onClear={() => setSelection(null)} />
         <PlayerRow t={t} locale={settings.locale} side={nearSide} config={config} active={active && actor === nearSide}
           teachingFocus={nearSide === teachingHudSide ? teachingHud : undefined}
           captures={captures} advantage={nearSide === 'white' ? balance : -balance} rating={snap.profile.rating}
@@ -444,10 +440,18 @@ export function App() {
                 {mode === 'rated' && <button type="button" className="text-button" onClick={() => setModal({ kind: 'technical' })}>{t('settings.abort')}</button>}
               </div>}
             </div>}
-            {!!showRoll && !lesson && <RollCard t={t} session={session} rollId={snap.rollId!} pending={snap.rollPhase === 'throwing'} />}
+            {!lesson && <RollDock t={t} session={session} rollId={showRoll ? snap.rollId : null}
+              reduced={snap.rollReduced} low={low} pending={rollPending}
+              active={Boolean(showRoll && snap.animating && snap.rollPhase !== 'idle')}
+              startedAt={snap.rollStartedAt ?? undefined} />}
           </div>
           {lesson && <LessonPanel t={t} locale={settings.locale} learning={lesson} guide={guidance} blocked={!snap.ready || Boolean(snap.storageProblem) || snap.busy || snap.animating || snap.teachingReturning}
             rolling={snap.rollPhase === 'throwing'}
+            dice={<RollDock t={t} session={session} rollId={showRoll && !beat?.diceLegend && !lesson.complete ? snap.rollId : null}
+              reduced={snap.rollReduced} low={low} pending={rollPending}
+              active={Boolean(showRoll && snap.animating && snap.rollPhase !== 'idle')}
+              reserve={Boolean(step && 'roll' in step && step.roll)}
+              startedAt={snap.rollStartedAt ?? undefined} />}
             inspected={inspected}
             onAdvance={() => { if (!beat && step?.kind === 'inspect') void cabinet.inspect(step.square); else void cabinet.advance(); }}
             onHandoff={() => void cabinet.handoff()} onNew={() => openSetup()}
