@@ -4,7 +4,7 @@
 
 Build a finished, beautiful, playable web game on the owner's Mac: Remorse Chess versus a real variant-aware AI with ten difficulty levels, local Elo progression, local two-player play, and a mandatory interactive tutorial. Laptop and phone interfaces and complete Russian/English localization are required. The owner has delegated routine implementation decisions and does not want questions during the build.
 
-The preparation package and implementation are both present. Read `docs/BUILD_STATUS.md` for the current verification state; do not describe planned or unverified work as accepted.
+The preparation package and implementation are both present. Read `docs/BUILD_STATUS.md` for the current verification state; do not describe planned or unverified work as accepted. The latest personal playthrough is `docs/VALIDATION_ROOT_PLAYTHROUGH.md`; the current Mac activation task is `prompts/ACTIVATE_STORAGE_RECOVERY_BUILD.md`.
 
 ## Read before implementation
 
