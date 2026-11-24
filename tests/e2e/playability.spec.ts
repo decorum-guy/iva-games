@@ -667,10 +667,14 @@ test('a real worker capture shows and sounds its own committed die', async ({ pa
   ] })
   const game = createMatch({ mode: 'practice', level: 10, human: 'white', provenance: 'standard' }, { root, seed })
   await persist(page, 'matches', game.record, 'home')
-  // The settled overlay has a short hold. Sample it at the DOM mutation rather
-  // than relying on the polling interval hitting its 350ms window under load.
+  // Observe both transient phases in the page. Remote polling can miss them
+  // while the first WebGL die is drawing and video is being captured.
   await page.evaluate(() => {
     const record = new MutationObserver(() => {
+      const throwing = document.querySelector<HTMLCanvasElement>(
+        '[data-testid="dice-reveal"][data-actor="black"][data-phase="throwing"] canvas',
+      )
+      if (throwing && throwing.getBoundingClientRect().width > 0) document.documentElement.dataset.qaDieThrow = 'black'
       const result = document.querySelector('[data-testid="dice-reveal"][data-phase="settled"] .dice-caption')
       const caption = result?.textContent?.trim()
       if (caption === '4') document.documentElement.dataset.qaDieFace = caption
@@ -682,10 +686,7 @@ test('a real worker capture shows and sounds its own committed die', async ({ pa
     record.observe(document.body, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ['data-phase'] })
   })
   await page.getByTestId('home-resume').click()
-  const reveal = page.getByTestId('dice-reveal')
-  await expect(reveal).toHaveAttribute('data-actor', 'black')
-  await expect(reveal).toHaveAttribute('data-phase', 'throwing')
-  await expect(page.getByTestId('die-throw').locator('canvas')).toBeVisible()
+  await expect(page.locator('html')).toHaveAttribute('data-qa-die-throw', 'black')
   await expect(page.locator('html')).toHaveAttribute('data-qa-die-face', '4')
   await expect(page.locator('html')).toHaveAttribute('data-qa-die-result', '4 · Unaffected')
   const saved = await recorded<MatchRecord>(page, 'matches', game.record.id)
@@ -694,7 +695,7 @@ test('a real worker capture shows and sounds its own committed die', async ({ pa
   await ready(page)
   const probe = await nativeAudio(page)
   expect(probe.starts).toHaveLength(7)
-  expect(probe.starts[1]).toMatchObject(dieWindows[0])
+  expect(probe.starts.toSorted((a, b) => a.when - b.when)[1]).toMatchObject(dieWindows[0])
   const peak = Math.max(...probe.signal.map(frame => frame.peak))
   expect(peak).toBeGreaterThan(.012)
   expect(peak).toBeLessThan(.9)
