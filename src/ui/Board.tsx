@@ -27,12 +27,15 @@ export interface BoardProps {
   readonly flipped: boolean;
   readonly flat: boolean;
   readonly reducedMotion: boolean;
+  readonly followSystemMotion?: boolean;
   readonly camera: 'studio' | 'tactical' | 'top';
   readonly low: boolean;
   readonly motionKey: string;
+  readonly cameraResetKey?: string;
   readonly onSquare: (square: Square) => void;
   readonly onDragSquare: (from: Square, to: Square) => void;
   readonly onFailure: () => void;
+  readonly onReady?: () => void;
   readonly onClear: () => void;
   readonly canMove: boolean;
   readonly overlay?: ReactNode;
@@ -157,7 +160,8 @@ export function Board(props: BoardProps) {
     </div> : <SceneLoaderBoundary onFailure={props.onFailure}><Suspense fallback={<div className="scene-loading" role="status">{t('settings.loadingScene')}</div>}>
       <BoardScene pieces={scenePieces} marks={activeMarks} events={props.events} flipped={flipped}
         camera={props.camera} quality={props.low ? 'low' : 'high'} reducedMotion={props.reducedMotion}
-        motionKey={props.motionKey} loadingLabel={t('settings.loadingScene')} onFailure={props.onFailure}
+        followSystemMotion={props.followSystemMotion} onReady={props.onReady}
+        motionKey={props.motionKey} cameraResetKey={props.cameraResetKey} loadingLabel={t('settings.loadingScene')} onFailure={props.onFailure}
         focus={props.focus} royal={props.royal} promotion={props.promotion}
         onSquare={square => { setFocus(square); onSquare(square); }} onDragSquare={props.canMove ? props.onDragSquare : undefined} />
     </Suspense></SceneLoaderBoundary>}

@@ -35,7 +35,9 @@ export interface BoardSceneProps {
   camera?: 'studio' | 'tactical' | 'top'
   quality?: 'high' | 'low'
   reducedMotion?: boolean
+  followSystemMotion?: boolean
   motionKey?: string
+  cameraResetKey?: string
   /** Explicit teaching focus only. Removing it restores the whole-board camera. */
   focus?: SceneFocus
   royal?: RoyalCue
@@ -43,6 +45,7 @@ export interface BoardSceneProps {
   onSquare: (square: Square) => void
   onDragSquare?: (from: Square, to: Square) => void
   onFailure: () => void
+  onReady?: () => void
   loadingLabel?: string
 }
 

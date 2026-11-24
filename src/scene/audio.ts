@@ -19,14 +19,14 @@ export interface SceneAudioOptions {
   readonly playback?: PromotionPlayback
 }
 
-type CueKind = 'move' | 'capture' | 'mercy' | 'friendlyCapture' | 'dice' | 'unaffected'
+export type CueKind = 'move' | 'capture' | 'mercy' | 'friendlyCapture' | 'dice' | 'unaffected'
   | 'guilt' | 'devastated' | 'berserk' | 'bloodlust' | 'heal' | 'convert' | 'remove'
   | 'promotionFormation' | 'promotionRookApproach' | 'promotionRookImpact'
   | 'promotionQueenApproach' | 'promotionQueenImpact' | 'promotionQueenFracture' | 'promotionQueenArc'
   | 'bonus' | 'check' | 'turn' | 'win' | 'loss' | 'draw' | 'finish' | RoyalSound
 type RoyalSound = 'royalCheck' | 'royalCharge' | 'royalBreak' | 'royalWin' | 'royalLoss' | 'royalEnd'
 
-interface SceneCue {
+export interface SceneCue {
   readonly kind: CueKind
   readonly at: number
 }
@@ -279,7 +279,7 @@ export function muteAudio() {
   stopSceneAudio()
 }
 
-function buildGraph(audio: AudioContext): AudioGraph {
+function buildGraph(audio: AudioContext, decodedBank?: AudioBuffer): AudioGraph {
   const input = audio.createGain()
   const master = audio.createGain()
   const compressor = audio.createDynamicsCompressor()
@@ -292,33 +292,33 @@ function buildGraph(audio: AudioContext): AudioGraph {
   input.connect(compressor).connect(master).connect(audio.destination)
 
   const result: AudioGraph = { audio, input, master }
-  if (typeof audio.decodeAudioData === 'function') {
-    void prepareSceneAudio().then(async bytes => {
-      if (!bytes || audio.state === 'closed') return
-      const samples = await audio.decodeAudioData(bytes.slice(0))
-      result.samples = samples
-      const resonance = sampleWindow('resonance')
-      const begin = Math.round(resonance.offset * samples.sampleRate)
-      const length = Math.round(resonance.duration * samples.sampleRate)
-      const charge = audio.createBuffer(1, length, samples.sampleRate)
-      const target = charge.getChannelData(0)
-      const recorded = samples.getChannelData(0)
-      for (let i = 0; i < length; i++) target[i] = recorded[begin + length - 1 - i] * (i / length)
-      result.charge = charge
-    }).catch(() => undefined)
+  function installSamples(samples: AudioBuffer) {
+    result.samples = samples
+    const resonance = sampleWindow('resonance')
+    const begin = Math.round(resonance.offset * samples.sampleRate)
+    const length = Math.round(resonance.duration * samples.sampleRate)
+    const charge = audio.createBuffer(1, length, samples.sampleRate)
+    const target = charge.getChannelData(0)
+    const recorded = samples.getChannelData(0)
+    for (let i = 0; i < length; i++) target[i] = recorded[begin + length - 1 - i] * (i / length)
+    result.charge = charge
   }
+  if (decodedBank) installSamples(decodedBank)
+  else if (typeof audio.decodeAudioData === 'function') void prepareSceneAudio().then(async bytes => {
+    if (bytes && audio.state !== 'closed') installSamples(await audio.decodeAudioData(bytes.slice(0)))
+  }).catch(() => undefined)
   return result
 }
 
 /** Invoke in a real gesture before awaiting storage. */
-export async function unlockAudio(): Promise<boolean> {
+export async function unlockAudio(decodedBank?: AudioBuffer): Promise<boolean> {
   enabled = true
   try {
     if (!graph || graph.audio.state === 'closed') {
       const AudioConstructor = globalThis.AudioContext ??
         (globalThis as typeof globalThis & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
       if (!AudioConstructor) return false
-      graph = buildGraph(new AudioConstructor({ latencyHint: 'interactive' }))
+      graph = buildGraph(new AudioConstructor({ latencyHint: 'interactive' }), decodedBank)
     }
     if (!visibilityListenerInstalled && typeof document !== 'undefined') {
       document.addEventListener('visibilitychange', () => { if (!visible()) stopSceneAudio() })
@@ -420,6 +420,45 @@ function renderCue(g: AudioGraph, kind: CueKind, when: number, reduced: boolean)
   const rate = reduced && (kind === 'move' || kind === 'capture' || kind === 'mercy' || kind === 'friendlyCapture')
     ? sound.rate * 1.42 : sound.rate
   playContact(g, when, rate === sound.rate ? sound : { ...sound, rate })
+}
+
+export interface RecordedClip {
+  readonly buffer: AudioBuffer
+  readonly at: number
+  readonly offset: number
+  readonly duration: number
+  readonly gain: number
+  readonly fadeIn: number
+  readonly fadeOut: number
+}
+
+/** The isolated audition uses the live bank and bus with a shared future visual epoch. */
+export function playAuditionAudio(cues: readonly SceneCue[], clip: RecordedClip | undefined, startedAt: number, reduced: boolean) {
+  const g = graph
+  if (!g?.samples || !enabled || !visible() || g.audio.state !== 'running') return false
+  const time = g.audio.currentTime + (startedAt - nowMs()) / 1000
+  if (time < g.audio.currentTime) return false
+  try {
+    releaseVoices()
+    adjustMaster(desiredGain())
+    for (const cue of cues) renderCue(g, cue.kind, time + cue.at, reduced)
+    if (clip) {
+      const source = g.audio.createBufferSource()
+      source.buffer = clip.buffer
+      const when = time + clip.at
+      const end = when + clip.duration
+      const gain = connectVoice(g, source, 0).gain
+      gain.setValueAtTime(0, when)
+      gain.linearRampToValueAtTime(clip.gain, when + clip.fadeIn)
+      gain.setValueAtTime(clip.gain, end - clip.fadeOut)
+      gain.linearRampToValueAtTime(0, end)
+      source.start(when, clip.offset, clip.duration)
+    }
+    return true
+  } catch {
+    stopSceneAudio()
+    return false
+  }
 }
 
 function scheduleCues(g: AudioGraph, cues: readonly SceneCue[], options: SceneAudioOptions, elapsedMs = 0) {

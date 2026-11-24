@@ -36,6 +36,8 @@ R2 and parts of P2 include **Fantasy SFX Pack Vol 1 by JC Sounds**, licensed und
 
 The separate P1 fracture audition isolates the already existing CC0 stone layers with their original processing and shared scene gain, and removes only verified trailing digital silence. It must not be added again over the complete P1 queen mix.
 
+Local comparison playback adds clip windows, gain and fades, including a 1.54-second R2 chant excerpt. The compare page links each recording to its author and license. [Playback edit and timing](docs/SFX_AUDITION.md#монтаж-для-сравнения)
+
 ## Software
 
 React, React DOM, Three.js, React Three Fiber and Drei are MIT-licensed. `idb` is ISC-licensed. Exact installed versions are pinned in [the lockfile](package-lock.json). The production build generates `dist/THIRD_PARTY_LICENSES.md` from the bundler’s dependency metadata. [The React Three Fiber license](public/assets/licenses/react-three-fiber.txt) is also included because the npm archive lists MIT without a standalone license text.

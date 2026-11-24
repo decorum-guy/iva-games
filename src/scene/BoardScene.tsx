@@ -280,7 +280,7 @@ function MarbleSet({ pieces, marks, events, flipped, low, reduced, focus, royal,
   )
 }
 
-function useReducedMotion(force: boolean) {
+function useReducedMotion(force: boolean, followSystem: boolean) {
   const query = '(prefers-reduced-motion: reduce)'
   const [system, setSystem] = useState(() => window.matchMedia(query).matches)
   useEffect(() => {
@@ -289,7 +289,7 @@ function useReducedMotion(force: boolean) {
     media.addEventListener('change', change)
     return () => media.removeEventListener('change', change)
   }, [])
-  return force || system
+  return force || (followSystem && system)
 }
 
 interface PointerOrigin {
@@ -301,10 +301,10 @@ interface PointerOrigin {
 
 export default function BoardScene({
   pieces, marks = emptyMarks, events = emptyEvents, flipped = false,
-  camera = 'studio', quality, reducedMotion = false, motionKey,
-  focus, royal, promotion, onSquare, onDragSquare, onFailure, loadingLabel,
+  camera = 'studio', quality, reducedMotion = false, followSystemMotion = true, motionKey, cameraResetKey,
+  focus, royal, promotion, onSquare, onDragSquare, onFailure, onReady: onLoaded, loadingLabel,
 }: BoardSceneProps) {
-  const reduced = useReducedMotion(reducedMotion)
+  const reduced = useReducedMotion(reducedMotion, followSystemMotion)
   const pointer = useRef<PointerOrigin>(null)
   const scene = useRef<RootState>(null)
   const [ready, setReady] = useState(false)
@@ -320,6 +320,7 @@ export default function BoardScene({
     ray: new Raycaster(),
   }), [])
   const onReady = useCallback(() => setReady(true), [])
+  useEffect(() => { if (ready) onLoaded?.() }, [ready, onLoaded])
   const onOrbit = useCallback((active: boolean) => {
     board.current?.toggleAttribute('data-camera-orbit', active)
   }, [])
@@ -414,7 +415,7 @@ export default function BoardScene({
           shadows={low ? false : 'percentage'}
           onCreated={state => { scene.current = state; state.gl.toneMappingExposure = .97 }}
         >
-          <Viewpoint flipped={flipped} preset={camera} reduced={reduced} focus={activeFocus} royal={royal} promotion={promotion} onOrbit={onOrbit} />
+          <Viewpoint key={cameraResetKey} flipped={flipped} preset={camera} reduced={reduced} focus={activeFocus} royal={royal} promotion={promotion} onOrbit={onOrbit} />
           <ContextLifecycle onFailure={onFailure} />
           <Lighting low={low} royal={royal} />
           <RoyalEffects cue={royal} low={low} />
