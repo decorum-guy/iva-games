@@ -7,6 +7,8 @@ import { createMatch } from '../../src/session/match'
 import type { MatchRecord } from '../../src/session/match'
 import { nextDie } from '../../src/session/random'
 import { sampleWindow } from '../../src/scene/audioSamples'
+import { actionPlan } from '../../src/scene/actionPresentation'
+import type { ActionPlan } from '../../src/scene/actionPresentation'
 import { learnerAction, saveLearning, scriptAction, startLesson } from '../../src/tutorial/controller'
 import type { Learning } from '../../src/tutorial/controller'
 import { move } from '../../src/tutorial/lessonTypes'
@@ -286,9 +288,14 @@ test('sound starts enabled and remembers both mute and the selected volume', asy
   await expect(volume).toHaveValue('35')
 })
 
-async function committedThrow(page: Page, face: DieFace, actor: Side, affliction: Affliction, teaching = false) {
+async function committedThrow(page: Page, face: DieFace, actor: Side, affliction: Affliction, plan: ActionPlan, target: string, teaching = false) {
   const reveal = page.getByTestId('dice-reveal')
   const die = page.getByTestId('die-throw')
+  const roll = plan.roll!
+  await expect(playfield(page)).toHaveAttribute('data-awaiting-reaction', 'true')
+  await page.clock.runFor(roll.start - 1)
+  await expect(die).toHaveCount(0)
+  await page.clock.runFor(1)
   await expect(playfield(page)).toHaveAttribute('data-dice', 'throwing')
   await expect(playfield(page)).toHaveAttribute('data-animating', 'true')
   await expect(page.locator('[data-renderer="2d"]')).toBeVisible()
@@ -299,19 +306,25 @@ async function committedThrow(page: Page, face: DieFace, actor: Side, affliction
   await expect(reveal.locator('.dice-actor')).toHaveText(translator('en')('die.actor', { side: translator('en')(`side.${actor}`) }))
   await expect(page.locator('body')).not.toContainText(diceExplanations)
 
-  // Exercise the specified 1500 ms throw and 350 ms result hold without racing
-  // wall-clock rendering or sleeping until a fleeting animation happens to end.
-  await page.clock.runFor(1499)
+  // Inspect the committed presentation at each boundary.
+  await page.clock.runFor(roll.settle - roll.start - 1)
   await expect(reveal).toHaveAttribute('data-phase', 'throwing')
   await expect(die).toHaveAttribute('data-phase', 'throwing')
   await page.clock.runFor(1)
   await expect(reveal).toHaveAttribute('data-phase', 'settled')
   await expect(die).toHaveAttribute('data-phase', 'settled')
   const result = translator('en')(affliction === 'neutral' ? 'state.unaffected' : `state.${affliction}`)
+  await expect(reveal.locator('.dice-caption')).toHaveText(String(face))
+  await expect(cell(page, target)).toHaveAccessibleName(new RegExp(translator('en')('state.neutral')))
+  if (teaching) await expect(page.getByTestId('teaching-cause')).toHaveCount(0)
+  await page.clock.runFor(roll.reveal - roll.settle - 1)
+  await expect(reveal.locator('.dice-caption')).toHaveText(String(face))
+  await page.clock.runFor(1)
   await expect(reveal.locator('.dice-caption')).toHaveText(`${face} · ${result}`)
+  await expect(cell(page, target)).toHaveAccessibleName(new RegExp(translator('en')(`state.${affliction}`)))
   if (teaching) await expect(page.getByTestId('teaching-cause')).toBeVisible()
   else await expect(page.getByTestId('roll')).toContainText(result)
-  await page.clock.runFor(349)
+  await page.clock.runFor(plan.end - roll.reveal - 1)
   await expect(reveal).toBeVisible()
   await expect(playfield(page)).toHaveAttribute('data-animating', 'true')
   await page.clock.runFor(1)
@@ -354,6 +367,10 @@ test('the dice dock leaves the board still and clear through a throw, language s
       expect(await page.getByTestId('game-aside').evaluate(element => element.scrollTop)).toBeGreaterThan(0)
     }
     await cell(page, fixture.to).click()
+    await expect(playfield(page)).toHaveAttribute('data-revision', '1')
+    const plan = actionPlan(fixture.after.current.events, true, false, false)
+    const roll = plan.roll!
+    await page.clock.runFor(roll.start)
     const die = page.getByTestId('die-throw')
     await expect(die.locator('canvas')).toBeVisible()
     const canvas = (await die.locator('canvas').elementHandle())!
@@ -371,9 +388,11 @@ test('the dice dock leaves the board still and clear through a throw, language s
     expect(await canvas.evaluate(element => element.isConnected)).toBe(true)
     await expect(page.getByTestId('dice-reveal')).toHaveAttribute('data-phase', 'settled')
     await expect(page.getByTestId('roll')).toHaveAttribute('data-face', '6')
+    await expect(page.locator('.dice-caption')).toHaveText('6')
+    await page.clock.runFor(roll.reveal - roll.settle)
     await expect(page.getByTestId('roll')).toContainText('6 · Berserk')
     expect(await page.locator('.board-stage').boundingBox()).toEqual(before)
-    await page.clock.runFor(350)
+    await page.clock.runFor(plan.end - roll.reveal)
     await ready(page)
     await expect(page.getByTestId('die-throw')).toHaveAttribute('data-phase', 'settled')
     expect(await canvas.evaluate(element => element.isConnected)).toBe(true)
@@ -405,19 +424,24 @@ test('the tutorial dock remains visible with held explanations, primary action a
   for (const [width, height] of [[1512, 715], [390, 844], [844, 390]]) {
     await page.setViewportSize({ width, height })
     for (const lesson of [1, 2]) {
-      await restoreLesson(page, startLesson(lesson))
+      const progress = startLesson(lesson)
+      await restoreLesson(page, progress)
+      const plan = actionPlan(learnerAction(progress, move('c3', 'c4')).progress.session.current.events, true, false, false)
+      const roll = plan.roll!
       const before = await page.locator('.board-stage').boundingBox()
       await cell(page, 'c3').click()
       await cell(page, 'c4').click()
+      await expect(playfield(page)).toHaveAttribute('data-revision', '1')
+      await page.clock.runFor(roll.start)
       await expect(page.getByTestId('dice-reveal')).toHaveAttribute('data-phase', 'throwing')
       await dockIsClearOfBoard(page)
       expect(await page.locator('.board-stage').boundingBox()).toEqual(before)
-      await page.clock.runFor(1500)
+      await page.clock.runFor(roll.reveal - roll.start)
       await expect(page.getByTestId('teaching-cause')).toBeInViewport({ ratio: 1 })
       await expect(page.getByTestId('teaching-rule')).toBeInViewport({ ratio: 1 })
       await dockIsClearOfBoard(page)
       expect(await page.locator('.board-stage').boundingBox()).toEqual(before)
-      await page.clock.runFor(350)
+      await page.clock.runFor(plan.end - roll.reveal)
       await ready(page)
       await visibleAction(page.getByTestId('lesson-next'))
       for (const locale of ['en', 'ru'] as const) {
@@ -451,7 +475,7 @@ test('real captures by either side show the committed 3D die in 2D, without repl
     const saved = await recorded<MatchRecord>(page, 'matches', fixture.before.record.id)
     expect(saved.actions[0]).toMatchObject({ actor: side, command: move(fixture.from, fixture.to), roll: { face, fixed: false } })
     const reaction = fixture.after.state.pieces.find(piece => piece.square === fixture.to)!.affliction
-    await committedThrow(page, saved.actions[0].roll!.face, side, reaction)
+    await committedThrow(page, saved.actions[0].roll!.face, side, reaction, actionPlan(fixture.after.current.events, true, false, false), fixture.to)
 
     await page.reload()
     await expect(playfield(page)).toHaveAttribute('data-game-id', fixture.before.record.id)
@@ -474,7 +498,8 @@ test('real captures by either side show the committed 3D die in 2D, without repl
   await expect(playfield(page)).toHaveAttribute('data-revision', '3')
   const saved = await recorded<ReturnType<typeof saveLearning>>(page, 'learning', 'progress')
   expect(saved.match.actions.at(-1)?.roll).toEqual({ face: 4, fixed: true })
-  await committedThrow(page, saved.match.actions.at(-1)!.roll!.face, 'white', 'neutral', true)
+  const lessonPlan = actionPlan(learnerAction(lesson, move('e4', 'd5')).progress.session.current.events, true, false, false)
+  await committedThrow(page, saved.match.actions.at(-1)!.roll!.face, 'white', 'neutral', lessonPlan, 'd5', true)
   const firstResult = LESSONS[0].positions[0].steps.find(step => step.id === 'capture-and-roll')!.after![0]
   await expect(page.getByTestId('tutorial')).toHaveAttribute('data-beat', firstResult.id)
   await expect(page.getByTestId('tutorial').getByRole('heading', { name: firstResult.title.en, exact: true })).toBeVisible()
@@ -512,7 +537,7 @@ test('the short introduction explains reactions, the die and bishops in both lan
 
 interface AudioProbe {
   context: string
-  starts: { when: number; offset: number; duration: number; state: string }[]
+  starts: { when: number; offset: number; duration: number; state: string; buffer: number }[]
   stops: { at: number; scheduled?: number }[]
   signal: { time: number; peak: number }[]
 }
@@ -546,7 +571,7 @@ async function instrumentNativeAudio(page: Page) {
     AudioBufferSourceNode.prototype.start = function (when = 0, offset = 0, duration?: number) {
       if (duration !== undefined) {
         scheduled.set(this, when)
-        probe.starts.push({ when, offset, duration, state: this.context.state })
+        probe.starts.push({ when, offset, duration, state: this.context.state, buffer: this.buffer?.duration ?? 0 })
       }
       if (duration === undefined) start.call(this, when, offset)
       else start.call(this, when, offset, duration)
@@ -562,6 +587,10 @@ async function instrumentNativeAudio(page: Page) {
 function nativeAudio(page: Page): Promise<AudioProbe> {
   return page.evaluate(() => (window as Window & { remorseAudioProbe?: AudioProbe }).remorseAudioProbe!)
 }
+
+const dieWindows = Array.from({ length: 5 }, (_, index) => ({
+  offset: expect.closeTo(index * .128, 5), duration: expect.closeTo(.108, 5),
+}))
 
 test('real audio plays the opening worker move and the confirmed resignation', async ({ page }) => {
   await instrumentNativeAudio(page)
@@ -586,6 +615,10 @@ test('real audio plays the opening worker move and the confirmed resignation', a
 
 test('real recorded impacts follow the animation, and undo stops the pending audio', async ({ page }) => {
   await instrumentNativeAudio(page)
+  const dieRecordings = new Set<string>()
+  page.on('request', request => {
+    if (/\/dice-auditions\/[^/]+\.mp3$/.test(request.url())) dieRecordings.add(request.url().split('/').at(-1)!)
+  })
   await open(page, 'en', false)
   const capture = captureFixture('white', 2)
   await restoreGame(page, capture.before.record)
@@ -604,13 +637,15 @@ test('real recorded impacts follow the animation, and undo stops the pending aud
   await expect(playfield(page)).toHaveAttribute('data-turn', '0')
   await expect(page.getByTestId('dice-reveal')).toHaveCount(0)
   const { starts, stops } = await nativeAudio(page)
-  expect(starts.map(({ offset, duration }) => ({ offset, duration }))).toEqual(
-    (['capture', 'diceBody', 'diceBounce', 'diceEdge', 'diceBounce', 'diceSettle', 'fracture'] as const)
-      .map(sampleWindow),
+  expect([...dieRecordings]).toEqual(['d2.mp3'])
+  expect(starts.slice(0, 6).map(({ offset, duration }) => ({ offset, duration }))).toEqual(
+    [sampleWindow('capture'), ...dieWindows],
   )
-  expect(starts[1].when - starts[0].when).toBeCloseTo(.23, 3)
+  expect(starts).toHaveLength(7)
+  expect(starts[6]).toMatchObject({ offset: 0, duration: 1.4, buffer: expect.closeTo(3, 1) })
+  expect(starts[1].when + .009 - starts[0].when).toBeCloseTo(.618, 3)
   expect(starts[5].when - starts[1].when).toBeCloseTo(1.14, 3)
-  expect(starts[6].when - starts[5].when).toBeCloseTo(.09, 3)
+  expect(starts[6].when - (starts[5].when + .009)).toBeCloseTo(.240, 3)
   for (const { when } of starts.slice(-2)) {
     expect(stops.some(stop => stop.scheduled === when && stop.at < when)).toBe(true)
   }
@@ -637,8 +672,10 @@ test('a real worker capture shows and sounds its own committed die', async ({ pa
   await page.evaluate(() => {
     const record = new MutationObserver(() => {
       const result = document.querySelector('[data-testid="dice-reveal"][data-phase="settled"] .dice-caption')
-      if (result) {
-        document.documentElement.dataset.qaDieResult = result.textContent ?? ''
+      const caption = result?.textContent?.trim()
+      if (caption === '4') document.documentElement.dataset.qaDieFace = caption
+      if (caption?.includes('Unaffected')) {
+        document.documentElement.dataset.qaDieResult = caption
         record.disconnect()
       }
     })
@@ -649,6 +686,7 @@ test('a real worker capture shows and sounds its own committed die', async ({ pa
   await expect(reveal).toHaveAttribute('data-actor', 'black')
   await expect(reveal).toHaveAttribute('data-phase', 'throwing')
   await expect(page.getByTestId('die-throw').locator('canvas')).toBeVisible()
+  await expect(page.locator('html')).toHaveAttribute('data-qa-die-face', '4')
   await expect(page.locator('html')).toHaveAttribute('data-qa-die-result', '4 · Unaffected')
   const saved = await recorded<MatchRecord>(page, 'matches', game.record.id)
   expect(saved.actions).toHaveLength(1)
@@ -656,7 +694,7 @@ test('a real worker capture shows and sounds its own committed die', async ({ pa
   await ready(page)
   const probe = await nativeAudio(page)
   expect(probe.starts).toHaveLength(7)
-  expect(probe.starts[1]).toMatchObject(sampleWindow('diceBody'))
+  expect(probe.starts[1]).toMatchObject(dieWindows[0])
   const peak = Math.max(...probe.signal.map(frame => frame.peak))
   expect(peak).toBeGreaterThan(.012)
   expect(peak).toBeLessThan(.9)
@@ -679,14 +717,15 @@ test('pawn reaction and queen contact use one live audio batch and undo cancels 
   // Undo the live batch before its delayed accents. Waiting for the WebGL die
   // to render can consume that window on a slow browser.
   await expect(playfield(page)).toHaveAttribute('data-revision', '1')
-  await expect.poll(async () => (await nativeAudio(page)).starts.length).toBe(11)
-  const sounds = (await nativeAudio(page)).starts
-  expect(sounds.map(({ offset, duration }) => ({ offset, duration }))).toEqual(
-    (['capture', 'diceBody', 'diceBounce', 'diceEdge', 'diceBounce', 'diceSettle', 'fracture',
-      'resonance', 'capture', 'fracture', 'diceEdge'] as const).map(sampleWindow),
+  await expect.poll(async () => (await nativeAudio(page)).starts.length).toBe(8)
+  const sounds = (await nativeAudio(page)).starts.sort((a, b) => a.when - b.when)
+  expect(sounds.slice(0, 6).map(({ offset, duration }) => ({ offset, duration }))).toEqual(
+    [sampleWindow('capture'), ...dieWindows],
   )
-  expect(sounds[6].when).toBeGreaterThan(sounds[5].when)
-  expect(sounds[8].when).toBeGreaterThan(sounds[6].when)
+  expect(sounds[6]).toMatchObject({ buffer: expect.closeTo(3, 1), duration: expect.closeTo(.38, 3) })
+  expect(sounds[7]).toMatchObject({ buffer: expect.closeTo(5, 1), offset: 0, duration: expect.closeTo(2.49, 3) })
+  expect(sounds[6].when - (sounds[5].when + .009)).toBeCloseTo(.240, 3)
+  expect(sounds[7].when).toBeGreaterThan(sounds[6].when + sounds[6].duration)
   await page.getByTestId('undo').click()
   await expect(playfield(page)).toHaveAttribute('data-promotion-stage', 'none')
   await expect(cell(page, 'b7')).toHaveAccessibleName(/Pawn/)
@@ -706,7 +745,8 @@ test('the promotion lesson schedules formation only after acknowledgment, includ
   await page.getByTestId('promotion-bishop').click()
   await expect(page.getByTestId('teaching-cause')).toContainText('went berserk')
   const windows = async () => (await nativeAudio(page)).starts.map(({ offset, duration }) => ({ offset, duration }))
-  const reaction = (['capture', 'diceBody', 'diceBounce', 'diceEdge', 'diceBounce', 'diceSettle', 'fracture'] as const).map(sampleWindow)
+  const reaction = [sampleWindow('capture'), ...dieWindows,
+    { offset: .4, duration: expect.closeTo(1.26, 3) }]
   expect(await windows()).toEqual(reaction)
   await page.waitForTimeout(550)
   expect(await windows()).toEqual(reaction)
@@ -717,7 +757,8 @@ test('the promotion lesson schedules formation only after acknowledgment, includ
   await expect.poll(async () => (await nativeAudio(page)).context).toBe('running')
   expect(await windows()).toEqual([])
   await page.getByTestId('lesson-next').click()
-  await expect.poll(windows).toEqual([sampleWindow('resonance')])
+  const formation = [{ offset: 0, duration: expect.closeTo(.93, 3) }]
+  await expect.poll(windows).toEqual(formation)
   await expect(page.getByTestId('teaching-cause')).toContainText('capture count to zero')
-  expect(await windows()).toEqual([sampleWindow('resonance')])
+  expect(await windows()).toEqual(formation)
 })

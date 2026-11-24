@@ -28,8 +28,8 @@ export function maskRollResult(current: GameState, previous: GameState): GameSta
 }
 
 /** Keep these disjoint slices for the action's lifetime, so reveal cannot replay a capture ghost. */
-export function rollSceneEvents(events: readonly GameEvent[], phase: 'throwing' | 'revealed'): readonly GameEvent[] {
-  return events.filter(event => (event.type === 'move' || event.type === 'capture') === (phase === 'throwing'))
+export function rollSceneEvents(events: readonly GameEvent[], phase: 'concealed' | 'revealed'): readonly GameEvent[] {
+  return events.filter(event => (event.type === 'move' || event.type === 'capture') === (phase === 'concealed'))
 }
 
 /** A rolled six can briefly show rage before the third capture escalates it. */

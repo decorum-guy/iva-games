@@ -1,6 +1,7 @@
 import { defineConfig, devices } from '@playwright/test';
 
-const url = 'http://127.0.0.1:4174/auditions.html';
+const port = process.env.REMORSE_AUDITION_PORT ?? '4174';
+const url = `http://127.0.0.1:${port}/auditions.html`;
 
 export default defineConfig({
   testDir: 'tests/auditions', workers: 1, timeout: 75000, retries: 0,
@@ -11,6 +12,6 @@ export default defineConfig({
       launchOptions: { args: ['--mute-audio', ...(process.platform === 'darwin' ? ['--use-angle=metal'] : [])] } } },
     { name: 'webkit', use: { ...devices['iPhone 13'], viewport: { width: 390, height: 844 } } },
   ],
-  webServer: { command: 'npm run auditions:build && npm run auditions:preview', url,
+  webServer: { command: `npm run auditions:build && vite preview --config vite.auditions.config.ts --host 127.0.0.1 --port ${port} --strictPort`, url,
     reuseExistingServer: true, timeout: 60000 },
 });

@@ -1,0 +1,24 @@
+.dice-comparison {
+  width: min(100%, 620px); margin: auto; padding: 14px; height: 100dvh; overflow: hidden;
+  display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto minmax(60px, 1fr) auto; gap: 9px;
+}
+.dice-comparison header { display: flex; align-items: center; gap: 7px; font: 650 1.4rem var(--display); letter-spacing: .12em; }
+.dice-comparison header .seal { width: 22px; height: 22px; }
+.dice-comparison h1 { font: 650 clamp(28px, 5vw, 42px)/1.03 var(--display); }
+.dice-comparison-stage { min-height: 0; min-width: 0; display: grid; place-items: center; overflow: hidden;
+  border: 1px solid #4b4840; border-radius: 8px; background: radial-gradient(ellipse, #30343a, #181b20); }
+.dice-comparison-stage .remorse-die-throw { width: min(100%, 425px); height: min(100%, 365px); }
+.dice-comparison-controls { display: grid; gap: 7px; min-width: 0; }
+.dice-comparison-controls .segmented { justify-content: stretch; }
+.dice-comparison-controls .segmented button { flex: 1; min-height: 34px; }
+.dice-comparison-controls p, .dice-comparison-controls a { font-size: .78rem; }
+.dice-comparison-transport { display: grid; grid-template-columns: 2fr 1fr; gap: 8px; }
+.dice-comparison-settings { display: flex; flex-wrap: wrap; gap: 8px; font-size: .72rem; }
+.dice-comparison-settings label { display: flex; align-items: center; gap: 6px; }
+.dice-comparison-settings input { accent-color: var(--bronze); }
+.dice-comparison-settings input[type='range'] { width: clamp(65px, 17vw, 118px); }
+@media (orientation: landscape) and (max-height: 490px) {
+  .dice-comparison { grid-template-columns: minmax(0, 1fr) minmax(252px, 44%); grid-template-rows: auto auto minmax(0, 1fr); }
+  .dice-comparison-stage { grid-area: 3 / 1; }
+  .dice-comparison-controls { grid-area: 2 / 2 / 4; align-content: center; }
+}

@@ -1,52 +1,72 @@
 import { useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import {
-  CanvasTexture, Color, CurvePath, LineCurve3, MeshBasicMaterial, Object3D, TubeGeometry, Vector3,
+  AdditiveBlending, CanvasTexture, Color, CurvePath, LineCurve3, MeshBasicMaterial, Object3D, TubeGeometry, Vector3,
 } from 'three'
-import type { Group, InstancedMesh, PointLight, Sprite, SpriteMaterial } from 'three'
+import type { Group, InstancedMesh, Sprite, SpriteMaterial } from 'three'
 import { easeRange } from './royalMotion'
-import { promotionFamily, samplePromotion, sceneRandom } from './promotionMotion'
+import { promotionFamily, promotionTiming, samplePromotion, sceneRandom } from './promotionMotion'
+import { boltReach, queenLightning } from './queenLightning'
 import type { FloorPoint, PromotionCue } from './promotionMotion'
 import { squarePoint } from './types'
 
-function electricGeometries([x, z]: FloorPoint, seed: string) {
-  const random = sceneRandom(seed + '/lightning')
-  const inward = z < 0 ? 1 : -1
-  const boundary = (value: number) => Math.max(-3.97, Math.min(3.97, value))
-  return Array.from({ length: 6 }, (_, index) => {
-    const dx = (index % 2 ? 1 : -1) * (.28 + random() * 1.33)
-    const dz = inward * (.60 + random() * 1.38)
-    const start = index <= 1 ? 2.62 : .52 + random() * .78
-    const points = Array.from({ length: 8 }, (_, i) => {
-      const t = i / 7
-      const jag = Math.sin(Math.PI * t) * (random() - .5) * .48
-      const y = Math.max(.045, start * (1 - t) ** 1.65 + jag * .36)
-      return new Vector3(boundary(x + dx * t + jag), y, boundary(z + dz * t - jag * .3))
-    })
-    const path = new CurvePath<Vector3>()
-    for (let i = 1; i < points.length; i++) path.add(new LineCurve3(points[i - 1], points[i]))
-    return new TubeGeometry(path, 31, index < 2 ? .037 : .019, 5, false)
-  })
+const arcSides = 5
+
+function taperedChannel(path: CurvePath<Vector3>, steps: number, radius: number) {
+  const tube = new TubeGeometry(path, steps, radius, arcSides, false)
+  const vertices = tube.getAttribute('position')
+  const vertex = new Vector3()
+  for (let ring = 0; ring <= steps; ring++) {
+    const fraction = ring / steps
+    const point = path.getPointAt(fraction)
+    const width = 1 - .67 * fraction ** 1.26
+    for (let side = 0; side <= arcSides; side++) {
+      const index = ring * (arcSides + 1) + side
+      vertex.fromBufferAttribute(vertices, index).lerp(point, 1 - width)
+      vertices.setXYZ(index, vertex.x, vertex.y, vertex.z)
+    }
+  }
+  tube.setDrawRange(0, 0)
+  return tube
 }
 
-function ElectricalArcs({ origin, cue, reduced }: { origin: FloorPoint; cue: PromotionCue; reduced: boolean }) {
-  const arcs = useMemo(() => electricGeometries(origin, cue.id), [origin, cue.id])
+function ElectricalArcs({ origin, cue, low }: { origin: FloorPoint; cue: PromotionCue; low: boolean }) {
+  const arcs = useMemo(() => queenLightning(origin, cue.id, low).map(bolt => {
+    const path = new CurvePath<Vector3>()
+    const points = bolt.points.map(point => new Vector3(...point))
+    for (let index = 1; index < points.length; index++) path.add(new LineCurve3(points[index - 1], points[index]))
+    const steps = (points.length - 1) * 4
+    const core = taperedChannel(path, steps, bolt.leader ? .024 : .013)
+    const glow = taperedChannel(path, steps, bolt.leader ? .057 : .031)
+    return { bolt, steps, core, glow }
+  }), [origin, cue.id, low])
   const [beam, haze] = useMemo(() => [
-    new MeshBasicMaterial({ color: '#fff5e3', toneMapped: false, transparent: true, opacity: 0, depthWrite: false }),
-    new MeshBasicMaterial({ color: '#9ebeff', toneMapped: false, transparent: true, opacity: 0, depthWrite: false }),
+    new MeshBasicMaterial({ color: '#fff5ea', toneMapped: false, transparent: true, opacity: 0, depthWrite: false }),
+    new MeshBasicMaterial({ color: '#8ca7f3', blending: AdditiveBlending, toneMapped: false,
+      transparent: true, opacity: 0, depthWrite: false }),
   ], [])
   const group = useRef<Group>(null)
-  useEffect(() => () => arcs.forEach(arc => arc.dispose()), [arcs])
+  useEffect(() => () => arcs.forEach(({ core, glow }) => { core.dispose(); glow.dispose() }), [arcs])
   useEffect(() => () => { beam.dispose(); haze.dispose() }, [beam, haze])
   useFrame(() => {
-    const sample = samplePromotion(cue, performance.now() - cue.startedAt, cue.reduced || reduced)
-    if (group.current) group.current.visible = sample.arc > .003
-    beam.opacity = sample.arc * .96
-    haze.opacity = sample.arc * .69
+    const elapsed = performance.now() - cue.startedAt
+    const after = elapsed - promotionTiming('queen', cue.reduced).impact
+    const { arc } = samplePromotion(cue, elapsed)
+    if (group.current) group.current.visible = arc > .003
+    beam.opacity = arc * .94
+    haze.opacity = arc * .30
+    if (arc <= .003) return
+    for (const { bolt, steps, core, glow } of arcs) {
+      const count = Math.floor(steps * boltReach(bolt, after)) * arcSides * 6
+      core.setDrawRange(0, count)
+      glow.setDrawRange(0, count)
+    }
   })
-  return <group ref={group} visible={false}>
-    {arcs.map((geometry, index) =>
-      <mesh key={index} geometry={geometry} material={index < 2 ? beam : haze} renderOrder={4} dispose={null} />)}
+  return <group ref={group} visible={false} name="queen-lightning">
+    {arcs.map(({ core, glow }, index) => <group key={index}>
+      <mesh geometry={glow} material={haze} renderOrder={3} dispose={null} />
+      <mesh geometry={core} material={beam} renderOrder={4} dispose={null} />
+    </group>)}
   </group>
 }
 
@@ -80,7 +100,6 @@ export function PromotionEffects({ cue, low, reduced }: { cue: PromotionCue; low
   const count = limitMotion ? 0 : queen ? low ? 22 : 38 : formation ? 11 : low ? 15 : 24
   const debris = useRef<InstancedMesh>(null)
   const dust = useRef<(Sprite | null)[]>([])
-  const lamp = useRef<PointLight>(null)
   const scratch = useMemo(() => new Object3D(), [])
   const invalidate = useThree(state => state.invalidate)
   const chips = useMemo(() => {
@@ -108,8 +127,6 @@ export function PromotionEffects({ cue, low, reduced }: { cue: PromotionCue; low
   useFrame(() => {
     const elapsed = performance.now() - cue.startedAt
     const sample = samplePromotion(cue, elapsed, limitMotion)
-    if (lamp.current) lamp.current.intensity = (queen ? 11.8 : formation ? 3.2 : 8.1) *
-      sample.lampLight
     const spread = easeRange(0, .56, sample.flight)
     const dustAlpha = easeRange(-.025, .095, sample.flight) * (1 - easeRange(.14, .62, sample.flight))
     for (const [index, cloud] of dust.current.entries()) {
@@ -145,9 +162,7 @@ export function PromotionEffects({ cue, low, reduced }: { cue: PromotionCue; low
   })
 
   return <>
-    <pointLight ref={lamp} color={queen ? '#ffc087' : '#e9d9af'} position={[x, .67, z]}
-      intensity={0} distance={queen ? 4.8 : 3.0} decay={2} />
-    {queen && !limitMotion && <ElectricalArcs origin={origin} cue={cue} reduced={reduced} />}
+    {queen && !limitMotion && <ElectricalArcs origin={origin} cue={cue} low={low} />}
     {!limitMotion && !formation && Array.from({ length: low ? 2 : 3 }, (_, index) => <sprite key={index}
       ref={node => { dust.current[index] = node }} renderOrder={2}>
       <spriteMaterial map={getPowderMap()} color="#bb947c" transparent opacity={0} depthWrite={false} toneMapped={false} />

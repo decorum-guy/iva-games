@@ -162,6 +162,7 @@ export const messages = {
   'die.label': ['Кубик', 'Reaction die'],
   'die.face': ['Результат кубика: {face}', 'Die result: {face}'],
   'die.rolling': ['Кубик катится…', 'Rolling…'],
+  'die.awaitingReaction': ['Ждём реакцию фигуры…', 'Waiting for the piece to react…'],
   'die.watch': ['Посмотрите на кубик', 'Watch the die'],
   'die.actor': ['Бросок: {side}', '{side} rolls'],
   'settings.language': ['Язык', 'Language'],

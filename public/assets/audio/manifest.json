@@ -75,5 +75,407 @@
       "license": "CC0-1.0",
       "use": "Filtered fracture and short resonance"
     }
-  ]
+  ],
+  "showcase": {
+    "dice": {
+      "selected": "D2",
+      "file": "dice-auditions/d2.mp3",
+      "level": 0.4,
+      "contactMarkerSeconds": 0.009,
+      "fallback": "Original bank contacts at the same 40% level"
+    },
+    "sounds": {
+      "guilt": {
+        "file": "auditions/reaction-r1-guilt.mp3",
+        "bytes": 73196,
+        "sha256": "85d6e7477c5259c9f8cfa90142f84fdef73a5ad02e0ace93b1b5dcb73af08360",
+        "auditionCandidates": [
+          "r1-guilt"
+        ],
+        "edit": {
+          "start": 0,
+          "end": 1.4,
+          "gainDb": -8,
+          "fadeIn": 0.014,
+          "fadeOut": 0.23,
+          "rookLevel": 0.8
+        },
+        "sources": [
+          {
+            "id": "reaction-r1-guilt",
+            "author": "qubodup",
+            "original": "qubodup-PowerDrain.flac",
+            "page": "https://opengameart.org/content/energy-drain",
+            "license": "CC0-1.0",
+            "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+            "originalSha256": "de0cb2775d484f4b7dc4aaa341d9750fda76d0d599d2b683720d6feaf616280d"
+          }
+        ]
+      },
+      "devastated": {
+        "file": "auditions/reaction-r2-devastated.mp3",
+        "bytes": 29996,
+        "sha256": "efcacfb9b7d88a9457cf2fe145a7b95a12ebc7e771100192667a6970e7ab13b8",
+        "auditionCandidates": [
+          "r2-devastated"
+        ],
+        "edit": {
+          "start": 0.16,
+          "end": 1.2,
+          "gainDb": -2,
+          "fadeIn": 0.014,
+          "fadeOut": 0.2,
+          "level": 0.8
+        },
+        "sources": [
+          {
+            "id": "reaction-r2-devastated",
+            "author": "JC Sounds",
+            "original": "Single_Fantasy SFX Pack Vol 1_Ice Spell_Buildup.wav",
+            "page": "https://opengameart.org/content/jc-sounds-fantasy-sfx-pack-vol-1",
+            "license": "CC-BY-4.0",
+            "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
+            "originalSha256": "020ef632467120f17131c12e13a242b4285ca1bec10eaddd6757843901644ba9"
+          }
+        ]
+      },
+      "berserk": {
+        "file": "auditions/reaction-r1-berserk.mp3",
+        "bytes": 73196,
+        "sha256": "0fb13ae8e8da4508d7518f5f12070f0eb62327494e541a88346966102f1c2a4e",
+        "auditionCandidates": [
+          "r1-berserk"
+        ],
+        "edit": {
+          "start": 0.4,
+          "end": 1.66,
+          "gainDb": -12,
+          "fadeIn": 0.014,
+          "fadeOut": 0.24,
+          "level": 0.95
+        },
+        "sources": [
+          {
+            "id": "reaction-r1-berserk",
+            "author": "lentikula",
+            "original": "Fire Spell Impact 1.wav",
+            "page": "https://lentikula.itch.io/freecc0-basic-spell-impacts-sfx",
+            "license": "CC0-1.0",
+            "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+            "originalSha256": "0ed8aa723a1189da00f115d7402508a291906bd249a80036e71a59f1020e67eb"
+          }
+        ]
+      },
+      "bloodlust": {
+        "file": "auditions/reaction-r2-bloodlust.mp3",
+        "bytes": 145196,
+        "sha256": "19d0d3a95da261be2f42836683b223b5c3e5206823bd63f541694731f8c14ca3",
+        "auditionCandidates": [
+          "r2-bloodlust"
+        ],
+        "edit": {
+          "start": 0,
+          "end": 1.54,
+          "gainDb": -7,
+          "fadeIn": 0.014,
+          "fadeOut": 0.24
+        },
+        "sources": [
+          {
+            "id": "reaction-r2-bloodlust",
+            "author": "JC Sounds",
+            "original": "Loop_Fantasy Pack Vol 1_Dark Necromancy Chant_01.wav",
+            "page": "https://opengameart.org/content/jc-sounds-fantasy-sfx-pack-vol-1",
+            "license": "CC-BY-4.0",
+            "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
+            "originalSha256": "57297aa868c441f87129be20a970c86d58c978bbb841924d483e7773b77a1039"
+          }
+        ]
+      },
+      "formation": {
+        "file": "auditions/promotion-p2-formation.mp3",
+        "bytes": 73196,
+        "sha256": "e67bcbd77896e94d015cc0d07520e5864f0f84d8f5697f15bc0d9bb3366cb76e",
+        "auditionCandidates": [
+          "p2-formation"
+        ],
+        "edit": {
+          "anchor": 0.12,
+          "gainDb": -5,
+          "fadeIn": 0.014,
+          "normalFadeOut": 0.22,
+          "reducedFadeOut": 0.14
+        },
+        "sources": [
+          {
+            "id": "promotion-teleport",
+            "author": "JC Sounds",
+            "original": "Single_Fantasy SFX Pack Vol 1_Teleport_In.wav",
+            "page": "https://opengameart.org/content/jc-sounds-fantasy-sfx-pack-vol-1",
+            "license": "CC BY 4.0",
+            "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
+            "originalSha256": "c720f0f4b1c11ac9ce81245d5bb3f1cbb060d3933e469a9d606d1681e25f243f"
+          },
+          {
+            "id": "promotion-whoosh",
+            "author": "pyranostudios",
+            "original": "whoosh2.wav",
+            "page": "https://opengameart.org/content/air-whoosh",
+            "license": "CC0",
+            "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+            "originalSha256": "d3fbff5bb78b289af16b2dfa29083f07ef83b0cbaff4514c48dfda16d082b468"
+          }
+        ]
+      },
+      "rook": {
+        "file": "showcase/promotion-rook-p1-p2-room.mp3",
+        "bytes": 85292,
+        "sha256": "525cd0262da171f9455c2d5b49a56975ebea7f984d269e76807499ce555918ae",
+        "auditionCandidates": [
+          "p1-rook",
+          "p2-rook"
+        ],
+        "edit": {
+          "anchor": 0.42,
+          "stemGainDb": [
+            -14,
+            -5
+          ],
+          "echoMs": [
+            74,
+            81
+          ],
+          "echoMix": 0.135,
+          "roomMix": 0.12,
+          "fadeIn": 0.014,
+          "normalFadeOut": 0.22,
+          "reducedFadeOut": 0.14,
+          "recipe": "scripts/build-rook-showcase-mix.py"
+        },
+        "sources": [
+          {
+            "id": "promotion-dull_explosion",
+            "author": "Julie Damsgaard / Spring Spring / Spring Enterprises",
+            "original": "dull_explosion.wav",
+            "page": "https://opengameart.org/content/various-sound-effects-0",
+            "license": "CC0",
+            "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+            "originalSha256": "f79f07a733eb27822fb4567318e38b150a482d340bdabad7a30c099815109588"
+          },
+          {
+            "id": "promotion-fire",
+            "author": "JC Sounds",
+            "original": "Single_Fantasy SFX Pack Vol 1_Fireball Impact_01.wav",
+            "page": "https://opengameart.org/content/jc-sounds-fantasy-sfx-pack-vol-1",
+            "license": "CC BY 4.0",
+            "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
+            "originalSha256": "117df27398321a5454dc1f502a481db5efbf525cbf7a08c9632641ccbc9877c5"
+          },
+          {
+            "id": "promotion-landing",
+            "author": "Julie Damsgaard / Spring Spring / Spring Enterprises",
+            "original": "snd_enemyland.wav",
+            "page": "https://opengameart.org/content/various-sound-effects-0",
+            "license": "CC0",
+            "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+            "originalSha256": "0532cbb00ed7d9987d49f1450f974f43180ffa8c4a863caf5a220aa1ddf911b4"
+          },
+          {
+            "id": "promotion-rock_fall",
+            "author": "rubberduck",
+            "original": "bfh1_rock_falling_01.ogg",
+            "page": "https://opengameart.org/content/75-cc0-breaking-falling-hit-sfx",
+            "license": "CC0",
+            "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+            "originalSha256": "9e58d2d3302c1bad27267cef6a2b3b47bb636f49f77d8e4b986ac81a26e80d7b"
+          },
+          {
+            "id": "promotion-swing",
+            "author": "JC Sounds",
+            "original": "Single_Fantasy SFX Pack Vol 1_Heavy Sword_Swing_01.wav",
+            "page": "https://opengameart.org/content/jc-sounds-fantasy-sfx-pack-vol-1",
+            "license": "CC BY 4.0",
+            "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
+            "originalSha256": "3eb8abd55dbe99c6390da79fcc3fa629e7c3c79cd29ddec122217e825933b063"
+          },
+          {
+            "id": "promotion-whoosh",
+            "author": "pyranostudios",
+            "original": "whoosh2.wav",
+            "page": "https://opengameart.org/content/air-whoosh",
+            "license": "CC0",
+            "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+            "originalSha256": "d3fbff5bb78b289af16b2dfa29083f07ef83b0cbaff4514c48dfda16d082b468"
+          }
+        ]
+      },
+      "queen": {
+        "file": "auditions/promotion-p2-queen.mp3",
+        "bytes": 121580,
+        "sha256": "3711bb92db1ec6844e47e0e65febf68ceb1d651c624f31903a8f2d17ec367665",
+        "auditionCandidates": [
+          "p2-queen"
+        ],
+        "edit": {
+          "anchor": 0.42,
+          "gainDb": -8,
+          "level": 0.9,
+          "fadeIn": 0.014,
+          "normalFadeOut": 0.32,
+          "reducedFadeOut": 0.14,
+          "stoneAfterContactMs": [
+            60,
+            250,
+            550
+          ],
+          "fracture": "P2 internal stone stem"
+        },
+        "sources": [
+          {
+            "id": "promotion-break_stone",
+            "author": "Julie Damsgaard / Spring Spring / Spring Enterprises",
+            "original": "break_stone.wav",
+            "page": "https://opengameart.org/content/various-sound-effects-0",
+            "license": "CC0",
+            "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+            "originalSha256": "8e3ed312e12791be6d6bbcf02a1889fb3913e420b85c796e4236319e23414df2"
+          },
+          {
+            "id": "promotion-dull_explosion",
+            "author": "Julie Damsgaard / Spring Spring / Spring Enterprises",
+            "original": "dull_explosion.wav",
+            "page": "https://opengameart.org/content/various-sound-effects-0",
+            "license": "CC0",
+            "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+            "originalSha256": "f79f07a733eb27822fb4567318e38b150a482d340bdabad7a30c099815109588"
+          },
+          {
+            "id": "promotion-electric",
+            "author": "JC Sounds",
+            "original": "Single_Fantasy SFX Pack Vol 1_Electric Spell_Hit_02.wav",
+            "page": "https://opengameart.org/content/jc-sounds-fantasy-sfx-pack-vol-1",
+            "license": "CC BY 4.0",
+            "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
+            "originalSha256": "b089297875138c3b99005b3405067c48a2d151aa0c1e7ba6c95912b210230f09"
+          },
+          {
+            "id": "promotion-fire",
+            "author": "JC Sounds",
+            "original": "Single_Fantasy SFX Pack Vol 1_Fireball Impact_01.wav",
+            "page": "https://opengameart.org/content/jc-sounds-fantasy-sfx-pack-vol-1",
+            "license": "CC BY 4.0",
+            "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
+            "originalSha256": "117df27398321a5454dc1f502a481db5efbf525cbf7a08c9632641ccbc9877c5"
+          },
+          {
+            "id": "promotion-landing",
+            "author": "Julie Damsgaard / Spring Spring / Spring Enterprises",
+            "original": "snd_enemyland.wav",
+            "page": "https://opengameart.org/content/various-sound-effects-0",
+            "license": "CC0",
+            "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+            "originalSha256": "0532cbb00ed7d9987d49f1450f974f43180ffa8c4a863caf5a220aa1ddf911b4"
+          },
+          {
+            "id": "promotion-rock_break1",
+            "author": "rubberduck",
+            "original": "bfh1_rock_breaking_01.ogg",
+            "page": "https://opengameart.org/content/75-cc0-breaking-falling-hit-sfx",
+            "license": "CC0",
+            "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+            "originalSha256": "970cac3139e1530009ca87f8ee0dd800dc4da61917a5e62bdc83d475a9bf4da7"
+          },
+          {
+            "id": "promotion-rock_break2",
+            "author": "rubberduck",
+            "original": "bfh1_rock_breaking_02.ogg",
+            "page": "https://opengameart.org/content/75-cc0-breaking-falling-hit-sfx",
+            "license": "CC0",
+            "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+            "originalSha256": "3e06b794511f693b6aaca5eee1d47491bab74d814746a68de6c8bf4eec744ccc"
+          },
+          {
+            "id": "promotion-swing",
+            "author": "JC Sounds",
+            "original": "Single_Fantasy SFX Pack Vol 1_Heavy Sword_Swing_01.wav",
+            "page": "https://opengameart.org/content/jc-sounds-fantasy-sfx-pack-vol-1",
+            "license": "CC BY 4.0",
+            "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
+            "originalSha256": "3eb8abd55dbe99c6390da79fcc3fa629e7c3c79cd29ddec122217e825933b063"
+          }
+        ]
+      }
+    }
+  },
+  "diceAuditions": {
+    "d1": {
+      "file": "dice-auditions/d1.mp3",
+      "bytes": 16748,
+      "sha256": "eda04b938a7577879e4ea169d1c110f8fa0fcd09cf121a9d80870e0f7bb8750e",
+      "author": "aunrea",
+      "title": "6-Sided Die Rolled on Wood Table",
+      "page": "https://freesound.org/people/aunrea/sounds/485950/",
+      "publicPreview": "https://cdn.freesound.org/previews/485/485950_7932944-hq.mp3",
+      "previewSha256": "50397ec57449f3deee9cc2f97d448395b8c7affe14d0995e74d6fce6b60ae436",
+      "license": "CC0-1.0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "transientsSeconds": [
+        0.941,
+        1.146,
+        1.247,
+        1.372,
+        1.487
+      ],
+      "trimmedContactSeconds": 0.108,
+      "strideSeconds": 0.128,
+      "insideWindowSeconds": 0.009,
+      "changes": "Public MP3 preview decoded to 48 kHz stereo, five transient windows, per-window RMS gain with peak ceiling, short fades, MP3 encoding."
+    },
+    "d2": {
+      "file": "dice-auditions/d2.mp3",
+      "bytes": 16748,
+      "sha256": "c083674f4cea409ef2a0e499fa2d19e58a569dc013412df5a0cd0d739219aaa1",
+      "author": "schoman3",
+      "title": "Dice_Roll.mp3",
+      "page": "https://freesound.org/people/schoman3/sounds/506914/",
+      "publicPreview": "https://cdn.freesound.org/previews/506/506914_4129624-hq.mp3",
+      "previewSha256": "d36b7532afa0e1da5013349cc3cd18a2e2d14fd7bb833589135f5dee6fb2e117",
+      "license": "CC0-1.0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "transientsSeconds": [
+        0.067,
+        0.187,
+        0.328,
+        0.428,
+        0.527
+      ],
+      "trimmedContactSeconds": 0.108,
+      "strideSeconds": 0.128,
+      "insideWindowSeconds": 0.009,
+      "changes": "Public MP3 preview decoded to 48 kHz stereo, five transient windows, per-window RMS gain with peak ceiling, short fades, MP3 encoding."
+    },
+    "d3": {
+      "file": "dice-auditions/d3.mp3",
+      "bytes": 16748,
+      "sha256": "ec83631074fd4ce67e35b3a521c52007bfc1bbc766857e026b365751098ff89f",
+      "author": "WallyDM",
+      "title": "Dice Clacking Together and Rolling into a Soft Tray",
+      "page": "https://freesound.org/people/WallyDM/sounds/815672/",
+      "publicPreview": "https://cdn.freesound.org/previews/815/815672_13150464-hq.mp3",
+      "previewSha256": "3cd1436021a5b434fcaac8e3f03502f33d60ecb474a28db8441864cc92d2c2e6",
+      "license": "CC0-1.0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "transientsSeconds": [
+        1.752,
+        1.871,
+        1.953,
+        2.042,
+        2.128
+      ],
+      "trimmedContactSeconds": 0.108,
+      "strideSeconds": 0.128,
+      "insideWindowSeconds": 0.009,
+      "changes": "Public MP3 preview decoded to 48 kHz stereo, five transient windows, per-window RMS gain with peak ceiling, short fades, MP3 encoding."
+    }
+  }
 }

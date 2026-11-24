@@ -105,7 +105,7 @@ describe('promotion camera framing', () => {
         expect(screenExtent([...BOARD_FRAMING_POINTS, ...rock, ...lights], camera)).toBeLessThan(.99)
       }
       const end = samplePromotion({ kind: 'queen', id: 'fit', pieceId: 'pawn', side: 'white', square: 'a8',
-        startedAt: 0, reduced: false, intoRoyal: false }, 2260)
+        startedAt: 0, reduced: false, intoRoyal: false }, 2760)
       expect(framePromotionCamera(rig, aspect, compact, point, end, false)).toEqual(frameCamera(rig, aspect, compact))
     }
   })

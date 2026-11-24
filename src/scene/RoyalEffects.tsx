@@ -5,6 +5,8 @@ import {
 } from 'three'
 import { easeRange, sampleRoyal } from './royalMotion'
 import type { RoyalCue } from './royalMotion'
+import { samplePromotion } from './promotionMotion'
+import type { PromotionCue } from './promotionMotion'
 import { squarePoint } from './types'
 
 const solidCount = 48
@@ -52,7 +54,9 @@ function dustTexture() {
   return mist
 }
 
-export function RoyalEffects({ cue, low }: { cue?: RoyalCue; low: boolean }) {
+export function RoyalEffects({ cue, promotion, low, reduced }: {
+  cue?: RoyalCue; promotion?: PromotionCue; low: boolean; reduced: boolean
+}) {
   const warm = useRef<PointLight>(null)
   const rim = useRef<PointLight>(null)
   const solids = useRef<InstancedMesh>(null)
@@ -85,11 +89,31 @@ export function RoyalEffects({ cue, low }: { cue?: RoyalCue; low: boolean }) {
     const elapsed = cue ? performance.now() - cue.startedAt : 0
     const pulse = cue ? sampleRoyal(cue, elapsed) : null
     const mate = cue?.kind === 'mate'
-    const [x, z] = cue ? squarePoint(cue.square) : [0, 0]
-    light.intensity = pulse ? pulse.contact * (mate ? 11.1 : 6.9) : 0
-    edge.intensity = pulse ? pulse.surface * (mate ? 2.85 : 1.83) : 0
-    light.position.set(x + .62, .52 + (pulse?.sweep ?? 0) * .79, z + .45)
-    edge.position.set(x - .77, 1.46, z - .83)
+    const subject = cue ?? promotion
+    const [x, z] = subject ? squarePoint(subject.square) : [0, 0]
+    // Keep the number of scene lights constant. Adding one at impact would
+    // invalidate every lit material program, including the marble and figures.
+    if (promotion && !cue) {
+      const birth = samplePromotion(promotion, performance.now() - promotion.startedAt, promotion.reduced || reduced)
+      const queen = birth.family === 'queen'
+      light.color.set(queen ? '#ffc087' : '#e9d9af')
+      light.intensity = birth.lampLight * (queen ? 11.8 : birth.family === 'formation' ? 3.2 : 8.1)
+      light.distance = queen ? 4.8 : 3
+      light.position.set(x, .67, z)
+      edge.color.set('#9aafff')
+      edge.intensity = birth.arc * 4.5
+      edge.distance = 3.8
+      edge.position.set(x, .88, z)
+    } else {
+      light.color.set('#ff6a3b')
+      light.intensity = pulse ? pulse.contact * (mate ? 11.1 : 6.9) : 0
+      light.distance = 4.8
+      light.position.set(x + .62, .52 + (pulse?.sweep ?? 0) * .79, z + .45)
+      edge.color.set('#a2c0f2')
+      edge.intensity = pulse ? pulse.surface * (mate ? 2.85 : 1.83) : 0
+      edge.distance = 3.6
+      edge.position.set(x - .77, 1.46, z - .83)
+    }
     const airborne = pulse?.flight ?? -1
     const launched = airborne >= 0 && airborne < 1.38
     chunks.visible = launched && mate

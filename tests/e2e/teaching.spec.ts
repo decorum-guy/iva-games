@@ -2,7 +2,7 @@ import { expect, test } from './fixtures'
 import type { Page } from '@playwright/test'
 import { translator } from '../../src/i18n/catalog'
 import { CAMERA_TRAVEL_MS } from '../../src/scene/cameraFocus'
-import { getDieMotionTiming } from '../../src/scene/diceMotion'
+import { actionPlan } from '../../src/scene/actionPresentation'
 import {
   acknowledgeTeaching, learnerAction, saveLearning, scriptAction, startLesson, teachingBeat,
 } from '../../src/tutorial/controller'
@@ -15,6 +15,8 @@ const tutorial = (page: Page) => page.getByTestId('tutorial')
 const stage = (page: Page) => page.locator('.board-stage')
 const scene = (page: Page) => page.locator('[data-renderer="3d"][data-scene-ready="true"]')
 const forbiddenNotice = /учебный бросок|фиксированный бросок|tutorial roll|fixed roll|scripted roll|preset roll/i
+const guiltPlan = actionPlan(learnerAction(startLesson(1), move('c3', 'c4')).progress.session.current.events, true, false, false)
+const guiltThrow = guiltPlan.roll!
 
 async function ready(page: Page) {
   await expect(playfield(page)).toHaveAttribute('data-busy', 'false')
@@ -103,16 +105,20 @@ test.describe('the actual 3D reaction starts its explanation', () => {
       // Keyboard operates the same live 3D board; no private app controller is used.
       await keyboardPath(page, ['ArrowLeft', 'ArrowLeft', 'ArrowUp', 'Enter', 'ArrowUp', 'Enter'])
       await expect(playfield(page)).toHaveAttribute('data-revision', '1')
+      await page.clock.runFor(guiltThrow.start)
       await expect(playfield(page)).toHaveAttribute('data-dice', 'throwing')
       await expect(scene(page)).toHaveAttribute('data-camera-focus', 'none')
       await expect(page.getByTestId('teaching-cause')).toHaveCount(0)
       await expect(page.getByTestId('teaching-rule')).toHaveCount(0)
-      const timing = getDieMotionTiming(false)
-      await page.clock.runFor(timing.motionMs - 100)
+      await page.clock.runFor(guiltThrow.settle - guiltThrow.start - 100)
       await expect(scene(page)).toHaveAttribute('data-camera-focus', 'none')
       await expect(page.getByTestId('teaching-cause')).toHaveCount(0)
 
-      await page.clock.runFor(120)
+      await page.clock.runFor(100)
+      await expect(playfield(page)).toHaveAttribute('data-dice', 'settled')
+      await expect(page.getByTestId('teaching-cause')).toHaveCount(0)
+      await expect(scene(page)).toHaveAttribute('data-camera-focus', 'none')
+      await page.clock.runFor(guiltThrow.reveal - guiltThrow.settle)
       const result = LESSONS[1].positions[0].steps[0].after![0]
       await expect(playfield(page)).toHaveAttribute('data-dice', 'settled')
       await expect(playfield(page)).toHaveAttribute('data-animating', 'true')
@@ -128,7 +134,7 @@ test.describe('the actual 3D reaction starts its explanation', () => {
       await expect(page.getByTestId('dice-dock')).toBeInViewport({ ratio: 1 })
       await expect(stage(page).getByTestId('dice-reveal')).toHaveCount(0)
       await expect(page.getByTestId('lesson-next')).toBeDisabled()
-      await page.clock.runFor(timing.holdMs + 5000)
+      await page.clock.runFor(guiltPlan.end - guiltThrow.reveal + 5000)
       await ready(page)
       await expect(page.getByTestId('dice-reveal')).toHaveCount(0)
       const held = await savedLearning(page)
@@ -203,6 +209,8 @@ test.describe('the actual 3D reaction starts its explanation', () => {
     await page.clock.pauseAt(new Date('2030-01-01T10:00:00Z'))
 
     await keyboardPath(page, ['ArrowLeft', 'ArrowLeft', 'ArrowUp', 'Enter', 'ArrowUp', 'Enter'])
+    await expect(playfield(page)).toHaveAttribute('data-revision', '1')
+    await page.clock.runFor(guiltThrow.start)
     await expect(playfield(page)).toHaveAttribute('data-dice', 'throwing')
     await page.getByTestId('lesson-restart').click()
     await page.getByTestId('confirm-action').click()
@@ -215,9 +223,10 @@ test.describe('the actual 3D reaction starts its explanation', () => {
 
     // The keyboard cursor is still on the previous destination.
     await keyboardPath(page, ['ArrowDown', 'Enter', 'ArrowUp', 'Enter'])
+    await expect(playfield(page)).toHaveAttribute('data-revision', '1')
+    await page.clock.runFor(guiltThrow.start)
     await expect(playfield(page)).toHaveAttribute('data-dice', 'throwing')
-    const timing = getDieMotionTiming(false)
-    await page.clock.runFor(timing.motionMs + timing.holdMs)
+    await page.clock.runFor(guiltPlan.end - guiltThrow.start)
     await expect(page.getByTestId('lesson-next')).toBeEnabled()
     await page.getByTestId('lesson-next').click()
     await expect(playfield(page)).toHaveAttribute('data-teaching-returning', 'true')

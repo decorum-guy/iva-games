@@ -1,3 +1,4 @@
+import { actionPlan, pieceTravelMs } from './actionPresentation'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { GameEvent, Piece } from '../core/types'
 import { getDieMotionTiming } from './diceMotion'
@@ -136,12 +137,16 @@ describe('semantic scene sounds', () => {
   it.each([false, true])('uses the visible die impacts and waits for settling before its state cue (reduced=%s)', async reducedMotion => {
     const timing = getDieMotionTiming(reducedMotion)
     const context = await unlock()
-    const planned = audio.planSceneCues([reaction], { reducedMotion })
-    expect(planned.find(cue => cue.kind === 'guilt')?.at).toBeCloseTo(timing.motionMs / 1000 + audio.DIE_SETTLE_SOUND_GAP)
-    expect(audio.playSceneCue([reaction], { reducedMotion })).toBe(true)
+    const events = [move(), capture, reaction]
+    const plan = actionPlan(events, true, reducedMotion, false)
+    const planned = audio.planSceneCues(events, { plan })
+    const lead = reducedMotion ? 105 : pieceTravelMs(3) + 130
+    expect(plan.roll!.start).toBe(lead)
+    expect(planned.find(cue => cue.kind === 'guilt')?.at).toBeCloseTo((lead + timing.motionMs + (reducedMotion ? 140 : 240)) / 1000)
+    expect(audio.playSceneCue(events, { plan, reducedMotion })).toBe(true)
     const starts = context.sources.flatMap(source => source.start.mock.calls.map(call => call[0] as number))
     for (const impactMs of timing.impactsMs) {
-      expect(starts.some(at => Math.abs(at - (.008 + impactMs / 1000)) < .00001)).toBe(true)
+      expect(starts.some(at => Math.abs(at - (.008 + (lead + impactMs) / 1000)) < .00001)).toBe(true)
     }
   })
 })
@@ -218,8 +223,8 @@ describe('audio user activation and cancellation', () => {
     context.completeResume()
     expect(await ready).toBe(true)
     const starts = context.sources.flatMap(source => source.start.mock.calls.map(call => call[0] as number))
-    expect(Math.min(...starts)).toBeCloseTo(.008 + 1.080 - .900)
-    expect(starts.some(at => Math.abs(at - (.008 + 1.500 + audio.DIE_SETTLE_SOUND_GAP - .900)) < .00001)).toBe(true)
+    expect(Math.min(...starts)).toBeCloseTo(.008 + 1.210 - .900)
+    expect(starts.some(at => Math.abs(at - (.008 + 1.870 - .900)) < .00001)).toBe(true)
   })
 
   it('uses commit time for a 900ms delayed effect even when the context is already running', async () => {
@@ -227,29 +232,31 @@ describe('audio user activation and cancellation', () => {
     const context = await unlock()
     expect(audio.playSceneCue([capture, reaction], { startedAt: 100 })).toBe(true)
     const starts = context.sources.flatMap(source => source.start.mock.calls.map(call => call[0] as number))
-    expect(Math.min(...starts)).toBeCloseTo(.008 + 1.080 - .900)
-    expect(starts.some(at => Math.abs(at - (.008 + 1.500 + audio.DIE_SETTLE_SOUND_GAP - .900)) < .00001)).toBe(true)
+    expect(Math.min(...starts)).toBeCloseTo(.008 + 1.210 - .900)
+    expect(starts.some(at => Math.abs(at - (.008 + 1.870 - .900)) < .00001)).toBe(true)
   })
 
   it('plays the recorded impact slices at the five shared contacts once the bank decodes', async () => {
     const buffer = { duration: 1 };
     const bank = new Uint8Array([1, 2, 3]);
-    const fetch = vi.fn(async () => new Response(bank));
+    const fetch = vi.fn(async (url: string) => url.endsWith('/board.wav')
+      ? new Response(bank) : new Response(null, { status: 404 }));
     vi.stubGlobal('fetch', fetch);
     const decode = vi.fn(async () => buffer);
     vi.stubGlobal('AudioContext', class extends FakeAudioContext { decodeAudioData = decode });
     await audio.prepareSceneAudio();
     const context = await unlock();
     await vi.waitFor(() => expect(decode).toHaveBeenCalledTimes(1));
-    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(fetch).toHaveBeenCalledTimes(9);
     expect(audio.playSceneCue([reaction])).toBe(true);
     const impacts = ['diceBody', 'diceBounce', 'diceEdge', 'diceBounce', 'diceSettle'] as const;
     for (const [index, impact] of impacts.entries()) {
       expect(context.sources[index].buffer).toBe(buffer);
       const { offset, duration } = sampleWindow(impact);
-      expect(context.sources[index].start).toHaveBeenCalledExactlyOnceWith(
-        .008 + getDieMotionTiming(false).impactsMs[index] / 1000, offset, duration,
-      );
+      const calls = context.sources[index].start.mock.calls;
+      expect(calls).toHaveLength(1);
+      expect(calls[0][0]).toBeCloseTo(.008 + (130 + getDieMotionTiming(false).impactsMs[index]) / 1000, 7);
+      expect(calls[0].slice(1)).toEqual([offset, duration]);
     }
     expect(context.sources).toHaveLength(6); // five impacts plus one state accent
   });
@@ -274,7 +281,7 @@ describe('audio user activation and cancellation', () => {
     context.completeResume()
     expect(await ready).toBe(true)
     const starts = context.sources.flatMap(source => source.start.mock.calls.map(call => call[0] as number))
-    expect(Math.min(...starts)).toBeCloseTo(.008 + 1.080 - .900)
+    expect(Math.min(...starts)).toBeCloseTo(.008 + 1.210 - .900)
   })
 
   it.each([undefined, NaN, Infinity, -10, 2000])('normalizes absent, invalid or future startedAt=%s to current time', async startedAt => {

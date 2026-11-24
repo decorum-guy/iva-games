@@ -17,7 +17,9 @@ describe('audition comparisons', () => {
       if (group.startsWith('reaction.')) expect(demo.result.affliction).toBe(group.split('.')[1]);
       if (demo.face) {
         expect(demo.events).toContainEqual(expect.objectContaining({ face: demo.face, type: 'reaction' }));
-        expect(demoFrame(demo, 0, 0).rolling).toBe(true);
+        expect(demoFrame(demo, 0, 0).showDie).toBe(false);
+        expect(demoFrame(demo, demo.plan.roll!.start, 0).rolling).toBe(true);
+        expect(demoFrame(demo, demo.plan.roll!.settle, 0)).toMatchObject({ rolling: false, awaitingReaction: true });
       }
     }
     const bloodlust = createDemo('reaction.bloodlust', 'bishop', false);

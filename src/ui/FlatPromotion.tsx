@@ -2,6 +2,7 @@ import { useId, useLayoutEffect, useMemo, useRef } from 'react'
 import type { RefObject } from 'react'
 import { clampUnit, easeRange } from '../scene/royalMotion'
 import { fractureLayout } from '../scene/fractureLayout'
+import { boltReach, queenLightning } from '../scene/queenLightning'
 import { fractureBanks, promotionFamily, promotionTiming, samplePromotion, sceneRandom } from '../scene/promotionMotion'
 import type { FloorPoint, PromotionCue } from '../scene/promotionMotion'
 import { squarePoint } from '../scene/types'
@@ -34,24 +35,16 @@ export function FlatPromotion({ cue, board, flipped, reduced }: {
       slabs: [0, 1, 2].map(index => outline(banks.map(row => row[index]).concat(banks.map(row => row[index + 1]).reverse())) + 'Z'),
     }
   }) : [], [origin, cue.id, queen])
+  const arcs = useMemo(() => queen ? queenLightning(origin, cue.id).map(bolt => ({ bolt,
+    path: outline(bolt.points.map(([px, , pz]) => [px, pz])) })) : [], [origin, cue.id, queen])
   const decoration = useMemo(() => {
     const random = sceneRandom(cue.id + '/flat')
-    const arcs = Array.from({ length: 5 }, (_, i) => {
-      const dx = (i % 2 === 0 ? -1 : 1) * (.55 + random() * 1.2)
-      const dz = (z < 0 ? 1 : -1) * (.6 + random() * 1.7)
-      const inside = (n: number) => Math.max(-3.99, Math.min(3.99, n))
-      return outline(Array.from({ length: 9 }, (_, j): FloorPoint => {
-        const t = j / 8
-        const jitter = j === 0 || j === 8 ? 0 : (random() - .5) * .25
-        return [inside(x + dx * t + jitter), inside(z + dz * t + jitter * .66)]
-      }))
-    })
     const chips = Array.from({ length: casting ? 9 : queen ? 27 : 16 }, (_, i) => ({
       angle: i * 2.399963, speed: .68 + random() * 1.64, lag: random() * .15, lift: .30 + random() * .70,
       size: .026 + random() * (queen ? .056 : .032),
     }))
-    return { arcs, chips }
-  }, [casting, cue.id, queen, x, z])
+    return { chips }
+  }, [casting, cue.id, queen])
 
   useLayoutEffect(() => {
     const host = board.current
@@ -75,6 +68,9 @@ export function FlatPromotion({ cue, board, flipped, reduced }: {
       trailing.current?.setAttribute('opacity', String(pulse.waveLight * .43))
       forkGroup.current?.setAttribute('opacity', String(pulse.crackAlpha))
       arcGroup.current?.setAttribute('opacity', String(pulse.arc * .92))
+      const after = elapsed - promotionTiming(cue.kind, cue.reduced).impact
+      arcs.forEach(({ bolt }, index) => arcGroup.current?.children.item(index)
+        ?.setAttribute('stroke-dasharray', `${boltReach(bolt, after).toFixed(3)} 1.1`))
       cracks.forEach(({ start, end }, index) => {
         const reach = clampUnit((pulse.crackReach - start) / Math.max(.04, end - start))
         mask.current[index]?.setAttribute('stroke-dasharray', `${reach.toFixed(4)} 1.2`)
@@ -98,7 +94,7 @@ export function FlatPromotion({ cue, board, flipped, reduced }: {
       cancelAnimationFrame(frame)
       for (const property of styling) host.style.removeProperty(property)
     }
-  }, [board, casting, cracks, cue, decoration, flipped, limitMotion, queen, x, z])
+  }, [arcs, board, casting, cracks, cue, decoration, flipped, limitMotion, queen, x, z])
 
   return <svg className="flat-promotion" viewBox="-4 -4 8 8" aria-hidden="true" data-testid="flat-promotion">
     <defs>
@@ -123,9 +119,9 @@ export function FlatPromotion({ cue, board, flipped, reduced }: {
         <path d={crack.slabs[1]} fill="#221317" stroke="#4a241c" strokeWidth=".016" />
         <path d={crack.slabs[2]} fill="#704635" stroke="#995b3c" strokeWidth=".009" />
       </g>)}</g>
-      {queen && !limitMotion && <g ref={arcGroup} opacity="0">{decoration.arcs.map((arc, i) =>
-        <g key={arc}><path d={arc} fill="none" stroke="#96b4e5" strokeWidth=".068" opacity=".43" />
-          <path d={arc} fill="none" stroke="#fff4e3" strokeWidth={i < 2 ? '.034' : '.021'} /></g>)}</g>}
+      {queen && !limitMotion && <g ref={arcGroup} opacity="0" strokeLinecap="round" strokeLinejoin="bevel">{arcs.map(({ path, bolt }) =>
+        <g key={path}><path pathLength="1" d={path} fill="none" stroke="#8ca7f3" strokeWidth={bolt.leader ? '.093' : '.056'} opacity=".47" />
+          <path pathLength="1" d={path} fill="none" stroke="#fff5ea" strokeWidth={bolt.leader ? '.041' : '.022'} /></g>)}</g>}
       {!limitMotion && <g ref={chipGroup}>{decoration.chips.map((_, i) => <path key={i} opacity="0"
         d={i % 3 ? 'M0 -1.28 1.15 -.24 .47 1.1 -1 .61Z' : 'M-.99 -.4 .34 -1.2 1.23 .81 -.05 1.1Z'}
         fill={['#edbb88', '#a46646', '#d0b9a5', '#605060'][i % 4]} stroke="#56332e" strokeWidth=".18" />)}</g>}

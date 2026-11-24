@@ -23,7 +23,7 @@ export function promotionTiming(kind: Promotion, reduced: boolean) {
     return kind === 'queen' ? { impact: 180, duration: 1040 }
       : kind === 'rook' ? { impact: 135, duration: 590 } : { impact: 180, duration: 390 }
   }
-  return kind === 'queen' ? { impact: 690, duration: 2260 }
+  return kind === 'queen' ? { impact: 690, duration: 2760 }
     : kind === 'rook' ? { impact: 550, duration: 1380 } : { impact: 670, duration: 960 }
 }
 
@@ -45,24 +45,25 @@ export function samplePromotion(cue: PromotionCue, elapsed: number, limitMotion 
   const waveEnd = Math.min(queen ? 1050 : 610, lightEnd)
   const waveLight = (limitMotion ? .55 : 1) * easeRange(0, 55, after) * (1 - easeRange(.24 * waveEnd, waveEnd, after))
   const crackAlpha = queen
-    ? easeRange(-12, 55, after) * (1 - easeRange(cue.reduced ? 225 : 680, duration - impact - 36, after)) : 0
+    ? easeRange(-12, 55, after) * (1 - easeRange(cue.reduced ? 225 : 1180, duration - impact - 36, after)) : 0
   const crackReach = limitMotion ? 1 : clampUnit(after / 270)
   const height = limitMotion ? 0 : formation
     ? .18 * Math.sin(charge * Math.PI) * (1 - easeRange(0, 190, after))
     : (queen ? 1.64 : 1.34) * (1 - clampUnit((elapsed - impact * .30) / (impact * .70)) ** 2.85)
       + (queen ? .059 : .046) * easeRange(0, 64, after) * (1 - easeRange(64, 186, after))
   const recoil = limitMotion ? 0 : easeRange(0, 38, after) * (1 - easeRange(45, 215, after))
-  const approach = easeRange(0, impact, elapsed) * (1 - easeRange(impact + (queen ? 360 : 80), duration - 20, elapsed))
+  const approach = easeRange(0, queen ? 360 : impact, elapsed) * (1 - easeRange(impact + (queen ? 490 : 80), duration - 20, elapsed))
   const reveal = limitMotion ? easeRange(0, impact + 120, elapsed)
     : formation ? easeRange(40, impact + 38, elapsed) : easeRange(20, impact * .72, elapsed)
-  const arc = queen && !limitMotion
-    ? easeRange(-95, 8, after) * (1 - easeRange(32, 338, after)) : 0
+  const arc = queen && !limitMotion ? Math.max(
+    easeRange(-85, 7, after) * (1 - easeRange(25, 167, after)),
+    .46 * easeRange(75, 112, after) * (1 - easeRange(124, 309, after))) : 0
   const surfaceLight = formation
     ? .81 * charge * (1 - .60 * reveal) * (1 - easeRange(36, lightEnd, after)) + .75 * contact
     : .56 * contact + .45 * arc
   const airLight = limitMotion ? 0 : easeRange(28, 182, elapsed) * easeRange(.12, .92, height)
   const depthView = queen && !limitMotion
-    ? easeRange(-100, 390, after) * (1 - easeRange(720, duration - impact - 35, after)) : 0
+    ? easeRange(0, 245, elapsed) * (1 - easeRange(1180, duration - impact - 45, after)) : 0
   return { family, charge, contact, lampLight, surfaceLight, wave, waveLight, crackAlpha, crackReach, height, recoil, reveal, arc, airLight,
     depthView, handoff: limitMotion ? 0 : easeRange(duration - 510, duration - 12, elapsed),
     approach: limitMotion ? 0 : approach, flight: limitMotion ? -1 : after / 1000,

@@ -7,7 +7,7 @@ import { captureLedger } from '../session/match';
 import { exportMatch } from '../session/save';
 import { guideCommands, instruction, teachingBeat } from '../tutorial/controller';
 import { actionPlan } from '../scene/actionPresentation';
-import { muteAudio, playRoyalCue, playSceneCue, prepareSceneAudio, setAudioVolume, stopSceneAudio, unlockAudio } from '../scene/audio';
+import { muteAudio, playRoyalCue, playSceneCue, prepareGameAudio, setAudioVolume, stopSceneAudio, unlockAudio } from '../scene/audio';
 import type { PromotionCue } from '../scene/promotionMotion';
 import type { SceneFocus, SceneMark } from '../scene/types';
 import { Board } from './Board';
@@ -96,7 +96,9 @@ export function App() {
   const plannedPromotion = livePromotion ?? savedPromotion;
   const promotionStage = plannedPromotion ? holdingPromotion ? 'reaction' : snap.promotionStage : null;
   const focusedFormation = promotionStage === 'formation' && live?.playback === 'formation';
-  const displayedActor = promotionStage && plannedPromotion ? plannedPromotion.event.piece.side : actor;
+  const awaitingReaction = reviewing === null && snap.awaitingReaction;
+  const displayedActor = promotionStage && plannedPromotion ? plannedPromotion.event.piece.side
+    : snap.animating && live?.plan.roll && currentAction ? currentAction.actor : actor;
   const formation = useMemo<PromotionCue | undefined>(() => {
     if (promotionStage !== 'formation' || !plannedPromotion || !live) return undefined;
     const { event, formationAt } = plannedPromotion;
@@ -118,7 +120,7 @@ export function App() {
   const guidance = useMemo(() => lesson ? guideCommands(lesson) : [], [lesson]);
   const active = Boolean(session && !position.outcome && reviewing === null);
   const humanActing = config?.mode === 'hotseat' || config?.human === actor;
-  const boosted = active && position.phase === 'bonus';
+  const boosted = active && !awaitingReaction && position.phase === 'bonus';
   const selectedId = selection?.key === snap.motionKey ? selection.id : boosted ? position.bonusPieceId : null;
   const selected = position.pieces.find(piece => piece.id === selectedId);
   const tutorialMode = !lesson ? 'none' : beat ? 'result' : lesson.complete ? 'complete' : step?.kind ?? 'position-complete';
@@ -136,22 +138,22 @@ export function App() {
     if (promotionStage && plannedPromotion) {
       return projectPromotion(position, session.review(session.record.cursor - 1).state, plannedPromotion, promotionStage);
     }
-    if (rollPending) return maskRollResult(position, session.review(session.record.cursor - 1).state);
+    if (awaitingReaction) return maskRollResult(position, session.review(session.record.cursor - 1).state);
     return snap.waitingForBloodlust && liveRoll ? maskBloodlust(position, latest) : position;
-  }, [promotionStage, plannedPromotion, rollPending, session, position, snap.waitingForBloodlust, liveRoll, latest]);
+  }, [promotionStage, plannedPromotion, awaitingReaction, session, position, snap.waitingForBloodlust, liveRoll, latest]);
   const boardEvents = useMemo(() => {
     if (reviewing !== null) return noEvents;
     if (plannedPromotion) return promotionEvents(plannedPromotion, promotionStage);
-    if (!liveRoll) return latest;
-    const slice = rollSceneEvents(latest, rollPending ? 'throwing' : 'revealed');
+    if (!liveRoll && !awaitingReaction) return latest;
+    const slice = rollSceneEvents(latest, awaitingReaction ? 'concealed' : 'revealed');
     return snap.waitingForBloodlust ? slice.filter(event => event.type !== 'affliction' || event.cause !== 'bloodlust') : slice;
-  }, [reviewing, plannedPromotion, promotionStage, liveRoll, latest, rollPending, snap.waitingForBloodlust]);
+  }, [reviewing, plannedPromotion, promotionStage, liveRoll, latest, awaitingReaction, snap.waitingForBloodlust]);
   const displayedPiece = boardPosition.pieces.find(piece => piece.id === selectedId);
   const inspectionKey = lesson && step?.kind === 'inspect'
     ? `${snap.motionKey}/${lesson.lesson}/${lesson.position}/${step.id}` : null;
   const inspected = inspectionKey !== null && inspectedStep === inspectionKey;
   const tutorialFocus = useMemo<SceneFocus | undefined>(() => {
-    if (!lesson || lesson.complete || rollPending || (promotionStage && !holdingPromotion && !focusedFormation)
+    if (!lesson || lesson.complete || awaitingReaction || (promotionStage && !holdingPromotion && !focusedFormation)
       || snap.teachingReturning) return undefined;
     const target = beat?.focus ?? step?.focus
       ?? (step?.kind === 'inspect' ? { square: step.square, subject: 'piece' as const } : undefined);
@@ -160,15 +162,15 @@ export function App() {
     // Start the close-up on the same reveal as the newly visible material.
     // No historical-event scan: finishing an exercise must not replay its effect.
     return { ...target, holdEmphasis: holdingPromotion, key: `${snap.motionKey}/${lesson.lesson}/${lesson.position}/${identity}` };
-  }, [lesson, beat, step, boardPosition.pieces, rollPending, promotionStage, holdingPromotion, focusedFormation, snap.teachingReturning, snap.motionKey]);
-  const teachingHud = !rollPending ? beat?.hud ?? step?.hud : undefined;
+  }, [lesson, beat, step, boardPosition.pieces, awaitingReaction, promotionStage, holdingPromotion, focusedFormation, snap.teachingReturning, snap.motionKey]);
+  const teachingHud = !awaitingReaction ? beat?.hud ?? step?.hud : undefined;
   const activePromotion = promotion?.key === snap.motionKey ? promotion.move : null;
   const allowedPromotions = activePromotion && lesson ? guidance.flatMap(command =>
     command.type === 'move' && command.from === activePromotion.from && command.to === activePromotion.to && command.promotion
       ? [command.promotion] : []) as Promotion[] : undefined;
   const lastMove = [...latest].reverse().find(event => event.type === 'move');
   const kingThreat = isInCheck(position);
-  const showThreat = kingThreat && !rollPending && !promotionStage && !snap.royalPending;
+  const showThreat = kingThreat && !awaitingReaction && !promotionStage && !snap.royalPending;
   const captures = useMemo(() => session
     ? reviewing === null ? captureLedger(session) : [
       ...session.record.rootLedger, ...session.eventsAt(reviewing).filter(event => event.type === 'capture'),
@@ -201,7 +203,7 @@ export function App() {
   }, [view]);
   useEffect(() => {
     setAudioVolume(settings.volume);
-    if (settings.sound) void prepareSceneAudio();
+    if (settings.sound) prepareGameAudio();
     else muteAudio();
     const wake = () => { if (settings.sound) void unlockAudio(); };
     document.addEventListener('pointerdown', wake, { capture: true });
@@ -380,6 +382,7 @@ export function App() {
       data-teaching-returning={snap.teachingReturning}
       data-promotion-stage={promotionStage ?? 'none'} data-promotion-kind={promotionStage ? plannedPromotion?.event.promotion : undefined}
       data-dice={showRoll && holdingPromotion ? 'settled' : showRoll && snap.animating ? snap.rollPhase : 'none'}
+      data-awaiting-reaction={awaitingReaction}
       data-active-side={actor} data-turn={position.turnSerial} data-phase={position.phase}
       data-revision={session?.record.revision ?? 0} data-game-id={session?.record.id ?? 'preview'}
       data-storage-problem={snap.storageProblem ?? 'none'}
@@ -457,20 +460,20 @@ export function App() {
           {notice}
           {storageNotice}
           <div className="decision-row" hidden={Boolean(lesson && beat)}>
-          {session.state.outcome && !lesson && !rollPending && !promotionStage && !snap.royalPending && (royal?.kind !== 'mate' || snap.royalResolved) ? <Result t={t} locale={settings.locale} session={session}
+          {session.state.outcome && !lesson && !awaitingReaction && !promotionStage && !snap.royalPending && (royal?.kind !== 'mate' || snap.royalResolved) ? <Result t={t} locale={settings.locale} session={session}
             entry={snap.ledger.find(entry => entry.matchId === session.record.id)} onNew={() => openSetup(mode === 'hotseat')} />
             : royal?.kind === 'mate' ? <div className="finale-controls">
               <button type="button" className="text-button" onClick={skipRoyal} data-testid="skip-royal">{t('game.skipFinale')}</button>
             </div> : <div className="turn-panel" data-testid="turn-panel">
               <div className="turn-heading" role="status"><span className={`mini-stamp ${displayedActor}`} aria-hidden="true" />
-                <strong>{promotionStage && plannedPromotion
+                <strong>{promotionStage === 'formation' && plannedPromotion
                   ? t('game.forming', { piece: t(`piece.${plannedPromotion.event.promotion}`) })
-                  : t(!snap.ready ? 'storage.opening' : snap.storageProblem ? 'storage.paused' : snap.busy ? 'storage.saving' : rollPending ? 'die.rolling' : snap.thinking ? 'game.thinking' : step?.kind === 'script' ? 'game.script' : lesson && !teachingMove ?
+                  : t(!snap.ready ? 'storage.opening' : snap.storageProblem ? 'storage.paused' : snap.busy ? 'storage.saving' : rollPending ? 'die.rolling' : awaitingReaction ? 'die.awaitingReaction' : snap.thinking ? 'game.thinking' : step?.kind === 'script' ? 'game.script' : lesson && !teachingMove ?
                   step?.kind === 'inspect' ? 'tutorial.selectCue' : lesson.complete ? 'tutorial.finish' : !step ? 'tutorial.positionDone' : 'tutorial.readCue' : boosted ? 'game.bonus' :
                   config?.mode === 'practice' || config?.mode === 'rated' ? humanActing ? 'game.yourTurn' : 'game.thinking' :
                     actor === 'white' ? 'game.turn' : 'game.turnBlack')}</strong>
                 {showThreat && <span className="check-label">{t('game.check')}</span>}</div>
-              {!rollPending && !promotionStage && boosted && teachingMove && (!lesson || mayEnd) && <div className="bonus-action">
+              {!promotionStage && boosted && teachingMove && (!lesson || mayEnd) && <div className="bonus-action">
                 <button type="button" className="button primary compact" disabled={!canInput || !mayEnd} data-testid="end-turn"
                   onClick={() => perform({ type: 'endTurn' })}>{t('game.endTurn')}</button>
                 {!lesson && <p>{t(mayEnd ? 'game.bonusHelp' : 'game.bonusRequired')}</p>}
@@ -483,16 +486,16 @@ export function App() {
               </div>}
             </div>}
             {!lesson && <RollDock t={t} session={session} rollId={showRoll ? snap.rollId : null}
-              reduced={snap.rollReduced} low={low} pending={rollPending}
+              reduced={snap.rollReduced} low={low} pending={rollPending} awaitingReaction={awaitingReaction}
               active={Boolean(showRoll && snap.animating && snap.rollPhase !== 'idle')}
               reserve={false} startedAt={snap.rollStartedAt ?? undefined} />}
           </div>
           {lesson && <LessonPanel t={t} locale={settings.locale} learning={lesson} guide={guidance} blocked={!snap.ready || Boolean(snap.storageProblem) || snap.busy || snap.animating || snap.teachingReturning}
-            rolling={snap.rollPhase === 'throwing'}
+            rolling={rollPending} awaitingReaction={awaitingReaction}
             promotionPending={Boolean(promotionStage && !holdingPromotion)}
             forming={promotionStage === 'formation' ? plannedPromotion?.event.promotion : undefined}
-            dice={<RollDock t={t} session={session} rollId={showRoll && !beat?.diceLegend && !lesson.complete ? snap.rollId : null}
-              reduced={snap.rollReduced} low={low} pending={rollPending}
+            dice={<RollDock t={t} session={session} rollId={showRoll && (!beat?.diceLegend || awaitingReaction) && !lesson.complete ? snap.rollId : null}
+              reduced={snap.rollReduced} low={low} pending={rollPending} awaitingReaction={awaitingReaction}
               active={Boolean(showRoll && (snap.animating || holdingPromotion) && snap.rollPhase !== 'idle')}
               reserve={Boolean(step && 'roll' in step && step.roll)}
               startedAt={snap.rollStartedAt ?? undefined} />}
@@ -501,11 +504,11 @@ export function App() {
             onHandoff={() => void cabinet.handoff()} onNew={() => openSetup()}
             onRepeat={() => setModal({ kind: 'repeat' })} onRestart={() => setModal({ kind: 'restart' })}
             onRestartAll={() => setModal({ kind: 'restart-all' })} />}
-          {!lesson && !rollPending && royal?.kind !== 'mate' && (selected || mobileDetails) && <Inspector t={t} locale={settings.locale}
+          {!lesson && !awaitingReaction && royal?.kind !== 'mate' && (selected || mobileDetails) && <Inspector t={t} locale={settings.locale}
             piece={displayedPiece} state={boardPosition} compact={!mobileDetails} />}
-          <div className={`secondary-panel ${mobileDetails && !rollPending ? '' : 'collapsed'}`}>
+          <div className={`secondary-panel ${mobileDetails && !awaitingReaction ? '' : 'collapsed'}`}>
             {lesson && <Inspector t={t} locale={settings.locale} piece={displayedPiece} state={boardPosition} />}
-            <History t={t} session={session} latest={promotionStage ? boardEvents : latest} review={reviewing}
+            <History t={t} session={session} latest={promotionStage || awaitingReaction ? boardEvents : latest} review={reviewing} concealLatest={awaitingReaction}
               onReview={cursor => setReview(cursor === null ? null : { key: snap.motionKey, cursor })} />
           </div>
           <div className="side-actions">

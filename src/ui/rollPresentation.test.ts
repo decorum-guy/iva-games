@@ -66,7 +66,7 @@ describe('unrevealed die presentation', () => {
     expect(result.events).toContainEqual(expect.objectContaining({ type: 'cure', cause: 'rally' }))
     expect(pieceAt(maskRollResult(result.state, before), 'd5')?.captureReaction).toBe('unassigned')
 
-    const throwing = rollSceneEvents(result.events, 'throwing')
+    const throwing = rollSceneEvents(result.events, 'concealed')
     const revealed = rollSceneEvents(result.events, 'revealed')
     expect(throwing.map(event => event.type)).toEqual(['move', 'capture'])
     expect(revealed.some(event => event.type === 'reaction')).toBe(true)
@@ -102,7 +102,7 @@ describe('unrevealed die presentation', () => {
     const result = applyResolvedCommand(before, { type: 'move', from: 'g6', to: 'g7' }, 4)
     expect(result.state.outcome).toEqual({ reason: 'checkmate', winner: 'white' })
     expect(maskRollResult(result.state, before).outcome).toBeNull()
-    expect(rollSceneEvents(result.events, 'throwing').some(event => event.type === 'outcome')).toBe(false)
+    expect(rollSceneEvents(result.events, 'concealed').some(event => event.type === 'outcome')).toBe(false)
     expect(rollSceneEvents(result.events, 'revealed')).toContainEqual(expect.objectContaining({ type: 'outcome' }))
     expect(result.state.outcome).toEqual({ reason: 'checkmate', winner: 'white' })
   })

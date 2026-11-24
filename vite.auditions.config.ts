@@ -6,6 +6,6 @@ export default mergeConfig(game, defineConfig({
   build: {
     outDir: '.qa/sfx-audition/production',
     emptyOutDir: true,
-    rolldownOptions: { input: 'auditions.html' },
+    rolldownOptions: { input: ['auditions.html', 'dice.html'] },
   },
 }));

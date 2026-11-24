@@ -147,7 +147,7 @@ export function framePromotionCamera(
   const elevation = Math.atan2(direction.y, Math.hypot(direction.x, direction.z))
   const yaw = Math.atan2(direction.x, direction.z)
   const view = viewDirection({ ...rig, yaw, elevation: elevation - (compact ? 8 : 9.5) * radians * depthView })
-  const top = Math.max(1.70, height + Math.min(1.70, .22 + 1.98 * reveal), 1.70 + Math.sqrt(arc) * 1.06)
+  const top = Math.max(1.70, height + Math.min(1.70, .22 + 1.98 * reveal), 1.70 + arc ** .34 * 1.13)
   const bounds = [...BOARD_FRAMING_POINTS, ...[-.46, .46].flatMap(dx => [-.46, .46].map(dz =>
     [x + dx, top, z + dz] as const))]
   const emphasis = Math.max(approach, recoil, clamp((top - 1.70) / .72))

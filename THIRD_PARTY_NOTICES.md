@@ -38,6 +38,12 @@ The separate P1 fracture audition isolates the already existing CC0 stone layers
 
 Local comparison playback adds clip windows, gain and fades, including a 1.54-second R2 chant excerpt. The compare page links each recording to its author and license. [Playback edit and timing](docs/SFX_AUDITION.md#монтаж-для-сравнения)
 
+## Selected showcase playback
+
+The installed R2 devastation and chant, the P2 formation and queen, and the P1/P2 rook mix include recordings from **Fantasy SFX Pack Vol 1 by JC Sounds**, [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). [Original pack](https://opengameart.org/content/jc-sounds-fantasy-sfx-pack-vol-1). Runtime edits include shortening selected reaction recordings, gain, fade envelopes, and synchronization to scene clocks. The rook adds contact-aligned P1/P2 mixing, a short stereo echo and room reverb, and MP3 re-encoding. The [audio manifest](public/assets/audio/manifest.json) records individual original filenames, hashes and CC0 contributors. [Installed choices and timing](docs/SHOWCASE_SFX.md)
+
+Optional dice demos contain trimmed, level-matched transient excerpts of the public CC0 previews by [aunrea](https://freesound.org/people/aunrea/sounds/485950/), [schoman3](https://freesound.org/people/schoman3/sounds/506914/), and [WallyDM](https://freesound.org/people/WallyDM/sounds/815672/). [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/).
+
 ## Software
 
 React, React DOM, Three.js, React Three Fiber and Drei are MIT-licensed. `idb` is ISC-licensed. Exact installed versions are pinned in [the lockfile](package-lock.json). The production build generates `dist/THIRD_PARTY_LICENSES.md` from the bundler’s dependency metadata. [The React Three Fiber license](public/assets/licenses/react-three-fiber.txt) is also included because the npm archive lists MIT without a standalone license text.

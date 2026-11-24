@@ -1,4 +1,4 @@
-import type { Affliction, GameEvent, Side } from '../core/types'
+import type { Affliction, GameEvent, PieceType, Side } from '../core/types'
 import { sampleWindow, sceneAudioPath } from './audioSamples'
 import type { SampleName } from './audioSamples'
 import { getDieMotionTiming } from './diceMotion'
@@ -7,6 +7,8 @@ import type { ActionPlan, PromotionPlayback } from './actionPresentation'
 import { promotionFamily, promotionTiming } from './promotionMotion'
 import { royalTiming } from './royalMotion'
 import type { RoyalCue } from './royalMotion'
+import { reactionSoundLevel, replaceShowcaseCues, showcaseDice, showcaseSoundForCue, showcaseSources } from './showcaseSfx'
+import type { ShowcaseSound } from './showcaseSfx'
 
 export interface SceneAudioOptions {
   readonly reducedMotion?: boolean
@@ -29,9 +31,13 @@ type RoyalSound = 'royalCheck' | 'royalCharge' | 'royalBreak' | 'royalWin' | 'ro
 export interface SceneCue {
   readonly kind: CueKind
   readonly at: number
+  readonly figure?: PieceType
 }
 
-export const DIE_SETTLE_SOUND_GAP = .09
+function stateCue(kind: CueKind, at: number, events: readonly GameEvent[]): SceneCue {
+  const state = events.find(event => (event.type === 'reaction' || event.type === 'affliction') && event.affliction === kind)
+  return state?.type === 'reaction' || state?.type === 'affliction' ? { kind, at, figure: state.piece.type } : { kind, at }
+}
 
 function importantEffect(events: readonly GameEvent[], rolled: boolean): CueKind | undefined {
   const states = new Set<Affliction>()
@@ -74,10 +80,10 @@ export function planSceneCues(events: readonly GameEvent[], options: SceneAudioO
 
   const ending = outcomeCue(events, options)
   if (promotion) {
-    const { event, reactionEvents, reactionAt, surgeAt, formationAt, aftermathAt, aftermathEvents } = promotion
+    const { event, reactionEvents, surgeEvents, reactionAt, surgeAt, formationAt, aftermathAt, aftermathEvents } = promotion
     const state = importantEffect(reactionEvents, rolled)
-    if (state && reactionAt !== null) cues.push({ kind: state, at: reactionAt / 1000 + (reduced ? .036 : .074) })
-    if (surgeAt !== null) cues.push({ kind: 'bloodlust', at: surgeAt / 1000 + (reduced ? .035 : .064) })
+    if (state && reactionAt !== null) cues.push(stateCue(state, reactionAt / 1000 + (roll ? 0 : reduced ? .036 : .074), reactionEvents))
+    if (surgeAt !== null) cues.push(stateCue('bloodlust', surgeAt / 1000 + (reduced ? .035 : .064), surgeEvents))
     const family = promotionFamily(event.promotion)
     const impact = (formationAt + promotionTiming(event.promotion, reduced).impact) / 1000
     if (family === 'formation') {
@@ -91,7 +97,7 @@ export function planSceneCues(events: readonly GameEvent[], options: SceneAudioO
       if (!reduced) cues.push({ kind: 'promotionQueenArc', at: impact + .14 })
     }
     const consequence = importantEffect(aftermathEvents.filter(event => event.type !== 'bonus'), false)
-    if (consequence) cues.push({ kind: consequence, at: aftermathAt / 1000 + (reduced ? .035 : .09) })
+    if (consequence) cues.push(stateCue(consequence, aftermathAt / 1000 + (reduced ? .035 : .09), aftermathEvents))
     if (ending) cues.push({ kind: ending, at: plan.end / 1000 + .015 })
     if (options.playback) {
       const boundary = formationAt / 1000
@@ -101,16 +107,17 @@ export function planSceneCues(events: readonly GameEvent[], options: SceneAudioO
     return cues
   }
 
-  const at = roll ? roll.settle / 1000 + DIE_SETTLE_SOUND_GAP : cues.length ? (reduced ? .084 : .258) : .018
+  const at = roll ? roll.reveal / 1000 : cues.length ? (reduced ? .084 : .258) : .018
   const reactions = ending ? [] : events.filter(isCaptureReaction)
   const accent = ending ?? importantEffect(reactions.length ? reactions.slice(0, 1) : events, rolled)
-  if (accent) cues.push({ kind: accent, at })
+  if (accent) cues.push(stateCue(accent, at, reactions.length ? reactions : events))
   if (plan.escalationAt !== null && !ending) {
-    cues.push({ kind: 'bloodlust', at: plan.escalationAt / 1000 + (reduced ? .035 : .064) })
+    cues.push(stateCue('bloodlust', plan.escalationAt / 1000 + (reduced ? .035 : .064), reactions))
   }
   if (reactions.length) {
     const consequence = importantEffect(events.filter(event => !isCaptureReaction(event) && event.type !== 'bonus'), false)
-    if (consequence) cues.push({ kind: consequence, at: (cues.at(-1)?.at ?? at) + (reduced ? .09 : .18) })
+    if (consequence) cues.push(stateCue(consequence, (cues.at(-1)?.at ?? at) + (reduced ? .09 : .18),
+      events.filter(event => !isCaptureReaction(event))))
   } else if (!options.royal && !cues.length && events.some(event => event.type === 'turn')) {
     cues.push({ kind: 'turn', at: .018 })
   }
@@ -211,11 +218,14 @@ const diceImpacts: readonly SampleVoice[] = [
   { sample: 'diceSettle', rate: .95, gain: .40 },
 ]
 const quietImpact: SampleVoice = { sample: 'diceBody', rate: 1.06, gain: .73 }
+const previousDieLevel = .65
 const MAX_CUE_AGE_MS = 1000
 const MAX_SEEN_BATCHES = 128
 const BUS_RELEASE = .018
 let graph: AudioGraph | undefined
 let sampleRequest: Promise<ArrayBuffer | undefined> | undefined
+let showcaseRequests: ReadonlyMap<ShowcaseSound, Promise<void>> | undefined
+const showcaseBuffers = new Map<ShowcaseSound, AudioBuffer>()
 let enabled = false
 let masterVolume = .65
 let generation = 0
@@ -233,6 +243,30 @@ export function prepareSceneAudio() {
   sampleRequest ??= fetch(`${import.meta.env.BASE_URL}${sceneAudioPath}`).then(response => response.ok ? response.arrayBuffer() : undefined, () => undefined)
     .catch(() => undefined)
   return sampleRequest
+}
+
+function prepareShowcaseAudio(fallback?: AudioContext) {
+  if (showcaseRequests) return showcaseRequests
+  let decoder: BaseAudioContext | undefined = fallback
+  try {
+    if (typeof OfflineAudioContext === 'function') decoder = new OfflineAudioContext(2, 1, 48_000)
+  } catch { /* Use the live decoder after the first gesture if necessary. */ }
+  if (!decoder) return
+  const decode = decoder
+  const requests = new Map<ShowcaseSound, Promise<void>>()
+  for (const [key, asset] of Object.entries(showcaseSources) as [ShowcaseSound, string][]) {
+    const request = fetch(`${import.meta.env.BASE_URL}assets/audio/${asset}`).then(async response => {
+      if (response.ok) showcaseBuffers.set(key, await decode.decodeAudioData(await response.arrayBuffer()))
+    }).catch(() => undefined).finally(() => { requests.delete(key) })
+    requests.set(key, request)
+  }
+  showcaseRequests = requests
+  return showcaseRequests
+}
+
+export function prepareGameAudio() {
+  void prepareSceneAudio()
+  prepareShowcaseAudio()
 }
 
 function adjustMaster(target: number) {
@@ -304,9 +338,12 @@ function buildGraph(audio: AudioContext, decodedBank?: AudioBuffer): AudioGraph 
     result.charge = charge
   }
   if (decodedBank) installSamples(decodedBank)
-  else if (typeof audio.decodeAudioData === 'function') void prepareSceneAudio().then(async bytes => {
-    if (bytes && audio.state !== 'closed') installSamples(await audio.decodeAudioData(bytes.slice(0)))
-  }).catch(() => undefined)
+  else if (typeof audio.decodeAudioData === 'function') {
+    void prepareSceneAudio().then(async bytes => {
+      if (bytes && audio.state !== 'closed') installSamples(await audio.decodeAudioData(bytes.slice(0)))
+    }).catch(() => undefined)
+    prepareShowcaseAudio(audio)
+  }
   return result
 }
 
@@ -393,11 +430,12 @@ function playContact(g: AudioGraph, when: number, voice: SampleVoice) {
   source.stop(when + decay)
 }
 
-function renderCue(g: AudioGraph, kind: CueKind, when: number, reduced: boolean) {
+function renderCue(g: AudioGraph, kind: CueKind, when: number, reduced: boolean, figure?: PieceType, dieLevel = previousDieLevel) {
   if (kind === 'dice') {
     const timing = getDieMotionTiming(reduced)
     for (const [index, impact] of timing.impactsMs.entries()) {
-      playContact(g, when + impact / 1000, reduced ? quietImpact : diceImpacts[index])
+      const voice = reduced ? quietImpact : diceImpacts[index]
+      playContact(g, when + impact / 1000, { ...voice, gain: voice.gain * dieLevel })
     }
     return
   }
@@ -419,7 +457,7 @@ function renderCue(g: AudioGraph, kind: CueKind, when: number, reduced: boolean)
   const sound = regular[kind]
   const rate = reduced && (kind === 'move' || kind === 'capture' || kind === 'mercy' || kind === 'friendlyCapture')
     ? sound.rate * 1.42 : sound.rate
-  playContact(g, when, rate === sound.rate ? sound : { ...sound, rate })
+  playContact(g, when, { ...sound, rate, gain: sound.gain * reactionSoundLevel(kind, figure) })
 }
 
 export interface RecordedClip {
@@ -432,8 +470,26 @@ export interface RecordedClip {
   readonly fadeOut: number
 }
 
+function playRecorded(g: AudioGraph, clip: RecordedClip, when: number) {
+  const now = g.audio.currentTime
+  const elapsed = Math.max(0, now - when)
+  const duration = clip.duration - elapsed
+  if (duration <= .018) return
+  const source = g.audio.createBufferSource()
+  source.buffer = clip.buffer
+  const start = Math.max(now, when)
+  const release = Math.min(clip.fadeOut, duration * .8)
+  const attack = Math.min(clip.fadeIn, duration - release)
+  const gain = connectVoice(g, source, 0).gain
+  gain.setValueAtTime(0, start)
+  gain.linearRampToValueAtTime(clip.gain * Math.min(1, duration / clip.fadeOut), start + attack)
+  gain.setValueAtTime(clip.gain * Math.min(1, duration / clip.fadeOut), start + duration - release)
+  gain.linearRampToValueAtTime(0, start + duration)
+  source.start(start, clip.offset + elapsed, duration)
+}
+
 /** The isolated audition uses the live bank and bus with a shared future visual epoch. */
-export function playAuditionAudio(cues: readonly SceneCue[], clip: RecordedClip | undefined, startedAt: number, reduced: boolean) {
+export function playAuditionAudio(cues: readonly SceneCue[], clips: readonly RecordedClip[], startedAt: number, reduced: boolean, dieLevel?: number) {
   const g = graph
   if (!g?.samples || !enabled || !visible() || g.audio.state !== 'running') return false
   const time = g.audio.currentTime + (startedAt - nowMs()) / 1000
@@ -441,19 +497,8 @@ export function playAuditionAudio(cues: readonly SceneCue[], clip: RecordedClip 
   try {
     releaseVoices()
     adjustMaster(desiredGain())
-    for (const cue of cues) renderCue(g, cue.kind, time + cue.at, reduced)
-    if (clip) {
-      const source = g.audio.createBufferSource()
-      source.buffer = clip.buffer
-      const when = time + clip.at
-      const end = when + clip.duration
-      const gain = connectVoice(g, source, 0).gain
-      gain.setValueAtTime(0, when)
-      gain.linearRampToValueAtTime(clip.gain, when + clip.fadeIn)
-      gain.setValueAtTime(clip.gain, end - clip.fadeOut)
-      gain.linearRampToValueAtTime(0, end)
-      source.start(when, clip.offset, clip.duration)
-    }
+    for (const cue of cues) renderCue(g, cue.kind, time + cue.at, reduced, cue.figure, dieLevel)
+    for (const clip of clips) playRecorded(g, clip, time + clip.at)
     return true
   } catch {
     stopSceneAudio()
@@ -468,10 +513,43 @@ function scheduleCues(g: AudioGraph, cues: readonly SceneCue[], options: SceneAu
   if (!future.length) return
   // Only the latest committed action owns the effects bus. Clear previous tails
   // and delayed accents before a quick reply or an interrupted presentation.
+  const batch = ++generation
   releaseVoices()
   adjustMaster(desiredGain())
   const base = g.audio.currentTime + .008 - elapsedMs / 1000
-  for (const cue of future) renderCue(g, cue.kind, base + cue.at, reduced)
+  const selected: SceneCue[] = []
+  const loading = new Set<Promise<void>>()
+  for (const cue of future) {
+    const sound = showcaseSoundForCue(cue.kind, options.plan)
+    if (!sound) {
+      renderCue(g, cue.kind, base + cue.at, reduced, cue.figure)
+      continue
+    }
+    selected.push(cue)
+    const request = !showcaseBuffers.has(sound) && showcaseRequests?.get(sound)
+    if (request) loading.add(request)
+  }
+  if (!selected.length) return
+  function playSelected() {
+    const { stock, clips } = replaceShowcaseCues(selected, showcaseBuffers, options.plan, options.playback, Boolean(options.royal))
+    for (const cue of stock) renderCue(g, cue.kind, base + cue.at, reduced, cue.figure, showcaseDice.level)
+    for (const clip of clips) playRecorded(g, clip, base + clip.at)
+  }
+  // WebKit may still be decoding the first recording when the player moves.
+  // Start the ordinary cues unchanged and reserve the recorded ones until
+  // ready or just before their first accent. Both use the original epoch.
+  const spareMs = (base + Math.min(...selected.map(cue => cue.at)) - g.audio.currentTime) * 1000 - 30
+  if (!loading.size || spareMs <= 0) { playSelected(); return }
+  let played = false
+  function finish() {
+    if (played) return
+    played = true
+    clearTimeout(deadline)
+    if (batch !== generation || !enabled || masterVolume === 0 || !visible() || g.audio.state !== 'running') return
+    try { playSelected() } catch { stopSceneAudio() }
+  }
+  const deadline = setTimeout(finish, spareMs)
+  void Promise.all(loading).then(finish)
 }
 
 function playBatch(batchId: string | undefined, cues: readonly SceneCue[], options: SceneAudioOptions): boolean {
@@ -498,7 +576,10 @@ function playBatch(batchId: string | undefined, cues: readonly SceneCue[], optio
 
 /** Accept only newly committed live events. Never call this with restored/review/search history. */
 export function playSceneCue(events: readonly GameEvent[], options: SceneAudioOptions = {}): boolean {
-  return playBatch(options.batchId ?? events.at(-1)?.id, planSceneCues(events, options), options)
+  const plan = options.plan ?? actionPlan(events, events.some(event => event.type === 'reaction' && event.face !== undefined),
+    Boolean(options.reducedMotion), Boolean(options.royal))
+  const live = { ...options, plan }
+  return playBatch(options.batchId ?? events.at(-1)?.id, planSceneCues(events, live), live)
 }
 
 export function playRoyalCue(cue: RoyalCue) {

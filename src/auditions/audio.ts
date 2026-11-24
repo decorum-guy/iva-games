@@ -1,6 +1,6 @@
 import { planSceneCues, prepareSceneAudio } from '../scene/audio';
 import type { CueKind, RecordedClip } from '../scene/audio';
-import { promotionTiming } from '../scene/promotionMotion';
+import { promotionGain, promotionMontage, reactionMontage } from '../scene/sfxMontage';
 import type { Demo, Group } from './demos';
 
 export type Variant = 'current' | 'R1' | 'R2' | 'P1' | 'P2' | 'CURRENT-STONE-SOLO' | 'P1-STONE-SOLO';
@@ -91,21 +91,6 @@ export function candidateFor(library: Library, group: Group, variant: Variant) {
   return library.catalog.candidates.find(asset => asset.id === id);
 }
 
-const reactionEdits: Record<string, [start: number, end: number, decibels: number, tail: number]> = {
-  'r1-guilt': [0, 1.40, -8, .23],
-  'r1-devastated': [.29, 1.67, -8, .24],
-  'r1-berserk': [.40, 1.66, -12, .24],
-  'r1-bloodlust': [.57, 1.98, -8, .25],
-  'r2-guilt': [.22, 1.433, -8, .25],
-  'r2-devastated': [.16, 1.20, -2, .20],
-  'r2-berserk': [.36, 1.20, -2, .20],
-  // One short phrase ending in the measured low-energy gap. The original is a separate listen button.
-  'r2-bloodlust': [0, 1.54, -7, .24],
-};
-const promotionGain: Record<string, number> = {
-  'p1-formation': -8, 'p2-formation': -5, 'p1-rook': -6, 'p2-rook': -8,
-  'p1-queen': -6, 'p2-queen': -8, 'p1-queen-fracture-only': -6,
-};
 const replaceable = {
   'reaction.guilt': ['guilt'], 'reaction.devastated': ['devastated'],
   'reaction.berserk': ['berserk'], 'reaction.bloodlust': ['bloodlust'],
@@ -114,27 +99,19 @@ const replaceable = {
 } as const satisfies Readonly<Record<Group, readonly CueKind[]>>;
 
 export function clipEdit(asset: Candidate, demo: Demo) {
-  const reaction = reactionEdits[asset.id];
-  if (reaction) {
-    const [offset, end, decibels, fadeOut] = reaction;
+  if (demo.group.startsWith('reaction.')) {
     const cue = planSceneCues(demo.events, { plan: demo.plan }).find(value => `reaction.${value.kind}` === demo.group);
-    if (!cue) throw new Error(`Reaction cue missing for ${asset.id}`);
-    return { at: cue.at, offset, duration: end - offset, decibels, fadeIn: .014, fadeOut };
+    const edit = cue && reactionMontage(asset.id, cue.at);
+    if (!edit) throw new Error(`Reaction cue missing for ${asset.id}`);
+    return edit;
   }
   const promotion = demo.plan.promotion;
   if (!promotion) throw new Error(`Promotion cue missing for ${asset.id}`);
-  const { reduced } = demo.plan;
-  const { impact, duration } = promotionTiming(promotion.event.promotion, reduced);
   const formation = asset.sync.main_formation_layer_onset_seconds;
   const marker = formation ?? asset.sync.physical_contact_seconds ?? asset.sync.physical_contact_reference_seconds;
   if (marker === undefined) throw new Error(`Missing contact marker for ${asset.id}`);
-  const target = formation != null ? (reduced ? .055 : .15) : impact / 1000;
-  const lead = Math.max(0, target - marker);
-  const offset = Math.max(0, marker - target);
-  return { at: promotion.formationAt / 1000 + lead, offset,
-    duration: Math.min(asset.decoded_duration_seconds - offset, duration / 1000 - lead),
-    decibels: promotionGain[asset.id], fadeIn: .014,
-    fadeOut: reduced ? .14 : promotion.event.promotion === 'queen' ? .32 : .22 };
+  return promotionMontage(promotion.event.promotion, demo.plan.reduced, promotion.formationAt,
+    { seconds: asset.decoded_duration_seconds, marker, decibels: promotionGain[asset.id], formation: formation != null });
 }
 
 export function makePlayback(library: Library, group: Group, variant: Variant, demo: Demo, chant = false) {

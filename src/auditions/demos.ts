@@ -59,7 +59,7 @@ export function createDemo(group: Group, minor: 'bishop' | 'knight', reduced: bo
 
 export function stageOffsets(demo: Demo) {
   const { plan } = demo;
-  return [0, ...new Set([plan.roll?.settle, plan.promotion?.formationAt, plan.promotion?.aftermathAt, plan.end])]
+  return [0, ...new Set([plan.roll?.start, plan.roll?.settle, plan.roll?.reveal, plan.promotion?.formationAt, plan.promotion?.aftermathAt, plan.end])]
     .filter((offset): offset is number => offset !== undefined).sort((a, b) => a - b);
 }
 
@@ -68,9 +68,11 @@ const noEvents: readonly GameEvent[] = [];
 export function demoFrame(demo: Demo, elapsed: number, startedAt: number) {
   const { before, after, events, plan } = demo;
   const forming = plan.promotion;
-  const rolling = plan.roll !== null && elapsed >= 0 && elapsed < plan.roll.settle;
-  let state = elapsed < 0 ? before : rolling ? maskRollResult(after, before) : after;
-  let visible = elapsed < 0 ? noEvents : plan.roll ? rollSceneEvents(events, rolling ? 'throwing' : 'revealed') : events;
+  const showDie = plan.roll !== null && elapsed >= plan.roll.start;
+  const rolling = plan.roll !== null && showDie && elapsed < plan.roll.settle;
+  const awaitingReaction = plan.roll !== null && elapsed >= 0 && elapsed < plan.roll.reveal;
+  let state = elapsed < 0 ? before : awaitingReaction ? maskRollResult(after, before) : after;
+  let visible = elapsed < 0 ? noEvents : plan.roll ? rollSceneEvents(events, awaitingReaction ? 'concealed' : 'revealed') : events;
   let stage: PromotionStage | undefined;
   let promotion: PromotionCue | undefined;
   if (forming && elapsed >= 0) {
@@ -84,6 +86,6 @@ export function demoFrame(demo: Demo, elapsed: number, startedAt: number) {
         reduced: plan.reduced, intoRoyal: false };
     }
   }
-  return { state, events: visible, stage, promotion, rolling,
-    revealed: elapsed >= (plan.roll?.settle ?? plan.promotion?.formationAt ?? plan.end) };
+  return { state, events: visible, stage, promotion, showDie, rolling, awaitingReaction,
+    revealed: elapsed >= (plan.roll?.reveal ?? plan.promotion?.formationAt ?? plan.end) };
 }

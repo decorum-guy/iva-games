@@ -17,8 +17,13 @@ describe.each(['bishop', 'knight', 'rook', 'queen'] as const)('%s promotion ligh
       expect(sample(impact - 50).lampLight).toBeGreaterThan(0)
       const peak = sample(impact + 65)
       expect(Math.min(peak.lampLight, peak.surfaceLight, peak.contact, peak.waveLight)).toBeGreaterThan(.1)
-      let previous = flash(impact + 90)
-      for (let t = impact + 91; t <= duration; t += 7) {
+      // The queen's electrical afterpulse crests at 112ms. The contact lamp and wave
+      // still fade monotonically from their original cutoff.
+      const fadeStart = kind === 'queen' && !limit ? 125 : 90
+      expect(sample(impact + 125).lampLight).toBeLessThanOrEqual(sample(impact + 90).lampLight)
+      expect(sample(impact + 125).waveLight).toBeLessThanOrEqual(sample(impact + 90).waveLight)
+      let previous = flash(impact + fadeStart)
+      for (let t = impact + fadeStart + 1; t <= duration; t += 7) {
         const next = flash(t)
         next.forEach((v, i) => expect(v).toBeLessThanOrEqual(previous[i] + 1e-9))
         previous = next

@@ -30,9 +30,9 @@ export function royalAction(state: GameState, events: readonly GameEvent[], huma
 }
 
 /** Board movement and material transitions get their own time before the king takes focus. */
-export function royalLeadIn(events: readonly GameEvent[], baseMs: number, rollMotionMs: number | null, reduced: boolean) {
+export function royalLeadIn(events: readonly GameEvent[], baseMs: number, rollSettledAt: number | null, reduced: boolean) {
   if (reduced) return baseMs
-  if (rollMotionMs !== null) return Math.max(baseMs, rollMotionMs + 615)
+  if (rollSettledAt !== null) return Math.max(baseMs, rollSettledAt + 615)
   if (events.every(event => event.type === 'turn' || event.type === 'outcome')) return 145
   return 625
 }

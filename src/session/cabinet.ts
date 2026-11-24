@@ -41,6 +41,7 @@ interface CabinetState {
   readonly motionKey: string;
   readonly rollId: string | null;
   readonly rollPhase: 'idle' | 'throwing' | 'settled';
+  readonly awaitingReaction: boolean;
   readonly rollReduced: boolean;
   readonly rollStartedAt: number | null;
   readonly audioCue: {
@@ -81,7 +82,7 @@ export class Cabinet {
   private data: CabinetState = {
     ready: false, durable: false, storageProblem: null, busy: false, animating: false, teachingReturning: false, thinking: false, searchFailed: false,
     profile: initialProfile, ledger: [], matches: [], view: 'home', game: null, learning: null,
-    error: null, motionKey: 'home', rollId: null, rollPhase: 'idle', rollReduced: false, rollStartedAt: null, audioCue: null,
+    error: null, motionKey: 'home', rollId: null, rollPhase: 'idle', awaitingReaction: false, rollReduced: false, rollStartedAt: null, audioCue: null,
     promotionStage: null, waitingForBloodlust: false, royalPending: false, royalCue: null, royalResolved: false,
   };
   private readonly listeners = new Set<() => void>();
@@ -261,7 +262,7 @@ export class Cabinet {
     clearTimeout(this.teachingReturn);
     this.attempts = 0;
     this.patch({ thinking: false, animating: false, teachingReturning: false, searchFailed: false, motionKey: newId(), rollId: null,
-      rollPhase: 'idle', rollStartedAt: null, audioCue: null, promotionStage: null, waitingForBloodlust: false, royalPending: false, royalCue: null, royalResolved: false });
+      rollPhase: 'idle', awaitingReaction: false, rollStartedAt: null, audioCue: null, promotionStage: null, waitingForBloodlust: false, royalPending: false, royalCue: null, royalResolved: false });
   }
 
   private async run(action: () => void | Promise<void>): Promise<boolean> {
@@ -419,10 +420,9 @@ export class Cabinet {
     const { roll, promotion } = plan;
     const resumeAt = playback === 'formation' ? promotion?.formationAt ?? 0 : 0;
     const holdAt = playback === 'reaction' ? promotion?.reactionAt ?? null : null;
-    const startsThrowing = !resumeAt && roll?.start === 0;
-    this.patch({ audioCue, animating: true, rollId: roll && (startsThrowing || resumeAt) ? action.id : null,
-      rollPhase: startsThrowing ? 'throwing' : 'idle', rollReduced: plan.reduced,
-      rollStartedAt: resumeAt ? this.data.rollStartedAt : startsThrowing ? startedAt : null, royalPending: Boolean(royal),
+    this.patch({ audioCue, animating: true, rollId: roll && resumeAt ? action.id : null,
+      rollPhase: 'idle', awaitingReaction: Boolean(roll && !resumeAt), rollReduced: plan.reduced,
+      rollStartedAt: resumeAt ? this.data.rollStartedAt : null, royalPending: Boolean(royal),
       promotionStage: promotion ? resumeAt ? 'formation' : 'contact' : null, waitingForBloodlust: plan.escalationAt !== null });
     const at = (offset: number, run: () => void) => {
       this.presentationTimers.push(setTimeout(() => {
@@ -430,16 +430,18 @@ export class Cabinet {
       }, offset - resumeAt));
     };
     if (roll && !resumeAt) {
-      if (roll.start > 0) at(roll.start, () => this.patch({
-        rollId: action.id, rollPhase: 'throwing', rollStartedAt: startedAt + roll.start, promotionStage: 'roll',
+      at(roll.start, () => this.patch({
+        rollId: action.id, rollPhase: 'throwing', rollStartedAt: startedAt + roll.start,
+        promotionStage: promotion ? 'roll' : null,
       }));
-      if (holdAt === null) at(roll.settle, () => this.patch({ rollPhase: 'settled',
+      at(roll.settle, () => this.patch({ rollPhase: 'settled' }));
+      if (holdAt === null) at(roll.reveal, () => this.patch({ awaitingReaction: false,
         ...(promotion ? { promotionStage: 'reaction' as const } : {}) }));
     }
     if (holdAt !== null) {
       const hold = (skipRemainingThrow = false) => {
         this.clearPresentation();
-        this.patch({ animating: false, promotionStage: 'reaction',
+        this.patch({ animating: false, awaitingReaction: false, promotionStage: 'reaction',
           rollId: roll ? action.id : null, rollPhase: roll ? 'settled' : 'idle',
           rollStartedAt: skipRemainingThrow ? null : this.data.rollStartedAt });
       };
@@ -461,7 +463,7 @@ export class Cabinet {
       const cue = royal && (typeof document === 'undefined' || !document.hidden)
         ? { ...royal, fromPromotion: Boolean(promotion), continuingCamera: promotion?.aftermathAt === plan.end,
           reduced: this.shortMotion, startedAt: performance.now() } : null;
-      this.patch({ animating: false, rollPhase: 'idle', promotionStage: null, waitingForBloodlust: false, royalPending: false, royalCue: cue, royalResolved: false,
+      this.patch({ animating: false, rollPhase: 'idle', awaitingReaction: false, promotionStage: null, waitingForBloodlust: false, royalPending: false, royalCue: cue, royalResolved: false,
         ...(roll ? { rollId: action.id } : {}) });
       if (!cue) { this.pump(); return; }
       const { duration, resolution } = royalTiming(cue);

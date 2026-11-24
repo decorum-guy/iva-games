@@ -128,7 +128,7 @@ export function Auditions() {
     if (!unlocked) { setStatus('blocked'); return; }
     const audio = makePlayback(library, group, variant, demo, chant);
     const startedAt = performance.now() + leadMs;
-    if (!playAuditionAudio(audio.cues, audio.clip, startedAt, reduced)) {
+    if (!playAuditionAudio(audio.cues, audio.clip ? [audio.clip] : [], startedAt, reduced)) {
       setStatus('blocked');
       return;
     }
@@ -187,7 +187,7 @@ export function Auditions() {
   return <div className="audition" data-testid="audition" data-group={group} data-variant={variant}
     data-motion={reduced ? 'reduced' : 'normal'} data-status={status} data-epoch={elapsed >= 0 ? epoch : undefined}
     data-stage={frame.stage ?? (elapsed < 0 ? 'idle' : frame.rolling ? 'roll' : 'result')}
-    data-dice={demo.face && elapsed >= 0 ? frame.rolling ? 'throwing' : 'settled' : 'none'}
+    data-dice={frame.showDie ? frame.rolling ? 'throwing' : 'settled' : 'none'}
     data-affliction={elapsed >= 0 ? frame.state.pieces.find(piece => piece.square === demo.result.square)?.affliction : undefined}>
     <header className="audition-header">
       <div className="audition-brand"><Seal /><span>REMORSE</span></div>
@@ -208,11 +208,11 @@ export function Auditions() {
         <div className="audition-caption">
           <div><span>{label('demo')}</span><strong>{demo.notation}</strong></div>
           <span className="audition-result" role="status">{frame.rolling ? t('die.rolling') : result}</span>
-          <div className="audition-die" data-visible={Boolean(demo.face && elapsed >= 0)} aria-hidden="true">
-            {demo.face && <DieThrow face={demo.face} rollKey={demo.key} startedAt={elapsed >= 0 ? epoch : 0}
+          <div className="audition-die" data-visible={frame.showDie} aria-hidden="true">
+            {demo.face && <DieThrow face={demo.face} rollKey={demo.key} startedAt={frame.showDie ? epoch + (demo.plan.roll?.start ?? 0) : 0}
               reduced={reduced} quality="low" />}
           </div>
-          {demo.face && frame.revealed && <output className="audition-face" aria-label={t('die.face', { face: demo.face })}>{demo.face}</output>}
+          {demo.face && frame.showDie && !frame.rolling && <output className="audition-face" aria-label={t('die.face', { face: demo.face })}>{demo.face}</output>}
         </div>
       </section>
 

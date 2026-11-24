@@ -69,9 +69,9 @@ export function Inspector({ t, locale, piece, state, compact = false }: {
 }
 
 /** One reserved information slot; a live throw never covers or resizes the board. */
-export function RollDock({ t, session, rollId, reduced, low, pending, active, startedAt, reserve = true }: {
+export function RollDock({ t, session, rollId, reduced, low, pending, awaitingReaction, active, startedAt, reserve = true }: {
   t: Translate; session: GameSession; rollId: string | null; reduced: boolean; low: boolean;
-  pending: boolean; active: boolean; startedAt?: number; reserve?: boolean;
+  pending: boolean; awaitingReaction: boolean; active: boolean; startedAt?: number; reserve?: boolean;
 }) {
   const dock = useRef<HTMLDivElement>(null);
   const [Renderer, setRenderer] = useState(() => preparedDie);
@@ -114,15 +114,17 @@ export function RollDock({ t, session, rollId, reduced, low, pending, active, st
             <Renderer face={roll.face} rollKey={key} reduced={reduced} quality={low ? 'low' : 'high'} startedAt={startedAt} />
           </DieLoadBoundary> : placeholder}
         </div>
-        <strong className="dice-caption" role="status">{pending ? t('die.rolling') : `${roll.face} · ${result}`}</strong>
+        <strong className="dice-caption" role="status" aria-label={!pending && awaitingReaction ? t('die.face', { face: roll.face }) : undefined}>
+          {pending ? t('die.rolling') : awaitingReaction ? roll.face : `${roll.face} · ${result}`}</strong>
       </div>
     </div>
   </div>;
 }
 
-export function LessonPanel({ t, locale, learning, guide, blocked, rolling = false, promotionPending = false, forming, inspected = false, dice, onAdvance, onHandoff, onNew, onRepeat, onRestart, onRestartAll }: {
+export function LessonPanel({ t, locale, learning, guide, blocked, rolling = false, awaitingReaction = false, promotionPending = false, forming, inspected = false, dice, onAdvance, onHandoff, onNew, onRepeat, onRestart, onRestartAll }: {
   t: Translate; locale: Locale; learning: Learning; guide: readonly Command[]; blocked: boolean;
   rolling?: boolean;
+  awaitingReaction?: boolean;
   promotionPending?: boolean;
   forming?: 'queen' | 'rook' | 'bishop' | 'knight';
   inspected?: boolean;
@@ -135,8 +137,8 @@ export function LessonPanel({ t, locale, learning, guide, blocked, rolling = fal
   const beat = teachingBeat(learning);
   const step = beat ? undefined : instruction(learning);
   const phase = beat ? 'result' : complete ? 'complete' : step?.kind ?? 'position-complete';
-  const waiting = rolling || promotionPending;
-  const showInstruction = !promotionPending || rolling || Boolean(forming);
+  const waiting = rolling || awaitingReaction || promotionPending;
+  const showInstruction = !promotionPending || awaitingReaction || rolling || Boolean(forming);
   const resultVisible = Boolean(beat && !waiting);
   const face = learning.session.record.actions[learning.session.record.cursor - 1]?.roll?.face;
   const moves = guide.filter(cmd => cmd.type === 'move');
@@ -166,9 +168,9 @@ export function LessonPanel({ t, locale, learning, guide, blocked, rolling = fal
       <h2>{complete ? t('tutorial.finish') : resultVisible ? beat!.title[locale] : feedback ? t('tutorial.choiceResult') : lesson.title[locale]}</h2>
       {dice}
     </div>
-    {showInstruction && !complete && !resultVisible && !feedback && <div className="lesson-action-label" role="status"><Icon name={read || inspected || !step ? 'check' : step.kind === 'inspect' ? 'info' : 'arrow'} />{t(rolling ? 'die.watch' : forming ? 'game.promotion' : inspected ? 'tutorial.readCue' : actionTitle)}</div>}
+    {showInstruction && !complete && !resultVisible && !feedback && <div className="lesson-action-label" role="status"><Icon name={read || inspected || !step ? 'check' : step.kind === 'inspect' ? 'info' : 'arrow'} />{t(rolling || awaitingReaction ? 'die.watch' : forming ? 'game.promotion' : inspected ? 'tutorial.readCue' : actionTitle)}</div>}
     {showInstruction && <p className="lesson-instruction" data-testid={resultVisible ? 'teaching-cause' : inspected ? 'counter-read' : feedback ? 'choice-feedback' : undefined}
-      data-feedback={feedback?.kind} role={resultVisible ? 'status' : undefined}>{rolling ? t('die.rolling')
+      data-feedback={feedback?.kind} role={resultVisible ? 'status' : undefined}>{rolling ? t('die.rolling') : awaitingReaction ? t('die.awaitingReaction')
       : forming ? t('game.forming', { piece: t(`piece.${forming}`) })
       : resultVisible ? beat!.text[locale]
       : inspected && remaining !== null ? t('tutorial.counterRead', { count: countText(locale, 'turn', remaining) })
@@ -205,15 +207,18 @@ export function LessonPanel({ t, locale, learning, guide, blocked, rolling = fal
   </section>;
 }
 
-export function History({ t, session, latest, review, onReview }: {
+export function History({ t, session, latest, review, concealLatest, onReview }: {
   t: Translate; session: GameSession; latest: readonly GameEvent[]; review: number | null;
+  concealLatest: boolean;
   onReview: (cursor: number | null) => void;
 }) {
   const tutorial = session.record.config.mode === 'tutorial';
   const total = session.record.cursor;
   const notable = latest.filter(event => event.type !== 'turn' || event.check);
   const tutorialEvents = tutorialHistory(session).filter(event => event.type !== 'turn' || event.check);
-  const events = (review === null ? session.events : session.eventsAt(review)).filter(event => event.type !== 'turn' || event.check);
+  const displayed = review !== null ? session.eventsAt(review)
+    : concealLatest ? [...session.eventsAt(total - 1), ...latest] : session.events;
+  const events = displayed.filter(event => event.type !== 'turn' || event.check);
   return <section className="history" data-testid="history">
     {notable.length > 0 && <div className="recent-event">{describeEvent(t, notable[notable.length - 1])}</div>}
     <details>
@@ -225,7 +230,7 @@ export function History({ t, session, latest, review, onReview }: {
       {events.length ? <ol>{events.map(event => <li key={event.id}>{describeEvent(t, event)}</li>)}</ol>
         : <p>{t('log.empty')}</p>}
       {!tutorial && total > 0 && <div className="review-controls">
-        {review === null ? <button type="button" className="button compact" onClick={() => onReview(total)}>{t('log.review')}</button>
+        {review === null ? <button type="button" className="button compact" disabled={concealLatest} onClick={() => onReview(total)}>{t('log.review')}</button>
           : <>
             <label>{t('log.step', { current: review, total })}
               <input type="range" min={0} max={total} value={review} onChange={event => onReview(Number(event.target.value))} /></label>

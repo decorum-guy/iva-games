@@ -17,6 +17,7 @@ import { easeRange, sampleRoyal } from './royalMotion'
 import type { RoyalCue } from './royalMotion'
 import { samplePromotion } from './promotionMotion'
 import type { PromotionCue } from './promotionMotion'
+import { pieceTravelMs } from './actionPresentation'
 
 const restHeight = .005
 const flatRotation: [number, number, number] = [-Math.PI / 2, 0, 0]
@@ -51,10 +52,6 @@ function seed(id: string) {
   let hash = 0
   for (let i = 0; i < id.length; i++) hash = (hash * 31 + id.charCodeAt(i)) >>> 0
   return (hash % 2483) / 217
-}
-
-function moveDuration(length: number) {
-  return Math.min(380, 232 + 26 * length)
 }
 
 function positionAlong(travel: Travel, p: number, target: Vector3) {
@@ -322,7 +319,7 @@ export function VisualPiece({ piece, assets, events, flipped, low, reduced, focu
       const from = body.current.position.clone()
       const length = Math.hypot(to.x - from.x, to.z - from.z)
       const knight = last.piece.kind === 'knight'
-      move.current = { from, to, start: now, duration: moveDuration(length), lift: knight ? .61 : .12 + .024 * length }
+      move.current = { from, to, start: now, duration: pieceTravelMs(length), lift: knight ? .61 : .12 + .024 * length }
     }
 
     const cue = eventId !== last.eventId ? events : []
@@ -492,7 +489,7 @@ export function DepartingPiece({ events, snapshot, assets, capture }: {
   if (capture && action?.type === 'move') {
     const [fx, fz] = squarePoint(action.from)
     const [tx, tz] = squarePoint(action.to)
-    delay = moveDuration(Math.hypot(tx - fx, tz - fz)) * .56
+    delay = pieceTravelMs(Math.hypot(tx - fx, tz - fz)) * .56
   }
 
   useLayoutEffect(() => {

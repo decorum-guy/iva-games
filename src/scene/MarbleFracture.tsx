@@ -72,14 +72,20 @@ export function breakMarble(source: Source, origin: FloorPoint, id: string, supp
   }
   const top = combine(fragments, 'top'), sides = combine(fragments, 'sides')
   const surfaces = [top, sides]
+  const lastRebound = motion.reduce((last, part) => Math.max(last, part.delay + 365), 0)
   let preceding = -1
+  let previousFlight = -1
+  let previousReduced = false
   function draw(progress: number, flight: number, reduced: boolean) {
-    if (progress === 0 && preceding === 0) return
+    const elapsed = reduced ? 0 : Math.min(lastRebound, flight * 1000)
+    if (progress === preceding && (progress === 0 || (elapsed === previousFlight && reduced === previousReduced))) return
     preceding = progress
+    previousFlight = elapsed
+    previousReduced = reduced
     for (const [i, part] of motion.entries()) {
-      const arrival = reduced ? 1 : easeRange(part.delay, part.delay + 128, flight * 1000)
-      const rebound = reduced ? 0 : easeRange(part.delay + 34, part.delay + 114, flight * 1000) *
-        (1 - easeRange(part.delay + 114, part.delay + 365, flight * 1000))
+      const arrival = reduced ? 1 : easeRange(part.delay, part.delay + 128, elapsed)
+      const rebound = reduced ? 0 : easeRange(part.delay + 34, part.delay + 114, elapsed) *
+        (1 - easeRange(part.delay + 114, part.delay + 365, elapsed))
       const amount = progress * part.freedom * part.power * arrival * (reduced ? .58 : 1)
       const scale = 1 - part.scale * amount
       const push = part.push * amount

@@ -102,8 +102,8 @@ function until(current: Cabinet, predicate: () => boolean) {
   })
 }
 
-async function finishMotion() {
-  await vi.advanceTimersByTimeAsync(2000)
+async function finishMotion(current = cabinet) {
+  await vi.advanceTimersByTimeAsync(current.getSnapshot().audioCue?.plan.end ?? 0)
 }
 
 async function savedLearning() {
@@ -330,26 +330,37 @@ describe('Cabinet shared die presentation timeline', () => {
   it.each([false, true])('reveals the committed face on settle and releases AI after the hold (reduced=%s)', async reduced => {
     await captureReady()
     cabinet.setShortMotion(reduced)
-    const timing = getDieMotionTiming(reduced)
     await cabinet.command(move('d4', 'd5'))
     const committed = cabinet.getSnapshot()
+    const plan = committed.audioCue!.plan
+    const roll = plan.roll!
     expect(committed.game?.current.events).toContainEqual(expect.objectContaining({ type: 'reaction', face: 4 }))
     expect(committed.game?.state.side).toBe('black')
-    expect(committed.rollPhase).toBe('throwing')
+    expect(committed.rollPhase).toBe('idle')
+    expect(committed.awaitingReaction).toBe(true)
+    expect(committed.rollId).toBeNull()
+    await vi.advanceTimersByTimeAsync(roll.start - 1)
+    expect(cabinet.getSnapshot().rollPhase).toBe('idle')
+    await vi.advanceTimersByTimeAsync(1)
+    expect(cabinet.getSnapshot().rollPhase).toBe('throwing')
     expect(committed.rollReduced).toBe(reduced)
     expect(committed.animating).toBe(true)
     expect(TestWorker.instances).toHaveLength(0)
 
     // A preference change cannot retime a throw already in progress.
     cabinet.setShortMotion(!reduced)
-    await vi.advanceTimersByTimeAsync(timing.motionMs - 1)
+    await vi.advanceTimersByTimeAsync(roll.settle - roll.start - 1)
     expect(cabinet.getSnapshot().rollPhase).toBe('throwing')
     expect(cabinet.getSnapshot().rollReduced).toBe(reduced)
     await vi.advanceTimersByTimeAsync(1)
     expect(cabinet.getSnapshot().rollPhase).toBe('settled')
     expect(cabinet.getSnapshot().animating).toBe(true)
     expect(TestWorker.instances).toHaveLength(0)
-    await vi.advanceTimersByTimeAsync(timing.holdMs - 1)
+    await vi.advanceTimersByTimeAsync(roll.reveal - roll.settle - 1)
+    expect(cabinet.getSnapshot().awaitingReaction).toBe(true)
+    await vi.advanceTimersByTimeAsync(1)
+    expect(cabinet.getSnapshot().awaitingReaction).toBe(false)
+    await vi.advanceTimersByTimeAsync(plan.end - roll.reveal - 1)
     expect(cabinet.getSnapshot().animating).toBe(true)
     expect(TestWorker.instances).toHaveLength(0)
     await vi.advanceTimersByTimeAsync(1)
@@ -365,7 +376,7 @@ describe('Cabinet shared die presentation timeline', () => {
     const ids = observeCues()
     await cabinet.command(move('d4', 'd5'))
     const motionKey = cabinet.getSnapshot().motionKey
-    await vi.advanceTimersByTimeAsync(timing.motionMs / 2)
+    await vi.advanceTimersByTimeAsync(cabinet.getSnapshot().audioCue!.plan.roll!.start + timing.motionMs / 2)
     expect(await cabinet.edit('undo')).toBe(true)
     const undone = cabinet.getSnapshot()
     expect(undone.game?.state).toEqual(original.state)
@@ -398,7 +409,10 @@ describe('Cabinet acknowledged tutorial results', () => {
 
   async function acknowledgeResults(current: Cabinet) {
     while (current.getSnapshot().learning?.pendingTeaching) {
+      const before = current.getSnapshot().learning
+      expect(current.getSnapshot().animating).toBe(false)
       await current.advance()
+      expect(current.getSnapshot().learning).not.toBe(before)
       if (current.getSnapshot().learning?.pendingTeaching && current.getSnapshot().teachingReturning) {
         await vi.advanceTimersByTimeAsync(CAMERA_TRAVEL_MS)
       }
@@ -492,22 +506,22 @@ describe('Cabinet acknowledged tutorial results', () => {
     const current = await tutorialReady()
     current.setShortMotion(reduced)
     current.setTeachingCamera(camera)
-    const timing = getDieMotionTiming(reduced)
     await current.command(move('c3', 'c4'))
+    const plan = current.getSnapshot().audioCue!.plan
     const committed = current.getSnapshot().learning!
     expect(committed.pendingTeaching?.stepId).toBe('guilt-roll')
     expect(teachingBeat(committed)?.focus?.square).toBe('c4')
-    expect(current.getSnapshot().rollPhase).toBe('throwing')
+    expect(current.getSnapshot().rollPhase).toBe('idle')
     const saved = await store.getLearning()
     expect(saved).toEqual(saveLearning(committed))
 
     // A premature click cannot consume result text while its die still spins.
     await current.advance()
     expect(current.getSnapshot().learning).toBe(committed)
-    await vi.advanceTimersByTimeAsync(timing.motionMs)
+    await vi.advanceTimersByTimeAsync(plan.roll!.settle)
     expect(current.getSnapshot().rollPhase).toBe('settled')
     expect(current.getSnapshot().learning).toBe(committed)
-    await vi.advanceTimersByTimeAsync(timing.holdMs + 5000)
+    await vi.advanceTimersByTimeAsync(plan.end - plan.roll!.settle + 5000)
     expect(current.getSnapshot().animating).toBe(false)
     expect(current.getSnapshot().learning?.session.record.cursor).toBe(1)
     expect(current.getSnapshot().learning?.pendingTeaching).toEqual(committed.pendingTeaching)
@@ -541,7 +555,7 @@ describe('Cabinet acknowledged tutorial results', () => {
   it('releases the pending script once if the learner switches to 2D during the return', async () => {
     const current = await tutorialReady()
     await current.command(move('c3', 'c4'))
-    await finishMotion()
+    await finishMotion(current)
     await current.advance()
     expect(current.getSnapshot().teachingReturning).toBe(true)
     current.setTeachingCamera(false)
@@ -580,7 +594,9 @@ describe('Cabinet acknowledged tutorial results', () => {
     await current.advance()
     expect(current.getSnapshot().learning?.pendingTeaching?.beforeFormation).toBe(true)
     await vi.advanceTimersByTimeAsync(first.plan.roll!.settle)
-    expect(current.getSnapshot()).toMatchObject({ animating: false, promotionStage: 'reaction', rollPhase: 'settled' })
+    expect(current.getSnapshot()).toMatchObject({ animating: true, awaitingReaction: true, promotionStage: 'roll', rollPhase: 'settled' })
+    await vi.advanceTimersByTimeAsync(first.plan.roll!.reveal - first.plan.roll!.settle)
+    expect(current.getSnapshot()).toMatchObject({ animating: false, awaitingReaction: false, promotionStage: 'reaction', rollPhase: 'settled' })
     await vi.advanceTimersByTimeAsync(10_000)
     const committed = current.getSnapshot().learning!
     expect(current.getSnapshot().promotionStage).toBe('reaction')
@@ -625,7 +641,7 @@ describe('Cabinet acknowledged tutorial results', () => {
   it.each(['home', 'restartLesson'] as const)('cancels the camera return and delayed script when %s interrupts', async action => {
     const current = await tutorialReady()
     await current.command(move('c3', 'c4'))
-    await finishMotion()
+    await finishMotion(current)
     await acknowledgeResults(current)
     expect(current.getSnapshot().teachingReturning).toBe(true)
     await current[action]()
@@ -660,7 +676,7 @@ describe('Cabinet acknowledged tutorial results', () => {
   it('does not hand a still-unacknowledged tutorial result to ordinary play', async () => {
     const current = await tutorialReady()
     await current.command(move('c3', 'c4'))
-    await finishMotion()
+    await finishMotion(current)
     const pending = current.getSnapshot().learning
     expect(await current.handoff()).toBe(false)
     expect(current.getSnapshot().view).toBe('learn')
@@ -675,7 +691,7 @@ describe('Cabinet acknowledged tutorial results', () => {
     const game = cabinet.getSnapshot().game!
     const current = await tutorialReady(startLesson(2, 1))
     await current.command(move('c3', 'c4'))
-    await finishMotion()
+    await finishMotion(current)
     const completedExample = current.getSnapshot().learning!
     expect(completedExample.pendingTeaching?.stepId).toBe('mercy-capture')
     expect(completedExample.index).toBe(1)
@@ -702,7 +718,7 @@ describe('Cabinet acknowledged tutorial results', () => {
   it('returns from a focused result before accepting a move in the restarted lesson', async () => {
     const current = await tutorialReady()
     await current.command(move('c3', 'c4'))
-    await finishMotion()
+    await finishMotion(current)
     const oldKey = current.getSnapshot().motionKey
     await current.restartLesson()
     expect(current.getSnapshot().motionKey).not.toBe(oldKey)
@@ -718,7 +734,7 @@ describe('Cabinet acknowledged tutorial results', () => {
   it.each(['advance', 'restartLesson'] as const)('does not discard a focused result when saving %s fails', async action => {
     const current = await tutorialReady()
     await current.command(move('c3', 'c4'))
-    await finishMotion()
+    await finishMotion(current)
     const before = current.getSnapshot()
     vi.spyOn(store, 'putLearning').mockRejectedValueOnce(new SessionError('storage'))
     expect(await current[action]()).toBe(false)

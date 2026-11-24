@@ -53,8 +53,9 @@ describe('promotion presents the committed action in causal stages', () => {
       }
     }
     expect(schedule.roll!.start).toBeGreaterThan(0)
-    expect(plan.reactionAt).toBe(schedule.roll!.settle)
-    expect(plan.formationAt).toBeGreaterThan(schedule.roll!.settle)
+    expect(schedule.roll!.reveal - schedule.roll!.settle).toBe(240)
+    expect(plan.reactionAt).toBe(schedule.roll!.reveal)
+    expect(plan.formationAt).toBeGreaterThan(schedule.roll!.reveal)
     expect(promotionEvents(plan, 'contact').map(event => event.type)).toEqual(['move', 'capture'])
     expect(promotionEvents(plan, 'reaction')).toEqual([expect.objectContaining({ type: 'reaction', face })])
   })

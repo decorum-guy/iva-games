@@ -146,7 +146,7 @@ function Viewpoint({ flipped, preset, reduced, focus, royal, promotion, onOrbit 
         frame.target.lerp(entry.target, shot.handoff)
       }
       apply(rig.current, frame)
-      lastRoyal.current = shot.approach > .001 || shot.height > .001 || (next && shot.handoff > 0) ? frame : null
+      lastRoyal.current = shot.approach > .001 || shot.height > .001 || shot.depthView > .001 || (next && shot.handoff > 0) ? frame : null
       if (!document.hidden) invalidate()
     } else if (overview) {
       apply(rig.current, overview)
@@ -418,7 +418,7 @@ export default function BoardScene({
           <Viewpoint key={cameraResetKey} flipped={flipped} preset={camera} reduced={reduced} focus={activeFocus} royal={royal} promotion={promotion} onOrbit={onOrbit} />
           <ContextLifecycle onFailure={onFailure} />
           <Lighting low={low} royal={royal} />
-          <RoyalEffects cue={royal} low={low} />
+          <RoyalEffects cue={royal} promotion={promotion} low={low} reduced={reduced} />
           {promotion && <PromotionEffects cue={promotion} low={low} reduced={reduced} />}
           <Suspense fallback={null}>
             <MarbleSet
