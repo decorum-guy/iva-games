@@ -35,9 +35,15 @@ export function samplePromotion(cue: PromotionCue, elapsed: number, limitMotion 
   const queen = family === 'queen'
   const after = elapsed - impact
   const charge = easeRange(0, impact, elapsed)
-  const contact = easeRange(-37, 28, after) * (1 - easeRange(80, queen ? 690 : 365, after))
+  // The cue's committed deadline also applies if motion preferences change in flight.
+  // Leave a fully settled frame before removal, including the shortest formation.
+  const lightEnd = duration - impact - 45
+  const contact = easeRange(-37, 28, after) * (1 - easeRange(80, Math.min(queen ? 690 : 365, lightEnd), after))
+  const preparationLight = charge * (1 - easeRange(0, Math.min(300, lightEnd), after))
+  const lampLight = contact + .13 * preparationLight
   const wave = clampUnit(after / (queen ? 1050 : 610))
-  const waveLight = (limitMotion ? .55 : 1) * easeRange(0, 55, after) * (1 - easeRange(.24, 1, wave))
+  const waveEnd = Math.min(queen ? 1050 : 610, lightEnd)
+  const waveLight = (limitMotion ? .55 : 1) * easeRange(0, 55, after) * (1 - easeRange(.24 * waveEnd, waveEnd, after))
   const crackAlpha = queen
     ? easeRange(-12, 55, after) * (1 - easeRange(cue.reduced ? 225 : 680, duration - impact - 36, after)) : 0
   const crackReach = limitMotion ? 1 : clampUnit(after / 270)
@@ -51,10 +57,13 @@ export function samplePromotion(cue: PromotionCue, elapsed: number, limitMotion 
     : formation ? easeRange(40, impact + 38, elapsed) : easeRange(20, impact * .72, elapsed)
   const arc = queen && !limitMotion
     ? easeRange(-95, 8, after) * (1 - easeRange(32, 338, after)) : 0
+  const surfaceLight = formation
+    ? .81 * charge * (1 - .60 * reveal) * (1 - easeRange(36, lightEnd, after)) + .75 * contact
+    : .56 * contact + .45 * arc
   const airLight = limitMotion ? 0 : easeRange(28, 182, elapsed) * easeRange(.12, .92, height)
   const depthView = queen && !limitMotion
     ? easeRange(-100, 390, after) * (1 - easeRange(720, duration - impact - 35, after)) : 0
-  return { family, charge, contact, wave, waveLight, crackAlpha, crackReach, height, recoil, reveal, arc, airLight,
+  return { family, charge, contact, lampLight, surfaceLight, wave, waveLight, crackAlpha, crackReach, height, recoil, reveal, arc, airLight,
     depthView, handoff: limitMotion ? 0 : easeRange(duration - 510, duration - 12, elapsed),
     approach: limitMotion ? 0 : approach, flight: limitMotion ? -1 : after / 1000,
   }

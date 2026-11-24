@@ -3,7 +3,7 @@ import { sampleWindow, sceneAudioPath } from './audioSamples'
 import type { SampleName } from './audioSamples'
 import { getDieMotionTiming } from './diceMotion'
 import { actionPlan, isCaptureReaction } from './actionPresentation'
-import type { ActionPlan } from './actionPresentation'
+import type { ActionPlan, PromotionPlayback } from './actionPresentation'
 import { promotionFamily, promotionTiming } from './promotionMotion'
 import { royalTiming } from './royalMotion'
 import type { RoyalCue } from './royalMotion'
@@ -16,6 +16,7 @@ export interface SceneAudioOptions {
   readonly royal?: boolean
   readonly plan?: ActionPlan
   readonly batchId?: string
+  readonly playback?: PromotionPlayback
 }
 
 type CueKind = 'move' | 'capture' | 'mercy' | 'friendlyCapture' | 'dice' | 'unaffected'
@@ -92,6 +93,11 @@ export function planSceneCues(events: readonly GameEvent[], options: SceneAudioO
     const consequence = importantEffect(aftermathEvents.filter(event => event.type !== 'bonus'), false)
     if (consequence) cues.push({ kind: consequence, at: aftermathAt / 1000 + (reduced ? .035 : .09) })
     if (ending) cues.push({ kind: ending, at: plan.end / 1000 + .015 })
+    if (options.playback) {
+      const boundary = formationAt / 1000
+      return options.playback === 'reaction' ? cues.filter(cue => cue.at < boundary)
+        : cues.filter(cue => cue.at >= boundary).map(cue => ({ ...cue, at: cue.at - boundary }))
+    }
     return cues
   }
 

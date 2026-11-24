@@ -330,7 +330,7 @@ export function BoardSurface({ assets, flipped, marks, royal, promotion, reduced
       <Plate size={9.54} height={.08} y={-.325} color="#222328" metalness={.3} />
       <Plate size={9.57} height={.017} y={-.299} color="#8c6945" metalness={.63} />
       {promotion?.kind === 'queen'
-        ? <MarbleFracture model={assets.board.geometry} material={boardMaterial} cue={promotion} reduced={reduced} pieces={pieces} />
+        ? <MarbleFracture assets={assets} material={boardMaterial} cue={promotion} reduced={reduced} pieces={pieces} />
         : <mesh geometry={assets.board.geometry} material={boardMaterial} receiveShadow dispose={null} />}
       <mesh position-y={.004} rotation={flatRotation}>
         <planeGeometry args={[9.58, 9.58]} />

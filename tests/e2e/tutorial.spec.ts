@@ -12,6 +12,7 @@ import { move } from '../../src/tutorial/lessonTypes'
 import type { Step } from '../../src/tutorial/lessonTypes'
 import { LESSONS } from '../../src/tutorial/lessons'
 import { describeEvent } from '../../src/ui/projections'
+import { readRecords } from './qaRecords'
 
 const square = (page: Page, name: string) => page.locator(`[data-square="${name}"]`)
 const playfield = (page: Page) => page.getByTestId('playfield')
@@ -85,11 +86,13 @@ function activate(locator: Locator, mobile: boolean) {
 }
 
 async function acknowledgeResults(page: Page, step: Step, locale: 'ru' | 'en', mobile: boolean) {
-  for (const beat of step.after ?? []) {
+  const beats = step.beforePromotion ? [step.beforePromotion, ...(step.after ?? [])] : step.after ?? []
+  for (const beat of beats) {
     await expect(tutorial(page)).toHaveAttribute('data-kind', 'result')
     await expect(tutorial(page)).toHaveAttribute('data-source-step', step.id)
     await expect(tutorial(page)).toHaveAttribute('data-beat', beat.id)
-    await interactable(page)
+    if (beat === step.beforePromotion) await expectPromotionReaction(page, locale)
+    else await interactable(page)
     await expect(tutorial(page).getByRole('heading', { name: beat.title[locale], exact: true })).toBeVisible()
     await expect(page.getByTestId('teaching-cause')).toHaveText(beat.text[locale])
     if (beat.rule) await expect(page.getByTestId('teaching-rule')).toHaveText(beat.rule[locale])
@@ -109,10 +112,82 @@ async function acknowledgeResults(page: Page, step: Step, locale: 'ru' | 'en', m
     }
     const next = page.getByTestId('lesson-next')
     await expect(next).toHaveAccessibleName(beat.action?.[locale] ?? translator(locale)('tutorial.readAction'))
+    await expect(next).toBeEnabled()
     await expect(next).toBeInViewport({ ratio: 1 })
     await expect(page.locator('.flat-board [draggable="true"]')).toHaveCount(0)
     await activate(next, mobile)
   }
+}
+
+async function expectPromotionReaction(page: Page, locale: 'ru' | 'en') {
+  const t = translator(locale)
+  const heading = locale === 'ru' ? 'Выпало 6 — ярость' : 'Rolled 6 — berserk'
+  await expect(tutorial(page).getByRole('heading', { name: heading, exact: true })).toBeVisible()
+  await expect(playfield(page)).toHaveAttribute('data-promotion-stage', 'reaction')
+  await expect(playfield(page)).toHaveAttribute('data-dice', 'settled')
+  await expect(page.getByTestId('roll')).toHaveAttribute('data-face', '6')
+  await expect(square(page, 'h8')).toHaveAccessibleName(t('game.cell', {
+    square: 'h8', side: t('side.white'), piece: t('piece.pawn'), state: t('state.berserk'),
+  }))
+  await expect(page.locator('.board-stage')).toHaveAttribute('data-focus-square', 'h8')
+  await expect(page.locator('.board-stage')).toHaveAttribute('data-focus-subject', 'piece')
+  await expect(square(page, 'h8')).toHaveAttribute('data-teaching-focus', 'piece')
+  await expect(page.getByTestId('end-turn')).toHaveCount(0)
+  const next = page.getByTestId('lesson-next')
+  await expect(next).toBeEnabled()
+  await expect(next).toBeInViewport({ ratio: 1 })
+}
+
+for (const locale of ['ru', 'en'] as const) {
+  test(`promotion waits with a visible berserk pawn and restores before formation · ${locale}`, async ({ page }) => {
+    await page.setViewportSize(locale === 'ru' ? { width: 360, height: 800 } : { width: 844, height: 390 })
+    await page.addInitScript(locale => {
+      if (!localStorage.getItem('remorse-settings-v1')) {
+        localStorage.setItem('remorse-settings-v1', JSON.stringify({ board: '2d', locale, sound: false }))
+      }
+    }, locale)
+    await page.goto('/')
+    await expect(page.getByTestId('mode-learn')).toBeVisible()
+    await restoreTutorialCheckpoint(page, startLesson(7, 1))
+    await play(page, move('g7', 'h8', 'bishop'), false)
+    await expect(page.getByTestId('teaching-cause')).toBeVisible()
+    await expectPromotionReaction(page, locale)
+    const held = await recorded<ReturnType<typeof saveLearning>>(page, 'learning', 'progress')
+    expect(held.match.actions.map(action => action.roll?.face)).toEqual([6])
+    expect(held.pendingTeaching?.beforeFormation).toBe(true)
+    await page.waitForTimeout(1550)
+    await expectPromotionReaction(page, locale)
+    expect(await recorded(page, 'learning', 'progress')).toEqual(held)
+
+    await page.reload()
+    await expectPromotionReaction(page, locale)
+    await expect(page.getByTestId('die-throw')).toHaveCount(0)
+    await page.getByTestId('leave-game').click()
+    await page.getByRole('dialog').getByRole('button', { name: translator(locale)('nav.menu'), exact: true }).click()
+    await page.getByTestId('mode-learn').click()
+    await expectPromotionReaction(page, locale)
+    expect(await recorded(page, 'learning', 'progress')).toEqual(held)
+
+    await page.getByTestId('lesson-next').click()
+    await expect(playfield(page)).toHaveAttribute('data-promotion-stage', 'formation')
+    await expect(page.getByTestId('teaching-cause')).toHaveCount(0)
+    await expect(page.getByTestId('teaching-cause')).toContainText(locale === 'ru' ? 'с нуля взятий' : 'capture count to zero')
+    await expect(page.getByTestId('teaching-rule')).toContainText(locale === 'ru' ? 'без дополнительного действия' : 'without an extra action')
+    const t = translator(locale)
+    await expect(square(page, 'h8')).toHaveAccessibleName(t('game.cell', {
+      square: 'h8', side: t('side.white'), piece: t('piece.bishop'), state: t('state.neutral'),
+    }))
+    const formed = await recorded<ReturnType<typeof saveLearning>>(page, 'learning', 'progress')
+    expect(formed.match).toEqual(held.match)
+    expect(formed.pendingTeaching?.beforeFormation).toBeUndefined()
+    expect(await readRecords(page, 'ratingLedger')).toEqual([])
+    expect(await page.evaluate(() => [document.documentElement.scrollHeight - innerHeight, document.documentElement.scrollWidth - innerWidth])).toEqual([0, 0])
+    await page.getByTestId('lesson-restart').click()
+    await page.getByTestId('confirm-action').click()
+    await expect(tutorial(page)).toHaveAttribute('data-step', 'promote-inherit')
+    await expect(playfield(page)).toHaveAttribute('data-revision', '0')
+    await expect(page.getByTestId('die-throw')).toHaveCount(0)
+  })
 }
 
 async function play(page: Page, command: Command, mobile: boolean) {

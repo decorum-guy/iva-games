@@ -1,10 +1,13 @@
 import { useEffect, useLayoutEffect, useMemo } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import { DynamicDrawUsage, Quaternion, Vector3 } from 'three'
-import type { BufferAttribute, BufferGeometry, MeshStandardMaterial } from 'three'
+import type { BufferAttribute, MeshStandardMaterial } from 'three'
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js'
 import { fractureShard, fractureSource } from './fractureGeometry'
 import { fractureLayout } from './fractureLayout'
+import { modelFootprint, supportedMotion } from './fractureSupport'
+import type { StoneSupport } from './fractureSupport'
+import type { ChessAssets } from './assets'
 import { samplePromotion, sceneRandom } from './promotionMotion'
 import type { FloorPoint, PromotionCue } from './promotionMotion'
 import { easeRange } from './royalMotion'
@@ -13,15 +16,6 @@ import type { ScenePiece } from './types'
 
 type Source = ReturnType<typeof fractureSource>
 type Shard = ReturnType<typeof fractureShard>
-
-function includes([x, z]: FloorPoint, outline: readonly FloorPoint[]) {
-  let contained = false
-  for (let i = 0, j = outline.length - 1; i < outline.length; j = i++) {
-    const [a, b] = outline[i], [c, d] = outline[j]
-    if ((b > z) !== (d > z) && x < a + (c - a) * (z - b) / (d - b)) contained = !contained
-  }
-  return contained
-}
 
 function combine(shards: readonly Shard[], kind: 'top' | 'sides') {
   const parts = shards.map(shard => shard[kind])
@@ -38,10 +32,9 @@ function combine(shards: readonly Shard[], kind: 'top' | 'sides') {
   return { geometry, positions, normals, segments, point: positions.clone(), normal: normals.clone() }
 }
 
-function breakMarble(source: Source, origin: FloorPoint, id: string, pieces: readonly ScenePiece[]) {
+export function breakMarble(source: Source, origin: FloorPoint, id: string, supports: readonly StoneSupport[]) {
   const { slabs } = fractureLayout(origin, id)
   const random = sceneRandom(id + '/shard-motion')
-  const occupied = pieces.map(piece => squarePoint(piece.square))
   const ax = new Vector3(), p = new Vector3(), n = new Vector3(), rotation = new Quaternion()
   const fragments = slabs.map(slab => fractureShard(source, slab.outline, slab.depth, slab.seed * 173))
   const motion = fragments.map(({ center: [x, z] }, i) => {
@@ -49,21 +42,23 @@ function breakMarble(source: Source, origin: FloorPoint, id: string, pieces: rea
     const distance = Math.hypot(x - origin[0], z - origin[1])
     const dx = distance > .01 ? (x - origin[0]) / distance : 0
     const dz = distance > .01 ? (z - origin[1]) / distance : 0
-    const shelter = occupied.some(point => includes(point, slab.outline))
     const power = slab.core ? .1 : 1 - easeRange(1.06, slab.reach + .28, distance)
     const close = 1 - easeRange(.48, 2.2, distance)
     const signed = random() > .41 ? 1 : -1
-    const lean = shelter ? .020 : signed * ((.13 + random() * .16) * close + .038)
-    const lift = shelter ? -.014 : signed * ((.094 + random() * .119) * close + .029)
+    const lean = signed * ((.13 + random() * .16) * close + .038)
+    const lift = signed * ((.094 + random() * .119) * close + .029)
     let sideX = 0, sideZ = 0
     for (const { normal, reach } of slab.longEdges) {
       const breadth = .068 * easeRange(.70, 1.89, distance) * (1 - easeRange(reach - 1.34, reach + .12, distance))
       sideX += normal[0] * breadth
       sideZ += normal[1] * breadth
     }
-    return { x, z, dx, dz, outline: slab.outline, delay: Math.max(0, distance - .34) * 57, power, lift, lean,
-      scale: slab.core ? .021 : .030 + .115 * close,
-      push: slab.core ? 0 : .026 + .108 * close, sideX, sideZ }
+    const scale = slab.core ? .021 : .030 + .115 * close
+    const push = slab.core ? 0 : .026 + .108 * close
+    const freedom = supportedMotion(slab.outline, [x, z], slab.depth, supports,
+      scale * power, lean * power, push * power + Math.hypot(sideX, sideZ))
+    return { x, z, dx, dz, outline: slab.outline, depth: slab.depth, delay: Math.max(0, distance - .34) * 57,
+      power, lift, lean, scale, push, sideX, sideZ, freedom }
   })
   // The tight, deeper veins get little sky light. Fresh exposed pieces at
   // the impact retain a brighter relief so their thickness remains readable.
@@ -85,20 +80,20 @@ function breakMarble(source: Source, origin: FloorPoint, id: string, pieces: rea
       const arrival = reduced ? 1 : easeRange(part.delay, part.delay + 128, flight * 1000)
       const rebound = reduced ? 0 : easeRange(part.delay + 34, part.delay + 114, flight * 1000) *
         (1 - easeRange(part.delay + 114, part.delay + 365, flight * 1000))
-      const amount = progress * part.power * arrival * (reduced ? .58 : 1)
+      const amount = progress * part.freedom * part.power * arrival * (reduced ? .58 : 1)
       const scale = 1 - part.scale * amount
       const push = part.push * amount
-      const side = progress * arrival * (reduced ? .54 : 1)
+      const side = progress * part.freedom * arrival * (reduced ? .54 : 1)
       let x = part.x + part.dx * push + part.sideX * side
       let z = part.z + part.dz * push + part.sideZ * side
       const raise = part.lift * amount * (1 + rebound * .36)
       ax.set(-part.dz, 0, part.dx).normalize()
       rotation.setFromAxisAngle(ax, part.lean * amount)
       if (amount > 0 || side > 0) {
-        // An outer slab may rub the brass frame, but its top remains inside it.
+        // Keep both the top and the swept underside of the prism inside the brass frame.
         let left = Infinity, right = -Infinity, back = Infinity, front = -Infinity
-        for (const [px, pz] of part.outline) {
-          p.set((px - part.x) * scale, 0, (pz - part.z) * scale).applyQuaternion(rotation)
+        for (const [px, pz] of part.outline) for (const y of [0, -part.depth]) {
+          p.set((px - part.x) * scale, y, (pz - part.z) * scale).applyQuaternion(rotation)
           left = Math.min(left, p.x)
           right = Math.max(right, p.x)
           back = Math.min(back, p.z)
@@ -128,15 +123,22 @@ function breakMarble(source: Source, origin: FloorPoint, id: string, pieces: rea
 }
 
 /** Play the break on the actual textured top. Each closed slab moves as a volume. */
-export function MarbleFracture({ model, material, cue, reduced, pieces }: {
-  model: BufferGeometry
+export function MarbleFracture({ assets, material, cue, reduced, pieces }: {
+  assets: ChessAssets
   material: MeshStandardMaterial
   cue: PromotionCue
   reduced: boolean
   pieces: readonly ScenePiece[]
 }) {
-  const source = useMemo(() => fractureSource(model), [model])
-  const shards = useMemo(() => breakMarble(source, squarePoint(cue.square), cue.id, pieces), [source, cue.square, cue.id, pieces])
+  const source = useMemo(() => fractureSource(assets.board.geometry), [assets])
+  const shards = useMemo(() => {
+    const supports = pieces.map(piece => ({
+      center: squarePoint(piece.square),
+      // Landing recoil expands the promoted body horizontally by up to 2.4%.
+      radius: modelFootprint(assets.pieces[piece.side][piece.kind].geometry) * (piece.id === cue.pieceId ? 1.024 : 1),
+    }))
+    return breakMarble(source, squarePoint(cue.square), cue.id, supports)
+  }, [source, assets, cue.square, cue.id, cue.pieceId, pieces])
   const invalidate = useThree(state => state.invalidate)
   useEffect(() => () => source.frame.dispose(), [source])
   useEffect(() => () => { shards.top.dispose(); shards.sides.dispose() }, [shards])

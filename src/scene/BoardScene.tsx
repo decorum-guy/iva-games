@@ -135,7 +135,7 @@ function Viewpoint({ flipped, preset, reduced, focus, royal, promotion, onOrbit 
       apply(rig.current, frame)
       lastRoyal.current = shot.camera > .001 ? frame : null
       if (!document.hidden) invalidate()
-    } else if (promotion && !reduced && !promotion.reduced) {
+    } else if (promotion && !focus && !reduced && !promotion.reduced) {
       const shot = samplePromotion(promotion, now - promotion.startedAt)
       const frame = framePromotionCamera(rig.current, aspect, mobile, squarePoint(promotion.square), shot, promotion.intoRoyal, overview)
       const next = promotion.royalFollowup

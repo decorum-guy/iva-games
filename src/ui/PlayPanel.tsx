@@ -120,9 +120,10 @@ export function RollDock({ t, session, rollId, reduced, low, pending, active, st
   </div>;
 }
 
-export function LessonPanel({ t, locale, learning, guide, blocked, rolling = false, forming, inspected = false, dice, onAdvance, onHandoff, onNew, onRepeat, onRestart, onRestartAll }: {
+export function LessonPanel({ t, locale, learning, guide, blocked, rolling = false, promotionPending = false, forming, inspected = false, dice, onAdvance, onHandoff, onNew, onRepeat, onRestart, onRestartAll }: {
   t: Translate; locale: Locale; learning: Learning; guide: readonly Command[]; blocked: boolean;
   rolling?: boolean;
+  promotionPending?: boolean;
   forming?: 'queen' | 'rook' | 'bishop' | 'knight';
   inspected?: boolean;
   dice: ReactNode;
@@ -134,7 +135,8 @@ export function LessonPanel({ t, locale, learning, guide, blocked, rolling = fal
   const beat = teachingBeat(learning);
   const step = beat ? undefined : instruction(learning);
   const phase = beat ? 'result' : complete ? 'complete' : step?.kind ?? 'position-complete';
-  const waiting = rolling || Boolean(forming);
+  const waiting = rolling || promotionPending;
+  const showInstruction = !promotionPending || rolling || Boolean(forming);
   const resultVisible = Boolean(beat && !waiting);
   const face = learning.session.record.actions[learning.session.record.cursor - 1]?.roll?.face;
   const moves = guide.filter(cmd => cmd.type === 'move');
@@ -164,13 +166,13 @@ export function LessonPanel({ t, locale, learning, guide, blocked, rolling = fal
       <h2>{complete ? t('tutorial.finish') : resultVisible ? beat!.title[locale] : feedback ? t('tutorial.choiceResult') : lesson.title[locale]}</h2>
       {dice}
     </div>
-    {!complete && !resultVisible && !feedback && <div className="lesson-action-label" role="status"><Icon name={read || inspected || !step ? 'check' : step.kind === 'inspect' ? 'info' : 'arrow'} />{t(rolling ? 'die.watch' : forming ? 'game.promotion' : inspected ? 'tutorial.readCue' : actionTitle)}</div>}
-    <p className="lesson-instruction" data-testid={resultVisible ? 'teaching-cause' : inspected ? 'counter-read' : feedback ? 'choice-feedback' : undefined}
+    {showInstruction && !complete && !resultVisible && !feedback && <div className="lesson-action-label" role="status"><Icon name={read || inspected || !step ? 'check' : step.kind === 'inspect' ? 'info' : 'arrow'} />{t(rolling ? 'die.watch' : forming ? 'game.promotion' : inspected ? 'tutorial.readCue' : actionTitle)}</div>}
+    {showInstruction && <p className="lesson-instruction" data-testid={resultVisible ? 'teaching-cause' : inspected ? 'counter-read' : feedback ? 'choice-feedback' : undefined}
       data-feedback={feedback?.kind} role={resultVisible ? 'status' : undefined}>{rolling ? t('die.rolling')
       : forming ? t('game.forming', { piece: t(`piece.${forming}`) })
       : resultVisible ? beat!.text[locale]
       : inspected && remaining !== null ? t('tutorial.counterRead', { count: countText(locale, 'turn', remaining) })
-        : complete ? t('tutorial.finishDetail') : feedback?.text ?? step?.text[locale] ?? t('tutorial.positionDoneDetail')}</p>
+        : complete ? t('tutorial.finishDetail') : feedback?.text ?? step?.text[locale] ?? t('tutorial.positionDoneDetail')}</p>}
     {resultVisible && beat?.rule && <p className="lesson-rule" data-testid="teaching-rule">{beat.rule[locale]}</p>}
     {feedback?.rule && <p className="lesson-rule" data-testid="choice-rule">{feedback.rule}</p>}
     {resultVisible && beat?.diceLegend && <div className="lesson-dice-legend" data-testid="dice-legend" role="group" aria-label={t('tutorial.diceLegend')}>

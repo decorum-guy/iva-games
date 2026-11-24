@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { GameEvent, Piece } from '../core/types'
 import { getDieMotionTiming } from './diceMotion'
 import { sampleWindow } from './audioSamples'
+import { learnerAction, startLesson } from '../tutorial/controller'
 
 const piece: Piece = {
   id: 'white-rook', side: 'white', type: 'rook', square: 'd4', affliction: 'neutral',
@@ -89,6 +90,16 @@ async function unlock() {
 }
 
 describe('semantic scene sounds', () => {
+  it.each([false, true])('schedules only the owed promotion sounds through the lesson hold (reduced=%s)', reducedMotion => {
+    const { progress } = learnerAction(startLesson(7, 1), { type: 'move', from: 'g7', to: 'h8', promotion: 'bishop' })
+    const events = progress.session.current.events
+    const before = audio.planSceneCues(events, { reducedMotion, playback: 'reaction' })
+    const after = audio.planSceneCues(events, { reducedMotion, playback: 'formation' })
+    expect(before.map(cue => cue.kind)).toEqual(['capture', 'dice', 'berserk'])
+    expect(after.map(cue => cue.kind)).toEqual(['promotionFormation'])
+    expect(after[0].at).toBeCloseTo(reducedMotion ? .055 : .15)
+  })
+
   it('only rattles dice for a committed roll, not a remembered reaction', () => {
     expect(audio.planSceneCues([move(), capture, reaction]).map(cue => cue.kind)).toEqual(['capture', 'dice', 'guilt'])
     const remembered: GameEvent = { ...reaction, face: undefined, cause: 'memory' }

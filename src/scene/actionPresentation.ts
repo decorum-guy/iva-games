@@ -7,6 +7,7 @@ import { royalLeadIn } from './royalMotion'
 type PromotionEvent = Extract<GameEvent, { type: 'promotion' }>
 
 export type PromotionStage = 'contact' | 'roll' | 'reaction' | 'surge' | 'formation' | 'aftermath'
+export type PromotionPlayback = 'reaction' | 'formation'
 
 export interface PromotionPlan {
   readonly event: PromotionEvent

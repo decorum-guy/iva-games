@@ -436,17 +436,26 @@ export const TEACHING_BEATS: Readonly<Record<string, readonly TeachingBeat[]>> =
   'bishop-promotion-rebirth': [
     {
       id: 'promotion-bishop-cleared-reaction',
-      title: copy('Превращение в слона сняло ярость', 'Becoming a bishop cleared berserk'),
+      title: copy('Превращение сняло ярость', 'The bishop is no longer berserk'),
       text: copy(
-        'За взятие выпало 6 — ярость. Но пешка превратилась в слона, и ярость сразу исчезла.',
-        'The capture rolled a 6 — berserk. But the pawn then became a bishop, clearing berserk immediately.',
+        'Слон забыл реакцию пешки и начал с нуля взятий.',
+        'The bishop forgot the pawn’s reaction and reset its capture count to zero.',
       ),
       rule: copy(
-        'Слон забывает реакцию, начинает с нулевым счётом взятий и становится пацифистом. Дополнительного действия нет.',
-        'The bishop forgets the reaction, resets its capture count, and becomes a pacifist. There is no extra action.',
+        'Ход завершён без дополнительного действия.',
+        'The turn ends without an extra action.',
       ),
       action: copy('Сравнить варианты превращения', 'Compare promotion choices'),
       focus: { square: 'h8', subject: 'piece' },
     },
   ],
+}
+
+export const bishopPromotionReaction: TeachingBeat = {
+  id: 'promotion-pawn-berserk',
+  title: copy('Выпало 6 — ярость', 'Rolled 6 — berserk'),
+  text: copy('Пешка на h8 взяла ладью и впала в ярость.', 'The pawn took the rook on h8 and went berserk.'),
+  rule: copy('В ярости взятие первым действием обычно даёт второе.', 'A first-action capture while berserk usually earns a second action.'),
+  action: copy('Превратить в слона', 'Promote to bishop'),
+  focus: { square: 'h8', subject: 'piece' },
 }

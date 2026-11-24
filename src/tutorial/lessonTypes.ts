@@ -39,6 +39,8 @@ export type Step = Guidance & {
   readonly focus?: { readonly square: string; readonly subject: 'piece' | 'countdown' };
   /** These observations pause before the next move, script or fixture reset. */
   readonly after?: readonly TeachingBeat[];
+  /** Hold the committed capture's pawn reaction before presenting the chosen piece. */
+  readonly beforePromotion?: TeachingBeat;
   readonly hud?: 'captures' | 'material';
 };
 

@@ -21,6 +21,7 @@ export interface SceneMark {
 export interface SceneFocus {
   readonly square: Square
   readonly subject: 'piece' | 'countdown'
+  readonly holdEmphasis?: boolean
   /** Stable lesson/step identity; changing the locale must not replay the focus. */
   readonly key: string
 }

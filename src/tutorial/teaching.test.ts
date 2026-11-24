@@ -84,6 +84,18 @@ describe('required explanations follow the committed event', () => {
 })
 
 describe('teaching checkpoint validation and compatibility', () => {
+  it('keeps a saved bishop explanation from before the reaction hold at the same finished step', () => {
+    const { progress } = learnerAction(startLesson(7, 1), move('g7', 'h8', 'bishop'))
+    const old = saveLearning(acknowledgeTeaching(progress))
+    expect(old.pendingTeaching).toEqual({ stepId: 'bishop-promotion-rebirth', beatIndex: 0 })
+    const loaded = restoreLearning(old)
+    expect(teachingBeat(loaded)?.id).toBe('promotion-bishop-cleared-reaction')
+    expect(loaded.session.record).toEqual({ ...old.match, config: { ...old.match.config, names: {} } })
+    expect(loaded.session.state.pieces.find(piece => piece.square === 'h8')).toMatchObject({
+      type: 'bishop', affliction: 'neutral', captureReaction: 'unassigned', capturesSinceRebirth: 0,
+    })
+  })
+
   it('keeps a legacy v1 checkpoint at the same next instruction without injecting an old result', () => {
     const fresh = saveLearning(captureWithGuilt())
     const legacy = { ...fresh }

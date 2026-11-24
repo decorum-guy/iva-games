@@ -6,6 +6,7 @@ import { Cabinet } from '../session/cabinet';
 import { captureLedger } from '../session/match';
 import { exportMatch } from '../session/save';
 import { guideCommands, instruction, teachingBeat } from '../tutorial/controller';
+import { actionPlan } from '../scene/actionPresentation';
 import { muteAudio, playRoyalCue, playSceneCue, prepareSceneAudio, setAudioVolume, stopSceneAudio, unlockAudio } from '../scene/audio';
 import type { PromotionCue } from '../scene/promotionMotion';
 import type { SceneFocus, SceneMark } from '../scene/types';
@@ -84,16 +85,24 @@ export function App() {
   const actor = position.side;
   const live = snap.audioCue;
   const currentAction = session?.record.actions[(session?.record.cursor ?? 0) - 1];
-  const plannedPromotion = reviewing === null && live && currentAction &&
+  const latest = session?.current.events ?? noEvents;
+  const holdingPromotion = reviewing === null && Boolean(lesson?.pendingTeaching?.beforeFormation) && !snap.animating;
+  const livePromotion = reviewing === null && live && currentAction &&
     live.id === `${session?.record.id}/${currentAction.id}` ? live.plan.promotion : null;
-  const promotionStage = plannedPromotion ? snap.promotionStage : null;
+  // Restored checkpoints show the committed pawn reaction with no roll or audio replay.
+  const savedPromotion = useMemo(() => holdingPromotion && !livePromotion && currentAction
+    ? actionPlan(latest, Boolean(currentAction.roll), reduced, false).promotion : null,
+  [holdingPromotion, livePromotion, currentAction, latest, reduced]);
+  const plannedPromotion = livePromotion ?? savedPromotion;
+  const promotionStage = plannedPromotion ? holdingPromotion ? 'reaction' : snap.promotionStage : null;
+  const focusedFormation = promotionStage === 'formation' && live?.playback === 'formation';
   const displayedActor = promotionStage && plannedPromotion ? plannedPromotion.event.piece.side : actor;
   const formation = useMemo<PromotionCue | undefined>(() => {
     if (promotionStage !== 'formation' || !plannedPromotion || !live) return undefined;
     const { event, formationAt } = plannedPromotion;
     const followup = live.royal && plannedPromotion.aftermathAt === live.plan.end ? live.royal : undefined;
     return { id: `${live.id}/${event.id}`, kind: event.promotion, square: event.piece.square, side: event.piece.side,
-      pieceId: event.piece.id, startedAt: live.startedAt + formationAt, reduced: live.plan.reduced,
+      pieceId: event.piece.id, startedAt: live.startedAt + (live.playback === 'formation' ? 0 : formationAt), reduced: live.plan.reduced,
       intoRoyal: Boolean(live.royal), royalFollowup: followup };
   }, [promotionStage, plannedPromotion, live]);
   const flat = settings.board === '2d' || graphicsFailed;
@@ -119,7 +128,6 @@ export function App() {
   const shownMoves = lesson ? step?.kind === 'move' ? guidance : [] : moves;
   const mayEnd = moves.some(move => move.type === 'endTurn') && (!lesson || guidance.some(move => move.type === 'endTurn'));
   const showRoll = reviewing === null && session && snap.rollId && session.record.cursor > 0;
-  const latest = session?.current.events ?? noEvents;
   const rollPending = Boolean(showRoll && snap.rollPhase === 'throwing');
   const liveRoll = Boolean(showRoll && snap.audioCue?.id === `${session?.record.id}/${snap.rollId}`);
   // Board and inspector use the same temporary figure. Rules and saves stay on the committed position.
@@ -143,15 +151,16 @@ export function App() {
     ? `${snap.motionKey}/${lesson.lesson}/${lesson.position}/${step.id}` : null;
   const inspected = inspectionKey !== null && inspectedStep === inspectionKey;
   const tutorialFocus = useMemo<SceneFocus | undefined>(() => {
-    if (!lesson || lesson.complete || rollPending || promotionStage || snap.teachingReturning) return undefined;
+    if (!lesson || lesson.complete || rollPending || (promotionStage && !holdingPromotion && !focusedFormation)
+      || snap.teachingReturning) return undefined;
     const target = beat?.focus ?? step?.focus
       ?? (step?.kind === 'inspect' ? { square: step.square, subject: 'piece' as const } : undefined);
-    if (!target || !position.pieces.some(piece => piece.square === target.square)) return undefined;
+    if (!target || !boardPosition.pieces.some(piece => piece.square === target.square)) return undefined;
     const identity = beat ? `${lesson.pendingTeaching!.stepId}/${beat.id}` : step?.id;
     // Start the close-up on the same reveal as the newly visible material.
     // No historical-event scan: finishing an exercise must not replay its effect.
-    return { ...target, key: `${snap.motionKey}/${lesson.lesson}/${lesson.position}/${identity}` };
-  }, [lesson, beat, step, position.pieces, rollPending, promotionStage, snap.teachingReturning, snap.motionKey]);
+    return { ...target, holdEmphasis: holdingPromotion, key: `${snap.motionKey}/${lesson.lesson}/${lesson.position}/${identity}` };
+  }, [lesson, beat, step, boardPosition.pieces, rollPending, promotionStage, holdingPromotion, focusedFormation, snap.teachingReturning, snap.motionKey]);
   const teachingHud = !rollPending ? beat?.hud ?? step?.hud : undefined;
   const activePromotion = promotion?.key === snap.motionKey ? promotion.move : null;
   const allowedPromotions = activePromotion && lesson ? guidance.flatMap(command =>
@@ -205,11 +214,13 @@ export function App() {
   useEffect(() => { stopSceneAudio(); }, [snap.motionKey, reviewing]);
   useEffect(() => {
     const cue = snap.audioCue;
-    if (!cue || cue.id === sounded.current) return;
-    sounded.current = cue.id;
+    if (!cue) return;
+    const batchId = cue.playback ? `${cue.id}/${cue.playback}` : cue.id;
+    if (batchId === sounded.current) return;
+    sounded.current = batchId;
     if (settings.sound && view !== 'home' && reviewing === null) {
-      playSceneCue(cue.events, { plan: cue.plan, batchId: cue.id, reducedMotion: cue.plan.reduced,
-        humanSide: cue.human, startedAt: cue.startedAt, royal: Boolean(cue.royal) });
+      playSceneCue(cue.events, { plan: cue.plan, batchId, reducedMotion: cue.plan.reduced,
+        humanSide: cue.human, startedAt: cue.startedAt, royal: Boolean(cue.royal), playback: cue.playback });
     }
   }, [snap.audioCue, settings.sound, view, reviewing]);
   useEffect(() => {
@@ -368,7 +379,7 @@ export function App() {
       data-tutorial-hud={teachingHud}
       data-teaching-returning={snap.teachingReturning}
       data-promotion-stage={promotionStage ?? 'none'} data-promotion-kind={promotionStage ? plannedPromotion?.event.promotion : undefined}
-      data-dice={showRoll && snap.animating ? snap.rollPhase : 'none'}
+      data-dice={showRoll && holdingPromotion ? 'settled' : showRoll && snap.animating ? snap.rollPhase : 'none'}
       data-active-side={actor} data-turn={position.turnSerial} data-phase={position.phase}
       data-revision={session?.record.revision ?? 0} data-game-id={session?.record.id ?? 'preview'}
       data-storage-problem={snap.storageProblem ?? 'none'}
@@ -478,10 +489,11 @@ export function App() {
           </div>
           {lesson && <LessonPanel t={t} locale={settings.locale} learning={lesson} guide={guidance} blocked={!snap.ready || Boolean(snap.storageProblem) || snap.busy || snap.animating || snap.teachingReturning}
             rolling={snap.rollPhase === 'throwing'}
-            forming={promotionStage ? plannedPromotion?.event.promotion : undefined}
+            promotionPending={Boolean(promotionStage && !holdingPromotion)}
+            forming={promotionStage === 'formation' ? plannedPromotion?.event.promotion : undefined}
             dice={<RollDock t={t} session={session} rollId={showRoll && !beat?.diceLegend && !lesson.complete ? snap.rollId : null}
               reduced={snap.rollReduced} low={low} pending={rollPending}
-              active={Boolean(showRoll && snap.animating && snap.rollPhase !== 'idle')}
+              active={Boolean(showRoll && (snap.animating || holdingPromotion) && snap.rollPhase !== 'idle')}
               reserve={Boolean(step && 'roll' in step && step.roll)}
               startedAt={snap.rollStartedAt ?? undefined} />}
             inspected={inspected}

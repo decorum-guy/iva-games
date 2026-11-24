@@ -10,6 +10,8 @@ export interface PendingTeaching {
   /** The original completed step, whose index has already advanced once. */
   readonly stepId: string;
   readonly beatIndex: number;
+  /** Existing checkpoints without this flag already reached the resulting piece. */
+  readonly beforeFormation?: true;
 }
 
 export interface Learning {
@@ -41,7 +43,9 @@ export function teachingBeat(progress: Learning): TeachingBeat | undefined {
   const pending = progress.pendingTeaching;
   if (!pending) return undefined;
   const source = LESSONS[progress.lesson].positions[progress.position].steps[progress.index - 1];
-  return source?.id === pending.stepId ? source.after?.[pending.beatIndex] : undefined;
+  return source?.id === pending.stepId
+    ? pending.beforeFormation ? source.beforePromotion : source.after?.[pending.beatIndex]
+    : undefined;
 }
 
 function isComplete(progress: Pick<Learning, 'lesson' | 'position' | 'index' | 'pendingTeaching'>) {
@@ -86,6 +90,9 @@ export function restoreLearning(value: unknown): Learning {
       || !Number.isInteger(pendingTeaching.beatIndex) || pendingTeaching.beatIndex < 0
       || source?.id !== pendingTeaching.stepId || !source.after?.[pendingTeaching.beatIndex]
       || !['move', 'script', 'illegal'].includes(source.kind)) throw new SessionError('invalidSave');
+    if (pendingTeaching.beforeFormation !== undefined && (pendingTeaching.beforeFormation !== true
+      || pendingTeaching.beatIndex !== 0 || !source.beforePromotion || source.kind !== 'move'
+      || !source.expect?.(session.current.events, session.state))) throw new SessionError('invalidSave');
     // An explanation must refer to the actual action at this checkpoint; it
     // cannot be relinked to an earlier roll or used to skip a future command.
     if (source.kind === 'illegal') {
@@ -112,7 +119,8 @@ function bump(progress: Learning, session = progress.session): Learning {
 function afterAction(progress: Learning, step: Step, session = progress.session): Learning {
   const next = bump(progress, session);
   return step.after?.length
-    ? { ...next, complete: false, pendingTeaching: { stepId: step.id, beatIndex: 0 } }
+    ? { ...next, complete: false, pendingTeaching: { stepId: step.id, beatIndex: 0,
+      ...(step.beforePromotion ? { beforeFormation: true as const } : {}) } }
     : next;
 }
 
@@ -120,6 +128,7 @@ function afterAction(progress: Learning, step: Step, session = progress.session)
 export function acknowledgeTeaching(progress: Learning): Learning {
   const pending = progress.pendingTeaching;
   if (!pending || !teachingBeat(progress)) throw new SessionError('tutorialChoice');
+  if (pending.beforeFormation) return { ...progress, pendingTeaching: { stepId: pending.stepId, beatIndex: pending.beatIndex } };
   const source = LESSONS[progress.lesson].positions[progress.position].steps[progress.index - 1];
   const beatIndex = pending.beatIndex + 1;
   if (source.after?.[beatIndex]) return { ...progress, pendingTeaching: { ...pending, beatIndex } };

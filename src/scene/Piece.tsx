@@ -262,7 +262,7 @@ export function VisualPiece({ piece, assets, events, flipped, low, reduced, focu
     focusStart.current = focus ? performance.now() : null
     values.uFocus.value = focus && reduced ? sampleFigureEmphasis(0, true) : 0
     invalidate()
-  }, [focus?.key, focus?.subject, reduced, values, invalidate])
+  }, [focus?.key, focus?.subject, focus?.holdEmphasis, reduced, values, invalidate])
 
   useLayoutEffect(() => {
     const next = Number(threatened)
@@ -357,8 +357,7 @@ export function VisualPiece({ piece, assets, events, flipped, low, reduced, focu
       body.current.scale.set(1 + .024 * sample.recoil, 1 - compression * sample.recoil, 1 + .024 * sample.recoil)
       const surface = values.uBirth.value
       surface.x = sample.reveal
-      surface.y = sample.family === 'formation' ? .81 * sample.charge * (1 - sample.reveal * .60) + .75 * sample.contact
-        : .56 * sample.contact + .45 * sample.arc
+      surface.y = sample.surfaceLight
       surface.z = sample.reveal < .995 ? 1 : 0
       surface.w = sample.airLight * (piece.side === 'black' ? .88 : .32)
       ;(shadow.current.material as MeshBasicMaterial).opacity = (low ? .61 : .38) / (1 + sample.height * 1.17)
@@ -430,7 +429,8 @@ export function VisualPiece({ piece, assets, events, flipped, low, reduced, focu
 
     if (focusStart.current !== null) {
       const elapsed = now - focusStart.current
-      values.uFocus.value = sampleFigureEmphasis(elapsed, reduced)
+      const held = focus?.holdEmphasis ? .36 * easeRange(0, 180, elapsed) : 0
+      values.uFocus.value = Math.max(sampleFigureEmphasis(elapsed, reduced), held)
       if (!reduced && elapsed < FOCUS_EMPHASIS_MS) active = true
     }
     if (piece.kind === 'king') {

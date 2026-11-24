@@ -2,7 +2,7 @@ import { createInitialState, createPosition, isInCheck } from '../core'
 import type { GameState, Piece, Square } from '../core/types'
 import { fixed, move } from './lessonTypes'
 import type { Copy, Lesson } from './lessonTypes'
-import { TEACHING_BEATS } from './teachingCopy'
+import { bishopPromotionReaction, TEACHING_BEATS } from './teachingCopy'
 
 const copy = (ru: string, en: string): Copy => ({ ru, en })
 const at = (state: GameState, square: Square): Piece | undefined =>
@@ -762,7 +762,9 @@ const lessonPositions: readonly Lesson[] = [
           {
             id: 'bishop-promotion-rebirth', kind: 'move',
             moves: [move('g7', 'h8', 'bishop')], roll: fixed(6, 'g7', 'h8'),
-            expect: (events, state) => events.some(event => event.type === 'reaction' && event.face === 6)
+            beforePromotion: bishopPromotionReaction,
+            expect: (events, state) => events.some(event => event.type === 'reaction' && event.face === 6
+              && event.piece.type === 'pawn' && event.affliction === 'berserk')
               && events.some(event => event.type === 'promotion' && event.promotion === 'bishop')
               && at(state, 'h8')?.captureReaction === 'unassigned' && at(state, 'h8')?.affliction === 'neutral'
               && at(state, 'h8')?.capturesSinceRebirth === 0 && state.phase === 'primary',

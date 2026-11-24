@@ -572,6 +572,56 @@ describe('Cabinet acknowledged tutorial results', () => {
     expect(loaded.getSnapshot().learning?.session.state.repetition).toEqual(committed.session.state.repetition)
   })
 
+  it('parks a committed promotion at reaction and resumes its formation once after recovery', async () => {
+    const current = await tutorialReady(startLesson(7, 1))
+    await current.command({ type: 'move', from: 'g7', to: 'h8', promotion: 'bishop' })
+    const first = current.getSnapshot().audioCue!
+    expect(first.playback).toBe('reaction')
+    await current.advance()
+    expect(current.getSnapshot().learning?.pendingTeaching?.beforeFormation).toBe(true)
+    await vi.advanceTimersByTimeAsync(first.plan.roll!.settle)
+    expect(current.getSnapshot()).toMatchObject({ animating: false, promotionStage: 'reaction', rollPhase: 'settled' })
+    await vi.advanceTimersByTimeAsync(10_000)
+    const committed = current.getSnapshot().learning!
+    expect(current.getSnapshot().promotionStage).toBe('reaction')
+    expect(teachingBeat(committed)?.id).toBe('promotion-pawn-berserk')
+    expect(committed.session.record.actions.map(action => action.roll?.face)).toEqual([6])
+
+    const loaded = new Cabinet()
+    cabinets.push(loaded)
+    await loaded.initialize()
+    expect(loaded.getSnapshot().audioCue).toBeNull()
+    const session = loaded.getSnapshot().learning!.session
+    expect(session.record).toEqual(committed.session.record)
+    expect(teachingBeat(loaded.getSnapshot().learning!)?.id).toBe('promotion-pawn-berserk')
+    loaded.setShortMotion(true)
+    await loaded.advance()
+    const resumed = loaded.getSnapshot()
+    expect(resumed).toMatchObject({ animating: true, promotionStage: 'formation', rollPhase: 'idle',
+      audioCue: { id: first.id, playback: 'formation', plan: { reduced: true } } })
+    expect(teachingBeat(resumed.learning!)?.id).toBe('promotion-bishop-cleared-reaction')
+    await loaded.advance()
+    expect(loaded.getSnapshot().audioCue).toBe(resumed.audioCue)
+    await vi.advanceTimersByTimeAsync(3000)
+    expect(loaded.getSnapshot()).toMatchObject({ animating: false, promotionStage: null })
+    expect(loaded.getSnapshot().learning?.session).toBe(session)
+    expect(teachingBeat(loaded.getSnapshot().learning!)?.id).toBe('promotion-bishop-cleared-reaction')
+  })
+
+  it('uses a static six when the tab is hidden as the lesson die is rolling', async () => {
+    const current = await tutorialReady(startLesson(7, 1))
+    await current.command({ type: 'move', from: 'g7', to: 'h8', promotion: 'bishop' })
+    const cue = current.getSnapshot().audioCue!
+    await vi.advanceTimersByTimeAsync(cue.plan.roll!.start)
+    expect(current.getSnapshot().rollPhase).toBe('throwing')
+    current.finishHiddenPresentation()
+    const held = current.getSnapshot()
+    expect(held).toMatchObject({ promotionStage: 'reaction', rollPhase: 'settled', rollStartedAt: null, animating: false })
+    expect(held.learning?.session.record.actions.at(-1)?.roll?.face).toBe(6)
+    await vi.advanceTimersByTimeAsync(cue.plan.end)
+    expect(current.getSnapshot()).toBe(held)
+  })
+
   it.each(['home', 'restartLesson'] as const)('cancels the camera return and delayed script when %s interrupts', async action => {
     const current = await tutorialReady()
     await current.command(move('c3', 'c4'))

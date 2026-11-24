@@ -3,7 +3,7 @@ import { ENGINE_VERSION, getPreset, PRESET_VERSION } from '../engine/presets';
 import type { SearchRequest, SearchResponse } from '../engine/protocol';
 import { initialProfile } from '../rating/elo';
 import { actionPlan } from '../scene/actionPresentation';
-import type { ActionPlan, PromotionStage } from '../scene/actionPresentation';
+import type { ActionPlan, PromotionPlayback, PromotionStage } from '../scene/actionPresentation';
 import { CAMERA_TRAVEL_MS } from '../scene/cameraFocus';
 import { royalAction, royalTiming } from '../scene/royalMotion';
 import type { RoyalCue } from '../scene/royalMotion';
@@ -46,6 +46,7 @@ interface CabinetState {
   readonly audioCue: {
     readonly id: string; readonly events: readonly GameEvent[]; readonly human: Side | null;
     readonly startedAt: number; readonly royal: ReturnType<typeof royalAction>; readonly plan: ActionPlan;
+    readonly playback?: PromotionPlayback;
   } | null;
   readonly promotionStage: PromotionStage | null;
   readonly waitingForBloodlust: boolean;
@@ -401,42 +402,58 @@ export class Cabinet {
     this.finishRoyal();
   };
 
-  private present(game: GameSession) {
+  private present(game: GameSession, playback?: PromotionPlayback) {
     const action = game.record.actions[game.record.cursor - 1];
     if (!action) return;
-    // Only a live, committed action creates a clock or an audio batch.
+    // The lesson can resume the remaining presentation of a committed action.
     const startedAt = performance.now();
     const { events } = game.current;
     const { human, mode } = game.record.config;
     const royal = mode === 'tutorial' ? null : royalAction(game.state, events, human, this.shortMotion);
     const plan = actionPlan(events, Boolean(action.roll), this.shortMotion, Boolean(royal));
-    const audioCue = { id: `${game.record.id}/${action.id}`, events, human, startedAt, royal, plan };
+    const audioCue = { id: `${game.record.id}/${action.id}`, events, human, startedAt, royal, plan, playback };
     const showsMotion = action.command.type === 'move' || action.command.type === 'endTurn';
     if (!showsMotion) { this.patch({ audioCue }); return; }
 
     this.clearPresentation();
     const { roll, promotion } = plan;
-    const startsThrowing = roll?.start === 0;
-    this.patch({ audioCue, animating: true, rollId: startsThrowing ? action.id : null,
+    const resumeAt = playback === 'formation' ? promotion?.formationAt ?? 0 : 0;
+    const holdAt = playback === 'reaction' ? promotion?.reactionAt ?? null : null;
+    const startsThrowing = !resumeAt && roll?.start === 0;
+    this.patch({ audioCue, animating: true, rollId: roll && (startsThrowing || resumeAt) ? action.id : null,
       rollPhase: startsThrowing ? 'throwing' : 'idle', rollReduced: plan.reduced,
-      rollStartedAt: startsThrowing ? startedAt : null, royalPending: Boolean(royal),
-      promotionStage: promotion ? 'contact' : null, waitingForBloodlust: plan.escalationAt !== null });
+      rollStartedAt: resumeAt ? this.data.rollStartedAt : startsThrowing ? startedAt : null, royalPending: Boolean(royal),
+      promotionStage: promotion ? resumeAt ? 'formation' : 'contact' : null, waitingForBloodlust: plan.escalationAt !== null });
     const at = (offset: number, run: () => void) => {
       this.presentationTimers.push(setTimeout(() => {
-        if (this.data.audioCue?.id === audioCue.id && this.data.animating) run();
-      }, offset));
+        if (this.data.audioCue === audioCue && this.data.animating) run();
+      }, offset - resumeAt));
     };
-    if (roll) {
+    if (roll && !resumeAt) {
       if (roll.start > 0) at(roll.start, () => this.patch({
         rollId: action.id, rollPhase: 'throwing', rollStartedAt: startedAt + roll.start, promotionStage: 'roll',
       }));
-      at(roll.settle, () => this.patch({ rollPhase: 'settled', ...(promotion ? { promotionStage: 'reaction' as const } : {}) }));
+      if (holdAt === null) at(roll.settle, () => this.patch({ rollPhase: 'settled',
+        ...(promotion ? { promotionStage: 'reaction' as const } : {}) }));
+    }
+    if (holdAt !== null) {
+      const hold = (skipRemainingThrow = false) => {
+        this.clearPresentation();
+        this.patch({ animating: false, promotionStage: 'reaction',
+          rollId: roll ? action.id : null, rollPhase: roll ? 'settled' : 'idle',
+          rollStartedAt: skipRemainingThrow ? null : this.data.rollStartedAt });
+      };
+      this.fastForwardPresentation = () => hold(true);
+      at(holdAt, hold);
+      return;
     }
     if (plan.escalationAt !== null) at(plan.escalationAt, () => this.patch({ waitingForBloodlust: false }));
     if (promotion) {
-      if (!roll && promotion.reactionAt !== null) at(promotion.reactionAt, () => this.patch({ promotionStage: 'reaction' }));
-      if (promotion.surgeAt !== null) at(promotion.surgeAt, () => this.patch({ promotionStage: 'surge' }));
-      at(promotion.formationAt, () => this.patch({ promotionStage: 'formation', rollPhase: 'idle' }));
+      if (!resumeAt) {
+        if (!roll && promotion.reactionAt !== null) at(promotion.reactionAt, () => this.patch({ promotionStage: 'reaction' }));
+        if (promotion.surgeAt !== null) at(promotion.surgeAt, () => this.patch({ promotionStage: 'surge' }));
+        at(promotion.formationAt, () => this.patch({ promotionStage: 'formation', rollPhase: 'idle' }));
+      }
       if (promotion.aftermathAt < plan.end) at(promotion.aftermathAt, () => this.patch({ promotionStage: 'aftermath' }));
     }
     const finish = () => {
@@ -472,7 +489,8 @@ export class Cabinet {
       const { progress, explanation } = learnerAction(current, command);
       // A requested illegal attempt can now produce a positive teaching beat;
       // its unchanged session must not replay the previous move, die or sound.
-      await this.updateLearning(progress, progress.session !== current.session ? () => this.present(progress.session) : undefined);
+      await this.updateLearning(progress, progress.session !== current.session
+        ? () => this.present(progress.session, progress.pendingTeaching?.beforeFormation ? 'reaction' : undefined) : undefined);
       if (explanation) this.patch({ error: explanation });
       return;
     }
@@ -563,6 +581,10 @@ export class Cabinet {
     const acknowledged = current.pendingTeaching || instruction(current)?.kind === 'read';
     if (acknowledged && !next.pendingTeaching && !instruction(next) && !next.complete) next = advanceLesson(next);
     await this.updateLearning(next, () => {
+      if (current.pendingTeaching?.beforeFormation) {
+        this.present(current.session, 'formation');
+        return;
+      }
       if (next.session.record.id !== current.session.record.id) this.invalidate();
       // The scene camera survives fixture changes. A new generation must own
       // the return gate, so a new board cannot accept input while still close.

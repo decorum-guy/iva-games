@@ -109,7 +109,7 @@ export function PromotionEffects({ cue, low, reduced }: { cue: PromotionCue; low
     const elapsed = performance.now() - cue.startedAt
     const sample = samplePromotion(cue, elapsed, limitMotion)
     if (lamp.current) lamp.current.intensity = (queen ? 11.8 : formation ? 3.2 : 8.1) *
-      (sample.contact + sample.charge * (1 - easeRange(0, 300, sample.flight * 1000)) * .13)
+      sample.lampLight
     const spread = easeRange(0, .56, sample.flight)
     const dustAlpha = easeRange(-.025, .095, sample.flight) * (1 - easeRange(.14, .62, sample.flight))
     for (const [index, cloud] of dust.current.entries()) {
