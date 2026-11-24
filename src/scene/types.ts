@@ -16,6 +16,13 @@ export interface SceneMark {
   kind: 'selected' | 'move' | 'capture' | 'friendly' | 'last' | 'check' | 'lesson' | 'focus'
 }
 
+export interface SceneFocus {
+  readonly square: Square
+  readonly subject: 'piece' | 'countdown'
+  /** Stable lesson/step identity; changing the locale must not replay the focus. */
+  readonly key: string
+}
+
 export interface BoardSceneProps {
   pieces: readonly ScenePiece[]
   marks?: readonly SceneMark[]
@@ -26,6 +33,8 @@ export interface BoardSceneProps {
   quality?: 'high' | 'low'
   reducedMotion?: boolean
   motionKey?: string
+  /** Explicit teaching focus only. Removing it restores the whole-board camera. */
+  focus?: SceneFocus
   onSquare: (square: Square) => void
   onDragSquare?: (from: Square, to: Square) => void
   onFailure: () => void
@@ -45,8 +54,8 @@ export function worldSquare(x: number, z: number): Square | null {
 
 export const stateColors = {
   neutral: '#aaa69a',
-  guilt: '#d6a15a',
-  devastated: '#93b6da',
-  berserk: '#ec7952',
-  bloodlust: '#eb6079',
+  guilt: '#edb65a',
+  devastated: '#79bde8',
+  berserk: '#ef8758',
+  bloodlust: '#e95d7b',
 }

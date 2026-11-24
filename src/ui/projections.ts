@@ -19,7 +19,7 @@ export function trophies(events: readonly CaptureEvent[], side: Side) {
   return trophyOrder.filter(type => counts.has(type)).map(type => ({ type, count: counts.get(type)! }));
 }
 
-export function describeEvent(t: Translate, event: GameEvent, tutorial: boolean): string {
+export function describeEvent(t: Translate, event: GameEvent): string {
   switch (event.type) {
     case 'move': return t(event.castle ? 'log.castle' : 'log.move',
       { piece: t(`piece.${event.piece.type}`), from: event.from, to: event.to });
@@ -27,7 +27,7 @@ export function describeEvent(t: Translate, event: GameEvent, tutorial: boolean)
       : event.kind === 'enPassant' ? event.mercy ? 'log.enPassantMercy' : 'log.enPassant'
         : event.mercy ? 'log.mercy' : 'log.capture',
       { square: event.victim.square, piece: t(`piece.${event.victim.type}`) });
-    case 'reaction': return t(event.face ? tutorial ? 'log.fixed' : 'log.roll'
+    case 'reaction': return t(event.face ? 'log.roll'
       : event.cause === 'bishop' ? 'log.bishopPenalty' : 'log.memory',
       { face: event.face ?? 0, state: t(event.affliction === 'neutral' ? 'state.unaffected' : `state.${event.affliction}`),
         square: event.piece.square });

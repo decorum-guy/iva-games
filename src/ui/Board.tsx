@@ -3,7 +3,7 @@ import type { FocusEvent, KeyboardEvent, ReactNode } from 'react';
 import { cyclesRemaining, fileOf, rankOf, squareAt } from '../core';
 import type { GameEvent, GameState, Piece, Square } from '../core';
 import type { Translate } from '../i18n/catalog';
-import type { SceneMark } from '../scene/types';
+import type { SceneFocus, SceneMark } from '../scene/types';
 import { PieceIcon, StateMark } from './pieces';
 
 const BoardScene = lazy(() => import('../scene/BoardScene'));
@@ -30,6 +30,9 @@ export interface BoardProps {
   readonly onDragSquare: (from: Square, to: Square) => void;
   readonly onFailure: () => void;
   readonly onClear: () => void;
+  readonly canMove: boolean;
+  readonly overlay?: ReactNode;
+  readonly focus?: SceneFocus;
 }
 
 function ariaSquare(t: Translate, square: Square, piece?: Piece) {
@@ -77,6 +80,7 @@ export function Board(props: BoardProps) {
   }
 
   return <section className={`board-stage ${props.flat ? 'flat-stage' : 'marble-stage'}`}
+    data-focus-square={props.focus?.square} data-focus-subject={props.focus?.subject}
     tabIndex={0} aria-label={t('game.board')} aria-describedby="board-keys" data-keyboard={showFocus}
     onPointerDownCapture={() => { pointerFocus.current = true; setShowFocus(false); }}
     onKeyDown={handleKey} onFocus={event => {
@@ -100,10 +104,11 @@ export function Board(props: BoardProps) {
         return <button key={square} type="button" tabIndex={-1} data-square={square}
           aria-label={target ? `${label}, ${t(target)}` : label}
           className={`cell ${(file + rank) % 2 === 0 ? 'dark' : 'light'} ${kinds.map(kind => `mark-${kind}`).join(' ')}`}
-          draggable={Boolean(piece)} onDragStart={event => event.dataTransfer.setData('text/plain', square)}
+          data-teaching-focus={props.focus?.square === square ? props.focus.subject : undefined}
+          draggable={props.canMove && piece?.side === state.side} onDragStart={event => event.dataTransfer.setData('text/plain', square)}
           onDragOver={event => event.preventDefault()} onDrop={event => {
             event.preventDefault();
-            props.onDragSquare(event.dataTransfer.getData('text/plain'), square);
+            if (props.canMove) props.onDragSquare(event.dataTransfer.getData('text/plain'), square);
           }}
           onClick={() => { setFocus(square); onSquare(square); }}>
           {column === 0 && <span className="rank" aria-hidden="true">{rank + 1}</span>}
@@ -119,7 +124,9 @@ export function Board(props: BoardProps) {
       <BoardScene pieces={scenePieces} marks={activeMarks} events={props.events} flipped={flipped}
         camera={props.camera} quality={props.low ? 'low' : 'high'} reducedMotion={props.reducedMotion}
         motionKey={props.motionKey} loadingLabel={t('settings.loadingScene')} onFailure={props.onFailure}
-        onSquare={square => { setFocus(square); onSquare(square); }} onDragSquare={props.onDragSquare} />
+        focus={props.focus}
+        onSquare={square => { setFocus(square); onSquare(square); }} onDragSquare={props.canMove ? props.onDragSquare : undefined} />
     </Suspense></SceneLoaderBoundary>}
+    {props.overlay}
   </section>;
 }

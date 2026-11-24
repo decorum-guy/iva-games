@@ -1,0 +1,29 @@
+.remorse-die-throw {
+  position: relative;
+  width: clamp(160px, 46vw, 226px);
+  max-width: 100%;
+  aspect-ratio: 1.08;
+  pointer-events: none;
+  user-select: none;
+  isolation: isolate;
+}
+
+.remorse-die-throw canvas {
+  display: block;
+  pointer-events: none;
+}
+
+.remorse-die-throw__fallback {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding-top: 12%;
+}
+
+.remorse-die-throw__fallback svg {
+  width: 45%;
+  max-width: 96px;
+  height: auto;
+  filter: drop-shadow(0 7px 5px rgb(0 0 0 / 30%));
+}

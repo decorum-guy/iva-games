@@ -1,4 +1,6 @@
 const paths = {
+  sound: 'M4 9h4l5-4v14l-5-4H4zM17 8a6 6 0 0 1 0 8m3-11a10 10 0 0 1 0 14',
+  muted: 'M4 9h4l5-4v14l-5-4H4zM17 9l5 6m0-6-5 6',
   menu: 'M3 5h18M3 12h18M3 19h18',
   profile: 'M4 21v-2a5 5 0 0 1 5-5h6a5 5 0 0 1 5 5v2M16 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0Z',
   book: 'M4 4h5a3 3 0 0 1 3 3v13a4 4 0 0 0-3-2H4zm16 0h-5a3 3 0 0 0-3 3v13a4 4 0 0 1 3-2h5z',

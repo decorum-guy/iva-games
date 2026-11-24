@@ -1,3 +1,4 @@
+import { Component, lazy, Suspense } from 'react';
 import type { ReactNode } from 'react';
 import { CYCLE, cyclesRemaining } from '../core';
 import type { Command, GameEvent, GameState, Piece } from '../core';
@@ -15,6 +16,13 @@ import { eloChange } from './Dialogs';
 import { Icon } from './icons';
 import { PieceIcon, StateMark } from './pieces';
 import { describeEvent } from './projections';
+
+const DieThrow = lazy(() => import('../scene/DieThrow'));
+class DieLoadBoundary extends Component<{ children: ReactNode; fallback: ReactNode }, { failed: boolean }> {
+  state = { failed: false };
+  static getDerivedStateFromError() { return { failed: true }; }
+  render() { return this.state.failed ? this.props.fallback : this.props.children; }
+}
 
 export function PanelNotice({ children, onClose, label }: { children: ReactNode; onClose: () => void; label: string }) {
   return <div className="notice" role="status"><span>{children}</span>
@@ -52,26 +60,48 @@ export function Inspector({ t, locale, piece, state }: { t: Translate; locale: L
   </div>;
 }
 
-export function RollCard({ t, session, rollId, reduced, animate }: {
-  t: Translate; session: GameSession; rollId: string; reduced: boolean; animate: boolean;
+export function RollCard({ t, session, rollId, pending }: {
+  t: Translate; session: GameSession; rollId: string; pending: boolean;
 }) {
   const action = session.record.actions[session.record.cursor - 1];
   if (!action || action.id !== rollId || !action.roll) return null;
   const reaction = session.current.events.find((event): event is Extract<GameEvent, { type: 'reaction' }> => event.type === 'reaction' && event.face !== undefined);
   return <div className="roll-card" data-testid="roll" data-face={action.roll.face} data-fixed={action.roll.fixed}>
-    <ReactionDie face={action.roll.face} rollKey={`${session.record.id}/${rollId}`} reducedMotion={reduced || !animate}
-      label={t('die.face', { face: action.roll.face })} />
+    {!pending && <ReactionDie face={action.roll.face} rollKey={`${session.record.id}/${rollId}`} reducedMotion
+      label={t('die.face', { face: action.roll.face })} />}
     <div>
       <span className="die-label">{t('die.label')}</span>
-      <strong className="die-result">{t(!reaction || reaction.affliction === 'neutral' ? 'state.unaffected' : `state.${reaction.affliction}`)}</strong>
-      {action.roll.fixed && <small>{t('die.tutorial')}</small>}
-      {!animate && <span className="sr-only" role="status">{t('die.face', { face: action.roll.face })}</span>}
+      <strong className="die-result">{t(pending ? 'die.rolling' : !reaction || reaction.affliction === 'neutral' ? 'state.unaffected' : `state.${reaction.affliction}`)}</strong>
+      {!pending && <span className="sr-only" role="status">{t('die.face', { face: action.roll.face })}</span>}
     </div>
   </div>;
 }
 
-export function LessonPanel({ t, locale, learning, guide, blocked, onAdvance, onHandoff, onNew, onRepeat, onRestart, onRestartAll }: {
+export function RollReveal({ t, session, rollId, reduced, low, pending, startedAt }: {
+  t: Translate; session: GameSession; rollId: string; reduced: boolean; low: boolean; pending: boolean; startedAt?: number;
+}) {
+  const action = session.record.actions[session.record.cursor - 1];
+  if (!action?.roll || action.id !== rollId) return null;
+  const reaction = session.current.events.find((event): event is Extract<GameEvent, { type: 'reaction' }> =>
+    event.type === 'reaction' && event.face !== undefined);
+  const result = t(!reaction || reaction.affliction === 'neutral' ? 'state.unaffected' : `state.${reaction.affliction}`);
+  const placeholder = <div className="dice-loading-face" aria-hidden="true">
+    {pending ? <span className="dice-loading-body" /> : <ReactionDie face={action.roll.face} rollKey={rollId} reducedMotion />}
+  </div>;
+  return <div className="dice-reveal" data-testid="dice-reveal" data-actor={action.actor}
+    data-phase={pending ? 'throwing' : 'settled'}>
+    <span className="dice-actor">{t('die.actor', { side: t(`side.${action.actor}`) })}</span>
+    <DieLoadBoundary fallback={placeholder}><Suspense fallback={placeholder}>
+      <DieThrow face={action.roll.face} rollKey={`${session.record.id}/${rollId}`} reduced={reduced} quality={low ? 'low' : 'high'} startedAt={startedAt} />
+    </Suspense></DieLoadBoundary>
+    <strong className="dice-caption" role="status">{pending ? t('die.rolling') : `${action.roll.face} · ${result}`}</strong>
+  </div>;
+}
+
+export function LessonPanel({ t, locale, learning, guide, blocked, rolling = false, inspected = false, onAdvance, onHandoff, onNew, onRepeat, onRestart, onRestartAll }: {
   t: Translate; locale: Locale; learning: Learning; guide: readonly Command[]; blocked: boolean;
+  rolling?: boolean;
+  inspected?: boolean;
   onAdvance: () => void; onHandoff: () => void; onNew: () => void; onRepeat: () => void; onRestart: () => void;
   onRestartAll: () => void;
 }) {
@@ -81,8 +111,15 @@ export function LessonPanel({ t, locale, learning, guide, blocked, onAdvance, on
   const phase = complete ? 'complete' : step?.kind ?? 'position-complete';
   const moves = guide.filter(cmd => cmd.type === 'move');
   const forced = moves[0] && moves.every(move => move.from === moves[0].from && move.to === moves[0].to);
+  const read = step?.kind === 'read';
+  const inspectedPiece = step?.kind === 'inspect' ? learning.session.state.pieces.find(piece => piece.square === step.square) : undefined;
+  const remaining = inspectedPiece ? cyclesRemaining(inspectedPiece, learning.session.state) : null;
+  const nextPosition = learning.position + 1 < lesson.positions.length;
+  const actionTitle = !step ? 'tutorial.positionDone' : step.kind === 'read' ? 'tutorial.readCue' :
+    step.kind === 'inspect' ? 'tutorial.selectCue' : step.kind === 'script' ? 'game.script' :
+      step.kind === 'illegal' ? 'tutorial.illegalCue' : 'tutorial.moveCue';
   return <section className="lesson-panel" data-testid="tutorial" data-lesson={lesson.id}
-    data-position={learning.position} data-step={step?.id ?? phase} data-kind={phase}>
+    data-position={learning.position} data-step={step?.id ?? phase} data-kind={phase} aria-label={lesson.title[locale]}>
     <div className="lesson-meta">
       <span>{t('tutorial.progress', { current: learning.lesson + 1, total: LESSONS.length })}</span>
       <div className="lesson-track" aria-hidden="true">
@@ -90,9 +127,14 @@ export function LessonPanel({ t, locale, learning, guide, blocked, onAdvance, on
       </div>
     </div>
     <h2>{complete ? t('tutorial.finish') : lesson.title[locale]}</h2>
-    <p>{complete ? t('tutorial.finishDetail') : step?.text[locale] ?? t('tutorial.positionDone')}</p>
-    {step?.kind === 'inspect' && <div className="lesson-target">{t('tutorial.inspect', { square: step.square })}</div>}
-    {forced && !complete && <div className="lesson-target">{t('tutorial.try', { from: moves[0].from, to: moves[0].to })}</div>}
+    {!complete && <div className="lesson-action-label" role="status"><Icon name={read || inspected || !step ? 'check' : step.kind === 'inspect' ? 'info' : 'arrow'} />{t(rolling ? 'die.watch' : inspected ? 'tutorial.readCue' : actionTitle)}</div>}
+    <p className="lesson-instruction" data-testid={inspected ? 'counter-read' : undefined}>{rolling ? t('die.rolling')
+      : inspected && remaining !== null ? t('tutorial.counterRead', { count: countText(locale, 'cycle', remaining) })
+        : complete ? t('tutorial.finishDetail') : step?.text[locale] ?? t('tutorial.positionDoneDetail')}</p>
+    {!rolling && !inspected && step?.kind === 'inspect' && <div className="lesson-target">{t('tutorial.inspect', { square: step.square })}</div>}
+    {!rolling && forced && !complete && <div className="lesson-target">{t('tutorial.try', { from: moves[0].from, to: moves[0].to })}</div>}
+    {!rolling && step?.kind === 'move' && !moves.length && guide.some(command => command.type === 'endTurn') &&
+      <div className="lesson-target">{t('tutorial.endAction')}</div>}
     {complete ? <div className="lesson-actions">
       <button type="button" className="button primary" onClick={onHandoff} disabled={blocked} data-testid="lesson-continue">
         <span>{t('tutorial.continue')}<small>{t('tutorial.continueDetail')}</small></span><Icon name="arrow" />
@@ -100,10 +142,10 @@ export function LessonPanel({ t, locale, learning, guide, blocked, onAdvance, on
       <button type="button" className="button" onClick={onNew} data-testid="lesson-new" disabled={blocked}>{t('home.new')}</button>
       <button type="button" className="text-button" onClick={onRestartAll} disabled={blocked}>{t('tutorial.restartAll')}</button>
     </div> : <>
-      {(!step || step.kind === 'read') && <button type="button" className="button primary" onClick={onAdvance}
-        disabled={blocked} data-testid="lesson-next">{t(!step ? 'tutorial.newPosition' : 'nav.next')}<Icon name="arrow" /></button>}
+      {(!step || step.kind === 'read' || inspected) && <button type="button" className={`button primary ${rolling ? 'awaiting-roll' : ''}`} onClick={onAdvance}
+        disabled={blocked} data-testid="lesson-next">{t(!step ? nextPosition ? 'tutorial.newPosition' : 'tutorial.nextLesson' : 'tutorial.readAction')}<Icon name="arrow" /></button>}
       <div className="lesson-tools">
-        <button type="button" className="text-button" onClick={onRepeat}>{t('tutorial.repeat')}</button>
+        {step && <button type="button" className="text-button" onClick={onRepeat}>{t(step.detail ? 'tutorial.why' : 'tutorial.repeat')}</button>}
         <button type="button" className="text-button" onClick={onRestart} data-testid="lesson-restart">{t('tutorial.restart')}</button>
       </div>
     </>}
@@ -120,14 +162,14 @@ export function History({ t, session, latest, review, onReview }: {
   const tutorialEvents = tutorialHistory(session).filter(event => event.type !== 'turn' || event.check);
   const events = (review === null ? session.events : session.eventsAt(review)).filter(event => event.type !== 'turn' || event.check);
   return <section className="history" data-testid="history">
-    {notable.length > 0 && <div className="recent-event">{describeEvent(t, notable[notable.length - 1], tutorial)}</div>}
+    {notable.length > 0 && <div className="recent-event">{describeEvent(t, notable[notable.length - 1])}</div>}
     <details>
       <summary><Icon name="history" />{t('log.title')}</summary>
       {(session.record.config.provenance === 'handoff' || tutorialEvents.length > 0) && <p>{t('log.handoff')}</p>}
       {tutorialEvents.length > 0 && <ol className="root-history">
-        {tutorialEvents.map(event => <li key={event.id}>{describeEvent(t, event, true)}</li>)}
+        {tutorialEvents.map(event => <li key={event.id}>{describeEvent(t, event)}</li>)}
       </ol>}
-      {events.length ? <ol>{events.map(event => <li key={event.id}>{describeEvent(t, event, tutorial)}</li>)}</ol>
+      {events.length ? <ol>{events.map(event => <li key={event.id}>{describeEvent(t, event)}</li>)}</ol>
         : <p>{t('log.empty')}</p>}
       {!tutorial && total > 0 && <div className="review-controls">
         {review === null ? <button type="button" className="button compact" onClick={() => onReview(total)}>{t('log.review')}</button>

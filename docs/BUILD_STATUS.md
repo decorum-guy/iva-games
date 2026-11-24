@@ -1,16 +1,33 @@
-# REMORSE build status
+# REMORSE — current build status
 
-Work started from `6cf4757035cfcbe755537a174002418a28bc3ad1` in `~/Developer/remorse-chess` on 2026-11-24 (Europe/Moscow). The PDF extracted with PDFKit agrees with the supplied transcript and its SHA-256 matches the preparation record.
+## Active task: corrections after the owner's first playtest
 
-| Stage | Status |
-|---|---|
-| Rules, source decisions and fixtures | Implemented and tested. |
-| Ten bot profiles and Worker | Implemented. Verified fixed-budget and real browser searches, plus bounded color-swapped self-play. |
-| WebGL, motion, asset licensing and 2D | Implemented. Reviewed Chrome and WebKit viewport captures plus a short motion recording. Production context-loss and asset recovery tests passed. |
-| Session, local Elo, history, saves and replay | Implemented. Browser runs covered a genuine mate, repetition and resignation, including two simultaneous tabs and practice save/import/undo. |
-| Nine RU/EN tutorial lessons | Implemented and completed through real controls in both languages. Verified continuing with standard RNG and real level 4 AI, plus canceling and confirming clean setup. |
-| Delivery | Final integrated pass complete. Production binds to loopback and Wi-Fi. The game has separate source and delivery commits on main. |
+The implemented baseline is `aa4aceb1023bfee0947fd5ce974bfe5d313039b8`. The previous Mac delivery report remains in [VALIDATION.md](VALIDATION.md); its results belong to that earlier version and are not acceptance of the current changes.
 
-The playfield centers the marble game board with ivory, obsidian and bronze materials. The responsive app uses Cormorant Garamond with Manrope, stacked capture ledgers on both ends and a collapsible phone sheet. Visual iterations corrected parity and bishop geometry, improved camera fit and lighting, then sharpened the low-quality canvas and expanded mobile hit areas.
+The owner wants the Mac executor to finish this iteration. Read [the complete execution brief](../prompts/FINISH_PLAYABILITY.md). The main executor uses Sol 6.2 / max. **Interactive visual acceptance must use a real, separate 6.1 Terra agent with high reasoning**, if the environment exposes that model. Verify actual availability and identity; never simulate or claim a Terra review that did not happen.
 
-Final checks passed: clean install, TypeScript, ESLint, 94 unit tests, production build and 28 Chromium/WebKit tests. See [validation](VALIDATION.md) for actual results, scene measurements and the tested implementation commit. The paired iPhone was unavailable over Xcode, so mobile evidence is from touchscreen viewports in browser automation. If work resumes, recheck the current Wi-Fi address and preview listeners before sharing the links.
+| Area | Implemented in this revision | Remaining acceptance |
+|---|---|---|
+| Tutorial | Concise RU/EN instructions, optional detail, current-action spotlight, no false legal targets/drag on read steps, restricted promotion/end-turn choices, preserved v1 checkpoints. | Execute the complete browser routes and manually check the lesson 3/4 boundary in 3D. |
+| Inspection | Select the counter figure, read it, explicitly press Got it; authored focus targets and end-of-example focus. | Verify pacing, target visibility and return to overview on Mac and mobile sizes. |
+| Legibility | Cooler/darker marble, stronger piece-state surfaces, clearer targets and badges, improved 2D contrast. | Inspect actual GPU output at normal zoom for both armies and all states. |
+| Camera | Eased 850 ms flip and teaching close-up; temporary material emphasis; delayed counter frame. | Judge motion and fix clipping, obstruction or excessive bloom. |
+| Die | Rounded 3D mesh, drop/tumble/settle, shared timestamp and sound timing, reveal gate for either side/AI, reduced-motion and WebGL fallbacks. | Run browser regressions; inspect the throw and reveal, including loading and cancellation. |
+| Sound | Distinct generated cues, header mute, volume, gesture unlock, transient commit-only playback and cancellation. | Real Web Audio checks and listening where actually possible. Unit tests use mocked audio APIs. |
+| Layout | Dynamic-viewport game surface, compact phone layout, short-landscape layout, bounded optional details. | Measure no document scroll and inspect essential controls at requested sizes. |
+| Rules, Elo and saves | Core and rating formula unchanged; presentation state is transient and renderer-only. | Run existing game/storage/rating browser regressions. |
+
+## Checks actually completed in the preparation environment
+
+- `npm ci` completed on Node 24.22.3 / npm 11.19.1.
+- Final `npm run check` passed: TypeScript, ESLint and **183 unit tests across 11 files**.
+- `npm run build` passed. Vite still reports a large shared 3D chunk; no FPS/device-performance claim follows from this build.
+- `npx playwright test --list` collected **46 tests across four files and two projects**. **Collection is not execution.**
+- `git diff --check` passed.
+- Actual browser inspection of the old local game at `http://127.0.0.1:4173/` confirmed poor white-piece contrast, a nearly invisible guilt surface, faint golden targets, preset-dice notices and document overflow. The observed old page was 949 px tall at a 390×844 viewport.
+
+The new browser suite was **not executed here**: bundled browsers could not be downloaded (403), and installed Chromium cannot create its required socket in this environment. The Browser plugin could inspect the owner's old Mac preview after it was started, but the new checkout was not deployed there. New graphics, sound and layout are **implemented and awaiting Mac acceptance**, not declared visually finished.
+
+## Next concrete action
+
+On the Mac, fetch the latest repository without discarding local work, read `prompts/FINISH_PLAYABILITY.md`, build and run this revision, execute all browser tests, and have **6.1 Terra / high** perform interactive visual acceptance. Fix observed defects, repeat the affected checks, update this file with real results, push finished changes and leave a current playable preview running. Do not stop after reading this status or producing another plan.

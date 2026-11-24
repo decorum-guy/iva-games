@@ -17,7 +17,15 @@ type Guidance =
   | { readonly kind: 'illegal'; readonly move: Move; readonly reason: RejectionCode }
   | { readonly kind: 'read' };
 
-export type Step = Guidance & { readonly id: string; readonly text: Copy };
+export type Step = Guidance & {
+  readonly id: string;
+  /** The one short action or observation shown in the main coachmark. */
+  readonly text: Copy;
+  /** Optional rule detail: never required reading before the learner can act. */
+  readonly detail?: Copy;
+  /** Deliberate inspection target; never inferred from the previous move. */
+  readonly focus?: { readonly square: string; readonly subject: 'piece' | 'countdown' };
+};
 
 export interface Position {
   readonly setup: () => GameState;

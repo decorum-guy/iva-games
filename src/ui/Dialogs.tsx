@@ -89,7 +89,7 @@ export function SetupDialog({ t, hotseat, durable, busy, pending, onStart, onClo
         </div>
         <p className="field-note">{t(!durable ? 'error.storage' : rated ? 'setup.ratedPolicy' : 'setup.practicePolicy')}</p>
         <LevelPicker t={t} value={level} onChange={setLevel} />
-        <p className="field-note">{t('setup.botScale')}</p>
+        <details className="setup-rating-help"><summary>{t('setup.aboutRating')}</summary><p className="field-note">{t('setup.botScale')}</p></details>
         <fieldset>
           <legend>{t('setup.yourSide')}</legend>
           <div className="segmented side-picker">
@@ -137,6 +137,7 @@ export interface Settings {
   readonly autoFlip: boolean;
   readonly reduce: boolean;
   readonly sound: boolean;
+  readonly volume: number;
 }
 
 export function SettingsDialog({ t, settings, onChange, onClose, exportFile, importFile, changeLevel, level }: {
@@ -170,6 +171,11 @@ export function SettingsDialog({ t, settings, onChange, onClose, exportFile, imp
       {(['autoFlip', 'reduce', 'sound'] as const).map(key => <label className="setting" key={key}>
         <span>{t(`settings.${key}`)}</span><input type="checkbox" checked={settings[key]} onChange={event => onChange({ [key]: event.target.checked })} />
       </label>)}
+      <label className="setting volume-setting"><span>{t('settings.volume')}</span>
+        <input type="range" min="0" max="100" step="5" value={Math.round(settings.volume * 100)}
+          disabled={!settings.sound} aria-valuetext={`${Math.round(settings.volume * 100)}%`}
+          onChange={event => onChange({ volume: Number(event.target.value) / 100 })} />
+      </label>
       {changeLevel && level && <LevelPicker t={t} value={level} onChange={changeLevel} />}
     </div>
     <div className="dialog-actions">
@@ -187,12 +193,13 @@ export function SettingsDialog({ t, settings, onChange, onClose, exportFile, imp
   </Dialog>;
 }
 
-export function PromotionDialog({ t, side, onPick, onClose, locale, onLocale }: {
+export function PromotionDialog({ t, side, onPick, onClose, locale, onLocale, allowed }: {
   t: Translate; side: Side; onPick: (piece: Promotion) => void; onClose: () => void; locale: Locale; onLocale: (locale: Locale) => void;
+  allowed?: readonly Promotion[];
 }) {
   return <Dialog closeLabel={t('nav.close')} className="promotion-dialog" title={t('game.promotion')} onClose={onClose}>
     <div className="promotion-options">{PROMOTIONS.map(piece => <button type="button" className="button" key={piece}
-      data-testid={`promotion-${piece}`} onClick={() => onPick(piece)}>
+      data-testid={`promotion-${piece}`} disabled={allowed !== undefined && !allowed.includes(piece)} onClick={() => onPick(piece)}>
       <PieceIcon type={piece} side={side} /><span>{t(`piece.${piece}`)}</span>
     </button>)}</div>
     <LanguagePicker t={t} locale={locale} onLocale={onLocale} />

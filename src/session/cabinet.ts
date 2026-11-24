@@ -1,7 +1,8 @@
-import type { Command } from '../core';
+import type { Command, GameEvent, Side } from '../core';
 import { ENGINE_VERSION, getPreset, PRESET_VERSION } from '../engine/presets';
 import type { SearchRequest, SearchResponse } from '../engine/protocol';
 import { initialProfile } from '../rating/elo';
+import { getDieMotionTiming, getDieThrowDuration } from '../scene/diceMotion';
 import type { Profile, RatingEntry } from '../rating/elo';
 import { openGameStore } from '../storage/database';
 import type { GameStore } from '../storage/database';
@@ -33,6 +34,10 @@ interface CabinetState {
   readonly error: SessionCode | null;
   readonly motionKey: string;
   readonly rollId: string | null;
+  readonly rollPhase: 'idle' | 'throwing' | 'settled';
+  readonly rollReduced: boolean;
+  readonly rollStartedAt: number | null;
+  readonly audioCue: { readonly id: string; readonly events: readonly GameEvent[]; readonly human: Side | null; readonly startedAt: number } | null;
 }
 
 function preference(key: string, setting?: string) {
@@ -57,7 +62,7 @@ export class Cabinet {
   private data: CabinetState = {
     ready: false, durable: false, busy: false, animating: false, thinking: false, searchFailed: false,
     profile: initialProfile, ledger: [], matches: [], view: 'home', game: null, learning: null,
-    error: null, motionKey: 'home', rollId: null,
+    error: null, motionKey: 'home', rollId: null, rollPhase: 'idle', rollReduced: false, rollStartedAt: null, audioCue: null,
   };
   private readonly listeners = new Set<() => void>();
   private store: GameStore | null = null;
@@ -66,6 +71,7 @@ export class Cabinet {
   private workerDeadline: ReturnType<typeof setTimeout> | undefined;
   private scheduled: ReturnType<typeof setTimeout> | undefined;
   private reveal: ReturnType<typeof setTimeout> | undefined;
+  private settle: ReturnType<typeof setTimeout> | undefined;
   private attempts = 0;
   private shortMotion = false;
   private initialized = false;
@@ -137,8 +143,10 @@ export class Cabinet {
     this.stopWorker();
     clearTimeout(this.scheduled);
     clearTimeout(this.reveal);
+    clearTimeout(this.settle);
     this.attempts = 0;
-    this.patch({ thinking: false, animating: false, searchFailed: false, motionKey: newId(), rollId: null });
+    this.patch({ thinking: false, animating: false, searchFailed: false, motionKey: newId(), rollId: null,
+      rollPhase: 'idle', rollStartedAt: null, audioCue: null });
   }
 
   private async run(action: () => void | Promise<void>): Promise<boolean> {
@@ -176,10 +184,11 @@ export class Cabinet {
     await this.refreshOverview().catch(() => undefined);
   }
 
-  private async persist(previous: GameSession, next: GameSession) {
+  private async persist(previous: GameSession, next: GameSession, afterCommit?: () => void) {
     if (previous === next) return;
     if (this.store) await this.store.commit(previous, next);
     if (!this.store && previous.record.config.mode === 'rated') throw new SessionError('storage');
+    afterCommit?.();
     this.patch({ game: next });
     await this.changedStore();
   }
@@ -246,14 +255,23 @@ export class Cabinet {
   private present(game: GameSession) {
     const action = game.record.actions[game.record.cursor - 1];
     if (!action) return;
+    // This is a live, committed action. Restores/reviews never call present and
+    // therefore cannot replay old sounds. Results need a cue even without motion.
+    const startedAt = performance.now();
+    const audioCue = { id: `${game.record.id}/${action.id}`, events: game.current.events, human: game.record.config.human, startedAt };
     const showsMotion = action.command.type === 'move' || action.command.type === 'endTurn';
-    if (!showsMotion) return;
+    if (!showsMotion) { this.patch({ audioCue }); return; }
     clearTimeout(this.reveal);
+    clearTimeout(this.settle);
     const rollId = action.roll ? action.id : null;
-    const duration = this.shortMotion ? (rollId ? 170 : 75) : (rollId ? 650 : 330);
-    this.patch({ animating: true, rollId });
+    const duration = rollId ? getDieThrowDuration(this.shortMotion) : this.shortMotion ? 75 : 330;
+    this.patch({ audioCue, animating: true, rollId, rollPhase: rollId ? 'throwing' : 'idle', rollReduced: this.shortMotion,
+      rollStartedAt: rollId ? startedAt : null });
+    if (rollId) this.settle = setTimeout(() => {
+      this.patch({ rollPhase: 'settled' });
+    }, getDieMotionTiming(this.shortMotion).motionMs);
     this.reveal = setTimeout(() => {
-      this.patch({ animating: false });
+      this.patch({ animating: false, rollPhase: 'idle' });
       this.pump();
     }, duration);
   }
@@ -262,9 +280,8 @@ export class Cabinet {
     if (this.data.animating && command.type !== 'resign') return;
     if (this.data.view === 'learn' && this.data.learning) {
       const { progress, explanation } = learnerAction(this.data.learning, command);
-      await this.updateLearning(progress);
+      await this.updateLearning(progress, !explanation ? () => this.present(progress.session) : undefined);
       if (explanation) this.patch({ error: explanation });
-      else this.present(progress.session);
       return;
     }
     const current = this.data.game;
@@ -272,9 +289,10 @@ export class Cabinet {
     const actor = command.type === 'resign' && current.record.config.human
       ? current.record.config.human : current.state.side;
     const next = current.submit(current.envelope(command, actor), 'human');
-    await this.persist(current, next);
-    if (command.type === 'resign') this.invalidate();
-    else this.present(next);
+    await this.persist(current, next, () => {
+      if (command.type === 'resign') this.invalidate();
+      this.present(next);
+    });
   });
 
   edit = (edit: 'undo' | 'redo' | number) => this.run(async () => {
@@ -286,8 +304,9 @@ export class Cabinet {
     this.patch({ rollId: lastRoll(next) });
   });
 
-  private async updateLearning(learning: Learning) {
+  private async updateLearning(learning: Learning, afterCommit?: () => void) {
     if (this.store) await this.store.putLearning(saveLearning(learning));
+    afterCommit?.();
     this.patch({ learning });
   }
 
@@ -344,8 +363,7 @@ export class Cabinet {
         if (this.generation !== generation || this.data.learning !== learning || this.data.view !== 'learn') return;
         void this.run(async () => {
           const next = scriptAction(learning);
-          await this.updateLearning(next);
-          this.present(next.session);
+          await this.updateLearning(next, () => this.present(next.session));
         });
       }, this.shortMotion ? 100 : 320);
     }
@@ -392,8 +410,7 @@ export class Cabinet {
         this.attempts = 0;
         this.patch({ thinking: false });
         void this.run(async () => {
-          await this.persist(game, next);
-          this.present(next);
+          await this.persist(game, next, () => this.present(next));
         }).then(ok => {
           if (!ok && current()) {
             this.stopWorker();

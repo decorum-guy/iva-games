@@ -76,17 +76,27 @@ function Plate({ size, height, y, color, metalness }: {
   )
 }
 
-function Border({ color, size, focused = false }: { color: string; size: number; focused?: boolean }) {
-  const width = focused ? .024 : .035
-  const arm = focused ? .19 : .23
+function Border({ color, size, focused = false, strong = false }: {
+  color: string; size: number; focused?: boolean; strong?: boolean
+}) {
+  const width = focused ? .036 : strong ? .068 : .055
+  const arm = focused ? .23 : strong ? .31 : .27
   const length = size - arm * .5
   return [-1, 1].flatMap(x => [-1, 1].map(z => (
     <group key={x + ':' + z} position={[x * size, 0, z * size]}>
       <mesh rotation={flatRotation} position={[(length - size) * x, 0, 0]}>
+        <planeGeometry args={[arm + .052, width + .052]} />
+        <meshBasicMaterial color="#111a24" toneMapped={false} />
+      </mesh>
+      <mesh rotation={flatRotation} position={[0, 0, (length - size) * z]}>
+        <planeGeometry args={[width + .052, arm + .052]} />
+        <meshBasicMaterial color="#111a24" toneMapped={false} />
+      </mesh>
+      <mesh rotation={flatRotation} position={[(length - size) * x, .002, 0]}>
         <planeGeometry args={[arm, width]} />
         <meshBasicMaterial color={color} toneMapped={false} />
       </mesh>
-      <mesh rotation={flatRotation} position={[0, 0, (length - size) * z]}>
+      <mesh rotation={flatRotation} position={[0, .002, (length - size) * z]}>
         <planeGeometry args={[width, arm]} />
         <meshBasicMaterial color={color} toneMapped={false} />
       </mesh>
@@ -95,13 +105,13 @@ function Border({ color, size, focused = false }: { color: string; size: number;
 }
 
 const markerStyle = {
-  selected: { color: '#e1ba77', tint: .26, y: .017 },
-  capture: { color: '#f7a388', tint: .15, y: .019 },
-  friendly: { color: '#ee8ab0', tint: .20, y: .020 },
-  check: { color: '#ff8878', tint: .25, y: .021 },
-  last: { color: '#cfac69', tint: .19, y: .012 },
-  lesson: { color: '#ffe3a2', tint: .16, y: .023 },
-  focus: { color: '#f0e6d4', tint: .08, y: .026 },
+  selected: { color: '#ffdf9b', tint: .22, y: .017 },
+  capture: { color: '#ffb29a', tint: .18, y: .019 },
+  friendly: { color: '#ffa5ca', tint: .20, y: .020 },
+  check: { color: '#ff9589', tint: .27, y: .021 },
+  last: { color: '#c6bb97', tint: .22, y: .012 },
+  lesson: { color: '#fff0bb', tint: .18, y: .023 },
+  focus: { color: '#eff5fc', tint: .08, y: .026 },
 }
 
 function TileMark({ mark }: { mark: SceneMark }) {
@@ -109,12 +119,12 @@ function TileMark({ mark }: { mark: SceneMark }) {
   if (mark.kind === 'move') return (
     <group position={[x, .027, z]}>
       <mesh rotation={flatRotation}>
-        <circleGeometry args={[.149, 24]} />
-        <meshBasicMaterial color="#1a1818" transparent opacity={.78} depthWrite={false} toneMapped={false} />
+        <circleGeometry args={[.205, 32]} />
+        <meshBasicMaterial color="#111a24" toneMapped={false} />
       </mesh>
       <mesh rotation={flatRotation} position-y={.003}>
-        <circleGeometry args={[.10, 24]} />
-        <meshBasicMaterial color="#f5dc9f" toneMapped={false} />
+        <circleGeometry args={[.132, 32]} />
+        <meshBasicMaterial color="#ffe4ac" toneMapped={false} />
       </mesh>
     </group>
   )
@@ -127,14 +137,21 @@ function TileMark({ mark }: { mark: SceneMark }) {
       </mesh>
       {mark.kind !== 'last' && (
         <group position-y={.001}>
-          <Border color={style.color} size={mark.kind === 'focus' ? .462 : .43} focused={mark.kind === 'focus'} />
+          <Border color={style.color} size={mark.kind === 'focus' ? .462 : .43}
+            focused={mark.kind === 'focus'} strong={mark.kind === 'lesson' || mark.kind === 'check'} />
         </group>
       )}
       {mark.kind === 'friendly' && (
-        <mesh rotation={[-Math.PI / 2, 0, Math.PI / 4]} position={[.365, .003, .365]}>
-          <planeGeometry args={[.135, .135]} />
-          <meshBasicMaterial color="#fb98be" toneMapped={false} />
-        </mesh>
+        <group position={[.34, .005, .34]}>
+          <mesh rotation={[-Math.PI / 2, 0, Math.PI / 4]}>
+            <planeGeometry args={[.23, .23]} />
+            <meshBasicMaterial color="#111a24" toneMapped={false} />
+          </mesh>
+          <mesh rotation={[-Math.PI / 2, 0, Math.PI / 4]} position-y={.002}>
+            <planeGeometry args={[.15, .15]} />
+            <meshBasicMaterial color="#ffa5ca" toneMapped={false} />
+          </mesh>
+        </group>
       )}
     </group>
   )
@@ -147,20 +164,37 @@ function LessonLine({ from, to }: { from: string; to: string }) {
   const length = direction.length()
   if (length < .9) return null
   direction.normalize()
-  const end = new Vector3(tx, .029, tz).addScaledVector(direction, -.34)
-  const start = new Vector3(x, .029, z).addScaledVector(direction, .37)
-  const dashCount = Math.max(1, Math.min(17, Math.round((length - .71) / .17)))
+  const end = new Vector3(tx, .035, tz).addScaledVector(direction, -.34)
+  const start = new Vector3(x, .035, z).addScaledVector(direction, .39)
+  const dashCount = Math.max(1, Math.min(17, Math.round((length - .73) / .22)))
+  const arrowRotation: [number, number, number] = [-Math.PI / 2, 0, Math.atan2(-direction.x, -direction.z)]
   return (
     <group>
       {Array.from({ length: dashCount }, (_, i) => {
         const position = start.clone().lerp(end, i / dashCount)
         return (
-          <mesh key={i} position={position} rotation={flatRotation}>
-            <circleGeometry args={[.025 + .018 * i / dashCount, 8]} />
-            <meshBasicMaterial color="#ffdda0" transparent opacity={.72} depthWrite={false} toneMapped={false} />
-          </mesh>
+          <group key={i} position={position}>
+            <mesh rotation={flatRotation}>
+              <circleGeometry args={[.076 + .015 * i / dashCount, 12]} />
+              <meshBasicMaterial color="#111a24" toneMapped={false} />
+            </mesh>
+            <mesh rotation={flatRotation} position-y={.002}>
+              <circleGeometry args={[.047 + .015 * i / dashCount, 12]} />
+              <meshBasicMaterial color="#fff0bb" toneMapped={false} />
+            </mesh>
+          </group>
         )
       })}
+      <group position={end}>
+        <mesh rotation={arrowRotation}>
+          <circleGeometry args={[.24, 3, Math.PI / 2]} />
+          <meshBasicMaterial color="#111a24" toneMapped={false} />
+        </mesh>
+        <mesh rotation={arrowRotation} position-y={.002}>
+          <circleGeometry args={[.17, 3, Math.PI / 2]} />
+          <meshBasicMaterial color="#fff0bb" toneMapped={false} />
+        </mesh>
+      </group>
     </group>
   )
 }
@@ -172,6 +206,16 @@ export function BoardSurface({ assets, flipped, marks }: {
 }) {
   const letters = useMemo(() => engraving(flipped), [flipped])
   useEffect(() => () => letters.dispose(), [letters])
+  const boardMaterial = useMemo(() => {
+    const material = assets.board.material.clone()
+    // Cool, lower-value stone separates the warm ivory army and gold targets
+    // without changing the licensed board geometry or replacing its marble map.
+    material.color.set('#a5afb5')
+    material.roughness = .95
+    material.envMapIntensity = .38
+    return material
+  }, [assets])
+  useEffect(() => () => boardMaterial.dispose(), [boardMaterial])
   const lesson = marks.filter(mark => mark.kind === 'lesson')
   return (
     <>
@@ -181,7 +225,7 @@ export function BoardSurface({ assets, flipped, marks }: {
       </mesh>
       <Plate size={9.54} height={.08} y={-.325} color="#222328" metalness={.3} />
       <Plate size={9.57} height={.017} y={-.299} color="#8c6945" metalness={.63} />
-      <mesh geometry={assets.board.geometry} material={assets.board.material} receiveShadow dispose={null} />
+      <mesh geometry={assets.board.geometry} material={boardMaterial} receiveShadow dispose={null} />
       <mesh position-y={.004} rotation={flatRotation}>
         <planeGeometry args={[9.58, 9.58]} />
         <meshBasicMaterial map={letters} transparent opacity={.96} depthWrite={false} toneMapped={false} />

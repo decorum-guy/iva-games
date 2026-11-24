@@ -6,7 +6,8 @@ import { translator } from '../../src/i18n/catalog'
 import type { MatchRecord } from '../../src/session/match'
 import { nextDie } from '../../src/session/random'
 import { restoreMatch } from '../../src/session/save'
-import type { saveLearning } from '../../src/tutorial/controller'
+import { learnerAction, saveLearning, scriptAction, startLesson } from '../../src/tutorial/controller'
+import type { Learning } from '../../src/tutorial/controller'
 import { move } from '../../src/tutorial/lessonTypes'
 import { LESSONS } from '../../src/tutorial/lessons'
 import { describeEvent } from '../../src/ui/projections'
@@ -14,6 +15,7 @@ import { describeEvent } from '../../src/ui/projections'
 const square = (page: Page, name: string) => page.locator(`[data-square="${name}"]`)
 const playfield = (page: Page) => page.getByTestId('playfield')
 const tutorial = (page: Page) => page.getByTestId('tutorial')
+const scriptedDiceNotice = /учебный бросок|tutorial roll|fixed roll|scripted roll|preset roll/i
 
 async function recorded<T>(page: Page, store: string, key: string): Promise<T> {
   const value = await page.evaluate(async ({ store, key }) => {
@@ -33,6 +35,35 @@ async function recorded<T>(page: Page, store: string, key: string): Promise<T> {
     }
   }, { store, key })
   return value as T
+}
+
+async function restoreTutorialCheckpoint(page: Page, learning: Learning) {
+  // Use the actual v1 saved format so this exercises existing users' progress,
+  // not a test-only navigation shortcut or a freshly restarted lesson.
+  const saved = saveLearning(learning)
+  await page.evaluate(async value => {
+    const db = await new Promise<IDBDatabase>((resolve, reject) => {
+      const opening = indexedDB.open('remorse-v1')
+      opening.onsuccess = () => resolve(opening.result)
+      opening.onerror = () => reject(opening.error)
+    })
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const transaction = db.transaction('learning', 'readwrite')
+        transaction.objectStore('learning').put(value, 'progress')
+        transaction.oncomplete = () => resolve()
+        transaction.onerror = () => reject(transaction.error)
+        transaction.onabort = () => reject(transaction.error)
+      })
+      localStorage.setItem('remorse-view-v1', 'learn')
+    } finally {
+      db.close()
+    }
+  }, saved)
+  await page.reload()
+  await expect(playfield(page)).toHaveAttribute('data-view', 'learn')
+  await interactable(page)
+  return saved
 }
 
 async function boardIdentity(page: Page) {
@@ -66,6 +97,12 @@ async function play(page: Page, command: Command, mobile: boolean) {
 async function changeLanguage(page: Page, locale: 'en' | 'ru', scope: Page | Locator = page) {
   await scope.getByTestId(`lang-${locale}`).click()
   await expect(page.locator('html')).toHaveAttribute('lang', locale)
+}
+
+async function setSecondaryDetails(page: Page, open: boolean) {
+  const toggle = page.locator('button.toggle-sheet')
+  if (await toggle.getAttribute('aria-expanded') !== String(open)) await toggle.click()
+  await expect(toggle).toHaveAttribute('aria-expanded', String(open))
 }
 
 async function verifyContinuation(page: Page, locale: 'en' | 'ru', mobile: boolean) {
@@ -133,6 +170,51 @@ for (const locale of ['ru', 'en'] as const) {
   test.describe(`complete tutorial · ${locale}`, () => {
     test.use({ hasTouch: true, reducedMotion: 'reduce' })
 
+    test('the lesson 3 finish is a visible Continue action and lesson 4 highlights the permitted king move', async ({ page }, testInfo) => {
+      const mobile = locale === 'en' || testInfo.project.name === 'webkit'
+      await page.setViewportSize(mobile ? { width: 360, height: 800 } : { width: 1280, height: 800 })
+      await page.goto('/')
+      await expect(page.getByTestId('mode-learn')).toBeVisible()
+      await changeLanguage(page, locale)
+      await page.getByTestId('flat-mode').click()
+
+      const nearExpiry = learnerAction(startLesson(2, 2), move('g2', 'g3')).progress
+      const saved = await restoreTutorialCheckpoint(page, scriptAction(nearExpiry))
+      await expect(tutorial(page)).toHaveAttribute('data-step', 'removal-material-only')
+      expect(await recorded(page, 'learning', 'progress')).toEqual(saved)
+      const before = await boardIdentity(page)
+
+      for (const phase of ['read', 'position-complete']) {
+        await expect(tutorial(page)).toHaveAttribute('data-kind', phase)
+        // A core-legal king move must not be advertised as actionable while the
+        // lesson asks for Continue. Clicking it cannot produce tutorialChoice.
+        await activate(square(page, 'h1'), mobile)
+        await expect(page.locator('.flat-board .mark-move, .flat-board .mark-capture, .flat-board .mark-friendly')).toHaveCount(0)
+        await activate(square(page, 'g1'), mobile)
+        expect(await boardIdentity(page)).toEqual(before)
+        await expect(page.getByTestId('game-aside').getByText(translator(locale)('error.tutorialChoice'), { exact: true })).toHaveCount(0)
+        await expect(page.getByTestId('lesson-next')).toBeInViewport()
+        await expect(page.getByTestId('lesson-next')).toBeEnabled()
+        await activate(page.getByTestId('lesson-next'), mobile)
+      }
+
+      await expect(tutorial(page)).toHaveAttribute('data-step', 'start-two-cures')
+      await interactable(page)
+      await play(page, move('c1', 'e3'), mobile)
+      await expect(tutorial(page)).toHaveAttribute('data-step', 'cure-two-pieces')
+      await interactable(page)
+      await activate(square(page, 'h1'), mobile)
+      await expect(square(page, 'g1')).toHaveClass(/mark-move/)
+      await expect(square(page, 'g2')).not.toHaveClass(/mark-move/)
+      await activate(square(page, 'g1'), mobile)
+      await expect(tutorial(page)).toHaveAttribute('data-step', 'bishop-pacifism')
+      const healed = await recorded<ReturnType<typeof saveLearning>>(page, 'learning', 'progress')
+      const state = restoreMatch(healed.match).state
+      expect(state.pieces.find(piece => piece.square === 'e4')?.affliction).toBe('neutral')
+      expect(state.pieces.find(piece => piece.square === 'f4')?.affliction).toBe('neutral')
+      await expect(page.getByTestId('game-aside').getByText(translator(locale)('error.tutorialChoice'), { exact: true })).toHaveCount(0)
+    })
+
     test('plays every lesson, restores mid-way, continues against the worker and starts a clean game', async ({ page }, testInfo) => {
       test.setTimeout(100_000)
       const mobile = locale === 'en' || testInfo.project.name === 'webkit'
@@ -171,21 +253,36 @@ for (const locale of ['ru', 'en'] as const) {
             await expect(tutorial(page)).toHaveAttribute('data-step', step.id)
             await expect(tutorial(page).getByText(step.text[locale], { exact: true })).toBeVisible()
             await interactable(page)
+            const offersEndTurn = step.kind === 'move' && step.moves !== 'open'
+              && step.moves.some(command => command.type === 'endTurn')
+            if (offersEndTurn) await expect(page.getByTestId('end-turn')).toBeEnabled()
+            else await expect(page.getByTestId('end-turn')).toHaveCount(0)
+            if (step.kind === 'read' || step.kind === 'inspect') {
+              await expect(page.locator('.flat-board .mark-move, .flat-board .mark-capture, .flat-board .mark-friendly')).toHaveCount(0)
+            }
+            if (step.kind === 'read') {
+              await expect(page.getByTestId('lesson-next')).toHaveAccessibleName(translator(locale)('tutorial.readAction'))
+            }
             if (step.id === 'guilt-forbids-capture') {
               const before = await boardIdentity(page)
               const saved = await recorded<ReturnType<typeof saveLearning>>(page, 'learning', 'progress')
               const capture = restoreMatch(saved.match).events.find(event => event.type === 'capture')!
               const history = page.getByTestId('history')
+              await setSecondaryDetails(page, true)
               await history.locator('summary').click()
-              const original = describeEvent(translator(locale), capture, true)
+              const original = describeEvent(translator(locale), capture)
               await expect(history.getByText(original, { exact: true })).toBeVisible()
+              await expect(history).not.toContainText(scriptedDiceNotice)
               const alternate = locale === 'en' ? 'ru' : 'en'
               await changeLanguage(page, alternate)
               await expect(tutorial(page).getByText(step.text[alternate], { exact: true })).toBeVisible()
-              const translated = describeEvent(translator(alternate), capture, true)
+              const translated = describeEvent(translator(alternate), capture)
               expect(translated).not.toBe(original)
               await expect(history.getByText(translated, { exact: true })).toBeVisible()
+              await expect(history).not.toContainText(scriptedDiceNotice)
               expect(await boardIdentity(page)).toEqual(before)
+              await history.locator('summary').click()
+              await setSecondaryDetails(page, false)
               await page.reload()
               await expect(playfield(page)).toHaveAttribute('data-view', 'learn')
               await expect(tutorial(page)).toHaveAttribute('data-step', step.id)
@@ -209,9 +306,14 @@ for (const locale of ['ru', 'en'] as const) {
                 await activate(square(page, command.from), mobile)
                 await activate(square(page, command.to), mobile)
                 const promotion = page.locator('.promotion-dialog[open]')
-                for (const kind of ['queen', 'rook', 'bishop', 'knight']) {
+                for (const kind of ['queen', 'rook', 'knight']) {
                   await expect(promotion.getByTestId(`promotion-${kind}`)).toBeVisible()
+                  await expect(promotion.getByTestId(`promotion-${kind}`)).toBeEnabled()
                 }
+                // This lesson teaches inherited afflictions. Bishop rebirth is
+                // the next position, so it must not look actionable here.
+                const bishop = promotion.getByTestId('promotion-bishop')
+                if (await bishop.count()) await expect(bishop).toBeDisabled()
                 await changeLanguage(page, locale === 'en' ? 'ru' : 'en', promotion)
                 expect(await boardIdentity(page)).toEqual(before)
                 await changeLanguage(page, locale, promotion)
@@ -226,7 +328,27 @@ for (const locale of ['ru', 'en'] as const) {
               await expect(page.getByTestId('game-aside').getByText(translator(locale)(`error.${step.reason}`), { exact: true })).toBeVisible()
               expect(await boardIdentity(page)).toEqual(before)
             } else if (step.kind === 'inspect') {
+              const before = await boardIdentity(page)
               await activate(square(page, step.square), mobile)
+              // Selecting the figure must leave time to examine its counter.
+              // Only the explicit acknowledgement advances to Black's reply.
+              await expect(tutorial(page)).toHaveAttribute('data-step', step.id)
+              await expect(page.getByTestId('lesson-next')).toHaveAccessibleName(translator(locale)('tutorial.readAction'))
+              await expect(page.getByTestId('lesson-next')).toBeEnabled()
+              expect(await boardIdentity(page)).toEqual(before)
+              if (step.focus?.subject === 'countdown') {
+                await expect(page.getByTestId('counter-read')).toBeVisible()
+                await expect(page.locator('.board-stage')).toHaveAttribute('data-focus-square', step.square)
+                await expect(page.locator('.board-stage')).toHaveAttribute('data-focus-subject', 'countdown')
+                await expect(square(page, step.square).locator('.cell-state')).toContainText('3')
+                await changeLanguage(page, locale === 'en' ? 'ru' : 'en')
+                await expect(page.getByTestId('counter-read')).toBeVisible()
+                await expect(tutorial(page)).toHaveAttribute('data-step', step.id)
+                await expect(page.locator('.board-stage')).toHaveAttribute('data-focus-square', step.square)
+                expect(await boardIdentity(page)).toEqual(before)
+                await changeLanguage(page, locale)
+              }
+              await activate(page.getByTestId('lesson-next'), mobile)
             } else {
               await activate(page.getByTestId('lesson-next'), mobile)
             }
@@ -234,13 +356,14 @@ for (const locale of ['ru', 'en'] as const) {
             if (step.id === 'capture-and-roll') {
               const roll = page.getByTestId('roll')
               await expect(roll).toHaveAttribute('data-face', '4')
-              await expect(roll).toHaveAttribute('data-fixed', 'true')
-              await expect(roll).toContainText(translator(locale)('die.tutorial'))
+              await expect(roll).toContainText(translator(locale)('state.unaffected'))
+              await expect(roll).not.toContainText(scriptedDiceNotice)
               const before = await boardIdentity(page)
               const alternate = locale === 'en' ? 'ru' : 'en'
               await changeLanguage(page, alternate)
               await expect(roll).toHaveAttribute('data-face', '4')
-              await expect(roll).toContainText(translator(alternate)('die.tutorial'))
+              await expect(roll).toContainText(translator(alternate)('state.unaffected'))
+              await expect(roll).not.toContainText(scriptedDiceNotice)
               expect(await boardIdentity(page)).toEqual(before)
               await changeLanguage(page, locale)
               await expect(page.locator('.player-row[data-side="white"] .trophy-group')).toHaveCount(1)
@@ -248,6 +371,7 @@ for (const locale of ['ru', 'en'] as const) {
             }
             if (step.id === 'friendly-capture') {
               await expect(playfield(page)).toHaveAttribute('data-phase', 'bonus')
+              await expect(tutorial(page)).toHaveAttribute('data-step', 'decline-optional-bonus')
               await expect(page.getByTestId('end-turn')).toBeVisible()
               const bonus = await boardIdentity(page)
               await changeLanguage(page, locale === 'en' ? 'ru' : 'en')

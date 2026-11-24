@@ -23,7 +23,7 @@ describe('player ledgers and material', () => {
     expect(capture).toMatchObject({ kind: 'enPassant', mercy: true, landing: 'd6', victim: { square: 'd5' } });
     expect(trophies([capture], 'white')).toEqual([{ type: 'pawn', count: 1 }]);
     expect(trophies([capture], 'black')).toEqual([]);
-    expect(describeEvent(translator('en'), capture, false)).toBe('Mercy en passant · d5');
+    expect(describeEvent(translator('en'), capture)).toBe('Mercy en passant · d5');
     expect(materialBalance(transition.state) - materialBalance(root)).toBe(1);
   });
 

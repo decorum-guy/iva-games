@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { canClaimRepetition, createInitialState, isInCheck, opposite, pieceAt } from '../core';
-import type { Command, GameEvent, Move, Side, Square } from '../core';
+import type { Command, GameEvent, Move, Promotion, Side, Square } from '../core';
 import { translator } from '../i18n/catalog';
 import { Cabinet } from '../session/cabinet';
 import { captureLedger } from '../session/match';
 import { exportMatch } from '../session/save';
 import { guideCommands, instruction } from '../tutorial/controller';
-import { muteAudio, playSceneCue, unlockAudio } from '../scene/audio';
-import type { SceneMark } from '../scene/types';
+import { muteAudio, playSceneCue, setAudioVolume, stopSceneAudio, unlockAudio } from '../scene/audio';
+import type { SceneFocus, SceneMark } from '../scene/types';
 import { Board } from './Board';
 import {
   CaptureDialog, Dialog, LanguagePicker, ProfileDialog, PromotionDialog, RulesDialog, SavesDialog, SettingsDialog, SetupDialog,
@@ -15,8 +15,9 @@ import {
 import type { Settings } from './Dialogs';
 import { PlayerRow } from './Hud';
 import { Icon, Seal } from './icons';
-import { History, Inspector, LessonPanel, PanelNotice, Result, RollCard } from './PlayPanel';
+import { History, Inspector, LessonPanel, PanelNotice, Result, RollCard, RollReveal } from './PlayPanel';
 import { materialBalance } from './projections';
+import { maskRollResult, rollSceneEvents } from './rollPresentation';
 
 type Modal =
   | { kind: 'settings' | 'rules' | 'profile' | 'saves' | 'resign' | 'draw' | 'exit' | 'restart' | 'restart-all' | 'repeat' | 'technical' }
@@ -27,7 +28,7 @@ const cabinet = new Cabinet();
 const preview = createInitialState();
 const noEvents: readonly GameEvent[] = [];
 const PREFS_KEY = 'remorse-settings-v1';
-const defaults: Settings = { locale: 'ru', board: '3d', camera: 'studio', quality: 'auto', autoFlip: false, reduce: false, sound: false };
+const defaults: Settings = { locale: 'ru', board: '3d', camera: 'studio', quality: 'auto', autoFlip: false, reduce: false, sound: true, volume: .65 };
 
 function loadSettings(): Settings {
   try {
@@ -36,7 +37,8 @@ function loadSettings(): Settings {
       locale: saved.locale === 'en' ? 'en' : 'ru', board: saved.board === '2d' ? '2d' : '3d',
       camera: saved.camera === 'tactical' || saved.camera === 'top' ? saved.camera : 'studio',
       quality: saved.quality === 'high' || saved.quality === 'low' ? saved.quality : 'auto',
-      autoFlip: saved.autoFlip === true, reduce: saved.reduce === true, sound: saved.sound === true,
+      autoFlip: saved.autoFlip === true, reduce: saved.reduce === true, sound: saved.sound !== false,
+      volume: typeof saved.volume === 'number' && Number.isFinite(saved.volume) ? Math.max(0, Math.min(1, saved.volume)) : defaults.volume,
     };
   } catch { return defaults; }
 }
@@ -62,7 +64,8 @@ export function App() {
   const [review, setReview] = useState<{ key: string; cursor: number } | null>(null);
   const [flip, setFlip] = useState(false);
   const [graphicsFailed, setGraphicsFailed] = useState(false);
-  const [mobileDetails, setMobileDetails] = useState(true);
+  const [mobileDetails, setMobileDetails] = useState(false);
+  const [inspectedStep, setInspectedStep] = useState<string | null>(null);
   const narrow = useQuery('(max-width: 740px)');
   const systemMotion = useQuery('(prefers-reduced-motion: reduce)');
   const reduced = settings.reduce || systemMotion;
@@ -87,12 +90,45 @@ export function App() {
   const boosted = active && position.phase === 'bonus';
   const selectedId = selection?.key === snap.motionKey ? selection.id : boosted ? position.bonusPieceId : null;
   const selected = position.pieces.find(piece => piece.id === selectedId);
-  const canInput = active && !snap.animating && !snap.busy && humanActing && !snap.thinking
-    && step?.kind !== 'script' && !lesson?.complete;
-  const mayEnd = moves.some(move => move.type === 'endTurn');
+  const tutorialMode = !lesson ? 'none' : lesson.complete ? 'complete' : step?.kind ?? 'position-complete';
+  const teachingMove = !lesson || step?.kind === 'move' || step?.kind === 'illegal';
+  const canInput = active && !snap.animating && !snap.busy && humanActing && !snap.thinking && teachingMove && !lesson?.complete;
+  const shownMoves = lesson ? step?.kind === 'move' ? guidance : [] : moves;
+  const mayEnd = moves.some(move => move.type === 'endTurn') && (!lesson || guidance.some(move => move.type === 'endTurn'));
   const showRoll = reviewing === null && session && snap.rollId && session.record.cursor > 0;
   const latest = session?.current.events ?? noEvents;
+  const rollPending = Boolean(showRoll && snap.rollPhase === 'throwing');
+  const liveRoll = Boolean(showRoll && snap.audioCue?.id === `${session?.record.id}/${snap.rollId}`);
+  // Only the renderer uses this projection. Legality, AI, ledgers and saves
+  // continue to use the committed position while the die reveals its outcome.
+  const boardPosition = useMemo(() => rollPending && session
+    ? maskRollResult(position, session.review(session.record.cursor - 1).state) : position,
+  [rollPending, session, position]);
+  const boardEvents = useMemo(() => reviewing !== null ? noEvents : liveRoll
+    ? rollSceneEvents(latest, rollPending ? 'throwing' : 'revealed') : latest,
+  [reviewing, liveRoll, latest, rollPending]);
+  const inspectionKey = lesson && step?.kind === 'inspect'
+    ? `${snap.motionKey}/${lesson.lesson}/${lesson.position}/${step.id}` : null;
+  const inspected = inspectionKey !== null && inspectedStep === inspectionKey;
+  const tutorialFocus = useMemo<SceneFocus | undefined>(() => {
+    if (!lesson || lesson.complete || snap.animating) return undefined;
+    const key = `${snap.motionKey}/${lesson.lesson}/${lesson.position}/${step?.id ?? 'position-complete'}`;
+    if (step?.focus) return { ...step.focus, key };
+    if (step?.kind === 'inspect') return { square: step.square, subject: 'piece', key };
+    if (step || !session) return undefined;
+    // Give a completed example a moment to show its surviving state. Ordinary
+    // game moves never trigger the tutorial camera.
+    for (const event of [...session.events].reverse()) {
+      if (event.type !== 'reaction' && event.type !== 'affliction') continue;
+      const piece = position.pieces.find(piece => piece.id === event.piece.id && piece.affliction !== 'neutral');
+      if (piece) return { square: piece.square, subject: piece.affliction === 'devastated' ? 'countdown' : 'piece', key };
+    }
+    return undefined;
+  }, [lesson, step, session, position.pieces, snap.animating, snap.motionKey]);
   const activePromotion = promotion?.key === snap.motionKey ? promotion.move : null;
+  const allowedPromotions = activePromotion && lesson ? guidance.flatMap(command =>
+    command.type === 'move' && command.from === activePromotion.from && command.to === activePromotion.to && command.promotion
+      ? [command.promotion] : []) as Promotion[] : undefined;
   const lastMove = [...latest].reverse().find(event => event.type === 'move');
   const kingThreat = isInCheck(position);
   const captures = useMemo(() => session
@@ -111,16 +147,41 @@ export function App() {
   }, [settings]);
   useEffect(() => { cabinet.setShortMotion(reduced); }, [reduced]);
   useEffect(() => {
-    const id = latest.at(-1)?.id;
-    if (!snap.animating || !id || id === sounded.current) return;
-    sounded.current = id;
-    if (settings.sound) playSceneCue(latest);
-  }, [latest, snap.animating, settings.sound]);
+    if (view !== 'home') void import('../scene/DieThrow').catch(() => undefined);
+  }, [view]);
+  useEffect(() => {
+    const playing = view !== 'home';
+    document.documentElement.classList.toggle('in-match', playing);
+    window.scrollTo(0, 0);
+    return () => document.documentElement.classList.remove('in-match');
+  }, [view]);
+  useEffect(() => {
+    setAudioVolume(settings.volume);
+    if (!settings.sound) muteAudio();
+    const wake = () => { if (settings.sound) void unlockAudio(); };
+    document.addEventListener('pointerdown', wake, { capture: true });
+    document.addEventListener('keydown', wake, { capture: true });
+    return () => {
+      document.removeEventListener('pointerdown', wake, { capture: true });
+      document.removeEventListener('keydown', wake, { capture: true });
+    };
+  }, [settings.sound, settings.volume]);
+  useEffect(() => { stopSceneAudio(); }, [snap.motionKey, reviewing]);
+  useEffect(() => {
+    const cue = snap.audioCue;
+    if (!cue || cue.id === sounded.current) return;
+    sounded.current = cue.id;
+    if (settings.sound && view !== 'home' && reviewing === null) {
+      playSceneCue(cue.events, { reducedMotion: cue.events.some(event => event.type === 'reaction' && event.face !== undefined)
+        ? snap.rollReduced : reduced, humanSide: cue.human, startedAt: cue.startedAt });
+    }
+  }, [snap.audioCue, snap.rollReduced, settings.sound, view, reviewing, reduced]);
 
   const onFailure = useCallback(() => { setGraphicsFailed(true); }, []);
   const close = () => setModal(null);
 
   function changeSettings(fields: Partial<Settings>) {
+    if (fields.volume !== undefined) setAudioVolume(fields.volume);
     if (fields.sound === true) void unlockAudio();
     if (fields.sound === false) muteAudio();
     if (fields.board === '3d') setGraphicsFailed(false);
@@ -150,7 +211,7 @@ export function App() {
     const occupant = pieceAt(position, square);
     if (lesson && step?.kind === 'inspect' && step.square === square) {
       if (occupant) setSelection({ key: snap.motionKey, id: occupant.id });
-      void cabinet.inspect(square);
+      setInspectedStep(inspectionKey);
       return;
     }
     const directedMove = guidance.some(choice => choice.type === 'move' && choice.from === selected?.square && choice.to === square);
@@ -167,12 +228,12 @@ export function App() {
   const marks: SceneMark[] = [];
   if (lastMove && reviewing === null) marks.push({ square: lastMove.from, kind: 'last' }, { square: lastMove.to, kind: 'last' });
   const king = kingThreat && position.pieces.find(piece => piece.type === 'king' && piece.side === actor);
-  if (king) marks.push({ square: king.square, kind: 'check' });
+  if (king && !rollPending) marks.push({ square: king.square, kind: 'check' });
   if (selected) {
     marks.push({ square: selected.square, kind: 'selected' });
     if (canInput && selected.side === actor) {
       const seen = new Set<Square>();
-      for (const choice of moves) {
+      for (const choice of shownMoves) {
         if (choice.type !== 'move' || choice.from !== selected.square || seen.has(choice.to)) continue;
         const target = pieceAt(position, choice.to);
         const enPassant = selected.type === 'pawn' && choice.from[0] !== choice.to[0];
@@ -182,6 +243,9 @@ export function App() {
     }
   }
   if (step?.kind === 'inspect') marks.push({ square: step.square, kind: 'lesson' });
+  if (tutorialFocus && !marks.some(mark => mark.square === tutorialFocus.square && mark.kind === 'lesson')) {
+    marks.push({ square: tutorialFocus.square, kind: 'lesson' });
+  }
   if (step && (step.kind === 'illegal' || (step.kind === 'move' && step.moves !== 'open'))) {
     const spotlight = new Set<string>();
     for (const move of guidance) {
@@ -218,7 +282,10 @@ export function App() {
         <div className="top-actions">
           <LanguagePicker t={t} locale={settings.locale} onLocale={locale => changeSettings({ locale })} />
           <span className="nav-separator" />
-          <button type="button" className="icon-button" title={t('nav.rules')} aria-label={t('nav.rules')} onClick={() => setModal({ kind: 'rules' })}>
+          <button type="button" className="icon-button sound-toggle" data-testid="sound-toggle" aria-pressed={settings.sound}
+            title={t(settings.sound ? 'settings.mute' : 'settings.unmute')} aria-label={t(settings.sound ? 'settings.mute' : 'settings.unmute')}
+            onClick={() => changeSettings({ sound: !settings.sound })}><Icon name={settings.sound ? 'sound' : 'muted'} /></button>
+          <button type="button" className="icon-button rules-button" title={t('nav.rules')} aria-label={t('nav.rules')} onClick={() => setModal({ kind: 'rules' })}>
             <Icon name="book" />
           </button>
           <button type="button" className="icon-button profile-button" title={t('nav.profile')} aria-label={t('nav.profile')} onClick={() => setModal({ kind: 'profile' })}>
@@ -231,6 +298,9 @@ export function App() {
     </header>
 
     <main className={`playfield view-${view}`} data-testid="playfield" data-view={view} data-mode={mode ?? 'preview'}
+      data-tutorial-mode={tutorialMode}
+      data-tutorial-focus={tutorialFocus ? 'true' : 'false'}
+      data-dice={showRoll && snap.animating ? snap.rollPhase : 'none'}
       data-active-side={actor} data-turn={position.turnSerial} data-phase={position.phase}
       data-revision={session?.record.revision ?? 0} data-game-id={session?.record.id ?? 'preview'}
       data-busy={snap.busy} data-animating={snap.animating} data-thinking={snap.thinking}>
@@ -238,11 +308,15 @@ export function App() {
         <PlayerRow t={t} locale={settings.locale} side={farSide} config={config} active={active && actor === farSide}
           captures={captures} advantage={farSide === 'white' ? balance : -balance} rating={snap.profile.rating}
           onCaptures={side => setModal({ kind: 'capture', side })} />
-        <Board t={t} state={position} marks={marks} events={reviewing === null ? latest : noEvents} flipped={reversed}
+        <Board t={t} state={boardPosition} marks={marks} events={boardEvents} flipped={reversed}
           flat={flat} reducedMotion={reduced} camera={settings.camera} low={low}
+          canMove={canInput}
+          focus={tutorialFocus}
           motionKey={`${snap.motionKey}/${reviewing ?? 'live'}`} onSquare={useSquare}
           onDragSquare={(from, to) => enter({ type: 'move', from, to })} onFailure={onFailure}
-          onClear={() => setSelection(null)} />
+          onClear={() => setSelection(null)}
+          overlay={showRoll && snap.animating && <RollReveal t={t} session={session} rollId={snap.rollId!}
+            reduced={snap.rollReduced} low={low} pending={snap.rollPhase === 'throwing'} startedAt={snap.rollStartedAt ?? undefined} />} />
         <PlayerRow t={t} locale={settings.locale} side={nearSide} config={config} active={active && actor === nearSide}
           captures={captures} advantage={nearSide === 'white' ? balance : -balance} rating={snap.profile.rating}
           onCaptures={side => setModal({ kind: 'capture', side })} />
@@ -291,32 +365,38 @@ export function App() {
           </div>
         </section> : session && <>
           {notice}
-          {!!showRoll && <RollCard t={t} session={session} rollId={snap.rollId!} reduced={reduced} animate={snap.animating} />}
-          {session.state.outcome && !lesson ? <Result t={t} locale={settings.locale} session={session}
+          <div className="decision-row">
+          {session.state.outcome && !lesson && !rollPending ? <Result t={t} locale={settings.locale} session={session}
             entry={snap.ledger.find(entry => entry.matchId === session.record.id)} onNew={() => openSetup(mode === 'hotseat')} />
             : <div className="turn-panel" data-testid="turn-panel">
               <div className="turn-heading" role="status"><span className={`mini-stamp ${actor}`} aria-hidden="true" />
-                <strong>{t(snap.thinking ? 'game.thinking' : step?.kind === 'script' ? 'game.script' : boosted ? 'game.bonus' :
+                <strong>{t(rollPending ? 'die.rolling' : snap.thinking ? 'game.thinking' : step?.kind === 'script' ? 'game.script' : lesson && !teachingMove ?
+                  step?.kind === 'inspect' ? 'tutorial.selectCue' : lesson.complete ? 'tutorial.finish' : !step ? 'tutorial.positionDone' : 'tutorial.readCue' : boosted ? 'game.bonus' :
                   config?.mode === 'practice' || config?.mode === 'rated' ? humanActing ? 'game.yourTurn' : 'game.thinking' :
                     actor === 'white' ? 'game.turn' : 'game.turnBlack')}</strong>
-                {kingThreat && <span className="check-label">{t('game.check')}</span>}</div>
-              {boosted && <div className="bonus-action">
+                {kingThreat && !rollPending && <span className="check-label">{t('game.check')}</span>}</div>
+              {!rollPending && boosted && teachingMove && (!lesson || mayEnd) && <div className="bonus-action">
                 <button type="button" className="button primary compact" disabled={!canInput || !mayEnd} data-testid="end-turn"
                   onClick={() => perform({ type: 'endTurn' })}>{t('game.endTurn')}</button>
-                <p>{t(mayEnd ? 'game.bonusHelp' : 'game.bonusRequired')}</p>
+                {!lesson && <p>{t(mayEnd ? 'game.bonusHelp' : 'game.bonusRequired')}</p>}
               </div>}
-              {!boosted && canInput && canClaimRepetition(position) && <button type="button" className="button" data-testid="claim-draw"
+              {!lesson && !boosted && canInput && canClaimRepetition(position) && <button type="button" className="button" data-testid="claim-draw"
                 onClick={() => perform({ type: 'claimRepetitionDraw' })}>{t('game.claim')}</button>}
               {snap.searchFailed && <div className="recovery-actions">
                 <button type="button" className="button" data-testid="retry-worker" onClick={cabinet.retrySearch}>{t('settings.retryEngine')}</button>
                 {mode === 'rated' && <button type="button" className="text-button" onClick={() => setModal({ kind: 'technical' })}>{t('settings.abort')}</button>}
               </div>}
             </div>}
+            {!!showRoll && <RollCard t={t} session={session} rollId={snap.rollId!} pending={snap.rollPhase === 'throwing'} />}
+          </div>
           {lesson && <LessonPanel t={t} locale={settings.locale} learning={lesson} guide={guidance} blocked={snap.busy || snap.animating}
-            onAdvance={() => void cabinet.advance()} onHandoff={() => void cabinet.handoff()} onNew={() => openSetup()}
+            rolling={snap.rollPhase === 'throwing'}
+            inspected={inspected}
+            onAdvance={() => { if (step?.kind === 'inspect') void cabinet.inspect(step.square); else void cabinet.advance(); }}
+            onHandoff={() => void cabinet.handoff()} onNew={() => openSetup()}
             onRepeat={() => setModal({ kind: 'repeat' })} onRestart={() => setModal({ kind: 'restart' })}
             onRestartAll={() => setModal({ kind: 'restart-all' })} />}
-          <div className={`secondary-panel ${mobileDetails ? '' : 'collapsed'}`}>
+          <div className={`secondary-panel ${mobileDetails && !rollPending ? '' : 'collapsed'}`}>
             <Inspector t={t} locale={settings.locale} piece={selected} state={position} />
             <History t={t} session={session} latest={latest} review={reviewing}
               onReview={cursor => setReview(cursor === null ? null : { key: snap.motionKey, cursor })} />
@@ -352,8 +432,7 @@ export function App() {
       exportFile={session && !lesson ? download : undefined} importFile={file => { close(); void cabinet.loadFile(file); }}
       level={config?.level ?? undefined} changeLevel={mode === 'practice' && canInput && !boosted ? level => { void cabinet.edit(level); } : undefined} />}
     {modal?.kind === 'repeat' && lesson && <Dialog title={t('tutorial.repeat')} closeLabel={t('nav.close')} onClose={close}>
-      <p>{step?.text[settings.locale] ?? t('tutorial.positionDone')}</p>
-      <p className="field-note">{t('tutorial.practice')}</p>
+      <p>{step?.detail?.[settings.locale] ?? step?.text[settings.locale] ?? t('tutorial.positionDone')}</p>
     </Dialog>}
     {modal?.kind === 'exit' && lesson && <Dialog title={t('tutorial.exit')} closeLabel={t('nav.close')} onClose={close}>
       <p>{t('tutorial.exitDetail')}</p>
@@ -379,6 +458,7 @@ export function App() {
       </div>
     </Dialog>}
     {activePromotion && !modal && <PromotionDialog t={t} side={actor} locale={settings.locale} onLocale={locale => changeSettings({ locale })}
+      allowed={allowedPromotions}
       onClose={() => setPromotion(null)} onPick={piece => { setPromotion(null); perform({ ...activePromotion, promotion: piece }); }} />}
   </>;
 }

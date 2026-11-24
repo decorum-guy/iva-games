@@ -1,14 +1,18 @@
 import { useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import {
-  CanvasTexture, Group, Mesh, MeshBasicMaterial, SRGBColorSpace, Vector3,
+  CanvasTexture, Group, Mesh, MeshBasicMaterial, Sprite, SpriteMaterial, SRGBColorSpace, Vector3,
 } from 'three'
 import type { GameEvent, Piece } from '../core/types'
 import type { ChessAssets } from './assets'
 import { getSoftShadow } from './BoardSurface'
+import {
+  COUNTER_FOCUS_DELAY_MS, COUNTER_FOCUS_MS, FOCUS_EMPHASIS_MS,
+  sampleCounterEmphasis, sampleFigureEmphasis,
+} from './cameraFocus'
 import { conditionCode, setArmySurface, stoneMaterial } from './stone'
 import { squarePoint, stateColors } from './types'
-import type { ScenePiece } from './types'
+import type { SceneFocus, ScenePiece } from './types'
 
 const restHeight = .005
 const flatRotation: [number, number, number] = [-Math.PI / 2, 0, 0]
@@ -129,7 +133,60 @@ function badgeTexture(key: string) {
   return texture
 }
 
-function PieceBadge({ piece, flipped }: { piece: ScenePiece; flipped: boolean }) {
+function counterFrameTexture() {
+  const cached = badgeCache.get('counter-frame')
+  if (cached) return cached
+  const canvas = document.createElement('canvas')
+  canvas.width = canvas.height = 96
+  const context = canvas.getContext('2d')!
+  context.lineJoin = 'round'
+  context.lineCap = 'round'
+  for (const [color, width] of [['#0a1521', 9], ['#e1f3ff', 3.5]] as const) {
+    context.strokeStyle = color
+    context.lineWidth = width
+    for (const [x, y] of [[7, 7], [89, 7], [7, 89], [89, 89]]) {
+      const dx = x < 48 ? 1 : -1
+      const dy = y < 48 ? 1 : -1
+      context.beginPath()
+      context.moveTo(x + 21 * dx, y)
+      context.lineTo(x, y)
+      context.lineTo(x, y + 21 * dy)
+      context.stroke()
+    }
+  }
+  const texture = new CanvasTexture(canvas)
+  texture.colorSpace = SRGBColorSpace
+  badgeCache.set('counter-frame', texture)
+  return texture
+}
+
+function PieceBadge({ piece, flipped, low, reduced, focus }: {
+  piece: ScenePiece; flipped: boolean; low: boolean; reduced: boolean; focus?: SceneFocus
+}) {
+  const badge = useRef<Group>(null)
+  const frame = useRef<Sprite>(null)
+  const started = useRef(0)
+  const invalidate = useThree(state => state.invalidate)
+  const emphasized = focus?.subject === 'countdown'
+  const size = low ? .42 : .35
+  useLayoutEffect(() => {
+    started.current = performance.now()
+    invalidate()
+    if (!emphasized || reduced) return
+    // Demand rendering can rest during the short pause after camera arrival.
+    const wake = window.setTimeout(invalidate, COUNTER_FOCUS_DELAY_MS)
+    return () => window.clearTimeout(wake)
+  }, [focus?.key, emphasized, reduced, invalidate])
+  useFrame(() => {
+    if (!badge.current || !frame.current) return
+    const elapsed = performance.now() - started.current
+    const amount = emphasized ? sampleCounterEmphasis(elapsed, reduced) : 0
+    badge.current.scale.set(size * (1 + .60 * amount), size * (1 + .60 * amount), 1)
+    frame.current.visible = amount > 0
+    ;(frame.current.material as SpriteMaterial).opacity = amount
+    if (emphasized && !reduced && elapsed >= COUNTER_FOCUS_DELAY_MS
+      && elapsed < COUNTER_FOCUS_DELAY_MS + COUNTER_FOCUS_MS && !document.hidden) invalidate()
+  })
   const { affliction, countdown, exposed, curePending } = piece
   const key = affliction === 'devastated' ? String(countdown ?? 3)
     : affliction !== 'neutral' ? affliction : exposed ? 'shame' : curePending ? 'cure' : null
@@ -138,29 +195,41 @@ function PieceBadge({ piece, flipped }: { piece: ScenePiece; flipped: boolean })
   const sign = flipped ? -1 : 1
   return (
     <group position={[x, .029, z]}>
-      {affliction === 'devastated' && [0, 1, 2].map(i => (
-        <mesh key={i} rotation={flatRotation}>
-          <ringGeometry args={[.388, .413, 16, 1, i * (Math.PI * 2 / 3), 1.6]} />
-          <meshBasicMaterial
-            color="#a5c8eb" transparent opacity={i < (countdown ?? 3) ? .86 : .22}
-            depthWrite={false} toneMapped={false}
-          />
+      {affliction === 'devastated' && <>
+        <mesh rotation={flatRotation}>
+          <ringGeometry args={[.367, .445, 48]} />
+          <meshBasicMaterial color="#101923" transparent opacity={.94} depthWrite={false} toneMapped={false} />
         </mesh>
-      ))}
-      <sprite position={[-.32 * sign, .135, .33 * sign]} scale={[.255, .255, 1]} renderOrder={2}>
-        <spriteMaterial map={badgeTexture(key)} transparent depthWrite={false} toneMapped={false} />
-      </sprite>
+        {[0, 1, 2].map(i => (
+          <mesh key={i} rotation={flatRotation} position-y={.002}>
+            <ringGeometry args={[.388, .426, 16, 1, i * (Math.PI * 2 / 3), 1.6]} />
+            <meshBasicMaterial
+              color="#b6e0fa" transparent opacity={i < (countdown ?? 3) ? 1 : .24}
+              depthWrite={false} toneMapped={false}
+            />
+          </mesh>
+        ))}
+      </>}
+      <group ref={badge} position={[-.30 * sign, .18, .32 * sign]} scale={[size, size, 1]}>
+        <sprite renderOrder={emphasized ? 8 : 2}>
+          <spriteMaterial map={badgeTexture(key)} transparent depthWrite={false} depthTest={!emphasized} toneMapped={false} />
+        </sprite>
+        <sprite ref={frame} scale={[1.2, 1.2, 1]} visible={false} renderOrder={9}>
+          <spriteMaterial map={counterFrameTexture()} transparent opacity={0} depthWrite={false} depthTest={false} toneMapped={false} />
+        </sprite>
+      </group>
     </group>
   )
 }
 
-export function VisualPiece({ piece, assets, events, flipped, low, reduced }: {
+export function VisualPiece({ piece, assets, events, flipped, low, reduced, focus }: {
   piece: ScenePiece
   assets: ChessAssets
   events: readonly GameEvent[]
   flipped: boolean
   low: boolean
   reduced: boolean
+  focus?: SceneFocus
 }) {
   const mesh = useRef<Mesh>(null)
   const body = useRef<Group>(null)
@@ -168,6 +237,7 @@ export function VisualPiece({ piece, assets, events, flipped, low, reduced }: {
   const trail = useRef<(Mesh | null)[]>([])
   const move = useRef<Travel | null>(null)
   const change = useRef<Change | null>(null)
+  const focusStart = useRef<number | null>(null)
   const previous = useRef<{ piece: ScenePiece; eventId?: string }>(null)
   const invalidate = useThree(state => state.invalidate)
   const asset = assets.pieces[piece.side][piece.kind]
@@ -176,6 +246,11 @@ export function VisualPiece({ piece, assets, events, flipped, low, reduced }: {
     [assets, piece.id],
   )
   useEffect(() => () => material.dispose(), [material])
+  useLayoutEffect(() => {
+    focusStart.current = focus ? performance.now() : null
+    values.uFocus.value = focus && reduced ? sampleFigureEmphasis(0, true) : 0
+    invalidate()
+  }, [focus?.key, focus?.subject, reduced, values, invalidate])
 
   function stoneState(affliction: ScenePiece['affliction'], amount: number) {
     values.uCondition.value = conditionCode[affliction]
@@ -309,6 +384,11 @@ export function VisualPiece({ piece, assets, events, flipped, low, reduced }: {
       }
     }
 
+    if (focusStart.current !== null) {
+      const elapsed = now - focusStart.current
+      values.uFocus.value = sampleFigureEmphasis(elapsed, reduced)
+      if (!reduced && elapsed < FOCUS_EMPHASIS_MS) active = true
+    }
     if (active && !document.hidden) invalidate()
   })
 
@@ -331,7 +411,7 @@ export function VisualPiece({ piece, assets, events, flipped, low, reduced }: {
           <meshBasicMaterial color={trailColor} transparent opacity={0} depthWrite={false} toneMapped={false} />
         </mesh>
       ))}
-      <PieceBadge piece={piece} flipped={flipped} />
+      <PieceBadge piece={piece} flipped={flipped} low={low} reduced={reduced} focus={focus} />
     </>
   )
 }

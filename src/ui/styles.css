@@ -455,3 +455,155 @@ input[type="checkbox"] { width: 20px; height: 20px; accent-color: var(--bronze);
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; }
 }
+
+/* Playing is a viewport-sized surface. Only explicitly opened details scroll. */
+html.in-match, .in-match body { height: 100%; overflow: hidden; overscroll-behavior: none; }
+.in-match #root { height: 100dvh; display: grid; grid-template-rows: auto minmax(0, 1fr); overflow: hidden; }
+.in-match .masthead { position: relative; z-index: 40; }
+.in-match .playfield {
+  position: relative; isolation: isolate; min-height: 0; height: 100%; width: 100%; margin-block: 0;
+  padding-block: 10px max(10px, env(safe-area-inset-bottom)); align-items: stretch; overflow: hidden;
+}
+.in-match .table-column {
+  min-height: 0; display: grid; grid-template-rows: 52px minmax(0, 1fr) 52px; gap: 4px;
+}
+.in-match .player-row:first-child, .in-match .board-stage + .player-row { margin-block: 0; }
+.in-match .board-stage { min-height: 0; height: 100%; aspect-ratio: auto; container-type: size; }
+.in-match .flat-board {
+  width: min(calc(100cqw - 24px), calc(100cqh - 24px));
+  height: min(calc(100cqw - 24px), calc(100cqh - 24px));
+}
+.in-match .game-aside {
+  min-height: 0; max-height: 100%; margin-top: 0; align-self: stretch;
+  overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain;
+  padding: 3px; gap: 9px; scrollbar-width: thin;
+}
+.in-match .game-aside > * { flex-shrink: 0; }
+.decision-row { display: flex; align-items: stretch; gap: 7px; min-width: 0; }
+.decision-row:empty { display: none; }
+.decision-row .turn-panel, .decision-row .result { flex: 1; min-width: 0; }
+.decision-row .roll-card { flex: 0 1 142px; gap: 6px; min-height: 58px; padding: 5px 7px; }
+.decision-row .roll-card .die-label { display: none; }
+.decision-row .roll-card .die-result { font-size: .77rem; }
+.decision-row .roll-card small { font-size: .64rem; }
+.decision-row .roll-card > div:first-child { flex-shrink: 0; }
+.view-learn .decision-row .turn-panel:not(:has(.bonus-action)):not(:has(.recovery-actions)) { padding-block: 8px; }
+.view-learn:not([data-tutorial-mode="script"]) .turn-panel:not(:has(.bonus-action)) { display: none; }
+.view-learn .decision-row:has(> .turn-panel:only-child:not(:has(.bonus-action))) { display: none; }
+.view-learn[data-tutorial-mode="script"] .decision-row { display: flex; }
+.lesson-action-label { display: flex; align-items: center; gap: 7px; font-size: .77rem; font-weight: 800; color: var(--bronze-bright); margin-bottom: 7px; }
+.lesson-action-label .icon { width: 16px; height: 16px; }
+.lesson-instruction { max-width: 47ch; min-height: 3.06em; }
+.awaiting-roll { visibility: hidden; }
+.lesson-panel > .button.primary { width: 100%; justify-content: space-between; min-height: 44px; }
+.lesson-target { padding: 7px 9px; margin-top: 9px; border-radius: 4px; background: #111b22; color: #e8f1f3; border: 1px solid #667d87; }
+.lesson-tools { justify-content: space-between; margin-block: 4px -7px; }
+.lesson-tools .text-button { min-height: 36px; }
+.side-actions { margin-top: auto; }
+.secondary-panel.collapsed { display: none; }
+.toggle-sheet { display: inline-flex; margin-left: auto; }
+.sound-toggle[aria-pressed="true"] { color: var(--bronze-bright); }
+.sound-toggle[aria-pressed="false"] { color: #d2a496; }
+.volume-setting input { width: min(55%, 210px); accent-color: var(--bronze); }
+.setup-rating-help { font-size: .75rem; color: var(--quiet); }
+.setup-rating-help p { padding-top: 5px; }
+
+/* One instruction is in focus. The board becomes active only for its own step. */
+.view-learn::before {
+  content: ''; position: fixed; inset: 0; z-index: 20; pointer-events: none;
+  background: #060b12a8; transition: background .16s ease;
+}
+.view-learn .lesson-panel {
+  position: relative; z-index: 22; border: 1px solid #c9ad7b;
+  background: #202730; box-shadow: 0 0 0 2px #c9ad7b25, 0 0 22px #c9ad7b25;
+}
+.view-learn .decision-row, .view-learn .side-actions, .view-learn > .game-aside > .notice { position: relative; z-index: 22; }
+.view-learn .secondary-panel:not(.collapsed) { position: relative; z-index: 22; }
+.view-learn:is([data-tutorial-mode="move"], [data-tutorial-mode="illegal"], [data-tutorial-mode="inspect"], [data-tutorial-mode="script"]) .table-column { z-index: 21; }
+.view-learn:is([data-tutorial-mode="read"], [data-tutorial-mode="position-complete"], [data-tutorial-mode="complete"]) .lesson-panel {
+  border-color: #f3d69f; box-shadow: 0 0 0 2px #ecd09c4d, 0 0 30px #d5b57642;
+}
+.view-learn:is([data-tutorial-mode="move"], [data-tutorial-mode="illegal"], [data-tutorial-mode="inspect"], [data-tutorial-mode="script"])::before { background: #060b1261; }
+.view-learn:is([data-dice="throwing"], [data-dice="settled"]) .table-column { z-index: 23; }
+.view-learn[data-tutorial-focus="true"] .table-column { z-index: 21; }
+.cell[data-teaching-focus] .piece-icon { filter: drop-shadow(0 0 3px #edc77b); }
+.cell[data-teaching-focus="countdown"] .cell-state {
+  font-size: .85rem; border: 2px solid #e7c77c; padding: 3px 4px; box-shadow: 0 0 0 2px #162430;
+}
+.dice-reveal {
+  position: absolute; z-index: 12; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  width: min(88%, 288px); display: grid; justify-items: center; gap: 0;
+  padding: 11px 16px 14px; pointer-events: none; color: #f2e9d8;
+  border: 1px solid #827258; border-radius: 14px;
+  background: radial-gradient(ellipse at 50% 60%, #343b42f2, #151b22fa 78%);
+  box-shadow: 0 16px 45px #04070b9e, inset 0 1px 0 #f2d5a526;
+}
+.dice-reveal .remorse-die-throw, .dice-loading-face { width: min(230px, calc(100cqh - 85px)); }
+.dice-loading-face { aspect-ratio: 1.08; display: grid; place-items: center; }
+.dice-loading-face > .remorse-die { transform: scale(1.8); }
+.dice-loading-body { width: 58px; height: 58px; border-radius: 10px; background: #d6c8ad; border: 3px solid #eee0c5; box-shadow: inset -8px -8px 0 #9a8c7755, 0 12px 12px #0006; transform: rotate(-12deg); }
+.dice-actor { color: #c2b69e; font-size: .74rem; font-weight: 700; }
+.dice-caption { text-align: center; font-size: .99rem; min-height: 24px; }
+.dice-reveal[data-phase="settled"] { border-color: #dfbd83; }
+.cell.light { background: #a9b5bc; color: #283b48; }
+.cell .piece-icon.white { fill: #f3ead6; stroke: #34424a; stroke-width: .9; }
+.cell.mark-lesson::before { background: #315d776b; box-shadow: inset 0 0 0 2px #102633, inset 0 0 0 4px #f5d58b; }
+.cell.mark-selected::before { background: #315d7799; box-shadow: inset 0 0 0 2px #102633, inset 0 0 0 5px #f5d58b; }
+.cell.mark-move::after { inset: 35%; background: #162d3c; border: 2px solid #f4d793; }
+.cell .piece-icon.guilt { filter: drop-shadow(0 0 2px #593b15); stroke: #8a560f; stroke-width: 1.2; }
+.cell .piece-icon.devastated { fill: #6d9ebd; stroke: #193e5d; stroke-width: 1.1; }
+.cell .piece-icon.berserk { stroke: #aa4726; stroke-width: 1.3; }
+.cell .piece-icon.bloodlust { stroke: #9e2946; stroke-width: 1.3; }
+
+@media (max-width: 740px) {
+  .top-bar { gap: 5px; }
+  .brand { gap: 4px; }
+  .top-bar .brand span { font-size: 21px; letter-spacing: .045em; }
+  .seal { width: 23px; height: 23px; }
+  .top-actions { gap: 0; }
+  .language-switch { padding: 2px; gap: 1px; }
+  .language-switch button { min-width: 28px; padding-inline: 3px; }
+  .in-match .playfield {
+    width: min(100%, 538px); grid-template-rows: minmax(0, 1fr) auto; gap: 6px;
+    padding-block: 4px max(5px, env(safe-area-inset-bottom));
+  }
+  .in-match .table-column { grid-template-rows: 43px minmax(0, 1fr) 43px; gap: 2px; }
+  .in-match .player-row { min-height: 0; padding-block: 2px; }
+  .in-match .game-aside { max-height: 46dvh; padding: 3px; gap: 5px; }
+  .in-match .flat-stage { padding: 5px; }
+  .in-match .flat-board { width: min(calc(100cqw - 10px), calc(100cqh - 10px)); height: min(calc(100cqw - 10px), calc(100cqh - 10px)); }
+  .decision-row { gap: 5px; }
+  .decision-row .turn-panel { padding: 6px 9px; }
+  .decision-row .turn-heading { font-size: .77rem; }
+  .decision-row .roll-card { flex-basis: 154px; min-height: 47px; padding: 3px 7px; }
+  .view-learn .lesson-panel { padding: 8px 10px 5px; }
+  .lesson-panel h2 { font-size: 1.48rem; margin-block: 4px; }
+  .lesson-action-label { font-size: .73rem; margin-bottom: 5px; }
+  .lesson-panel p { font-size: .79rem; line-height: 1.4; }
+  .lesson-panel > .button.primary { margin-top: 8px; }
+  .lesson-target { margin-top: 6px; padding: 5px 8px; font-size: .75rem; }
+  .lesson-tools { margin-block: 1px -3px; }
+  .lesson-tools .text-button { min-height: 32px; font-size: .69rem; }
+  .side-actions { margin-top: 0; min-height: 38px; gap: 2px; }
+  .side-actions .text-button { font-size: .72rem; min-height: 38px; }
+  .lesson-actions { margin-top: 7px; gap: 5px; }
+  .lesson-actions .text-button { min-height: 32px; }
+  .lesson-actions .button { min-height: 42px; }
+}
+@media (max-height: 535px) and (orientation: landscape) {
+  .in-match .top-bar { min-height: 46px; }
+  .in-match .playfield {
+    width: 100%; max-width: 1100px; grid-template-columns: minmax(0, 1fr) minmax(230px, 38%);
+    grid-template-rows: minmax(0, 1fr); gap: 12px; padding-block: 3px;
+  }
+  .in-match .table-column { grid-template-rows: 35px minmax(0, 1fr) 35px; gap: 0; }
+  .in-match .player-row { min-height: 0; padding-block: 0; }
+  .in-match .player-heading strong { font-size: .73rem; }
+  .in-match .capture-line { min-height: 17px; }
+  .in-match .game-aside { max-height: 100%; gap: 5px; }
+  .in-match .lesson-panel { padding: 7px 10px; }
+  .in-match .lesson-panel h2 { font-size: 1.45rem; }
+  .in-match .lesson-panel p { font-size: .77rem; }
+  .in-match .lesson-target { margin-top: 5px; }
+  .in-match .lesson-tools .text-button { min-height: 30px; }
+}

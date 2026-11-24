@@ -32,7 +32,6 @@ Representative fixed catalog entries to implement consistently:
 | `tutorial.exit` | Выйти из обучения | Exit tutorial |
 | `tutorial.nextPosition` | Следующая учебная позиция | Next training position |
 | `tutorial.progress` | Урок {current} из {total} | Lesson {current} of {total} |
-| `tutorial.scriptedRoll` | Учебный бросок: результат задан для примера | Tutorial roll: this result is preset for the example |
 | `tutorial.allowedButNotTarget` | Этот ход разрешен, но сейчас попробуем выделенный ход | That move is legal, but let’s try the highlighted move for this step |
 | `tutorial.finish.continue` | Продолжить эту партию | Continue this game |
 | `tutorial.finish.continueDetail` | С текущей учебной позиции, без подсказок · тренировка | From this training position, without guidance · practice |
@@ -97,7 +96,15 @@ Ordinary castling, en passant, pawn movement, check and checkmate are available 
 
 Disable the ordinary AI controller during directed lessons. A `TutorialController` submits scripted opponent moves through the same legality and command path as a human/AI seat. A scripted move that becomes illegal is a scenario error to fix, not permission to force the board.
 
-Use an injected **`TutorialRollProvider`**, separate from the ordinary provider. Show «Учебный бросок: результат задан для примера» on the die reveal. Bind each planned result to lesson ID, step ID, expected capturer/target and command/chance-event identity. Unexpected captures must not silently consume the next queued number.
+Use an injected **`TutorialRollProvider`**, separate from the ordinary provider. The owner explicitly removed preset-dice notices from the interface: do not explain predetermined rolls in a label, modal, coachmark or event-log prefix. Bind each planned result to lesson ID, step ID, expected capturer/target and command/chance-event identity. Unexpected captures must not silently consume the next queued number.
+
+### Playtest corrections
+
+- Keep the main instruction to one short observation or action; longer reasoning belongs behind optional help. State clearly whether the player should read, select, move, or press the primary button.
+- On `read` and completed-position steps, hide move affordances and prevent dragging. A legal chess move must not be advertised while the tutorial expects a UI transition. The primary button stays in the viewport.
+- Selecting a counter in an `inspect` step does not immediately launch the next scripted turn. Show the count, allow a camera close-up, and advance only after «Понятно» / “Got it”. The controller IDs and old checkpoints remain compatible.
+- Use authored focus targets for inspection; never zoom to an empty/removed figure. Emphasize the actual surface state briefly, then the counter, and return to the whole board on the next action. Do not hide a move destination with a close-up.
+- Fit the board and essential instructions in one dynamic viewport on laptops and phones. Only deliberately opened secondary details may scroll internally.
 
 No hidden production setting such as `forceNextRoll` may survive lesson completion. Save tutorial state as tutorial state; an imported normal save must not accidentally reactivate a script. Reject or explicitly route tutorial-save imports to the tutorial controller.
 

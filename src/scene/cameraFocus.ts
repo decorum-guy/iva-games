@@ -1,0 +1,115 @@
+import { Vector3 } from 'three'
+
+export const CAMERA_TRAVEL_MS = 850
+export const FOCUS_EMPHASIS_MS = 1000
+export const COUNTER_FOCUS_DELAY_MS = CAMERA_TRAVEL_MS + 180
+export const COUNTER_FOCUS_MS = 240
+export const MAX_FOCUS_ZOOM = 2.6
+
+export type Point3 = readonly [number, number, number]
+export type GroundPoint = readonly [number, number]
+
+export interface CameraRig {
+  readonly elevation: number
+  readonly yaw: number
+  readonly fov: number
+  readonly focusAmount: number
+  readonly focusPoint: GroundPoint
+}
+
+export interface CameraFrame {
+  readonly position: Vector3
+  readonly target: Vector3
+  readonly distance: number
+}
+
+const up = new Vector3(0, 1, 0)
+const overviewOrigin = new Vector3(0, .30, 0)
+const radians = Math.PI / 180
+const clamp = (value: number) => Math.max(0, Math.min(1, value))
+const smooth = (value: number) => { const t = clamp(value); return t * t * (3 - 2 * t) }
+
+// Covers the actual 9.55-cell slab and the tallest supplied king (1.642 cells).
+export const BOARD_FRAMING_POINTS: readonly Point3[] = [-4.8, 4.8].flatMap(x => [-4.8, 4.8].flatMap(z => [
+  [x, -.38, z] as const,
+  [x, .01, z] as const,
+  [x * .81, 1.70, z * .81] as const,
+]))
+
+/** The whole model, base and enlarged camera-facing counter fit in this envelope. */
+export function pieceFocusBounds([x, z]: GroundPoint): readonly Point3[] {
+  return [-.85, .85].flatMap(dx => [-.30, 1.85].flatMap(y => [-.85, .85].map(dz => [x + dx, y, z + dz] as const)))
+}
+
+function fitFrame(points: readonly Point3[], origin: Vector3, view: Vector3, fov: number, aspect: number, room: number): CameraFrame {
+  const horizontal = up.clone().cross(view).normalize()
+  const vertical = view.clone().cross(horizontal)
+  const tanHeight = Math.tan(fov * radians / 2) * room
+  function fit(axis: Vector3, aperture: number) {
+    let upper = -Infinity
+    let lower = -Infinity
+    for (const value of points) {
+      const point = new Vector3(...value).sub(origin)
+      const depth = point.dot(view)
+      const offset = point.dot(axis) / aperture
+      upper = Math.max(upper, depth + offset)
+      lower = Math.max(lower, depth - offset)
+    }
+    return { distance: (upper + lower) / 2, center: (upper - lower) * aperture / 2 }
+  }
+  const x = fit(horizontal, tanHeight * Math.max(.05, aspect))
+  const y = fit(vertical, tanHeight)
+  const target = origin.clone().addScaledVector(horizontal, x.center).addScaledVector(vertical, y.center)
+  const distance = Math.max(x.distance, y.distance)
+  return { position: target.clone().addScaledVector(view, distance), target, distance }
+}
+
+/** Framing follows the existing orientation: teaching focus never adds a turn. */
+export function frameCamera(rig: CameraRig, aspect: number, compact: boolean): CameraFrame {
+  const view = new Vector3(Math.cos(rig.elevation) * Math.sin(rig.yaw), Math.sin(rig.elevation), Math.cos(rig.elevation) * Math.cos(rig.yaw))
+  const overview = fitFrame(BOARD_FRAMING_POINTS, overviewOrigin, view, rig.fov, aspect, compact ? .986 : .968)
+  const amount = clamp(rig.focusAmount)
+  if (amount === 0) return overview
+  const [x, z] = rig.focusPoint
+  const closeup = fitFrame(pieceFocusBounds(rig.focusPoint), new Vector3(x, .76, z), view, rig.fov, aspect, .78)
+  // A constrained push-in keeps context and avoids a giant face-filling pawn.
+  const focusedDistance = Math.max(closeup.distance, overview.distance / MAX_FOCUS_ZOOM)
+  const distance = overview.distance + (focusedDistance - overview.distance) * amount
+  const target = overview.target.clone().lerp(closeup.target, amount)
+  return { position: target.clone().addScaledVector(view, distance), target, distance }
+}
+
+export function sameCameraRig(a: CameraRig, b: CameraRig): boolean {
+  return a.elevation === b.elevation && a.yaw === b.yaw && a.fov === b.fov && a.focusAmount === b.focusAmount
+    && a.focusPoint[0] === b.focusPoint[0] && a.focusPoint[1] === b.focusPoint[1]
+}
+
+/** Interpolate an orbit, not a chord through the board, with zero end velocity. */
+export function sampleCameraTravel(from: CameraRig, to: CameraRig, elapsedMs: number): CameraRig {
+  const t = clamp(elapsedMs / CAMERA_TRAVEL_MS)
+  if (t === 1) return to
+  const p = (1 - Math.cos(Math.PI * t)) / 2
+  const yaw = Math.atan2(Math.sin(to.yaw - from.yaw), Math.cos(to.yaw - from.yaw))
+  return {
+    elevation: from.elevation + (to.elevation - from.elevation) * p,
+    yaw: from.yaw + yaw * p,
+    fov: from.fov + (to.fov - from.fov) * p,
+    focusAmount: from.focusAmount + (to.focusAmount - from.focusAmount) * p,
+    focusPoint: [
+      from.focusPoint[0] + (to.focusPoint[0] - from.focusPoint[0]) * p,
+      from.focusPoint[1] + (to.focusPoint[1] - from.focusPoint[1]) * p,
+    ],
+  }
+}
+
+/** One deliberate on-surface emphasis, then the ordinary material remains. */
+export function sampleFigureEmphasis(elapsedMs: number, reduced: boolean): number {
+  if (reduced) return .48
+  if (elapsedMs < 0 || elapsedMs >= FOCUS_EMPHASIS_MS) return 0
+  return smooth(elapsedMs / 180) * (1 - smooth((elapsedMs - 360) / (FOCUS_EMPHASIS_MS - 360)))
+}
+
+/** Wait for the camera and the material cue before framing the counter. */
+export function sampleCounterEmphasis(elapsedMs: number, reduced: boolean): number {
+  return reduced ? 1 : smooth((elapsedMs - COUNTER_FOCUS_DELAY_MS) / COUNTER_FOCUS_MS)
+}

@@ -11,11 +11,13 @@ import type { GameEvent } from '../core/types'
 import { BoardSurface } from './BoardSurface'
 import { DepartingPiece, VisualPiece } from './Piece'
 import { clearChessAssetLoad, studioHDR, useChessAssets } from './assets'
+import { CAMERA_TRAVEL_MS, frameCamera, sameCameraRig, sampleCameraTravel } from './cameraFocus'
+import type { CameraRig } from './cameraFocus'
 import { squarePoint, worldSquare } from './types'
-import type { BoardSceneProps, SceneMark } from './types'
+import type { BoardSceneProps, SceneFocus, SceneMark } from './types'
 import './scene.css'
 
-export type { BoardSceneProps, SceneMark, ScenePiece } from './types'
+export type { BoardSceneProps, SceneFocus, SceneMark, ScenePiece } from './types'
 
 class GraphicsBoundary extends Component<{ children: ReactNode; onFailure?: () => void }, { failed: boolean }> {
   state = { failed: false }
@@ -36,45 +38,12 @@ class GraphicsBoundary extends Component<{ children: ReactNode; onFailure?: () =
 const emptyEvents: readonly GameEvent[] = []
 const emptyMarks: readonly SceneMark[] = []
 const toRadians = Math.PI / 180
-const lookAt = new Vector3(0, .30, 0)
-const yAxis = new Vector3(0, 1, 0)
-const corners = [-4.8, 4.8].flatMap(x => [-4.8, 4.8].flatMap(z => [
-  new Vector3(x, -.38, z).sub(lookAt),
-  new Vector3(x, .01, z).sub(lookAt),
-  new Vector3(x * .75, 1.58, z * .73).sub(lookAt),
-]))
 
-function setCamera(camera: PerspectiveCamera, elevation: number, yaw: number, snug: boolean) {
-  const view = new Vector3(Math.cos(elevation) * Math.sin(yaw), Math.sin(elevation), Math.cos(elevation) * Math.cos(yaw))
-  const horizontal = yAxis.clone().cross(view).normalize()
-  const vertical = view.clone().cross(horizontal)
-  const tanHeight = Math.tan(camera.fov * toRadians / 2)
-  const room = snug ? .992 : .968
-  const tanWidth = tanHeight * camera.aspect * room
-  const tanVertical = tanHeight * room
-  function fit(axis: Vector3, aperture: number) {
-    let upper = -Infinity
-    let lower = -Infinity
-    for (const corner of corners) {
-      const depth = corner.dot(view)
-      const offset = corner.dot(axis) / aperture
-      upper = Math.max(upper, depth + offset)
-      lower = Math.max(lower, depth - offset)
-    }
-    return { distance: (upper + lower) / 2, center: (upper - lower) * aperture / 2 }
-  }
-  const x = fit(horizontal, tanWidth)
-  const y = fit(vertical, tanVertical)
-  const center = lookAt.clone().addScaledVector(horizontal, x.center).addScaledVector(vertical, y.center)
-  camera.position.copy(view).multiplyScalar(Math.max(x.distance, y.distance)).add(center)
-  camera.lookAt(center)
-  camera.updateMatrixWorld()
-}
-
-function Viewpoint({ flipped, preset, reduced }: {
+function Viewpoint({ flipped, preset, reduced, focus }: {
   flipped: boolean
   preset: NonNullable<BoardSceneProps['camera']>
   reduced: boolean
+  focus?: SceneFocus
 }) {
   const camera = useThree(state => state.camera) as PerspectiveCamera
   const size = useThree(state => state.size)
@@ -82,46 +51,47 @@ function Viewpoint({ flipped, preset, reduced }: {
   const mobile = size.width < 515
   const height = (preset === 'top' ? 89.98 : preset === 'tactical' ? 75 : mobile ? 67 : 58) * toRadians
   const yaw = (preset === 'studio' ? (mobile ? .6 : 3.5) : 0) * toRadians + (flipped ? Math.PI : 0)
-  const angle = useRef<{ height: number; yaw: number; change?: {
-    fromHeight: number; fromYaw: number; heightDiff: number; yawDiff: number; start: number
-  } }>(null)
-  const configured = useRef({ height, yaw })
+  const rig = useRef<CameraRig | null>(null)
+  const change = useRef<{ from: CameraRig; to: CameraRig; start: number } | null>(null)
+  const configured = useRef<CameraRig | null>(null)
 
-  useLayoutEffect(() => {
-    camera.fov = preset === 'top' ? 26 : 35
+  function apply(value: CameraRig) {
+    camera.fov = value.fov
     camera.aspect = size.width / Math.max(1, size.height)
     camera.updateProjectionMatrix()
-    const previous = configured.current
-    const switching = previous.height !== height || previous.yaw !== yaw
-    if (!angle.current || reduced) {
-      angle.current = { height, yaw }
-      setCamera(camera, height, yaw, mobile)
-    } else if (switching) {
-      const wrapped = ((yaw - angle.current.yaw + Math.PI * 4) % (Math.PI * 2))
-      angle.current.change = {
-        fromHeight: angle.current.height,
-        fromYaw: angle.current.yaw,
-        heightDiff: height - angle.current.height,
-        yawDiff: wrapped > Math.PI ? wrapped - 2 * Math.PI : wrapped,
-        start: performance.now(),
-      }
-    } else {
-      setCamera(camera, angle.current.height, angle.current.yaw, mobile)
+    const frame = frameCamera(value, camera.aspect, mobile)
+    camera.position.copy(frame.position)
+    camera.lookAt(frame.target)
+    camera.updateMatrixWorld()
+  }
+
+  useLayoutEffect(() => {
+    const target: CameraRig = {
+      elevation: height, yaw, fov: preset === 'top' ? 26 : 35,
+      focusAmount: focus && !reduced ? 1 : 0,
+      focusPoint: focus ? squarePoint(focus.square) : rig.current?.focusPoint ?? [0, 0],
     }
-    configured.current = { height, yaw }
+    if (!rig.current) rig.current = { ...target, focusAmount: 0 }
+    if (reduced) {
+      rig.current = target
+      change.current = null
+    } else if (!configured.current || !sameCameraRig(configured.current, target)) {
+      // At overview scale the unused anchor can move without moving the camera.
+      if (rig.current.focusAmount === 0) rig.current = { ...rig.current, focusPoint: target.focusPoint }
+      change.current = sameCameraRig(rig.current, target) ? null : { from: rig.current, to: target, start: performance.now() }
+    }
+    configured.current = target
+    apply(rig.current)
     invalidate()
-  }, [camera, height, yaw, invalidate, mobile, preset, reduced, size.width, size.height])
+  }, [camera, height, yaw, invalidate, mobile, preset, reduced, size.width, size.height, focus?.square, focus?.key])
 
   useFrame(() => {
-    const current = angle.current
-    const change = current?.change
-    if (!current || !change) return
-    const t = Math.min(1, (performance.now() - change.start) / 310)
-    const p = 1 - (1 - t) ** 3
-    current.height = change.fromHeight + change.heightDiff * p
-    current.yaw = change.fromYaw + change.yawDiff * p
-    setCamera(camera, current.height, current.yaw, mobile)
-    if (t === 1) angle.current = { height, yaw }
+    const travel = change.current
+    if (!travel) return
+    const elapsed = performance.now() - travel.start
+    rig.current = sampleCameraTravel(travel.from, travel.to, elapsed)
+    apply(rig.current)
+    if (elapsed >= CAMERA_TRAVEL_MS) change.current = null
     else if (!document.hidden) invalidate()
   })
 
@@ -131,21 +101,21 @@ function Viewpoint({ flipped, preset, reduced }: {
 function Reflections({ low }: { low: boolean }) {
   const texture = useLoader(HDRLoader, studioHDR)
   texture.mapping = EquirectangularReflectionMapping
-  return <EnvironmentMap map={texture} environmentIntensity={low ? .60 : .78} environmentRotation={[0, .63, 0]} />
+  return <EnvironmentMap map={texture} environmentIntensity={low ? .55 : .66} environmentRotation={[0, .63, 0]} />
 }
 
 function Lighting({ low }: { low: boolean }) {
   return (
     <>
-      <hemisphereLight color="#f4eee5" groundColor="#505b71" intensity={.60} />
+      <hemisphereLight color="#f1eee8" groundColor="#4b5870" intensity={.44} />
       <directionalLight
-        castShadow={!low} position={[-3.8, 9.4, 5.7]} color="#fff0d5" intensity={1.95}
+        castShadow={!low} position={[-3.8, 9.4, 5.7]} color="#fff1dc" intensity={1.70}
         shadow-mapSize-width={1536} shadow-mapSize-height={1536}
         shadow-camera-left={-7} shadow-camera-right={7} shadow-camera-top={7} shadow-camera-bottom={-7}
         shadow-camera-near={.5} shadow-camera-far={24} shadow-normalBias={.022} shadow-bias={-.00016} shadow-radius={2.8}
       />
-      <directionalLight position={[4.5, 5, -5.8]} color="#c4d9ff" intensity={1.30} />
-      <directionalLight position={[4.9, 4.5, 1.5]} color="#fff4e3" intensity={.30} />
+      <directionalLight position={[4.5, 5, -5.8]} color="#b9d3ff" intensity={1.12} />
+      <directionalLight position={[4.9, 4.5, 1.5]} color="#fff4e3" intensity={.24} />
       <GraphicsBoundary>
         <Suspense fallback={null}>
           <Reflections low={low} />
@@ -180,13 +150,14 @@ function eventPieceId(event: GameEvent) {
   return null
 }
 
-function MarbleSet({ pieces, marks, events, flipped, low, reduced, onReady }: {
+function MarbleSet({ pieces, marks, events, flipped, low, reduced, focus, onReady }: {
   pieces: BoardSceneProps['pieces']
   marks: readonly SceneMark[]
   events: readonly GameEvent[]
   flipped: boolean
   low: boolean
   reduced: boolean
+  focus?: SceneFocus
   onReady: () => void
 }) {
   const assets = useChessAssets()
@@ -213,6 +184,7 @@ function MarbleSet({ pieces, marks, events, flipped, low, reduced, onReady }: {
           <VisualPiece
             key={piece.id} piece={piece} assets={assets} events={eventsById.get(piece.id) ?? emptyEvents}
             low={low} flipped={flipped} reduced={reduced}
+            focus={piece.square === focus?.square ? focus : undefined}
           />
         ))}
       </group>
@@ -247,7 +219,7 @@ interface PointerOrigin {
 export default function BoardScene({
   pieces, marks = emptyMarks, events = emptyEvents, flipped = false,
   camera = 'studio', quality, reducedMotion = false, motionKey,
-  onSquare, onDragSquare, onFailure, loadingLabel,
+  focus, onSquare, onDragSquare, onFailure, loadingLabel,
 }: BoardSceneProps) {
   const reduced = useReducedMotion(reducedMotion)
   const pointer = useRef<PointerOrigin>(null)
@@ -265,9 +237,13 @@ export default function BoardScene({
     ray: new Raycaster(),
   }), [])
   const onReady = useCallback(() => setReady(true), [])
+  const activeFocus = ready && focus && pieces.some(piece => piece.square === focus.square) ? focus : undefined
   const shownMarks: readonly SceneMark[] = dragTarget && !marks.some(mark => mark.square === dragTarget && mark.kind === 'focus')
     ? [...marks, { square: dragTarget, kind: 'focus' }]
     : marks
+  const focusedMarks: readonly SceneMark[] = activeFocus && !shownMarks.some(mark => mark.square === activeFocus.square && mark.kind === 'focus')
+    ? [...shownMarks, { square: activeFocus.square, kind: 'focus' }]
+    : shownMarks
 
   useEffect(() => {
     const element = board.current
@@ -337,6 +313,7 @@ export default function BoardScene({
   return (
     <div
       ref={board} className="remorse-scene" data-renderer="3d" data-scene-ready={ready ? 'true' : 'false'}
+      data-camera-focus={activeFocus?.square ?? 'none'} data-focus-subject={activeFocus?.subject ?? 'none'}
       onPointerDown={startPointer} onPointerUp={finishPointer} onPointerMove={movePointer}
       onPointerCancel={() => { pointer.current = null; setDragTarget(null) }}
     >
@@ -348,13 +325,13 @@ export default function BoardScene({
           shadows={low ? false : 'percentage'}
           onCreated={state => { scene.current = state; state.gl.toneMappingExposure = .97 }}
         >
-          <Viewpoint flipped={flipped} preset={camera} reduced={reduced} />
+          <Viewpoint flipped={flipped} preset={camera} reduced={reduced} focus={activeFocus} />
           <ContextLifecycle onFailure={onFailure} />
           <Lighting low={low} />
           <Suspense fallback={null}>
             <MarbleSet
-              key={motionKey ?? 'marble-set'} pieces={pieces} marks={shownMarks} events={events}
-              flipped={flipped} low={low} reduced={reduced} onReady={onReady}
+              key={motionKey ?? 'marble-set'} pieces={pieces} marks={focusedMarks} events={events}
+              flipped={flipped} low={low} reduced={reduced} focus={activeFocus} onReady={onReady}
             />
           </Suspense>
         </Canvas>

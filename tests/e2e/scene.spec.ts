@@ -1,5 +1,8 @@
 import { expect, test } from '@playwright/test'
 import type { Locator, Page } from '@playwright/test'
+import { createPosition } from '../../src/core'
+import { createMatch } from '../../src/session/match'
+import { exportMatch } from '../../src/session/save'
 
 const surface = (page: Page) => page.locator('[data-renderer="3d"][data-scene-ready="true"]')
 
@@ -142,4 +145,59 @@ test('studio lighting stays playable without its optional HDR reflection map', a
   await board.press('ArrowUp')
   await board.press('Enter') // e4
   await expect(page.getByTestId('playfield')).toHaveAttribute('data-revision', '1')
+})
+
+test('both armies render their distinct surface states at the ordinary camera in high and low quality', async ({ page }, testInfo) => {
+  const errors: string[] = []
+  page.on('pageerror', error => errors.push(error.message))
+  page.on('console', message => {
+    if (message.type() === 'error' && /WebGLProgram|VALIDATE_STATUS|shader.*error|Error compiling/i.test(message.text())) {
+      errors.push(message.text())
+    }
+  })
+  if (testInfo.project.name === 'webkit') await page.setViewportSize({ width: 360, height: 800 })
+  const root = createPosition({ pieces: [
+    { side: 'white', type: 'king', square: 'a1' },
+    { side: 'black', type: 'king', square: 'a8' },
+    { side: 'white', type: 'rook', square: 'b2' },
+    { side: 'white', type: 'rook', square: 'd2', affliction: 'guilt' },
+    { side: 'white', type: 'rook', square: 'f2', affliction: 'devastated' },
+    { side: 'white', type: 'rook', square: 'h2', affliction: 'berserk' },
+    { side: 'black', type: 'rook', square: 'b6' },
+    { side: 'black', type: 'rook', square: 'd6', affliction: 'guilt' },
+    { side: 'black', type: 'rook', square: 'f6', affliction: 'devastated' },
+    { side: 'black', type: 'rook', square: 'h6', affliction: 'bloodlust' },
+  ] })
+  const session = createMatch({ mode: 'hotseat', human: null, level: null, provenance: 'import' }, { root })
+  await page.goto('/')
+  await readyCanvas(page)
+  await page.getByTestId('settings').click()
+  await page.getByTestId('import-file').setInputFiles({
+    name: 'surface-states.json', mimeType: 'application/json', buffer: Buffer.from(exportMatch(session)),
+  })
+  await expect(page.getByTestId('playfield')).toHaveAttribute('data-mode', 'hotseat')
+  const canvas = await readyCanvas(page)
+  const board = page.locator('.board-stage')
+  // Use the ordinary fitted camera throughout. These artifacts are for actual
+  // normal-scale visual review; shader compilation and input are asserted here.
+  await board.focus()
+  await board.press('ArrowLeft') // d2 from the default keyboard square e2
+  await board.press('Enter')
+  await expect(page.getByTestId('inspector')).toHaveAttribute('data-state', 'guilt')
+  for (const quality of ['high', 'low']) {
+    await page.getByTestId('settings').click()
+    await page.getByRole('dialog').getByRole('combobox', { name: /^(Качество 3D|3D quality)$/ }).selectOption(quality)
+    await page.getByTestId('dialog-close').click()
+    await expect(surface(page)).toBeVisible()
+    await canvas.screenshot({ path: testInfo.outputPath(`material-states-${quality}.png`) })
+    await expect(page.getByTestId('fallback')).toHaveCount(0)
+  }
+  await board.focus()
+  await board.press('ArrowUp')
+  await board.press('Enter') // the guilt-ridden rook makes a permitted quiet move
+  await expect(page.getByTestId('playfield')).toHaveAttribute('data-revision', '1')
+  await expect(page.getByTestId('playfield')).toHaveAttribute('data-active-side', 'black')
+  await page.getByTestId('flip').click()
+  await canvas.screenshot({ path: testInfo.outputPath('material-states-flipped.png') })
+  expect(errors).toEqual([])
 })

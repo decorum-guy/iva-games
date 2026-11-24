@@ -54,11 +54,12 @@ Drive both Chromium and available WebKit. A Playwright mobile viewport is an emu
 - Place two same-kind/same-army figures in different states next to each other. Change/move one and rotate the camera: surface masks remain attached, each material stays independent and both states are readable at normal scale. Repeat for white/black, mobile low quality and reduced motion.
 - Every logical square is clickable correctly after board flip, camera change, resize and touch interaction.
 - Trails are visible while moving, fade out, do not pile up and do not obscure legal targets.
-- Dice face, state badge and event log agree; tutorial dice are labeled; no production roll is forced accidentally.
+- The visible 3D die drops, tumbles and settles on the committed face for both colors and AI; state badge and event log agree. State effects reveal after the shared settling time. Restores/undo do not replay throws. Preset-dice notices are absent from the tutorial UI; no production roll is forced accidentally.
 - Capture/reaction/bonus and cure/shame/conversion/removal events appear in an understandable order.
 - Countdown text matches the digital full-cycle rule and never decreases on each berserk movement.
 - Tutorial callouts never cover the requested piece, square, promotion option or finish action on laptop or phone.
-- Mobile browser chrome, safe areas and changing viewport height do not hide the board controls. Keep pinch/scroll behavior sensible and avoid disabling page zoom globally.
+- Mobile browser chrome, safe areas and changing viewport height do not hide the board controls. During play/tutorial the document does not scroll; required controls remain inside the viewport. Optional help/history scroll internally. Preserve browser zoom.
+- In the counter lesson, select the figure, inspect the close-up and its highlighted counter, then explicitly acknowledge. The camera returns smoothly; manual board flips are eased. Reduced motion retains visible static focus.
 - In a congested 360×800 view show both nicknames/capture rows, material advantage, a selected afflicted figure, tutorial guidance and a bonus-action control simultaneously. Keep source/target accessible. Test both Russian and English text lengths, Cyrillic font coverage and no layout shift on first capture.
 - Bot `≈Elo`, human Elo and material `+N` are clearly distinct. The ten-level choice is compact in setup; it does not become ten permanent buttons around the board.
 - Reduced motion removes excessive movement while retaining state feedback. Muted default stays muted after a clean start.

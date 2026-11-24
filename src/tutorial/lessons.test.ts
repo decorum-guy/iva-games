@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { commandRejection, cyclesRemaining } from '../core'
 import type { Command } from '../core/types'
 import { captureLedger, createContinuation } from '../session/match'
 import { nextDie } from '../session/random'
@@ -25,10 +26,44 @@ function transfer(progress: Learning, command: Command) {
 }
 
 describe('interactive lesson fixtures', () => {
+  it('restores the lesson 3 reading and position boundaries without inventing a required king move', () => {
+    let progress = scriptAction(transfer(startLesson(2, 2), move('g2', 'g3')))
+    expect(instruction(progress)).toMatchObject({ id: 'removal-material-only', kind: 'read' })
+    expect(commandRejection(progress.session.state, move('h1', 'g1'))).toBeNull()
+
+    // Existing v1 saves store the step index, not its copy. Keep their board and
+    // progress intact: these are Continue decisions, not broken chess positions.
+    for (const expectedStep of ['removal-material-only', undefined]) {
+      progress = restored(progress)
+      expect(instruction(progress)?.id).toBe(expectedStep)
+      expect(guideCommands(progress)).toEqual([])
+      const record = progress.session.record
+      expect(() => learnerAction(progress, move('h1', 'g1'))).toThrow('tutorialChoice')
+      expect(progress.session.record).toBe(record)
+      progress = advanceLesson(progress)
+    }
+
+    expect(progress).toMatchObject({ lesson: 3, position: 0, index: 0 })
+    expect(instruction(progress)?.id).toBe('start-two-cures')
+    expect(guideCommands(progress)).toEqual([move('c1', 'e3')])
+  })
+
+  it('restores the actual king instruction in lesson 4 and completes both cures', () => {
+    const beforeKing = restored(scriptAction(transfer(startLesson(3), move('c1', 'e3'))))
+    expect(instruction(beforeKing)?.id).toBe('cure-two-pieces')
+    expect(commandRejection(beforeKing.session.state, move('h1', 'g2'))).toBeNull()
+    expect(guideCommands(beforeKing)).toEqual([move('h1', 'g1')])
+    expect(() => learnerAction(beforeKing, move('h1', 'g2'))).toThrow('tutorialChoice')
+    const afterKing = transfer(beforeKing, move('h1', 'g1'))
+    expect(afterKing.session.current.events.filter(event => event.type === 'cure')).toHaveLength(2)
+    expect(instruction(scriptAction(afterKing))?.id).toBe('bishop-pacifism')
+  })
+
   it.each([0, 1, 2])('teaches every directed step with full state restored and promotion alternative %i', promotionIndex => {
     let progress = startLesson()
     let positions = 1
     let steps = 0
+    const focusSteps: string[] = []
 
     while (!progress.complete) {
       const { session } = progress
@@ -42,6 +77,16 @@ describe('interactive lesson fixtures', () => {
         steps++
         expect(current.text.en.trim()).not.toBe('')
         expect(current.text.ru.trim()).not.toBe('')
+        if (current.focus) {
+          focusSteps.push(current.id)
+          expect(['read', 'inspect']).toContain(current.kind)
+          const piece = session.state.pieces.find(piece => piece.square === current.focus!.square)
+          expect(piece, `${current.id} must focus a living piece`).toBeDefined()
+          if (current.focus.subject === 'countdown') {
+            expect(piece?.affliction).toBe('devastated')
+            expect(cyclesRemaining(piece!, session.state)).toBeGreaterThan(0)
+          }
+        }
         switch (current.kind) {
           case 'inspect':
             expect(session.state.pieces.some(piece => piece.square === current.square)).toBe(true)
@@ -78,6 +123,7 @@ describe('interactive lesson fixtures', () => {
     expect(LESSONS).toHaveLength(9)
     expect(positions).toBe(14)
     expect(steps).toBe(55)
+    expect(focusSteps).toEqual(['inspect-countdown', 'promotion-clears-bonus'])
     expect(progress.session.state).toMatchObject({ side: 'white', phase: 'primary', outcome: null })
     expect(captureLedger(progress.session).map(event => event.victim.square)).toEqual(['c5'])
   })
