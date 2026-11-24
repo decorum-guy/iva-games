@@ -115,7 +115,7 @@ export function clipEdit(asset: Candidate, demo: Demo) {
 }
 
 export function makePlayback(library: Library, group: Group, variant: Variant, demo: Demo, chant = false) {
-  const stock = planSceneCues(demo.events, { plan: demo.plan });
+  const stock = planSceneCues(demo.events, { plan: demo.plan }).filter(cue => cue.kind !== 'berserkIgnite');
   const asset = candidateFor(library, group, variant);
   const solo = variant.endsWith('STONE-SOLO');
   if (!asset) {

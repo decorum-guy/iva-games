@@ -83,4 +83,13 @@ describe('selected showcase playback', () => {
     const confirm = planSceneCues(demo.events, { plan: demo.plan, playback: 'formation' })
     expect(replaceShowcaseCues(confirm, buffers, demo.plan, 'formation', false).clips[0].at).toBeCloseTo(.03)
   })
+
+  it('adds the selected ignition over R1 only at the genuine state reveal', () => {
+    const demo = createDemo('reaction.berserk', 'bishop', false)
+    const cues = planSceneCues(demo.events, { plan: demo.plan })
+    const { clips } = replaceShowcaseCues(cues, buffers, demo.plan, undefined, false)
+    const fire = clips.find(clip => clip.buffer === buffers.get('berserkIgnite'))
+    const reaction = clips.find(clip => clip.buffer === buffers.get('berserk'))
+    expect(fire).toMatchObject({ at: reaction?.at, offset: 0, duration: .88 })
+  })
 })

@@ -11,7 +11,7 @@ const reactions = {
 
 type ReactionSound = keyof typeof reactions
 type PromotionSound = ReturnType<typeof promotionFamily>
-export type ShowcaseSound = ReactionSound | PromotionSound | 'dice' | 'royalCheck' | 'royalGround'
+export type ShowcaseSound = ReactionSound | PromotionSound | 'dice' | 'berserkIgnite' | 'royalCheck' | 'royalGround'
 
 export const showcaseDice = { id: 'D2', level: .40 } as const
 
@@ -21,6 +21,7 @@ export const showcaseSources = {
   formation: 'auditions/promotion-p2-formation.mp3', rook: 'showcase/promotion-rook-p1-p2-room.mp3',
   queen: 'auditions/promotion-p2-queen.mp3',
   dice: `dice-auditions/${showcaseDice.id.toLowerCase()}.mp3`,
+  berserkIgnite: 'showcase/berserk-ignition-f1-f2.mp3',
   royalCheck: 'showcase/royal-check.mp3', royalGround: 'showcase/royal-mate-ground.mp3',
 } as const satisfies Readonly<Record<ShowcaseSound, string>>
 
@@ -42,6 +43,7 @@ function isReactionSound(kind: CueKind): kind is ReactionSound {
 
 export function showcaseSoundForCue(kind: CueKind, plan: ActionPlan | undefined): ShowcaseSound | undefined {
   if (kind === 'dice') return 'dice'
+  if (kind === 'berserkIgnite') return 'berserkIgnite'
   if (kind === 'check' || kind === 'royalCheck') return 'royalCheck'
   if (kind === 'royalGround') return 'royalGround'
   if (isReactionSound(kind)) return kind
@@ -75,12 +77,24 @@ export function replaceShowcaseCues(cues: readonly SceneCue[], buffers: Readonly
     }
   }
   const replacedPromotion = clips.length > 0
+  function untilNextAccent(cue: SceneCue, index: number) {
+    const nextState = cues.slice(index + 1).find(later => isReactionSound(later.kind))
+    const nextStage = promotion && playback === undefined && cue.at < promotion.formationAt / 1000
+      ? promotion.formationAt / 1000 : royal && plan ? plan.end / 1000 : Infinity
+    return Math.min(nextState?.at ?? Infinity, nextStage) - cue.at
+  }
   for (const [index, cue] of cues.entries()) {
     if (replacedPromotion && promotionSounds.has(cue.kind)) continue
     const sound = showcaseSoundForCue(cue.kind, plan)
     const buffer = sound ? buffers.get(sound) : undefined
     if (sound === 'dice' && buffer) {
       clips.push(...dieRecordingCues(buffer, reduced, cue.at, showcaseDice.level))
+      continue
+    }
+    if (sound === 'berserkIgnite' && buffer) {
+      const duration = Math.min(buffer.duration, reduced ? .36 : .88, untilNextAccent(cue, index))
+      if (duration > .025) clips.push({ buffer, at: cue.at, duration, offset: 0, gain: reduced ? .72 : 1,
+        fadeIn: .009, fadeOut: Math.min(.12, duration * .40) })
       continue
     }
     if ((sound === 'royalCheck' || sound === 'royalGround') && buffer) {
@@ -90,11 +104,8 @@ export function replaceShowcaseCues(cues: readonly SceneCue[], buffers: Readonly
     }
     const edit = isReactionSound(cue.kind) ? reactionMontage(reactions[cue.kind], cue.at) : undefined
     if (!buffer || !edit) { stock.push(cue); continue }
-    const nextState = cues.slice(index + 1).find(later => isReactionSound(later.kind))
     // A committed new state or a cinematic handoff owns its own accent.
-    const nextStage = promotion && playback === undefined && cue.at < promotion.formationAt / 1000
-      ? promotion.formationAt / 1000 : royal && plan ? plan.end / 1000 : Infinity
-    const duration = Math.min(edit.duration, buffer.duration - edit.offset, Math.min(nextState?.at ?? Infinity, nextStage) - edit.at)
+    const duration = Math.min(edit.duration, buffer.duration - edit.offset, untilNextAccent(cue, index))
     if (duration > .025) clips.push({ ...edit, buffer, duration,
       gain: 10 ** (edit.decibels / 20) * reactionSoundLevel(cue.kind, cue.figure),
       fadeOut: duration < edit.duration - .001 ? Math.min(edit.fadeOut, duration * .52) : edit.fadeOut })

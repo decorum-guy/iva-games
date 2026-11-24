@@ -38,7 +38,7 @@ describe('berserk fire', () => {
       const duration = fireDuration(kind, reduced)
       const pulse = { id: 'fire', kind, startedAt: 0, duration }
       expect(fireOpacity(pulse, -1)).toBe(0)
-      expect(fireOpacity(pulse, 120)).toBeGreaterThan(.65)
+      expect(fireOpacity(pulse, duration * .26)).toBeGreaterThan(.65)
       expect(fireOpacity(pulse, duration - 20)).toBe(0)
     },
   )

@@ -96,7 +96,8 @@ describe('semantic scene sounds', () => {
     const events = progress.session.current.events
     const before = audio.planSceneCues(events, { reducedMotion, playback: 'reaction' })
     const after = audio.planSceneCues(events, { reducedMotion, playback: 'formation' })
-    expect(before.map(cue => cue.kind)).toEqual(['capture', 'dice', 'berserk'])
+    expect(before.map(cue => cue.kind)).toEqual(['capture', 'dice', 'berserk', 'berserkIgnite'])
+    expect(before[3].at).toBe(before[2].at)
     expect(after.map(cue => cue.kind)).toEqual(['promotionFormation'])
     expect(after[0].at).toBeCloseTo(reducedMotion ? .055 : .15)
   })
@@ -247,7 +248,7 @@ describe('audio user activation and cancellation', () => {
     await audio.prepareSceneAudio();
     const context = await unlock();
     await vi.waitFor(() => expect(decode).toHaveBeenCalledTimes(1));
-    expect(fetch).toHaveBeenCalledTimes(11);
+    expect(fetch).toHaveBeenCalledTimes(12);
     expect(audio.playSceneCue([reaction])).toBe(true);
     const impacts = ['diceBody', 'diceBounce', 'diceEdge', 'diceBounce', 'diceSettle'] as const;
     for (const [index, impact] of impacts.entries()) {

@@ -2,6 +2,7 @@ import type { Affliction, GameEvent, PieceType, Side } from '../core/types'
 import { sampleWindow, sceneAudioPath } from './audioSamples'
 import type { SampleName } from './audioSamples'
 import { getDieMotionTiming } from './diceMotion'
+import { fireEvent } from './fireMotion'
 import { actionPlan, isCaptureReaction } from './actionPresentation'
 import type { ActionPlan, PromotionPlayback } from './actionPresentation'
 import { promotionFamily, promotionTiming } from './promotionMotion'
@@ -22,7 +23,7 @@ export interface SceneAudioOptions {
 }
 
 export type CueKind = 'move' | 'capture' | 'mercy' | 'friendlyCapture' | 'dice' | 'unaffected'
-  | 'guilt' | 'devastated' | 'berserk' | 'bloodlust' | 'heal' | 'convert' | 'remove'
+  | 'guilt' | 'devastated' | 'berserk' | 'berserkIgnite' | 'bloodlust' | 'heal' | 'convert' | 'remove'
   | 'promotionFormation' | 'promotionRookApproach' | 'promotionRookImpact'
   | 'promotionQueenApproach' | 'promotionQueenImpact' | 'promotionQueenFracture' | 'promotionQueenArc'
   | 'bonus' | 'check' | 'turn' | 'win' | 'loss' | 'draw' | 'finish' | RoyalSound
@@ -71,6 +72,12 @@ export function planSceneCues(events: readonly GameEvent[], options: SceneAudioO
   const plan = options.plan ?? actionPlan(events, rolled, Boolean(options.reducedMotion), Boolean(options.royal))
   const { reduced, roll, promotion } = plan
   const capture = events.find(event => event.type === 'capture')
+  function stateAccent(kind: CueKind, at: number, related: readonly GameEvent[]) {
+    cues.push(stateCue(kind, at, related))
+    if (kind === 'berserk' && capture && fireEvent(related, capture.capturer.affliction, 'berserk')?.kind === 'ignite') {
+      cues.push({ kind: 'berserkIgnite', at })
+    }
+  }
   if (capture) cues.push({
     kind: capture.friendly ? 'friendlyCapture' : capture.mercy ? 'mercy' : 'capture',
     at: reduced ? .018 : promotion ? .205 : .13,
@@ -82,7 +89,7 @@ export function planSceneCues(events: readonly GameEvent[], options: SceneAudioO
   if (promotion) {
     const { event, reactionEvents, surgeEvents, reactionAt, surgeAt, formationAt, aftermathAt, aftermathEvents } = promotion
     const state = importantEffect(reactionEvents, rolled)
-    if (state && reactionAt !== null) cues.push(stateCue(state, reactionAt / 1000 + (roll ? 0 : reduced ? .036 : .074), reactionEvents))
+    if (state && reactionAt !== null) stateAccent(state, reactionAt / 1000 + (roll ? 0 : reduced ? .036 : .074), reactionEvents)
     if (surgeAt !== null) cues.push(stateCue('bloodlust', surgeAt / 1000 + (reduced ? .035 : .064), surgeEvents))
     const family = promotionFamily(event.promotion)
     const impact = (formationAt + promotionTiming(event.promotion, reduced).impact) / 1000
@@ -110,7 +117,7 @@ export function planSceneCues(events: readonly GameEvent[], options: SceneAudioO
   const at = roll ? roll.reveal / 1000 : cues.length ? (reduced ? .084 : .258) : .018
   const reactions = ending ? [] : events.filter(isCaptureReaction)
   const accent = ending ?? importantEffect(reactions.length ? reactions.slice(0, 1) : events, rolled)
-  if (accent) cues.push(stateCue(accent, at, reactions.length ? reactions : events))
+  if (accent) stateAccent(accent, at, reactions.length ? reactions : events)
   if (plan.escalationAt !== null && !ending) {
     cues.push(stateCue('bloodlust', plan.escalationAt / 1000 + (reduced ? .035 : .064), reactions))
   }
@@ -151,7 +158,7 @@ interface SampleVoice {
   readonly gain: number
 }
 
-const regular: Record<Exclude<CueKind, 'dice' | RoyalSound>, SampleVoice> = {
+const regular: Record<Exclude<CueKind, 'dice' | 'berserkIgnite' | RoyalSound>, SampleVoice> = {
   move: { sample: 'stone', rate: 1, gain: .47 },
   capture: { sample: 'capture', rate: 1, gain: .68 },
   mercy: { sample: 'stone', rate: .87, gain: .40 },
@@ -434,6 +441,7 @@ function playContact(g: AudioGraph, when: number, voice: SampleVoice) {
 }
 
 function renderCue(g: AudioGraph, kind: CueKind, when: number, reduced: boolean, figure?: PieceType, dieLevel = previousDieLevel) {
+  if (kind === 'berserkIgnite') return
   if (kind === 'dice') {
     const timing = getDieMotionTiming(reduced)
     for (const [index, impact] of timing.impactsMs.entries()) {

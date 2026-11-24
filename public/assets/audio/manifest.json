@@ -104,6 +104,35 @@
         "decodedPeakDbfs": -3.5
       }
     },
+    "berserkIgnition": {
+      "file": "showcase/berserk-ignition-f1-f2.mp3",
+      "bytes": 22508,
+      "sha256": "62b895e943b4f47918912e3fb93507b3f9339f1cbd468b9d5629bc7df0f64564",
+      "recipe": "scripts/build-berserk-ignition-mix.py",
+      "changes": "Level-matched excerpts with light filtering, fades and short room return. F1 starts on the state reveal and F2 enters 132 ms later. This layer plays with R1 only on entry into berserk.",
+      "sources": [
+        {
+          "id": "F1",
+          "author": "kingsrow",
+          "title": "Whoosh.wav",
+          "page": "https://freesound.org/people/kingsrow/sounds/181577/",
+          "publicPreview": "https://cdn.freesound.org/previews/181/181577_1857065-hq.mp3",
+          "previewSha256": "32a39e33c5d5069ab2739f26740b2273af3644101180875f775d47a5bb55720b",
+          "license": "CC0-1.0",
+          "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/"
+        },
+        {
+          "id": "F2",
+          "author": "magnuswaker",
+          "title": "Flame Burst",
+          "page": "https://freesound.org/people/magnuswaker/sounds/592572/",
+          "publicPreview": "https://cdn.freesound.org/previews/592/592572_11537497-hq.mp3",
+          "previewSha256": "e641e20676ac786db2cac77c827907f284ba2899cf451ada9960102fb692af3f",
+          "license": "CC0-1.0",
+          "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/"
+        }
+      ]
+    },
     "sounds": {
       "guilt": {
         "file": "auditions/reaction-r1-guilt.mp3",

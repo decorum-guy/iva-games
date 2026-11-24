@@ -46,6 +46,8 @@ The dice demos use trimmed, level-matched transient excerpts of the public CC0 p
 
 The authored check and mate contact recordings derive from the shipped CC0 stone bank. They pitch and filter stone, capture and fracture excerpts by mh2o, Wuzzy and SamsterBirdies, then add damped modal resonances, short stereo reflections and fades. [Sources and output hashes](public/assets/audio/manifest.json)
 
+The installed berserk ignition combines **Whoosh.wav** by kingsrow and **Flame Burst** by magnuswaker. The public previews were trimmed, level-matched, filtered and mixed with fades and a short room return. [Whoosh.wav](https://freesound.org/people/kingsrow/sounds/181577/) · [Flame Burst](https://freesound.org/people/magnuswaker/sounds/592572/) · [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/)
+
 ## Software
 
 React, React DOM, Three.js, React Three Fiber and Drei are MIT-licensed. `idb` is ISC-licensed. Exact installed versions are pinned in [the lockfile](package-lock.json). The production build generates `dist/THIRD_PARTY_LICENSES.md` from the bundler’s dependency metadata. [The React Three Fiber license](public/assets/licenses/react-three-fiber.txt) is also included because the npm archive lists MIT without a standalone license text.

@@ -105,8 +105,9 @@ describe('promotion presents the committed action in causal stages', () => {
     })
     expect(plan.formed).toMatchObject({ type: 'rook', affliction: 'bloodlust' })
     const cues = planSceneCues(committed.events, { plan: schedule })
-    expect(cues.map(cue => cue.kind)).toEqual(['capture', 'dice', 'berserk', 'bloodlust', 'promotionRookApproach', 'promotionRookImpact'])
-    expect(cues[3].at).toBeGreaterThan(cues[2].at)
+    expect(cues.map(cue => cue.kind)).toEqual(['capture', 'dice', 'berserk', 'berserkIgnite', 'bloodlust', 'promotionRookApproach', 'promotionRookImpact'])
+    expect(cues[3].at).toBe(cues[2].at)
+    expect(cues[4].at).toBeGreaterThan(cues[3].at)
   })
 
   it('keeps a previously guilty pawn guilty on a quiet promotion without a new effect', () => {

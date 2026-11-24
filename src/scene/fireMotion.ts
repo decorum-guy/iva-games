@@ -20,11 +20,11 @@ export function fireEvent(events: readonly GameEvent[], before: Affliction, afte
 
 export function fireDuration(kind: FireKind, reduced: boolean) {
   if (reduced) return kind === 'ignite' ? 360 : 295
-  return kind === 'ignite' ? 690 : 540
+  return kind === 'ignite' ? 1120 : 540
 }
 
 export function fireOpacity(burst: FireBurst, elapsed: number) {
   const ignition = burst.kind === 'ignite'
-  return easeRange(0, ignition ? 108 : 46, elapsed) *
+  return easeRange(0, ignition ? burst.duration * .20 : 46, elapsed) *
     (1 - easeRange(burst.duration * (ignition ? .43 : .31), burst.duration - 21, elapsed))
 }

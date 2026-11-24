@@ -747,7 +747,8 @@ test('the promotion lesson schedules formation only after acknowledgment, includ
   await expect(page.getByTestId('teaching-cause')).toContainText('went berserk')
   const windows = async () => (await nativeAudio(page)).starts.map(({ offset, duration }) => ({ offset, duration }))
   const reaction = [sampleWindow('capture'), ...dieWindows,
-    { offset: .4, duration: expect.closeTo(1.26, 3) }]
+    { offset: .4, duration: expect.closeTo(1.26, 3) },
+    { offset: 0, duration: expect.closeTo(.88, 3) }]
   expect(await windows()).toEqual(reaction)
   await page.waitForTimeout(550)
   expect(await windows()).toEqual(reaction)

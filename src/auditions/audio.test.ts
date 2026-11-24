@@ -33,7 +33,8 @@ describe('audition comparisons', () => {
     for (const group of groups) {
       const demo = createDemo(group, 'bishop', reduced);
       const stock = makePlayback(library, group, 'current', demo);
-      expect(stock.cues).toEqual(planSceneCues(demo.events, { plan: demo.plan }));
+      const gameCues = planSceneCues(demo.events, { plan: demo.plan });
+      expect(stock.cues).toEqual(gameCues.filter(cue => cue.kind !== 'berserkIgnite'));
       for (const variant of variantsFor(group).slice(1)) {
         const { clip, cues, asset } = makePlayback(library, group, variant, demo);
         if (!clip || !asset) throw new Error(`Missing ${group} ${variant}`);

@@ -106,11 +106,11 @@ function fireSheets(model: BufferGeometry, seed: number, low: boolean) {
   geometry.setAttribute('position', position)
   geometry.setAttribute('uv', new BufferAttribute(new Float32Array(uv), 2))
   geometry.setIndex(indices)
-  function pose(time: number) {
+  function pose(time: number, spread = 1) {
     let vertex = 0
     for (const { angle, root, rise, width, sector } of flames) {
       const phase = time * 4.1 + angle * 2.7
-      const lift = rise * (1 + .16 * Math.sin(phase) + .08 * Math.sin(phase * 1.71))
+      const lift = rise * (.56 + .44 * spread) * (1 + .16 * Math.sin(phase) + .08 * Math.sin(phase * 1.71))
       for (let row = 0; row <= layers; row++) {
         const v = row / layers
         const y = root + v * lift
@@ -118,7 +118,7 @@ function fireSheets(model: BufferGeometry, seed: number, low: boolean) {
         const lo = Math.floor(band), hi = Math.min(bands - 1, lo + 1)
         const radius = radii[lo * sectors + sector] * (1 - band + lo) + radii[hi * sectors + sector] * (band - lo)
         const curl = angle + v * (.21 * Math.sin(phase - v * 4.4) + .16 * Math.sin(phase * .67 - 5 * v))
-        const outer = radius + .012 + .046 * Math.sin(v * Math.PI) + .026 * v
+        const outer = radius + .012 + (.046 * Math.sin(v * Math.PI) + .026 * v) * spread
         for (let k = 0; k <= columns; k++) {
           const arc = curl + (k / columns * 2 - 1) * width / Math.max(.09, outer)
           position.setXYZ(vertex++, Math.cos(arc) * outer, y, Math.sin(arc) * outer)
@@ -151,8 +151,9 @@ export function BerserkFire({ model, seed, low, reduced, burst }: {
   useFrame(() => {
     const elapsed = performance.now() - burst.startedAt
     if (elapsed < 0) return
-    if (material.current) material.current.opacity = .90 * fireOpacity(burst, elapsed)
-    if (!reduced) sheets.pose(elapsed * .001)
+    const strength = fireOpacity(burst, elapsed)
+    if (material.current) material.current.opacity = .90 * strength
+    if (!reduced) sheets.pose(elapsed * .001, burst.kind === 'ignite' ? strength : 1)
     if (elapsed < burst.duration && !document.hidden) invalidate()
   })
   return <mesh name="berserk-fire" geometry={sheets.geometry} renderOrder={1} frustumCulled={false}>

@@ -312,6 +312,8 @@ export function VisualPiece({ piece, assets, events, flipped, low, reduced, focu
       const distance = Math.hypot(x - body.current.position.x, z - body.current.position.z)
       const approach = burst.kind === 'capture' && changedSquare && !reduced ? pieceTravelMs(distance) * .92 : 0
       setFire({ ...burst, startedAt: now + approach, duration: fireDuration(burst.kind, reduced) })
+    } else if (fire?.kind === 'ignite' && piece.affliction !== 'berserk') {
+      setFire(null)
     }
     if (!last || reduced || promotion) {
       move.current = null
