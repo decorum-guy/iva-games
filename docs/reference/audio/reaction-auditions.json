@@ -1,0 +1,467 @@
+{
+  "status": "Unselected audition candidates; not installed; no subjective listening. Paths describe the separately delivered research package, not repository runtime assets.",
+  "options": [
+    {
+      "id": "R1_Reactions_CC0",
+      "name_ru": "R1 — Элементы и тёмная магия",
+      "license": "CC0-1.0",
+      "status": "Audition candidates only. Not integrated into REMORSE. No subjective listening performed.",
+      "order": [
+        "guilt",
+        "devastation",
+        "berserk",
+        "bloodlust"
+      ],
+      "assumption": "Mapping sound names to REMORSE reactions is a proposed design choice, not an author-supplied usage or a verified aesthetic judgment.",
+      "edits": [
+        "Each whole original retained",
+        "Resampled to 48 kHz stereo",
+        "Independent constant gain to -6 dBFS sample peak (not loudness normalization)",
+        "0.4 s leading/trailing silence and 0.8 s silence between clips",
+        "MP3 192 kbps encoding; also lossless 24-bit PCM WAV"
+      ],
+      "not_applied": [
+        "No trimming",
+        "No layering",
+        "No synthesis",
+        "No pitch shift",
+        "No compression"
+      ],
+      "clips": [
+        {
+          "state": "guilt",
+          "label_ru": "Вина",
+          "source": {
+            "title": "Energy Drain",
+            "creator": "qubodup",
+            "page_url": "https://opengameart.org/content/energy-drain",
+            "download_url": "https://opengameart.org/sites/default/files/qubodup-PowerDrain.7z",
+            "license": "CC0-1.0",
+            "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+            "license_note": "Author page explicitly changes the terms to CC0 on 2024-06-23 and says restrictions in the archive may be ignored. Archived page is retained."
+          },
+          "original_file": "originals/energy_drain/qubodup-PowerDrain.flac",
+          "original_filename": "qubodup-PowerDrain.flac",
+          "original_sha256": "de0cb2775d484f4b7dc4aaa341d9750fda76d0d599d2b683720d6feaf616280d",
+          "source_metadata": {
+            "programs": [],
+            "stream_groups": [],
+            "streams": [
+              {
+                "codec_name": "flac",
+                "sample_rate": "48000",
+                "channels": 2,
+                "bits_per_sample": 0
+              }
+            ],
+            "format": {
+              "duration": "3.000000",
+              "size": "311228"
+            }
+          },
+          "duration_seconds": 3.0,
+          "starts_at_seconds": 0.4,
+          "ends_at_seconds": 3.4,
+          "constant_gain_db": -5.990000191316226,
+          "original_decoded_sample_peak_dbfs": -0.009999808683775285
+        },
+        {
+          "state": "devastation",
+          "label_ru": "Опустошение",
+          "source": {
+            "title": "Basic Spell Impacts",
+            "creator": "lentikula",
+            "page_url": "https://lentikula.itch.io/freecc0-basic-spell-impacts-sfx",
+            "download_url": "https://lentikula.itch.io/freecc0-basic-spell-impacts-sfx/purchase",
+            "license": "CC0-1.0",
+            "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+            "license_note": "Author explicitly releases the pack under CC0. Original archive reused from prior research download; originals are copied byte-for-byte."
+          },
+          "original_file": "originals/lentikula/Ice Spell Impact 1.wav",
+          "original_filename": "Ice Spell Impact 1.wav",
+          "original_sha256": "793bd970c9e4edf55acd4551335ae3a6e07415527022057369bbdb68ead355a4",
+          "source_metadata": {
+            "programs": [],
+            "stream_groups": [],
+            "streams": [
+              {
+                "codec_name": "pcm_s24le",
+                "sample_rate": "48000",
+                "channels": 2,
+                "bits_per_sample": 24
+              }
+            ],
+            "format": {
+              "duration": "2.427417",
+              "size": "699176"
+            }
+          },
+          "duration_seconds": 2.427416666666667,
+          "starts_at_seconds": 4.2,
+          "ends_at_seconds": 6.627416666666667,
+          "constant_gain_db": -5.482142746499482,
+          "original_decoded_sample_peak_dbfs": -0.5178572535005184
+        },
+        {
+          "state": "berserk",
+          "label_ru": "Ярость",
+          "source": {
+            "title": "Basic Spell Impacts",
+            "creator": "lentikula",
+            "page_url": "https://lentikula.itch.io/freecc0-basic-spell-impacts-sfx",
+            "download_url": "https://lentikula.itch.io/freecc0-basic-spell-impacts-sfx/purchase",
+            "license": "CC0-1.0",
+            "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+            "license_note": "Author explicitly releases the pack under CC0. Original archive reused from prior research download; originals are copied byte-for-byte."
+          },
+          "original_file": "originals/lentikula/Fire Spell Impact 1.wav",
+          "original_filename": "Fire Spell Impact 1.wav",
+          "original_sha256": "0ed8aa723a1189da00f115d7402508a291906bd249a80036e71a59f1020e67eb",
+          "source_metadata": {
+            "programs": [],
+            "stream_groups": [],
+            "streams": [
+              {
+                "codec_name": "pcm_s24le",
+                "sample_rate": "48000",
+                "channels": 2,
+                "bits_per_sample": 24
+              }
+            ],
+            "format": {
+              "duration": "2.997333",
+              "size": "863312"
+            }
+          },
+          "duration_seconds": 2.997333333333333,
+          "starts_at_seconds": 7.427416666666667,
+          "ends_at_seconds": 10.42475,
+          "constant_gain_db": -5.577843076899133,
+          "original_decoded_sample_peak_dbfs": -0.4221569231008668
+        },
+        {
+          "state": "bloodlust",
+          "label_ru": "Жажда крови",
+          "source": {
+            "title": "3 dark magic spells",
+            "creator": "qubodup",
+            "page_url": "https://opengameart.org/content/3-dark-magic-spells",
+            "download_url": "https://opengameart.org/sites/default/files/dark_magic.7z",
+            "license": "CC0-1.0",
+            "license_url": "https://creativecommons.org/publicdomain/zero/1.0/"
+          },
+          "original_file": "originals/dark_magic/fout-03.flac",
+          "original_filename": "fout-03.flac",
+          "original_sha256": "ec55b77eb3096dcc083d219254d0a37a0ecf071477d7c47bc363092c2ca02d0d",
+          "source_metadata": {
+            "programs": [],
+            "stream_groups": [],
+            "streams": [
+              {
+                "codec_name": "flac",
+                "sample_rate": "44100",
+                "channels": 2,
+                "bits_per_sample": 0
+              }
+            ],
+            "format": {
+              "duration": "3.920816",
+              "size": "381356"
+            }
+          },
+          "duration_seconds": 3.9208333333333334,
+          "starts_at_seconds": 11.22475,
+          "ends_at_seconds": 15.145583333333335,
+          "constant_gain_db": -5.877361360915342,
+          "original_decoded_sample_peak_dbfs": -0.12263863908465857
+        }
+      ],
+      "pcm_duration_seconds": 15.545583333333333
+    },
+    {
+      "id": "R2_Reactions_JCSounds_CC_BY_4",
+      "name_ru": "R2 — Заклинания JC Sounds",
+      "license": "CC-BY-4.0",
+      "status": "Audition candidates only. Not integrated into REMORSE. No subjective listening performed.",
+      "order": [
+        "guilt",
+        "devastation",
+        "berserk",
+        "bloodlust"
+      ],
+      "assumption": "Mapping sound names to REMORSE reactions is a proposed design choice, not an author-supplied usage or a verified aesthetic judgment.",
+      "edits": [
+        "Each whole original retained",
+        "Resampled to 48 kHz stereo",
+        "Independent constant gain to -6 dBFS sample peak (not loudness normalization)",
+        "0.4 s leading/trailing silence and 0.8 s silence between clips",
+        "MP3 192 kbps encoding; also lossless 24-bit PCM WAV"
+      ],
+      "not_applied": [
+        "No trimming",
+        "No layering",
+        "No synthesis",
+        "No pitch shift",
+        "No compression"
+      ],
+      "clips": [
+        {
+          "state": "guilt",
+          "label_ru": "Вина",
+          "source": {
+            "title": "JC Sounds - Fantasy SFX Pack Vol 1",
+            "creator": "JC Sounds",
+            "page_url": "https://opengameart.org/content/jc-sounds-fantasy-sfx-pack-vol-1",
+            "download_url": "https://opengameart.org/sites/default/files/fantasy_sfx_pack_vol_1.7z",
+            "license": "CC-BY-4.0",
+            "license_url": "https://creativecommons.org/licenses/by/4.0/",
+            "attribution": "JC Sounds - Fantasy SFX Pack Vol 1 by JC Sounds; https://opengameart.org/content/jc-sounds-fantasy-sfx-pack-vol-1 ; CC BY 4.0 https://creativecommons.org/licenses/by/4.0/ . Audition edits: stereo/48 kHz conversion, per-clip constant gain to -6 dBFS sample peak, silence between clips, MP3 encoding. No trimming, layering, pitch change, or compression."
+          },
+          "original_file": "originals/jcsounds/Seq_Fantasy SFX Pack Vol 1_Mana Drain_Start.wav",
+          "original_filename": "Seq_Fantasy SFX Pack Vol 1_Mana Drain_Start.wav",
+          "original_sha256": "7020a586bef1f42fd08d00c83d861b54e647c7c90fc93a54edcec89e08184977",
+          "source_metadata": {
+            "programs": [],
+            "stream_groups": [],
+            "streams": [
+              {
+                "codec_name": "pcm_s16le",
+                "sample_rate": "44100",
+                "channels": 1,
+                "bits_per_sample": 16
+              }
+            ],
+            "format": {
+              "duration": "1.433333",
+              "size": "127110"
+            }
+          },
+          "duration_seconds": 1.4333333333333333,
+          "starts_at_seconds": 0.4,
+          "ends_at_seconds": 1.8333333333333335,
+          "constant_gain_db": 2.2977520797690687,
+          "original_decoded_sample_peak_dbfs": -8.297752079769069
+        },
+        {
+          "state": "devastation",
+          "label_ru": "Опустошение",
+          "source": {
+            "title": "JC Sounds - Fantasy SFX Pack Vol 1",
+            "creator": "JC Sounds",
+            "page_url": "https://opengameart.org/content/jc-sounds-fantasy-sfx-pack-vol-1",
+            "download_url": "https://opengameart.org/sites/default/files/fantasy_sfx_pack_vol_1.7z",
+            "license": "CC-BY-4.0",
+            "license_url": "https://creativecommons.org/licenses/by/4.0/",
+            "attribution": "JC Sounds - Fantasy SFX Pack Vol 1 by JC Sounds; https://opengameart.org/content/jc-sounds-fantasy-sfx-pack-vol-1 ; CC BY 4.0 https://creativecommons.org/licenses/by/4.0/ . Audition edits: stereo/48 kHz conversion, per-clip constant gain to -6 dBFS sample peak, silence between clips, MP3 encoding. No trimming, layering, pitch change, or compression."
+          },
+          "original_file": "originals/jcsounds/Single_Fantasy SFX Pack Vol 1_Ice Spell_Buildup.wav",
+          "original_filename": "Single_Fantasy SFX Pack Vol 1_Ice Spell_Buildup.wav",
+          "original_sha256": "020ef632467120f17131c12e13a242b4285ca1bec10eaddd6757843901644ba9",
+          "source_metadata": {
+            "programs": [],
+            "stream_groups": [],
+            "streams": [
+              {
+                "codec_name": "pcm_s16le",
+                "sample_rate": "44100",
+                "channels": 1,
+                "bits_per_sample": 16
+              }
+            ],
+            "format": {
+              "duration": "1.200000",
+              "size": "106530"
+            }
+          },
+          "duration_seconds": 1.2,
+          "starts_at_seconds": 2.6333333333333337,
+          "ends_at_seconds": 3.833333333333334,
+          "constant_gain_db": 1.9443444122164768,
+          "original_decoded_sample_peak_dbfs": -7.944344412216477
+        },
+        {
+          "state": "berserk",
+          "label_ru": "Ярость",
+          "source": {
+            "title": "JC Sounds - Fantasy SFX Pack Vol 1",
+            "creator": "JC Sounds",
+            "page_url": "https://opengameart.org/content/jc-sounds-fantasy-sfx-pack-vol-1",
+            "download_url": "https://opengameart.org/sites/default/files/fantasy_sfx_pack_vol_1.7z",
+            "license": "CC-BY-4.0",
+            "license_url": "https://creativecommons.org/licenses/by/4.0/",
+            "attribution": "JC Sounds - Fantasy SFX Pack Vol 1 by JC Sounds; https://opengameart.org/content/jc-sounds-fantasy-sfx-pack-vol-1 ; CC BY 4.0 https://creativecommons.org/licenses/by/4.0/ . Audition edits: stereo/48 kHz conversion, per-clip constant gain to -6 dBFS sample peak, silence between clips, MP3 encoding. No trimming, layering, pitch change, or compression."
+          },
+          "original_file": "originals/jcsounds/Single_Fantasy SFX Pack Vol 1_Fireball_Buildup.wav",
+          "original_filename": "Single_Fantasy SFX Pack Vol 1_Fireball_Buildup.wav",
+          "original_sha256": "15f43d950d226436354678a241d85685fa627d6e91a2d39715bd235597376b36",
+          "source_metadata": {
+            "programs": [],
+            "stream_groups": [],
+            "streams": [
+              {
+                "codec_name": "pcm_s16le",
+                "sample_rate": "44100",
+                "channels": 1,
+                "bits_per_sample": 16
+              }
+            ],
+            "format": {
+              "duration": "1.200000",
+              "size": "106530"
+            }
+          },
+          "duration_seconds": 1.2,
+          "starts_at_seconds": 4.633333333333334,
+          "ends_at_seconds": 5.833333333333334,
+          "constant_gain_db": -0.4856575853815046,
+          "original_decoded_sample_peak_dbfs": -5.514342414618496
+        },
+        {
+          "state": "bloodlust",
+          "label_ru": "Жажда крови",
+          "source": {
+            "title": "JC Sounds - Fantasy SFX Pack Vol 1",
+            "creator": "JC Sounds",
+            "page_url": "https://opengameart.org/content/jc-sounds-fantasy-sfx-pack-vol-1",
+            "download_url": "https://opengameart.org/sites/default/files/fantasy_sfx_pack_vol_1.7z",
+            "license": "CC-BY-4.0",
+            "license_url": "https://creativecommons.org/licenses/by/4.0/",
+            "attribution": "JC Sounds - Fantasy SFX Pack Vol 1 by JC Sounds; https://opengameart.org/content/jc-sounds-fantasy-sfx-pack-vol-1 ; CC BY 4.0 https://creativecommons.org/licenses/by/4.0/ . Audition edits: stereo/48 kHz conversion, per-clip constant gain to -6 dBFS sample peak, silence between clips, MP3 encoding. No trimming, layering, pitch change, or compression."
+          },
+          "original_file": "originals/jcsounds/Loop_Fantasy Pack Vol 1_Dark Necromancy Chant_01.wav",
+          "original_filename": "Loop_Fantasy Pack Vol 1_Dark Necromancy Chant_01.wav",
+          "original_sha256": "57297aa868c441f87129be20a970c86d58c978bbb841924d483e7773b77a1039",
+          "source_metadata": {
+            "programs": [],
+            "stream_groups": [],
+            "streams": [
+              {
+                "codec_name": "pcm_s16le",
+                "sample_rate": "44100",
+                "channels": 2,
+                "bits_per_sample": 16
+              }
+            ],
+            "format": {
+              "duration": "6.000000",
+              "size": "1059090"
+            }
+          },
+          "duration_seconds": 6.0,
+          "starts_at_seconds": 6.633333333333334,
+          "ends_at_seconds": 12.633333333333333,
+          "constant_gain_db": -0.8754683904844187,
+          "original_decoded_sample_peak_dbfs": -5.124531609515582,
+          "integration_note": "The full six-second necromancy chant is included only to choose a timbre. It is a loop with a vocal/chant label; if selected, choose a short non-looping excerpt by listening and specify the edit. Do not install the whole loop automatically."
+        }
+      ],
+      "pcm_duration_seconds": 13.033333333333333
+    }
+  ],
+  "technical_validation": [
+    {
+      "file": "R1_Reactions_CC0.wav",
+      "sha256": "97e082258e4b58fac0488172c3af122c1b564272b467d137a04a98cf4f212ba1",
+      "bytes": 4477230,
+      "metadata": {
+        "programs": [],
+        "stream_groups": [],
+        "streams": [
+          {
+            "codec_name": "pcm_s24le",
+            "sample_rate": "48000",
+            "channels": 2,
+            "bits_per_sample": 24
+          }
+        ],
+        "format": {
+          "duration": "15.545583",
+          "size": "4477230"
+        }
+      },
+      "decoded_duration_seconds": 15.545583333333333,
+      "decoded_sample_peak_dbfs": -6.0000004906757844,
+      "non_finite_samples": 0,
+      "samples_at_or_above_full_scale": 0,
+      "heard_by_agent": false
+    },
+    {
+      "file": "R1_Reactions_CC0.mp3",
+      "sha256": "448ee99aa1cc1bb3de040eb7a6915838a23df8e995bde7e3553e2cde58c99d2f",
+      "bytes": 374444,
+      "metadata": {
+        "programs": [],
+        "stream_groups": [],
+        "streams": [
+          {
+            "codec_name": "mp3",
+            "sample_rate": "48000",
+            "channels": 2,
+            "bits_per_sample": 0
+          }
+        ],
+        "format": {
+          "duration": "15.576000",
+          "size": "374444"
+        }
+      },
+      "decoded_duration_seconds": 15.545583333333333,
+      "decoded_sample_peak_dbfs": -5.56895742103522,
+      "non_finite_samples": 0,
+      "samples_at_or_above_full_scale": 0,
+      "heard_by_agent": false
+    },
+    {
+      "file": "R2_Reactions_JCSounds_CC_BY_4.wav",
+      "sha256": "dda2e29dea83d2fbfd242758676884d31304b85262456f4f03fb9e8af23237f3",
+      "bytes": 3753702,
+      "metadata": {
+        "programs": [],
+        "stream_groups": [],
+        "streams": [
+          {
+            "codec_name": "pcm_s24le",
+            "sample_rate": "48000",
+            "channels": 2,
+            "bits_per_sample": 24
+          }
+        ],
+        "format": {
+          "duration": "13.033333",
+          "size": "3753702"
+        }
+      },
+      "decoded_duration_seconds": 13.033333333333333,
+      "decoded_sample_peak_dbfs": -5.99999842470403,
+      "non_finite_samples": 0,
+      "samples_at_or_above_full_scale": 0,
+      "heard_by_agent": false
+    },
+    {
+      "file": "R2_Reactions_JCSounds_CC_BY_4.mp3",
+      "sha256": "2db982855bb839193df6b5537cdb739be58f0434c8044d15ebdccebbef4a2064",
+      "bytes": 314540,
+      "metadata": {
+        "programs": [],
+        "stream_groups": [],
+        "streams": [
+          {
+            "codec_name": "mp3",
+            "sample_rate": "48000",
+            "channels": 2,
+            "bits_per_sample": 0
+          }
+        ],
+        "format": {
+          "duration": "13.080000",
+          "size": "314540"
+        }
+      },
+      "decoded_duration_seconds": 13.033333333333333,
+      "decoded_sample_peak_dbfs": -6.173958596668295,
+      "non_finite_samples": 0,
+      "samples_at_or_above_full_scale": 0,
+      "heard_by_agent": false
+    }
+  ]
+}

@@ -106,7 +106,7 @@ Durations below are **design targets**. Tune for clarity and responsiveness, not
 | Shame | A readable connection/pulse on the affected target when the stage actually matures; a warning preview before the deadline. |
 | Conversion | A short surface mask/dissolve changes the actual piece's army material and clears its old affliction details; it reforms in place without changing logical square or identity. Explain ownership and new movement direction. |
 | Self-removal | Quiet dissolution and an empty square; distinguish it from an enemy capture in the event log. |
-| Promotion | Smooth transformation/reveal after a legible chooser; the chosen kind is shown before a capture roll is revealed. |
+| Promotion | Three tiers: shared bishop/knight formation; a heavy rook landing and wave; a stronger queen landing with lightning and a deep branching fracture across 4–6 squares, followed by a complete fade out. The choice is committed and communicated before any capture roll; the mesh change follows the causal presentation stages. [Detailed staging](CINEMATIC_PROMOTIONS_AND_REACTIONS.md) |
 | Castling | King and rook animate coherently from one game command. |
 | Check / checkmate | A short surface impulse for check and a complete scene for mate, with a readable king, directed fragments, sound, and return to the board. [Staging brief](../prompts/IMPLEMENT_CHECK_AND_MATE.md) |
 
@@ -122,7 +122,7 @@ State tooltips use the shared localized names and brief functional explanations.
 
 ## Audio
 
-Fresh profiles enable effects after the first genuine user gesture. Preserve an explicitly stored mute, show a direct header mute control and a volume slider. Use the recorded [local CC0 sound bank](../public/assets/audio/manifest.json) for contact, capture, dice, states, healing, promotion, check and results. Bounce sounds use the same contact times as the rendered die. A committed action owns the audio output until the next action and has at most one expressive accent. Respect autoplay policies; never replay old sounds after restore, undo, review or a delayed gesture. Do not acquire background music or create an always-playing soundtrack for this version.
+Fresh profiles enable effects after the first genuine user gesture. Preserve an explicitly stored mute, show a direct header mute control and a volume slider. The existing [local CC0 sound bank](../public/assets/audio/manifest.json) remains available for contact, capture, dice, states, healing, promotion, check and results. New reaction/promotion recordings await the owner's choice in [REACTION_AND_PROMOTION_SFX.md](REACTION_AND_PROMOTION_SFX.md). Bounce sounds use the same contact times as the rendered die. A committed action owns an ordered presentation/audio plan: a capture reaction and a promotion must both be expressed in their own stages. Keep one coherent main accent at a time, with deliberate layers and tails; do not discard the reaction just because the same action promotes. Respect autoplay policies and deduplicate by action/stage; never replay old sounds after restore, undo, review or a delayed gesture. Do not acquire background music or create an always-playing soundtrack for this version. The new staging contract is [CINEMATIC_PROMOTIONS_AND_REACTIONS.md](CINEMATIC_PROMOTIONS_AND_REACTIONS.md).
 
 ## Performance and reliability
 
