@@ -37,7 +37,7 @@
 
 Для падения короля владелец выбрал сочетание E, G и D. Тяжёлый обвал E даёт основной удар, гул G держит низ, треск D добавляет каменный край. Три отрезка сведены в один голос на касании доски. Это 1700 мс в обычном мате, 1385 мс после превращения и 1430 мс в сокращённом режиме. [Рецепт сведения](../scripts/build-mate-showcase-mix.py) · [Spring Spring — Various Sound Effects, CC0](https://opengameart.org/content/various-sound-effects-0) · [DAEDAL — Cinematic Impacts, CC0](https://daedal.art/resources/cinematic-impacts/)
 
-Вылет осколков сопровождает стереозвук надлома камня. Через 45 мс начинается россыпь мелких сколов. Она затухает до посадки короля. В галерее можно сопоставить окончательный микс с семью вариантами A–G на одной сцене. [Послушать мат](http://127.0.0.1:4174/showcase/royal-auditions.html?scene=mate&sound=h) · [Breaking Rock — themightyglider / SoundCollectah, CC0](https://opengameart.org/content/breaking-rock) · [rubberduck — 75 breaking, falling and hit SFX, CC0](https://opengameart.org/content/75-cc0-breaking-falling-hit-sfx)
+У вылета осколков теперь звук короткого выброса давления. Низкий хлопок совпадает со вспышкой, затем уходит шипение пара. Микс E+G+D звучит отдельно при падении короля. В галерее можно сопоставить окончательный звук с семью вариантами A–G. [Послушать вариант H](http://127.0.0.1:4174/showcase/royal-auditions.html?scene=mate&sound=h) · [DAEDAL — Cinematic Impacts, CC0](https://daedal.art/resources/cinematic-impacts/) · [bart — Steam release sounds, CC0](https://opengameart.org/content/steam-release-sounds)
 
 ## Огонь ярости
 

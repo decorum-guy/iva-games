@@ -90,7 +90,7 @@
         "mateLanding": "E+G+D"
       },
       "recipe": "scripts/build-royal-showcase-mix.py",
-      "changes": "The selected steel hit retains its attack and adds stereo room decay. E, G and D play as one landing. The separate fragment release combines a fresh stereo fracture and scattered chips.",
+      "changes": "The selected steel hit retains its attack and adds stereo room decay. E, G and D play as one landing. A short punch and steam burst sound when the king sheds fragments.",
       "check": {
         "file": "showcase/royal-check.mp3",
         "bytes": 18476,
@@ -157,27 +157,21 @@
           "license": "CC0-1.0",
           "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/"
         },
-        "rockCrack": {
-          "author": "themightyglider",
-          "title": "rock_break.ogg",
-          "page": "https://opengameart.org/content/breaking-rock",
-          "download": "https://opengameart.org/sites/default/files/rock_break.ogg",
-          "sourceSha256": "b645f35d21194e7855dd4a5405b1e8e6bec070731b92df6abcb202676b8e9f2e",
+        "pressurePunch": {
+          "author": "DAEDAL",
+          "title": "DAEDAL_Impact_032_Punch.wav",
+          "page": "https://daedal.art/resources/cinematic-impacts/",
+          "download": "https://github.com/luciansofronie/daedal-downloads/releases/download/packs-v1/DAEDAL_Cinematic_Impacts.zip",
+          "sourceSha256": "78370e32192ec63cb3d5fb80b8f823f2b8b2a974bdb05dd758328867ff810dbd",
           "license": "CC0-1.0",
-          "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
-          "original": {
-            "author": "SoundCollectah",
-            "title": "stone falls and breaks low pitch.aiff",
-            "page": "https://freesound.org/people/SoundCollectah/sounds/109360/",
-            "license": "CC0-1.0"
-          }
+          "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/"
         },
-        "rockDebris": {
-          "author": "rubberduck",
-          "title": "bfh1_rock_falling_03.ogg",
-          "page": "https://opengameart.org/content/75-cc0-breaking-falling-hit-sfx",
-          "download": "https://opengameart.org/sites/default/files/sfx_breaking_and_falling.zip",
-          "sourceSha256": "16080f9bc90924b0e4ede52922529e30e34e72af32a505b39bdfc5ebcbb9248c",
+        "steamRelease": {
+          "author": "bart",
+          "title": "steam hisses - Marker #3.wav",
+          "page": "https://opengameart.org/content/steam-release-sounds",
+          "download": "https://opengameart.org/sites/default/files/steam_hisses.zip",
+          "sourceSha256": "f064442e7f7974f7f526f5d7dafc62015ea2d0ad7b1ca252e2841df4709ebe24",
           "license": "CC0-1.0",
           "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/"
         }
@@ -185,14 +179,14 @@
       "mateRecipe": "scripts/build-mate-showcase-mix.py",
       "mateFragments": {
         "file": "showcase/royal-mate-fragments.mp3",
-        "bytes": 11564,
-        "sha256": "c810f763bb7be00291f0426e4d471ae6216cf5c1978ad20a7118d0908c7a742f",
+        "bytes": 11614,
+        "sha256": "e32fb6bf40d19cee2e6edeeea843f03d944d33afc0372a906633fe5bf7ea066d",
         "playSeconds": 0.42,
         "reducedPlaySeconds": 0.36,
-        "changes": "Start the trimmed crack on the discharge. Add stone chips 45 ms later with a 10 ms spread across the channels. Pitch, filter, equalize, peak-limit and fade out the short voice.",
+        "changes": "Start a short filtered punch at discharge. Bring the steam in across the channels after 9 and 17 ms, fade quickly and keep a separate landing shortly afterward.",
         "sources": [
-          "rockCrack",
-          "rockDebris"
+          "pressurePunch",
+          "steamRelease"
         ]
       },
       "mateGround": {
