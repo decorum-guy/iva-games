@@ -33,16 +33,24 @@ describe('selected showcase playback', () => {
     })
   })
 
-  it.each([false, true])('gives the royal strike and landing separate recordings (reduced=%s)', reduced => {
+  it.each([false, true])('plays the selected steel strike and room tail (reduced=%s)', reduced => {
     const { stock, clips } = replaceShowcaseCues([
-      { kind: 'royalCheck', at: .243 }, { kind: 'royalGround', at: 1.62 },
+      { kind: 'royalCheck', at: .243 },
     ], buffers, undefined, undefined, false, reduced)
     expect(stock).toEqual([])
     const gain = reduced ? .73 : 1
     expect(clips).toMatchObject([
-      { buffer: buffers.get('royalCheck'), at: .243, duration: .42, gain },
-      { buffer: buffers.get('royalGround'), at: 1.62, duration: .92, gain },
+      { buffer: buffers.get('royalCheck'), at: .243, duration: reduced ? .57 : .70, gain },
     ])
+  })
+
+  it('keeps the existing mate audio while sound auditions are pending', () => {
+    const cues = [
+      { kind: 'royalCharge', at: .27 }, { kind: 'royalBreak', at: 1.03 }, { kind: 'royalEnd', at: 2.37 },
+    ] as const
+    const { stock, clips } = replaceShowcaseCues(cues, buffers, undefined, undefined, false)
+    expect(stock).toEqual(cues)
+    expect(clips).toEqual([])
   })
 
   it('uses the short chant and the requested per-state levels', () => {

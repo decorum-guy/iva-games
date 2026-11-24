@@ -85,23 +85,32 @@
       "fallback": "Original bank contacts at the same 40% level"
     },
     "royal": {
-      "sourceBank": "board.wav",
+      "selected": {
+        "check": "B"
+      },
       "recipe": "scripts/build-royal-showcase-mix.py",
-      "sourceNames": ["capture", "stone", "fracture"],
-      "changes": "CC0 contacts pitched and filtered, damped modal body and short stereo room reflections. One recording per point of contact.",
+      "changes": "The selected steel hit retains its audition attack and adds a stereo room tail. Mate alternatives are local sound comparisons.",
       "check": {
         "file": "showcase/royal-check.mp3",
-        "bytes": 11564,
-        "sha256": "bd05ec2d87b487a8d44b5598f49ed0121954c3db1fe2a1772753c70f30da92a4",
-        "playSeconds": 0.42,
-        "decodedPeakDbfs": -5.3
+        "bytes": 18476,
+        "sha256": "3f3b883640453780bb8d1de94640491d2661b38b4660d61916e284d60f670e17",
+        "playSeconds": 0.7,
+        "sources": [
+          "door"
+        ],
+        "reducedPlaySeconds": 0.57,
+        "roomPredelaySeconds": 0.02
       },
-      "mateGround": {
-        "file": "showcase/royal-mate-ground.mp3",
-        "bytes": 23660,
-        "sha256": "5ac5daea0a4420c23e23cc62ec345b61aa95d436f815eb4c70f7b8997dd00c59",
-        "playSeconds": 0.92,
-        "decodedPeakDbfs": -3.5
+      "sources": {
+        "door": {
+          "author": "Sandermotions",
+          "title": "Heavy steal door closing and locking.WAV",
+          "page": "https://freesound.org/people/Sandermotions/sounds/275441/",
+          "publicPreview": "https://cdn.freesound.org/previews/275/275441_1402315-hq.mp3",
+          "previewSha256": "bdd930f424ef02688fbd4c0f7632da0362f7df6e61bfa845337243c9e70e0bd5",
+          "license": "CC0-1.0",
+          "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/"
+        }
       }
     },
     "berserkIgnition": {

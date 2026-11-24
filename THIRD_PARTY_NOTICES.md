@@ -44,7 +44,7 @@ The installed R2 devastation and chant, the P2 formation and queen, and the P1/P
 
 The dice demos use trimmed, level-matched transient excerpts of the public CC0 previews by [aunrea](https://freesound.org/people/aunrea/sounds/485950/), [schoman3](https://freesound.org/people/schoman3/sounds/506914/), and [WallyDM](https://freesound.org/people/WallyDM/sounds/815672/). The runtime uses schoman3's D2 at the selected level of 40%. [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/).
 
-The authored check and mate contact recordings derive from the shipped CC0 stone bank. They pitch and filter stone, capture and fracture excerpts by mh2o, Wuzzy and SamsterBirdies, then add damped modal resonances, short stereo reflections and fades. [Sources and output hashes](public/assets/audio/manifest.json)
+The installed check sound uses **Heavy steal door closing and locking.WAV** by Sandermotions under CC0 1.0. The excerpt is trimmed, pitched, filtered and edited with a stereo room tail. The local check and mate comparisons list their additional CC0 sources on the page. [Original recording](https://freesound.org/people/Sandermotions/sounds/275441/) · [Source and output hash](public/assets/audio/manifest.json) · [Local comparisons](http://127.0.0.1:4174/showcase/royal-auditions.html)
 
 The installed berserk ignition combines **Whoosh.wav** by kingsrow and **Flame Burst** by magnuswaker. The public previews were trimmed, level-matched, filtered and mixed with fades and a short room return. [Whoosh.wav](https://freesound.org/people/kingsrow/sounds/181577/) · [Flame Burst](https://freesound.org/people/magnuswaker/sounds/592572/) · [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/)
 

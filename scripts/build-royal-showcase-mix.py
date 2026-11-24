@@ -1,110 +1,88 @@
 #!/usr/bin/env python3
-"""Make the check strike and mate landing from the shipped stone recordings."""
+"""Render the selected steel check from the CC0 source in the audio manifest."""
+import argparse
 from array import array
-import json
-from math import exp, sin, tau
+from math import sqrt
 from pathlib import Path
 import subprocess
 import sys
-import wave
 
-AUDIO = Path(__file__).resolve().parents[1] / 'public/assets/audio'
-RATE = 48_000
-WINDOWS = json.loads((AUDIO / 'manifest.json').read_text())['clipFrames']
+RATE = 48000
+DEFAULT_OUTPUT = Path(__file__).resolve().parents[1] / 'public/assets/audio/showcase/royal-check.mp3'
 
 
-def board_samples():
-    with wave.open(str(AUDIO / 'board.wav'), 'rb') as recording:
-        rate = recording.getframerate()
-        pcm = array('h')
-        pcm.frombytes(recording.readframes(recording.getnframes()))
+def silence(seconds):
+    return array('f', [0]) * round(seconds * RATE) * 2
+
+
+def add(output, samples, delay=0, gain=1):
+    offset = round(delay * RATE) * 2
+    for i, sample in enumerate(samples[:len(output) - offset]):
+        output[i + offset] += sample * gain
+
+
+def strike(path):
+    samples = array('f')
+    samples.frombytes(subprocess.check_output([
+        'ffmpeg', '-v', 'error', '-ss', '2.397', '-i', str(path),
+        '-af', f'aresample={RATE},asetrate=43680,aresample={RATE},highpass=f=110,lowpass=f=3650',
+        '-t', '0.32', '-ac', '2', '-ar', str(RATE), '-f', 'f32le', '-',
+    ]))
     if sys.byteorder != 'little':
-        pcm.byteswap()
-    return {name: (rate, [value / 32768 for value in pcm[start:start + length]])
-            for name, (start, length) in WINDOWS.items()}
+        samples.byteswap()
+    peak = max(map(abs, samples))
+    for i, sample in enumerate(samples):
+        head = (i + 1) / (RATE * 2 * .0018)
+        tail = (len(samples) - 1 - i) / (RATE * 2 * .093)
+        samples[i] = sample * min(1, max(0, head), max(0, tail))
+    dry = silence(.42)
+    add(dry, samples, .004, 1 / peak)
+    direct = dry[:]
+    add(dry, direct, .041, .052)
+    add(dry, direct, .079, .052 * .55)
+    peak = max(map(abs, dry))
+    return array('f', (sample * .74 / peak for sample in dry))
 
 
-def add_recording(sound, bank, name, delay, speed, gain, cutoff, highpass):
-    rate, source = bank[name]
-    start = round(delay * RATE)
-    stride = speed * rate / RATE
-    length = min(len(sound) - start, int((len(source) - 1) / stride))
-    low, floor = 0., 0.
-    top_step = 1 - exp(-tau * cutoff / RATE)
-    floor_step = 1 - exp(-tau * highpass / RATE)
-    for i in range(length):
-        source_frame = i * stride
-        left = int(source_frame)
-        fraction = source_frame - left
-        raw = source[left] * (1 - fraction) + source[left + 1] * fraction
-        low += (raw - low) * top_step
-        floor += (low - floor) * floor_step
-        edge = min(1., (i + 1) / (.0018 * RATE), (length - 1 - i) / (.014 * RATE))
-        sound[start + i] += (low - floor) * gain * edge
-
-
-def add_mode(sound, frequency, end, decay, level, delay=0.):
-    start = round(delay * RATE)
-    phase = 0.
-    for i in range(start, len(sound)):
-        t = (i - start) / RATE
-        f = end + (frequency - end) * exp(-t * 18)
-        phase += tau * f / RATE
-        sound[i] += sin(phase) * level * (1 - exp(-t * 338)) * exp(-t / decay)
-
-
-def stereo_room(sound, profile):
-    left = sound.copy()
-    right = sound.copy()
-    for channel, reflections in zip((left, right), profile):
-        for delay, gain in reflections:
-            frames = round(delay * RATE)
-            for i in range(frames, len(sound)):
-                channel[i] += gain * sound[i - frames]
-    return left, right
-
-
-def save(name, channels, peak):
-    left, right = channels
-    scale = peak / max(max(map(abs, left)), max(map(abs, right)))
-    length = len(left)
-    data = array('f')
-    for i, (l, r) in enumerate(zip(left, right)):
-        tail = min(1., (length - i - 1) / (.055 * RATE))
-        data.extend((l * scale * tail, r * scale * tail))
-    if sys.byteorder != 'little':
-        data.byteswap()
-    subprocess.run([
-        'ffmpeg', '-v', 'error', '-y', '-f', 'f32le', '-ar', str(RATE), '-ac', '2', '-i', '-',
-        '-codec:a', 'libmp3lame', '-b:a', '192k', str(AUDIO / 'showcase' / f'{name}.mp3'),
-    ], input=data.tobytes(), check=True)
+def steel_room(dry):
+    output = silence(.70)
+    add(output, dry)
+    for channel, delays in enumerate(((.030, .043, .052, .061), (.034, .047, .058, .067))):
+        source = output[channel::2]
+        combs = [[0.] * round(delay * RATE) for delay in delays]
+        damping = [0.] * len(combs)
+        wet = array('f')
+        predelay = round(.020 * RATE)
+        for i in range(len(source)):
+            excitation = source[i - predelay] if i >= predelay else 0.
+            sum_reflections = 0.
+            for j, comb in enumerate(combs):
+                index = i % len(comb)
+                reflection = comb[index]
+                damping[j] = .64 * reflection + .36 * damping[j]
+                comb[index] = excitation + (.76 - .035 * j) * damping[j]
+                sum_reflections += reflection / len(combs)
+            wet.append(sum_reflections)
+        scale = .51 * sqrt(sum(value * value for value in source) / sum(value * value for value in wet))
+        for i, value in enumerate(wet):
+            tail = min(1., (len(wet) - 1 - i) / (.104 * RATE))
+            output[2 * i + channel] += value * scale * tail
+    return output
 
 
 def main():
-    bank = board_samples()
-    check = [0.] * round(.42 * RATE)
-    add_recording(check, bank, 'capture', 0., .88, .73, 4700, 73)
-    add_recording(check, bank, 'stone', .006, .72, .22, 2100, 92)
-    add_recording(check, bank, 'fracture', .019, 1.04, .16, 2500, 160)
-    for f, decay, gain in ((161, .052, .14), (269, .070, .087), (431, .065, .034), (699, .040, .013)):
-        add_mode(check, f, f * .97, decay, gain, .003)
-    save('royal-check', stereo_room(check, (
-        ((.032, .092), (.073, .042)), ((.041, .088), (.088, .039)),
-    )), .56)
-
-    fall = [0.] * round(.92 * RATE)
-    add_recording(fall, bank, 'capture', 0., .64, .44, 2450, 45)
-    add_recording(fall, bank, 'stone', .008, .65, .25, 1460, 57)
-    add_recording(fall, bank, 'fracture', .032, .84, .24, 2150, 125)
-    for start, end, decay, gain, delay in (
-        (111, 49, .168, .45, .003), (159, 91, .122, .24, .006),
-        (231, 146, .096, .122, .009), (377, 277, .059, .047, .012),
-    ):
-        add_mode(fall, start, end, decay, gain, delay)
-    save('royal-mate-ground', stereo_room(fall, (
-        ((.041, .10), (.089, .053), (.147, .026)),
-        ((.052, .092), (.103, .048), (.169, .023)),
-    )), .69)
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('source', type=Path, help='local path to the Sandermotions public preview')
+    parser.add_argument('output', type=Path, nargs='?', default=DEFAULT_OUTPUT)
+    args = parser.parse_args()
+    samples = steel_room(strike(args.source))
+    if sys.byteorder != 'little':
+        samples.byteswap()
+    args.output.parent.mkdir(parents=True, exist_ok=True)
+    subprocess.run([
+        'ffmpeg', '-v', 'error', '-y', '-f', 'f32le', '-ar', str(RATE), '-ac', '2', '-i', '-',
+        '-c:a', 'libmp3lame', '-b:a', '192k', str(args.output),
+    ], input=samples.tobytes(), check=True)
 
 
 if __name__ == '__main__':

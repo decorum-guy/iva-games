@@ -11,7 +11,7 @@ const reactions = {
 
 type ReactionSound = keyof typeof reactions
 type PromotionSound = ReturnType<typeof promotionFamily>
-export type ShowcaseSound = ReactionSound | PromotionSound | 'dice' | 'berserkIgnite' | 'royalCheck' | 'royalGround'
+export type ShowcaseSound = ReactionSound | PromotionSound | 'dice' | 'berserkIgnite' | 'royalCheck'
 
 export const showcaseDice = { id: 'D2', level: .40 } as const
 
@@ -22,7 +22,7 @@ export const showcaseSources = {
   queen: 'auditions/promotion-p2-queen.mp3',
   dice: `dice-auditions/${showcaseDice.id.toLowerCase()}.mp3`,
   berserkIgnite: 'showcase/berserk-ignition-f1-f2.mp3',
-  royalCheck: 'showcase/royal-check.mp3', royalGround: 'showcase/royal-mate-ground.mp3',
+  royalCheck: 'showcase/royal-check.mp3',
 } as const satisfies Readonly<Record<ShowcaseSound, string>>
 
 export const QUEEN_SOUND_LEVEL = .90
@@ -45,7 +45,6 @@ export function showcaseSoundForCue(kind: CueKind, plan: ActionPlan | undefined)
   if (kind === 'dice') return 'dice'
   if (kind === 'berserkIgnite') return 'berserkIgnite'
   if (kind === 'check' || kind === 'royalCheck') return 'royalCheck'
-  if (kind === 'royalGround') return 'royalGround'
   if (isReactionSound(kind)) return kind
   if (plan?.promotion && promotionSounds.has(kind)) return promotionFamily(plan.promotion.event.promotion)
 }
@@ -97,8 +96,9 @@ export function replaceShowcaseCues(cues: readonly SceneCue[], buffers: Readonly
         fadeIn: .009, fadeOut: Math.min(.12, duration * .40) })
       continue
     }
-    if ((sound === 'royalCheck' || sound === 'royalGround') && buffer) {
-      clips.push({ buffer, at: cue.at, offset: 0, duration: Math.min(buffer.duration, sound === 'royalCheck' ? .42 : .92),
+    if (sound === 'royalCheck' && buffer) {
+      const length = reduced ? .57 : .70
+      clips.push({ buffer, at: cue.at, offset: 0, duration: Math.min(buffer.duration, length),
         gain: reduced ? .73 : 1, fadeIn: .003, fadeOut: .045 })
       continue
     }

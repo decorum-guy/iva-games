@@ -6,7 +6,7 @@ import { fireEvent } from './fireMotion'
 import { actionPlan, isCaptureReaction } from './actionPresentation'
 import type { ActionPlan, PromotionPlayback } from './actionPresentation'
 import { promotionFamily, promotionTiming } from './promotionMotion'
-import { mateGroundContact, royalTiming } from './royalMotion'
+import { royalTiming } from './royalMotion'
 import type { RoyalCue } from './royalMotion'
 import { reactionSoundLevel, replaceShowcaseCues, showcaseDice, showcaseSoundForCue, showcaseSources } from './showcaseSfx'
 import type { ShowcaseSound } from './showcaseSfx'
@@ -27,7 +27,7 @@ export type CueKind = 'move' | 'capture' | 'mercy' | 'friendlyCapture' | 'dice' 
   | 'promotionFormation' | 'promotionRookApproach' | 'promotionRookImpact'
   | 'promotionQueenApproach' | 'promotionQueenImpact' | 'promotionQueenFracture' | 'promotionQueenArc'
   | 'bonus' | 'check' | 'turn' | 'win' | 'loss' | 'draw' | 'finish' | RoyalSound
-type RoyalSound = 'royalCheck' | 'royalCharge' | 'royalBreak' | 'royalGround' | 'royalWin' | 'royalLoss' | 'royalEnd'
+type RoyalSound = 'royalCheck' | 'royalCharge' | 'royalBreak' | 'royalWin' | 'royalLoss' | 'royalEnd'
 
 export interface SceneCue {
   readonly kind: CueKind
@@ -189,23 +189,19 @@ const regular: Record<Exclude<CueKind, 'dice' | 'berserkIgnite' | RoyalSound>, S
   finish: { sample: 'capture', rate: .84, gain: .61 },
 }
 
-// The charge and release still use the recorded stone bank. Compact versions
-// of the two authored contacts cover a browser that cannot decode them.
+// The mate cues still use the recorded stone bank, which also covers a failed
+// steel check decode.
 const royalLayers = {
   royalCheck: [
     [0, { sample: 'capture', rate: .83, gain: .76 }],
     [.019, { sample: 'fracture', rate: .93, gain: .23 }],
   ],
   royalBreak: [
-    [0, { sample: 'capture', rate: .68, gain: .81 }],
-    [.009, { sample: 'fracture', rate: .80, gain: .56 }],
-    [.072, { sample: 'resonance', rate: .61, gain: .38 }],
-    [.190, { sample: 'stone', rate: .63, gain: .16 }],
-  ],
-  royalGround: [
-    [0, { sample: 'capture', rate: .48, gain: .85 }],
-    [.017, { sample: 'stone', rate: .54, gain: .34 }],
-    [.051, { sample: 'resonance', rate: .52, gain: .27 }],
+    [0, { sample: 'capture', rate: .68, gain: .92 }],
+    [.009, { sample: 'fracture', rate: .80, gain: .61 }],
+    [.024, { sample: 'diceEdge', rate: .84, gain: .41 }],
+    [.072, { sample: 'resonance', rate: .61, gain: .42 }],
+    [.190, { sample: 'stone', rate: .63, gain: .18 }],
   ],
   royalWin: [
     [0, { sample: 'resonance', rate: .98, gain: .39 }],
@@ -459,7 +455,7 @@ function renderCue(g: AudioGraph, kind: CueKind, when: number, reduced: boolean,
     source.start(when)
     return
   }
-  if (kind === 'royalCheck' || kind === 'royalBreak' || kind === 'royalGround' || kind === 'royalWin' || kind === 'royalLoss' || kind === 'royalEnd') {
+  if (kind === 'royalCheck' || kind === 'royalBreak' || kind === 'royalWin' || kind === 'royalLoss' || kind === 'royalEnd') {
     for (const [delay, layer] of royalLayers[kind]) {
       playContact(g, when + delay, reduced ? { ...layer, gain: layer.gain * .73 } : layer)
     }
@@ -600,7 +596,6 @@ export function playRoyalCue(cue: RoyalCue) {
     : [
       ...(cue.fromPromotion && !cue.reduced ? [] : [{ kind: 'royalCharge' as const, at: (impact - 760) / 1000 }]),
       { kind: 'royalBreak', at: impact / 1000 },
-      { kind: 'royalGround', at: mateGroundContact(cue) / 1000 },
       { kind: cue.tone === 'win' ? 'royalWin' : cue.tone === 'loss' ? 'royalLoss' : 'royalEnd', at: resolution / 1000 },
     ]
   return playBatch(`royal/${cue.id}`, cues, { reducedMotion: cue.reduced, startedAt: cue.startedAt })
