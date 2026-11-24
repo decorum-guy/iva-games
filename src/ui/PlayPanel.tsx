@@ -1,6 +1,5 @@
 import { Component, useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
-import { cyclesRemaining } from '../core';
 import type { Command, GameEvent, GameState, Piece } from '../core';
 import { countText, numberText } from '../i18n/catalog';
 import type { Locale, Translate } from '../i18n/catalog';
@@ -133,17 +132,18 @@ export function LessonPanel({ t, locale, learning, guide, blocked, rolling = fal
   const face = learning.session.record.actions[learning.session.record.cursor - 1]?.roll?.face;
   const moves = guide.filter(cmd => cmd.type === 'move');
   const forced = moves[0] && moves.every(move => move.from === moves[0].from && move.to === moves[0].to);
+  const endTurnOnly = step?.kind === 'move' && !moves.length && guide.some(command => command.type === 'endTurn');
   const read = step?.kind === 'read';
   const feedback = tutorialChoiceFeedback(learning, locale);
   const inspectedPiece = step?.kind === 'inspect' ? learning.session.state.pieces.find(piece => piece.square === step.square) : undefined;
-  const remaining = inspectedPiece ? cyclesRemaining(inspectedPiece, learning.session.state) : null;
+  const remaining = inspectedPiece ? effectTiming(inspectedPiece, learning.session.state).removal : null;
   const nextPosition = learning.position + 1 < lesson.positions.length;
   const finalRead = read && learning.index === lesson.positions[learning.position].steps.length - 1;
   const readAction = finalRead ? nextPosition ? 'tutorial.newPosition'
     : learning.lesson === LESSONS.length - 1 ? 'tutorial.finishAction' : 'tutorial.nextLesson' : 'tutorial.readAction';
   const actionTitle = !step ? 'tutorial.positionDone' : step.kind === 'read' ? 'tutorial.readCue' :
     step.kind === 'inspect' ? 'tutorial.selectCue' : step.kind === 'script' ? 'game.script' :
-      step.kind === 'illegal' ? 'tutorial.illegalCue' : 'tutorial.moveCue';
+      step.kind === 'illegal' ? 'tutorial.illegalCue' : endTurnOnly ? 'tutorial.endAction' : 'tutorial.moveCue';
   return <section className="lesson-panel" data-testid="tutorial" data-lesson={lesson.id}
     data-position={learning.position} data-step={beat ? `result:${learning.pendingTeaching!.stepId}:${beat.id}` : step?.id ?? phase}
     data-source-step={learning.pendingTeaching?.stepId} data-beat={beat?.id} data-kind={phase} aria-label={lesson.title[locale]}>
@@ -153,12 +153,12 @@ export function LessonPanel({ t, locale, learning, guide, blocked, rolling = fal
         {LESSONS.map((item, index) => <i key={item.id} className={index <= learning.lesson ? 'reached' : ''} />)}
       </div>
     </div>
-    <h2>{complete ? t('tutorial.finish') : resultVisible ? beat!.title[locale] : lesson.title[locale]}</h2>
-    {!complete && !resultVisible && <div className="lesson-action-label" role="status"><Icon name={read || inspected || !step ? 'check' : step.kind === 'inspect' ? 'info' : 'arrow'} />{t(rolling ? 'die.watch' : inspected ? 'tutorial.readCue' : actionTitle)}</div>}
+    <h2>{complete ? t('tutorial.finish') : resultVisible ? beat!.title[locale] : feedback ? t('tutorial.choiceResult') : lesson.title[locale]}</h2>
+    {!complete && !resultVisible && !feedback && <div className="lesson-action-label" role="status"><Icon name={read || inspected || !step ? 'check' : step.kind === 'inspect' ? 'info' : 'arrow'} />{t(rolling ? 'die.watch' : inspected ? 'tutorial.readCue' : actionTitle)}</div>}
     <p className="lesson-instruction" data-testid={resultVisible ? 'teaching-cause' : inspected ? 'counter-read' : feedback ? 'choice-feedback' : undefined}
       data-feedback={feedback?.kind} role={resultVisible ? 'status' : undefined}>{rolling ? t('die.rolling')
       : resultVisible ? beat!.text[locale]
-      : inspected && remaining !== null ? t('tutorial.counterRead', { count: countText(locale, 'cycle', remaining) })
+      : inspected && remaining !== null ? t('tutorial.counterRead', { count: countText(locale, 'turn', remaining) })
         : complete ? t('tutorial.finishDetail') : feedback?.text ?? step?.text[locale] ?? t('tutorial.positionDoneDetail')}</p>
     {resultVisible && beat?.rule && <p className="lesson-rule" data-testid="teaching-rule">{beat.rule[locale]}</p>}
     {feedback?.rule && <p className="lesson-rule" data-testid="choice-rule">{feedback.rule}</p>}
@@ -174,8 +174,6 @@ export function LessonPanel({ t, locale, learning, guide, blocked, rolling = fal
     </div>}
     {!rolling && !inspected && step?.kind === 'inspect' && <div className="lesson-target">{t('tutorial.inspect', { square: step.square })}</div>}
     {!rolling && forced && !complete && <div className="lesson-target">{t('tutorial.try', { from: moves[0].from, to: moves[0].to })}</div>}
-    {!rolling && step?.kind === 'move' && !moves.length && guide.some(command => command.type === 'endTurn') &&
-      <div className="lesson-target">{t('tutorial.endAction')}</div>}
     {complete ? <div className="lesson-actions">
       <button type="button" className="button primary" onClick={onHandoff} disabled={blocked} data-testid="lesson-continue">
         <span>{t('tutorial.continue')}<small>{t('tutorial.continueDetail')}</small></span><Icon name="arrow" />

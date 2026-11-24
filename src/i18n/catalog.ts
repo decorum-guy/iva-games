@@ -3,7 +3,7 @@ type Pair = readonly [ru: string, en: string];
 
 export const messages = {
   'home.title': ['Шахматы с характером', 'Chess with consequences'],
-  'home.prompt': ['Цель — мат. Взятия могут вызвать вину, опустошение или ярость: реакцию определяет кубик, и фигура её запоминает. Вина запрещает брать; ярость после взятия даёт ещё одно действие той же фигурой. Слоны лечат своих и обращают чужих.', 'The goal is checkmate. Captures can bring guilt, devastation, or berserk: a die sets the reaction, and the piece remembers it. Guilt prevents captures; a berserk capture earns the same piece one extra action. Bishops heal allies and convert enemies.'],
+  'home.prompt': ['Цель — мат. Взятие может вызвать вину, опустошение или ярость. Реакцию определяет кубик, и фигура её запоминает. Вина запрещает взятия. В ярости взятие первым действием даёт той же фигуре ещё одно. Слоны лечат своих и обращают чужих.', 'The goal is checkmate. A capture can cause guilt or devastation, or send a piece berserk. A die sets the reaction, and the piece remembers it. Guilt prevents captures. A berserk piece that captures on its first action earns one extra action. Bishops heal allies and convert enemies.'],
   'home.playAI': ['Играть с ИИ', 'Play against AI'],
   'home.hotseat': ['Играть вдвоём', 'Two players'],
   'home.learn': ['Пройти обучение', 'Start tutorial'],
@@ -199,6 +199,7 @@ export const messages = {
   'tutorial.progress': ['Урок {current} из {total}', 'Lesson {current} of {total}'],
   'tutorial.newPosition': ['Следующий пример', 'Next example'],
   'tutorial.nextLesson': ['Следующий урок', 'Next lesson'],
+  'tutorial.choiceResult': ['Что изменил ваш ход', 'What your move changed'],
   'tutorial.positionDone': ['Получилось!', 'Well done!'],
   'tutorial.positionDoneDetail': ['Этот пример завершён. Можно идти дальше.', 'This example is complete. You can move on.'],
   'tutorial.readCue': ['Посмотрите результат', 'See what changed'],
@@ -224,7 +225,7 @@ export const messages = {
   'tutorial.repeat': ['Повторить объяснение', 'Repeat explanation'],
   'tutorial.practice': ['Учебная партия не меняет рейтинг.', 'Tutorial games leave your rating unchanged.'],
   'tutorial.inspect': ['Нажмите на фигуру {square}', 'Tap the piece on {square}'],
-  'tutorial.counterRead': ['До исчезновения: {count}. Один цикл — ход белых и ход чёрных.', 'Until removal: {count}. One cycle is a White turn and a Black turn.'],
+  'tutorial.counterRead': ['До исчезновения {count}. Значок показывает циклы, считая неполный за целый. За цикл ходят обе стороны.', '{count} until removal. The badge counts cycles, including a partial cycle. Both sides move once per cycle.'],
   'tutorial.try': ['Ход: {from} → {to}', 'Move: {from} → {to}'],
   'common.loading': ['Открываем партию', 'Opening game'],
   'error.finished': ['Партия завершена.', 'The game is over.'],

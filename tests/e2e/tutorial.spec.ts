@@ -2,7 +2,7 @@ import { expect, test } from './fixtures'
 import type { Locator, Page, Route } from '@playwright/test'
 import { createInitialState } from '../../src/core'
 import type { Command } from '../../src/core/types'
-import { translator } from '../../src/i18n/catalog'
+import { countText, translator } from '../../src/i18n/catalog'
 import type { MatchRecord } from '../../src/session/match'
 import { nextDie } from '../../src/session/random'
 import { restoreMatch } from '../../src/session/save'
@@ -139,7 +139,7 @@ async function setSecondaryDetails(page: Page, open: boolean) {
   await expect(toggle).toHaveAttribute('aria-expanded', String(open))
 }
 
-async function verifyContinuation(page: Page, locale: 'en' | 'ru', mobile: boolean) {
+async function verifyContinuation(page: Page, locale: 'en' | 'ru', mobile: boolean, helpedKnight: boolean) {
   const state = playfield(page)
   const initialProfile = await recorded(page, 'profiles', 'local')
   const training = await recorded<ReturnType<typeof saveLearning>>(page, 'learning', 'progress')
@@ -157,6 +157,16 @@ async function verifyContinuation(page: Page, locale: 'en' | 'ru', mobile: boole
   expect(handoff.root).toEqual(snapshot.state)
   expect(handoff.rootLedger.map(event => event.victim.square)).toEqual(['c5'])
   expect(handoff.actions).toHaveLength(0)
+  const knight = handoff.root.pieces.find(piece => piece.square === 'c3')!
+  await activate(square(page, knight.square), mobile)
+  const inspector = page.getByTestId('inspector')
+  const t = translator(locale)
+  await expect(inspector).toHaveAttribute('data-compact', 'true')
+  await expect(inspector).toHaveAttribute('data-state', 'devastated')
+  await expect(inspector).toContainText(t('game.removalDue', { count: countText(locale, 'turn', 2) }))
+  const healing = inspector.getByText(t('game.cureDue', { count: countText(locale, 'turn', 1) }), { exact: true })
+  if (helpedKnight) await expect(healing).toBeVisible()
+  else await expect(healing).toHaveCount(0)
 
   // Delay only module loading, then let the actual worker complete and submit its command.
   let releaseWorker = () => {}
@@ -195,6 +205,9 @@ async function verifyContinuation(page: Page, locale: 'en' | 'ru', mobile: boole
   const played = await recorded<MatchRecord>(page, 'matches', id)
   expect(played.actions.some(action => action.actor === 'black')).toBe(true)
   expect(played.actions.filter(action => action.actor === 'white' && action.command.type === 'move')).toHaveLength(1)
+  expect(restoreMatch(played).events).toContainEqual(expect.objectContaining({
+    type: helpedKnight ? 'cure' : 'remove', piece: expect.objectContaining({ id: knight.id }),
+  }))
   expect(await recorded<ReturnType<typeof saveLearning>>(page, 'learning', 'progress')).toEqual(training)
   expect(await recorded(page, 'profiles', 'local')).toEqual(initialProfile)
   await changeLanguage(page, locale)
@@ -313,6 +326,7 @@ for (const locale of ['ru', 'en'] as const) {
     test('plays every lesson, restores mid-way, continues against the worker and starts a clean game', async ({ page }, testInfo) => {
       test.setTimeout(100_000)
       const mobile = locale === 'en' || testInfo.project.name === 'webkit'
+      const helpedKnight = testInfo.project.name === 'chromium'
       await page.setViewportSize(mobile ? { width: 360, height: 800 } : { width: 1280, height: 800 })
       const errors: string[] = []
       page.on('pageerror', error => errors.push(error.message))
@@ -355,9 +369,14 @@ for (const locale of ['ru', 'en'] as const) {
             }
             await expect(tutorial(page)).toHaveAttribute('data-step', step.id)
             if (step.id === 'practice-ready') {
-              await expect(page.getByTestId('choice-feedback')).toHaveAttribute('data-feedback', 'unassisted')
-              await expect(page.getByTestId('choice-feedback')).toContainText(locale === 'ru'
-                ? 'после хода белых и ответа чёрных' : 'after White’s turn and Black’s reply')
+              const result = page.getByTestId('choice-feedback')
+              await expect(result).toHaveAttribute('data-feedback', helpedKnight ? 'healing' : 'unassisted')
+              if (helpedKnight) {
+                await expect(result).toContainText(locale === 'ru' ? 'после следующего хода белых' : 'after White’s next turn')
+                await expect(page.getByTestId('choice-rule')).toContainText(countText(locale, 'turn', 2))
+              } else {
+                await expect(result).toContainText(locale === 'ru' ? 'после хода белых и ответа чёрных' : 'after White’s turn and Black’s reply')
+              }
             } else {
               await expect(tutorial(page).getByText(step.text[locale], { exact: true })).toBeVisible()
             }
@@ -406,7 +425,7 @@ for (const locale of ['ru', 'en'] as const) {
             }
 
             if (step.kind === 'move') {
-              const command = step.moves === 'open' ? move('a1', 'a2') : step.moves[0]
+              const command = step.moves === 'open' ? helpedKnight ? move('f1', 'd3') : move('a1', 'a2') : step.moves[0]
               if (step.id === 'open-with-e4' && !mobile) {
                 const board = page.locator('.board-stage')
                 await board.focus()
@@ -529,7 +548,7 @@ for (const locale of ['ru', 'en'] as const) {
       await expect(tutorial(page)).toHaveAttribute('data-step', 'complete')
       expect(await boardIdentity(page)).toEqual(completed)
 
-      await verifyContinuation(page, locale, mobile)
+      await verifyContinuation(page, locale, mobile, helpedKnight)
       await page.getByTestId('leave-game').click()
       await page.getByTestId('mode-learn').click()
       await expect(tutorial(page)).toHaveAttribute('data-step', 'complete')

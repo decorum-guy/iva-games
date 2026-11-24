@@ -85,8 +85,8 @@ const lessonPositions: readonly Lesson[] = [
           id: 'guilt-roll', kind: 'move', moves: [move('c3', 'c4')], roll: fixed(2, 'c3', 'c4'),
           expect: (_, state) => at(state, 'c4')?.affliction === 'guilt' && !isInCheck(state, 'black'),
           text: copy(
-            'Фигура может пожалеть о взятии — это вина. Возьмите пешку ладьёй и посмотрите, что произойдёт.',
-            'A piece may regret a capture — that is guilt. Take the pawn with your rook and see what happens.',
+            'В новой позиции возьмите пешку ладьёй и посмотрите, как фигура может пожалеть о взятии.',
+            'In this new position, take the pawn with your rook to see how a piece can come to regret a capture.',
           ),
           detail: copy(
             'Возьмите пешку ладьёй с c3 на c4. Виноватая фигура может ходить, но не может брать фигуры и шаховать.',
@@ -144,8 +144,8 @@ const lessonPositions: readonly Lesson[] = [
             id: 'devastation-roll', kind: 'move', moves: [move('c3', 'c4')], roll: fixed(1, 'c3', 'c4'),
             expect: (_, state) => at(state, 'c4')?.devastationDue === state.turnSerial + 6,
             text: copy(
-              'Бывает, фигура не может пережить взятие — это опустошение. Возьмите пешку ладьёй.',
-              'Sometimes a piece cannot bear a capture — that is devastation. Take the pawn with your rook.',
+              'В новой позиции возьмите пешку ладьёй. Иногда фигура тяжело переживает взятие и впадает в опустошение.',
+              'In this new position, take the pawn with your rook. A capture can be too much for a piece and leave it devastated.',
             ),
             detail: copy(
               'Ладьёй с c3 возьмите пешку на c4. При единице фигура впадает в опустошение.',
@@ -278,8 +278,8 @@ const lessonPositions: readonly Lesson[] = [
             expect: (_, state) => at(state, 'e4')?.cureArmedAt === state.turnSerial
               && at(state, 'f4')?.cureArmedAt === state.turnSerial,
             text: copy(
-              'Слон лечит своих соседей. Подведите его к ладье с виной и опустошённому коню.',
-              'A bishop heals nearby allies. Bring it beside the guilty rook and the devastated knight.',
+              'В новой позиции подведите слона к ладье с виной и опустошённому коню. Слон лечит своих соседей.',
+              'In this new position, bring your bishop beside the guilty rook and the devastated knight. Bishops heal nearby allies.',
             ),
             detail: copy(
               'Слон помогает всем своим фигурам на восьми соседних клетках, включая диагональные. Пока он их лечит, вы можете ходить другими фигурами.',
@@ -389,8 +389,8 @@ const lessonPositions: readonly Lesson[] = [
             expect: (_, state) => at(state, 'e4')?.shameArmedAt === state.turnSerial
               && at(state, 'd4')?.shameArmedAt === null,
             text: copy(
-              'Свой слон лечит, а чужой вызывает стыд. Подведите вашего слона к чёрной ладье.',
-              'A friendly bishop heals; an enemy bishop causes shame. Bring your bishop beside the black rook.',
+              'В новой позиции подведите своего слона к чёрной ладье. Рядом с чужим слоном фигура испытывает стыд.',
+              'In this new position, bring your bishop beside the black rook. A piece feels shame next to an enemy bishop.',
             ),
             detail: copy(
               'Стыд действует и на фигуру с запомненной реакцией «Без изменений»: 4–5 относится только к её собственным взятиям. Король, ярость и жажда крови невосприимчивы к стыду.',
@@ -561,8 +561,8 @@ const lessonPositions: readonly Lesson[] = [
           expect: (events, state) => events.filter(event => event.type === 'cure' && event.cause === 'rally').length === 2
             && at(state, 'h3')?.affliction === 'berserk' && at(state, 'f1')?.affliction === 'guilt',
           text: copy(
-            'Король помогает своим соседям сразу, без ожидания. Подведите его к ладье и коню.',
-            'A king helps nearby allies immediately. Bring it beside the rook and knight.',
+            'В новой позиции подведите короля к ладье и коню. Король помогает соседним союзникам сразу.',
+            'In this new position, bring the king beside the rook and knight. The king helps neighboring allies immediately.',
           ),
           detail: copy(
             'Помощь короля действует на восемь соседних клеток, как у слона, но ждать цикл не нужно. Можно подвести короля к фигуре или саму фигуру к королю. Чужие фигуры и ярость остаются без изменений.',
@@ -614,8 +614,8 @@ const lessonPositions: readonly Lesson[] = [
           expect: (events, state) => at(state, 'd2')?.capturesSinceRebirth === 1
             && !events.some(event => event.type === 'reaction'),
           text: copy(
-            'Конь обучен бою. Возьмите им первую пешку — за такое первое взятие кубик не нужен.',
-            'The knight is trained for battle. Take its first pawn; a first capture like this needs no roll.',
+            'В новой позиции возьмите пешку конём. Конь обучен бою, поэтому за такое первое взятие кубик не нужен.',
+            'In this new position, take the pawn with your knight. Knights are trained for battle, so a first capture like this needs no roll.',
           ),
           detail: copy(
             'Льгота действует только на первое взятие коня. Милосердное тоже засчитывается первым. Взятие слона всё равно вызывает опустошение, как в уроке о слонах.',
@@ -729,8 +729,8 @@ const lessonPositions: readonly Lesson[] = [
               && at(state, 'g8')?.affliction === 'guilt' && at(state, 'g8')?.captureReaction === 'guilt'
               && at(state, 'g8')?.capturesSinceRebirth === 2,
             text: copy(
-              'Доведите пешку до последней горизонтали и выберите ферзя, ладью или коня. Сохранится ли её вина?',
-              'Advance the pawn to the last rank and choose a queen, rook, or knight. Will its guilt remain?',
+              'В новой позиции доведите пешку до последней горизонтали и выберите ферзя, ладью или коня. Сохранится ли её вина?',
+              'In this new position, advance the pawn to the last rank and choose a queen, rook, or knight. Will its guilt remain?',
             ),
             detail: copy(
               'Эта пешка уже взяла две фигуры и запомнила вину. Ферзь, ладья и конь сохранят её состояние, реакцию и число взятий. У коня первое взятие бывает без броска только при нулевом счёте и ещё не определённой реакции.',

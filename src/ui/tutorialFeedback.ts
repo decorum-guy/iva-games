@@ -60,10 +60,12 @@ export function tutorialChoiceFeedback(learning: Learning, locale: Locale): Choi
     rule: locale === 'ru' ? `Конь исчезнет раньше — ${expiry}, если его не спасти другим способом.`
       : `The knight will disappear first, ${expiry}, unless it is saved another way.`,
   };
+  const nextSide = state.side === 'white' ? 'белых' : 'чёрных';
+  const nextSideEn = state.side === 'white' ? 'White' : 'Black';
   return {
     kind: cure === removal ? 'last-moment-healing' : 'healing',
-    text: locale === 'ru' ? `Слон начал лечить коня ${knight.square}. Если они останутся рядом, конь восстановится ${healing}.`
-      : `The bishop has started healing the knight on ${knight.square}. If they stay next to each other, the knight will recover ${healing}.`,
+    text: locale === 'ru' ? `Слон начал лечить коня ${knight.square}. Сейчас ход ${nextSide}. Если слон останется рядом, конь исцелится ${healing}.`
+      : `The bishop has started healing the knight on ${knight.square}. ${nextSideEn} moves next. Keep them together and the knight will recover ${healing}.`,
     rule: cure === removal
       ? locale === 'ru' ? 'Исцеление сработает в последний момент и спасёт коня от исчезновения.'
         : 'The cure will finish at the deadline and save the knight from disappearing.'

@@ -60,10 +60,12 @@ test('live 3D hotseat accepts pointer input, flips and recovers the same game af
   expect(id).not.toBe('preview')
 
   if (hasTouch) {
-    for (const square of ['b1', 'c3']) {
-      const { x, y } = await cellCenter(canvas, square)
-      await page.touchscreen.tap(x, y)
-    }
+    const from = await cellCenter(canvas, 'b1')
+    const to = await cellCenter(canvas, 'c3')
+    await page.touchscreen.tap(from.x, from.y)
+    await expect(page.getByTestId('inspector')).toContainText('b1')
+    expect(await cellCenter(canvas, 'c3')).toEqual(to)
+    await page.touchscreen.tap(to.x, to.y)
   } else {
     const from = await cellCenter(canvas, 'b1')
     const to = await cellCenter(canvas, 'c3')

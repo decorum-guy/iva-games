@@ -33,6 +33,7 @@ describe('feedback for the final free decision', () => {
     const ru = tutorialChoiceFeedback(learning, 'ru')!
     expect(ru.kind).toBe('healing')
     expect(ru.text).toContain('Слон начал лечить коня c3')
+    expect(ru.text).toContain('Сейчас ход белых')
     expect(ru.text).toContain('после следующего хода белых')
     expect(ru.rule).toContain('2 хода игроков')
     expect(tutorialChoiceFeedback(learning, 'en')?.text).toContain('after White’s next turn')

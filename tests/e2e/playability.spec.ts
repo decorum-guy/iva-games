@@ -2,7 +2,7 @@ import { expect, test } from './fixtures'
 import type { Locator, Page } from '@playwright/test'
 import { createPosition } from '../../src/core'
 import type { Affliction, DieFace, Side } from '../../src/core'
-import { translator } from '../../src/i18n/catalog'
+import { countText, translator } from '../../src/i18n/catalog'
 import { createMatch } from '../../src/session/match'
 import type { MatchRecord } from '../../src/session/match'
 import { nextDie } from '../../src/session/random'
@@ -206,6 +206,44 @@ for (const viewport of [
   })
 }
 
+test('phone layouts keep a recorded roll, the bonus action and both selected-piece deadlines visible in either language', async ({ page }) => {
+  await page.setViewportSize({ width: 568, height: 320 })
+  await open(page, 'ru')
+  const seed = Array.from({ length: 100 }, (_, n) => n).find(n => nextDie(n).face === 6)!
+  const match = createMatch(hotseat, { seed, root: createPosition({ pieces: [
+    { side: 'white', type: 'king', square: 'h1' }, { side: 'black', type: 'king', square: 'a8' },
+    { side: 'white', type: 'rook', square: 'c3' }, { side: 'black', type: 'pawn', square: 'c4' },
+    { side: 'white', type: 'knight', square: 'c6', affliction: 'devastated' }, { side: 'white', type: 'bishop', square: 'd6' },
+  ] }) })
+  const captured = match.submit(match.envelope(move('c3', 'c4')), 'human')
+  await restoreGame(page, captured.record)
+  await expect(playfield(page)).toHaveAttribute('data-phase', 'bonus')
+  await cell(page, 'c6').tap()
+  const timers = page.getByTestId('inspector').locator('.inspector-timers')
+  const end = page.getByTestId('end-turn')
+  for (const [width, height] of [[568, 320], [844, 390], [360, 800], [390, 844]]) {
+    await page.setViewportSize({ width, height })
+    for (const locale of ['ru', 'en'] as const) {
+      await page.getByTestId(`lang-${locale}`).tap()
+      const t = translator(locale)
+      await expect(timers.getByText(t('game.removalDue', { count: countText(locale, 'turn', 6) }), { exact: true })).toBeInViewport({ ratio: 1 })
+      await expect(timers.getByText(t('game.cureDue', { count: countText(locale, 'turn', 2) }), { exact: true })).toBeInViewport({ ratio: 1 })
+      await expect(page.getByTestId('roll')).toBeInViewport({ ratio: 1 })
+      await expect(page.locator('.flat-board')).toBeInViewport({ ratio: 1 })
+      await visibleAction(end)
+      await noDocumentScroll(page)
+    }
+  }
+  await page.setViewportSize({ width: 568, height: 320 })
+  await page.getByTestId('lang-ru').tap()
+  await end.tap()
+  await ready(page)
+  await expect(playfield(page)).toHaveAttribute('data-turn', '1')
+  const t = translator('ru')
+  await expect(timers.getByText(t('game.removalDue', { count: countText('ru', 'turn', 5) }), { exact: true })).toBeVisible()
+  await expect(timers.getByText(t('game.cureDue', { count: countText('ru', 'turn', 1) }), { exact: true })).toBeVisible()
+})
+
 test('sound starts enabled and remembers both mute and the selected volume', async ({ page }) => {
   await open(page)
   const sound = page.getByTestId('sound-toggle')
@@ -336,11 +374,13 @@ test('real captures by either side show the committed 3D die in 2D, without repl
 test('the short introduction explains reactions, the die and bishops in both languages', async ({ page }) => {
   await open(page, 'ru')
   const intro = page.getByTestId('home-introduction')
-  await expect(intro).toContainText('кубик')
-  await expect(intro).toContainText('слоны')
+  await expect(intro).toContainText(/кубик.*фигура её запоминает/i)
+  await expect(intro).toContainText(/ярости взятие первым действием/i)
+  await expect(intro).toContainText(/слоны лечат/i)
   await page.getByTestId('lang-en').click()
-  await expect(intro).toContainText('a die decides its reaction')
-  await expect(intro).toContainText('bishops can heal')
+  await expect(intro).toContainText(/a die sets the reaction.*the piece remembers/i)
+  await expect(intro).toContainText(/berserk piece that captures on its first action/i)
+  await expect(intro).toContainText(/bishops heal/i)
   await expect(page.getByTestId('mode-ai')).toBeVisible()
 })
 
