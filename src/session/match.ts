@@ -77,6 +77,7 @@ export interface GameTransport {
 }
 
 export type SessionCode = RejectionCode | 'stale' | 'ratedLocked' | 'invalidSave' | 'storage'
+  | 'storageTimeout' | 'storageBlocked' | 'storageClosed' | 'practiceCopied'
   | 'ratedOccupied' | 'tutorialChoice' | 'tutorialBroken' | 'workerFailed' | 'noUndo' | 'noRedo';
 
 export class SessionError extends Error {

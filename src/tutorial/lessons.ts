@@ -305,8 +305,8 @@ const lessonPositions: readonly Lesson[] = [
               'Move your king, leaving the bishop beside the rook and knight. This completes the healing cycle.',
             ),
             detail: copy(
-              'Сходите королём на g1. Через полный цикл слон снимет и вину ладьи, и опустошение коня.',
-              'Move your king to g1. After a full cycle the bishop clears both the rook’s guilt and the knight’s devastation.',
+              'Сходите королём на g1. Этот ход завершит цикл: слон снимет вину ладьи и опустошение коня.',
+              'Move your king to g1. This move completes the healing cycle, clearing the rook’s guilt and the knight’s devastation.',
             ),
           },
           {

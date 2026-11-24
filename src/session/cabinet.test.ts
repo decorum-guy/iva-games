@@ -1,4 +1,5 @@
 import 'fake-indexeddb/auto'
+import { forceCloseDatabase } from 'fake-indexeddb'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPosition } from '../core'
 import type { Command } from '../core'
@@ -15,6 +16,7 @@ import { exportMatch } from './save'
 
 const hotseat = { mode: 'hotseat', human: null, level: null, provenance: 'standard' } as const
 const move = (from: string, to: string): Command => ({ type: 'move', from, to })
+const realOpenGameStore = database.openGameStore
 
 class TestWorker {
   static instances: TestWorker[] = []
@@ -37,6 +39,8 @@ class TestWorker {
 let store: database.GameStore
 let cabinet: Cabinet
 let cabinets: Cabinet[]
+let databaseName: string
+let extraStores: database.GameStore[]
 
 beforeEach(async () => {
   // Keep fake IndexedDB's real asynchronous tasks; control only presentation/worker deadlines.
@@ -49,7 +53,9 @@ beforeEach(async () => {
   vi.stubGlobal('BroadcastChannel', undefined)
   vi.stubGlobal('Worker', TestWorker)
   TestWorker.instances = []
-  store = await database.openGameStore(`cabinet-audio-${crypto.randomUUID()}`)
+  databaseName = `cabinet-audio-${crypto.randomUUID()}`
+  extraStores = []
+  store = await realOpenGameStore(databaseName)
   vi.spyOn(database, 'openGameStore').mockResolvedValue(store)
   cabinet = new Cabinet()
   cabinets = [cabinet]
@@ -60,6 +66,7 @@ beforeEach(async () => {
 afterEach(async () => {
   for (const current of cabinets) await current.home()
   store.close()
+  for (const connection of extraStores) connection.close()
   vi.clearAllTimers()
   vi.useRealTimers()
   vi.restoreAllMocks()
@@ -97,6 +104,19 @@ function until(current: Cabinet, predicate: () => boolean) {
 
 async function finishMotion() {
   await vi.advanceTimersByTimeAsync(2000)
+}
+
+async function savedLearning() {
+  const connection = await realOpenGameStore(databaseName)
+  try { return await connection.getLearning() } finally { connection.close() }
+}
+
+function enableRealRecovery() {
+  vi.mocked(database.openGameStore).mockImplementation(async (_name, options) => {
+    const connection = await realOpenGameStore(databaseName, options)
+    extraStores.push(connection)
+    return connection
+  })
 }
 
 describe('Cabinet live audio delivery', () => {
@@ -144,20 +164,25 @@ describe('Cabinet live audio delivery', () => {
     expect(ids).toHaveLength(1)
   })
 
-  it('starts committed presentation without waiting for a slow overview refresh', async () => {
+  it('unlocks a committed move while an obsolete overview is still pending', async () => {
     await cabinet.startGame(hotseat)
-    const overview = store.overview.bind(store)
+    const oldOverview = await store.overview()
     let release!: () => void
     const gate = new Promise<void>(resolve => { release = resolve })
-    vi.spyOn(store, 'overview').mockImplementationOnce(async () => { await gate; return overview() })
-    const displayed = until(cabinet, () => cabinet.getSnapshot().game?.record.cursor === 1)
-    const action = cabinet.command(move('e2', 'e4'))
-    await displayed
-    expect(cabinet.getSnapshot().busy).toBe(true)
+    const oldRefresh = gate.then(() => oldOverview)
+    vi.spyOn(store, 'overview').mockReturnValueOnce(oldRefresh)
+    expect(await cabinet.command(move('e2', 'e4'))).toBe(true)
+    expect(cabinet.getSnapshot().busy).toBe(false)
     expect(cabinet.getSnapshot().animating).toBe(true)
     expect(cabinet.getSnapshot().audioCue?.events).toEqual(cabinet.getSnapshot().game?.current.events)
+    await finishMotion()
+    expect(await cabinet.command(move('e7', 'e5'))).toBe(true)
+    const committed = cabinet.getSnapshot().game!
     release()
-    expect(await action).toBe(true)
+    await oldRefresh
+    await Promise.resolve()
+    expect(cabinet.getSnapshot().game).toBe(committed)
+    expect(cabinet.getSnapshot().matches.find(match => match.id === committed.record.id)?.revision).toBe(2)
   })
 
   it('replaces a move cue on immediate resignation and cancels the old presentation timer', async () => {
@@ -408,7 +433,7 @@ describe('Cabinet acknowledged tutorial results', () => {
     expect(current.getSnapshot().learning).toBe(before.learning)
     expect(current.getSnapshot().motionKey).toBe(before.motionKey)
     expect(current.getSnapshot().error).toBe('storage')
-    expect(await store.getLearning()).toEqual(saved)
+    expect(await savedLearning()).toEqual(saved)
   })
 
   it('still resumes a legacy position-complete save and advances it once', async () => {
@@ -628,6 +653,206 @@ describe('Cabinet acknowledged tutorial results', () => {
     expect(current.getSnapshot().error).toBe('storage')
     await vi.advanceTimersByTimeAsync(5000)
     expect(current.getSnapshot().learning).toBe(before.learning)
-    expect(await store.getLearning()).toEqual(saveLearning(before.learning!))
+    expect(await savedLearning()).toEqual(saveLearning(before.learning!))
+  })
+})
+
+describe('Cabinet storage recovery', () => {
+  it('pauses an uncertain save and recovers its committed revision without replaying the move', async () => {
+    await cabinet.startGame(hotseat)
+    const before = cabinet.getSnapshot().game!
+    const commit = store.commit.bind(store)
+    vi.spyOn(store, 'commit').mockImplementationOnce(async (previous, next) => {
+      await commit(previous, next)
+      // The transaction succeeded, but its completion was not delivered in time.
+      throw new database.StorageError('storageTimeout')
+    })
+    expect(await cabinet.command(move('e2', 'e4'))).toBe(false)
+    expect(cabinet.getSnapshot()).toMatchObject({ busy: false, storageProblem: 'storageTimeout' })
+    expect(cabinet.getSnapshot().game).toBe(before)
+    expect(await cabinet.command(move('d2', 'd4'))).toBe(false)
+    expect(await cabinet.loadFile(exportMatch(before))).toBe(false)
+    expect(cabinet.getSnapshot().game).toBe(before)
+    enableRealRecovery()
+    await cabinet.retryStorage()
+    expect(cabinet.getSnapshot()).toMatchObject({ ready: true, durable: true, storageProblem: null, view: 'game', audioCue: null })
+    expect(cabinet.getSnapshot().game?.record).toMatchObject({ id: before.record.id, revision: 1, cursor: 1 })
+    expect(cabinet.getSnapshot().game?.state.pieces.find(piece => piece.id === 'w-e2')?.square).toBe('e4')
+    expect(await cabinet.command(move('e7', 'e5'))).toBe(true)
+    expect(cabinet.getSnapshot().game?.record.revision).toBe(2)
+  })
+
+  it('allows a distinct unsaved practice game without mutating the paused saved match', async () => {
+    await cabinet.startGame(hotseat)
+    const saved = cabinet.getSnapshot().game!
+    vi.spyOn(store, 'commit').mockRejectedValueOnce(new database.StorageError('storageTimeout'))
+    expect(await cabinet.command(move('e2', 'e4'))).toBe(false)
+    expect(await cabinet.startGame(hotseat)).toBe(true)
+    const memory = cabinet.getSnapshot().game!
+    expect(memory.record.id).not.toBe(saved.record.id)
+    expect(cabinet.getSnapshot()).toMatchObject({ durable: false, storageProblem: null })
+    expect(await cabinet.command(move('d2', 'd4'))).toBe(true)
+
+    const connection = await realOpenGameStore(databaseName)
+    try {
+      expect(await connection.getMatch(saved.record.id)).toEqual(saved.record)
+      expect(await connection.getMatch(memory.record.id)).toBeUndefined()
+    } finally { connection.close() }
+  })
+
+  it('keeps tutorial start and resume unavailable in unsaved practice without changing its checkpoint', async () => {
+    await cabinet.learn()
+    const learning = cabinet.getSnapshot().learning
+    const checkpoint = await store.getLearning()
+    await cabinet.startGame(hotseat)
+    vi.spyOn(store, 'commit').mockRejectedValueOnce(new database.StorageError('storageTimeout'))
+    await cabinet.command(move('e2', 'e4'))
+    await cabinet.startGame(hotseat)
+    const memory = cabinet.getSnapshot().game
+
+    expect(await cabinet.learn()).toBe(false)
+    expect(await cabinet.learn(true)).toBe(false)
+    expect(cabinet.getSnapshot()).toMatchObject({ durable: false, storageProblem: null, view: 'game' })
+    expect(cabinet.getSnapshot().game).toBe(memory)
+    expect(cabinet.getSnapshot().learning).toBe(learning)
+    expect(await savedLearning()).toEqual(checkpoint)
+    expect(await cabinet.command(move('d2', 'd4'))).toBe(true)
+  })
+
+  it.each([false, true])('saves the current unsaved game on reconnect and preserves older saves (uncertain first save: %s)', async uncertain => {
+    await cabinet.startGame(hotseat)
+    const older = cabinet.getSnapshot().game!
+    vi.spyOn(store, 'commit').mockRejectedValueOnce(new database.StorageError('storageTimeout'))
+    expect(await cabinet.command(move('e2', 'e4'))).toBe(false)
+    expect(await cabinet.startGame(hotseat)).toBe(true)
+    expect(await cabinet.command(move('d2', 'd4'))).toBe(true)
+    await finishMotion()
+    const memory = cabinet.getSnapshot().game!
+    enableRealRecovery()
+
+    if (uncertain) {
+      const save = database.GameStore.prototype.savePracticeOnReconnect
+      vi.spyOn(database.GameStore.prototype, 'savePracticeOnReconnect').mockImplementationOnce(async function (this: database.GameStore, game) {
+        await save.call(this, game)
+        throw new database.StorageError('storageTimeout')
+      })
+      await cabinet.retryStorage()
+      expect(cabinet.getSnapshot()).toMatchObject({ durable: false, storageProblem: 'storageTimeout', view: 'game' })
+      expect(cabinet.getSnapshot().game).toBe(memory)
+    }
+
+    await cabinet.retryStorage()
+    expect(cabinet.getSnapshot()).toMatchObject({ durable: true, storageProblem: null, view: 'game', audioCue: null })
+    expect(cabinet.getSnapshot().game?.record).toMatchObject({ id: memory.record.id, revision: 1, cursor: 1 })
+    expect(cabinet.getSnapshot().game?.state.pieces.find(piece => piece.id === 'w-d2')?.square).toBe('d4')
+    const connection = await realOpenGameStore(databaseName)
+    try {
+      const overview = await connection.overview()
+      expect(overview.matches).toHaveLength(2)
+      expect(await connection.getMatch(older.record.id)).toEqual(older.record)
+      expect(await connection.getMatch(memory.record.id)).toEqual(memory.record)
+      expect(overview.ledger).toHaveLength(0)
+      expect(await cabinet.command(move('e7', 'e5'))).toBe(true)
+      expect((await connection.getMatch(memory.record.id))?.revision).toBe(2)
+    } finally { connection.close() }
+  })
+
+  it('preserves both versions after another tab changes a recovery save, including an uncertain copy save', async () => {
+    await cabinet.startGame(hotseat)
+    const older = cabinet.getSnapshot().game!
+    vi.spyOn(store, 'commit').mockRejectedValueOnce(new database.StorageError('storageTimeout'))
+    await cabinet.command(move('e2', 'e4'))
+    await cabinet.startGame(hotseat)
+    await cabinet.command(move('d2', 'd4'))
+    await finishMotion()
+    const memory = cabinet.getSnapshot().game!
+    enableRealRecovery()
+    const save = database.GameStore.prototype.savePracticeOnReconnect
+    const saveSpy = vi.spyOn(database.GameStore.prototype, 'savePracticeOnReconnect')
+    saveSpy.mockImplementationOnce(async function (this: database.GameStore, game) {
+      await save.call(this, game)
+      throw new database.StorageError('storageTimeout')
+    })
+    await cabinet.retryStorage()
+
+    const other = await realOpenGameStore(databaseName)
+    try {
+      const advanced = memory.submit(memory.envelope(move('c7', 'c5')), 'human')
+      await other.commit(memory, advanced)
+      let loseCopyCompletion = true
+      saveSpy.mockImplementation(async function (this: database.GameStore, game) {
+        await save.call(this, game)
+        if (game.record.id !== memory.record.id && loseCopyCompletion) {
+          loseCopyCompletion = false
+          throw new database.StorageError('storageTimeout')
+        }
+      })
+      await cabinet.retryStorage()
+      const copy = cabinet.getSnapshot().game!
+      expect(copy.record.id).not.toBe(memory.record.id)
+      expect(copy.state).toEqual(memory.state)
+      expect(cabinet.getSnapshot().storageProblem).toBe('storageTimeout')
+
+      await cabinet.retryStorage()
+      expect(cabinet.getSnapshot()).toMatchObject({ durable: true, storageProblem: null, view: 'game', error: 'practiceCopied' })
+      expect(cabinet.getSnapshot().game?.record.id).toBe(copy.record.id)
+      expect(cabinet.getSnapshot().game?.state).toEqual(memory.state)
+      const overview = await other.overview()
+      expect(overview.matches).toHaveLength(3)
+      expect(await other.getMatch(older.record.id)).toEqual(older.record)
+      expect(await other.getMatch(memory.record.id)).toEqual(advanced.record)
+      expect(await other.getMatch(copy.record.id)).toEqual(copy.record)
+      expect(overview.ledger).toHaveLength(0)
+      expect(await cabinet.command(move('e7', 'e5'))).toBe(true)
+    } finally { other.close() }
+  })
+
+  it('closes a late initialization connection after a newer attempt has restored play', async () => {
+    const lateStore = await realOpenGameStore(databaseName)
+    extraStores.push(lateStore)
+    const closeLate = vi.spyOn(lateStore, 'close')
+    let release!: (store: database.GameStore) => void
+    const opening = new Promise<database.GameStore>(resolve => { release = resolve })
+    vi.mocked(database.openGameStore).mockReturnValueOnce(opening)
+    const current = new Cabinet()
+    cabinets.push(current)
+    const abandoned = current.initialize()
+    expect(current.getSnapshot().ready).toBe(false)
+    enableRealRecovery()
+    await current.retryStorage()
+    await current.startGame(hotseat)
+    const active = current.getSnapshot().game
+    release(lateStore)
+    await abandoned
+    expect(closeLate).toHaveBeenCalledTimes(1)
+    expect(current.getSnapshot().game).toBe(active)
+    expect(current.getSnapshot()).toMatchObject({ ready: true, durable: true, storageProblem: null })
+  })
+
+  it('pauses on an unexpectedly closed connection and reopens the same saved match', async () => {
+    await cabinet.startGame(hotseat)
+    await cabinet.command(move('e2', 'e4'))
+    await finishMotion()
+    const saved = cabinet.getSnapshot().game!
+    const nativeOpen = indexedDB.open
+    let raw: IDBDatabase | undefined
+    vi.spyOn(indexedDB, 'open').mockImplementation((name, version) => {
+      const request = nativeOpen.call(indexedDB, name, version)
+      request.addEventListener('success', () => { raw = request.result })
+      return request
+    })
+    enableRealRecovery()
+    const current = new Cabinet()
+    cabinets.push(current)
+    await current.initialize()
+    if (!raw) throw new Error('Expected a native database connection')
+    // The utility's declaration names the constructor type, but it closes an instance.
+    forceCloseDatabase(raw as unknown as Parameters<typeof forceCloseDatabase>[0])
+    await until(current, () => current.getSnapshot().storageProblem === 'storageClosed')
+    expect(await current.command(move('e7', 'e5'))).toBe(false)
+    await current.retryStorage()
+    expect(current.getSnapshot().game?.record).toMatchObject({ id: saved.record.id, revision: saved.record.revision })
+    expect(current.getSnapshot()).toMatchObject({ durable: true, storageProblem: null })
+    expect(await current.command(move('e7', 'e5'))).toBe(true)
   })
 })

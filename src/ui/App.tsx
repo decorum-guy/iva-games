@@ -95,7 +95,7 @@ export function App() {
   const selected = position.pieces.find(piece => piece.id === selectedId);
   const tutorialMode = !lesson ? 'none' : beat ? 'result' : lesson.complete ? 'complete' : step?.kind ?? 'position-complete';
   const teachingMove = !lesson || step?.kind === 'move' || step?.kind === 'illegal';
-  const canInput = active && !snap.animating && !snap.teachingReturning && !snap.busy && humanActing && !snap.thinking && teachingMove && !lesson?.complete;
+  const canInput = active && snap.ready && !snap.storageProblem && !snap.animating && !snap.teachingReturning && !snap.busy && humanActing && !snap.thinking && teachingMove && !lesson?.complete;
   const canLeaveForPractice = !position.outcome && !beat && !snap.animating && !snap.teachingReturning;
   const shownMoves = lesson ? step?.kind === 'move' ? guidance : [] : moves;
   const mayEnd = moves.some(move => move.type === 'endTurn') && (!lesson || guidance.some(move => move.type === 'endTurn'));
@@ -273,7 +273,17 @@ export function App() {
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
 
-  const notice = snap.error && <PanelNotice onClose={cabinet.dismissError} label={t('nav.close')}>{t(`error.${snap.error}`)}</PanelNotice>;
+  const notice = snap.error && !snap.storageProblem && <PanelNotice onClose={cabinet.dismissError} label={t('nav.close')}>{t(`error.${snap.error}`)}</PanelNotice>;
+  const storageNotice = (snap.storageProblem || (snap.ready && !snap.durable)) && <div className="notice"
+    role={snap.storageProblem ? 'alert' : 'status'} data-testid="storage-recovery">
+    <div>
+      <p>{t(snap.storageProblem ? `error.${snap.storageProblem}` : 'storage.memory')}</p>
+      <div className="recovery-actions">
+        <button type="button" className="button compact" data-testid="retry-storage" disabled={snap.busy || !snap.ready}
+          onClick={() => { void cabinet.retryStorage(); }}>{t(snap.ready ? 'storage.retry' : 'storage.opening')}</button>
+      </div>
+    </div>
+  </div>;
   const mode = config?.mode;
 
   return <>
@@ -310,6 +320,7 @@ export function App() {
       data-dice={showRoll && snap.animating ? snap.rollPhase : 'none'}
       data-active-side={actor} data-turn={position.turnSerial} data-phase={position.phase}
       data-revision={session?.record.revision ?? 0} data-game-id={session?.record.id ?? 'preview'}
+      data-storage-problem={snap.storageProblem ?? 'none'}
       data-busy={snap.busy} data-animating={snap.animating} data-thinking={snap.thinking}>
       <div className="table-column" data-testid="board">
         <PlayerRow t={t} locale={settings.locale} side={farSide} config={config} active={active && actor === farSide}
@@ -352,11 +363,12 @@ export function App() {
             <h1>{t('home.title')}</h1><p className="home-introduction" data-testid="home-introduction">{t('home.prompt')}</p>
           </div>
           {notice}
+          {storageNotice}
           {snap.ready ? <div className="play-options">
-            {pending && <button type="button" className="button primary mode-button" onClick={() => resumeGame(pending.id)} data-testid="home-resume-rated">
+            {pending && <button type="button" className="button primary mode-button" disabled={Boolean(snap.storageProblem)} onClick={() => resumeGame(pending.id)} data-testid="home-resume-rated">
               <Icon name="history" /><span>{t('home.resumeRated')}</span><Icon name="right" />
             </button>}
-            {resume && <button type="button" className={`button ${pending ? '' : 'primary'} mode-button`} onClick={() => resumeGame(resume.id)} data-testid="home-resume">
+            {resume && <button type="button" className={`button ${pending ? '' : 'primary'} mode-button`} disabled={Boolean(snap.storageProblem)} onClick={() => resumeGame(resume.id)} data-testid="home-resume">
               <Icon name="history" /><span>{t('home.resume')}</span><Icon name="right" />
             </button>}
             <button type="button" className={`button ${pending || resume ? '' : 'primary'} mode-button`} data-testid="mode-ai" onClick={() => openSetup(false, false)}>
@@ -365,25 +377,26 @@ export function App() {
             <button type="button" className="button mode-button" data-testid="mode-hotseat" onClick={() => openSetup(true, false)}>
               <Icon name="local" /><span>{t('home.hotseat')}</span><Icon name="right" />
             </button>
-            <button type="button" className="button mode-button" data-testid="mode-learn" onClick={() => { void cabinet.learn(); setFlip(false); }}>
+            <button type="button" className="button mode-button" data-testid="mode-learn" disabled={!snap.durable} onClick={() => { void cabinet.learn(); setFlip(false); }}>
               <Icon name="bookOpen" /><span>{t(learning?.complete ? 'home.learnResult' : learning ? 'home.resumeLearn' : 'home.learn')}</span><Icon name="right" />
             </button>
-          </div> : <p role="status">{t('common.loading')}</p>}
+          </div> : <p role="status">{t('storage.opening')}</p>}
           <div className="home-footer">
             <button type="button" className="text-button" data-testid="saved-games" onClick={() => setModal({ kind: 'saves' })}><Icon name="folder" />{t('home.saved')}</button>
             <button type="button" className="text-button" onClick={() => setModal({ kind: 'profile' })}>{t('nav.profile')}</button>
-            {learning && !learning.complete && <button type="button" className="text-button" onClick={() => setModal({ kind: 'restart-all' })}>
+            {learning && !learning.complete && <button type="button" className="text-button" disabled={!snap.durable} onClick={() => setModal({ kind: 'restart-all' })}>
               {t('tutorial.restartAll')}
             </button>}
           </div>
         </section> : session && <>
           {notice}
+          {storageNotice}
           <div className="decision-row" hidden={Boolean(lesson && beat)}>
           {session.state.outcome && !lesson && !rollPending ? <Result t={t} locale={settings.locale} session={session}
             entry={snap.ledger.find(entry => entry.matchId === session.record.id)} onNew={() => openSetup(mode === 'hotseat')} />
             : <div className="turn-panel" data-testid="turn-panel">
               <div className="turn-heading" role="status"><span className={`mini-stamp ${actor}`} aria-hidden="true" />
-                <strong>{t(rollPending ? 'die.rolling' : snap.thinking ? 'game.thinking' : step?.kind === 'script' ? 'game.script' : lesson && !teachingMove ?
+                <strong>{t(!snap.ready ? 'storage.opening' : snap.storageProblem ? 'storage.paused' : snap.busy ? 'storage.saving' : rollPending ? 'die.rolling' : snap.thinking ? 'game.thinking' : step?.kind === 'script' ? 'game.script' : lesson && !teachingMove ?
                   step?.kind === 'inspect' ? 'tutorial.selectCue' : lesson.complete ? 'tutorial.finish' : !step ? 'tutorial.positionDone' : 'tutorial.readCue' : boosted ? 'game.bonus' :
                   config?.mode === 'practice' || config?.mode === 'rated' ? humanActing ? 'game.yourTurn' : 'game.thinking' :
                     actor === 'white' ? 'game.turn' : 'game.turnBlack')}</strong>
@@ -402,7 +415,7 @@ export function App() {
             </div>}
             {!!showRoll && !lesson && <RollCard t={t} session={session} rollId={snap.rollId!} pending={snap.rollPhase === 'throwing'} />}
           </div>
-          {lesson && <LessonPanel t={t} locale={settings.locale} learning={lesson} guide={guidance} blocked={snap.busy || snap.animating || snap.teachingReturning}
+          {lesson && <LessonPanel t={t} locale={settings.locale} learning={lesson} guide={guidance} blocked={!snap.ready || Boolean(snap.storageProblem) || snap.busy || snap.animating || snap.teachingReturning}
             rolling={snap.rollPhase === 'throwing'}
             inspected={inspected}
             onAdvance={() => { if (!beat && step?.kind === 'inspect') void cabinet.inspect(step.square); else void cabinet.advance(); }}
@@ -419,9 +432,9 @@ export function App() {
           <div className="side-actions">
             {mode !== 'rated' && !lesson && <>
               <button type="button" className="icon-button" data-testid="undo" aria-label={t('game.undo')} title={t('game.undo')}
-                onClick={() => void cabinet.edit('undo')} disabled={session.undoTarget() === null || snap.busy || reviewing !== null}><Icon name="undo" /></button>
+                onClick={() => void cabinet.edit('undo')} disabled={!snap.ready || Boolean(snap.storageProblem) || session.undoTarget() === null || snap.busy || reviewing !== null}><Icon name="undo" /></button>
               <button type="button" className="icon-button" data-testid="redo" aria-label={t('game.redo')} title={t('game.redo')}
-                onClick={() => void cabinet.edit('redo')} disabled={!session.record.redo.length || snap.busy || reviewing !== null}><Icon name="redo" /></button>
+                onClick={() => void cabinet.edit('redo')} disabled={!snap.ready || Boolean(snap.storageProblem) || !session.record.redo.length || snap.busy || reviewing !== null}><Icon name="redo" /></button>
             </>}
             {!lesson && !session.state.outcome && <button type="button" className="text-button" data-testid="resign"
               onClick={() => setModal({ kind: 'resign' })}>{t('game.resign')}</button>}
@@ -436,12 +449,12 @@ export function App() {
       </aside>
     </main>
 
-    {modal?.kind === 'setup' && <SetupDialog t={t} hotseat={modal.hotseat} pending={pending} durable={snap.durable} busy={snap.busy}
+    {modal?.kind === 'setup' && <SetupDialog t={t} hotseat={modal.hotseat} pending={pending} durable={snap.durable} busy={!snap.ready || snap.busy}
       onClose={close} onResume={resumeGame} onStart={config => { void cabinet.startGame(config).then(ok => { if (ok) { close(); setFlip(false); } }); }}
       onRelease={id => { void cabinet.closeRated(id); }} onMode={modal.choice ? hotseat => setModal({ ...modal, hotseat }) : undefined} />}
     {modal?.kind === 'rules' && <RulesDialog t={t} locale={settings.locale} onClose={close} />}
     {modal?.kind === 'profile' && <ProfileDialog t={t} locale={settings.locale} profile={snap.profile} ledger={snap.ledger} onClose={close} />}
-    {modal?.kind === 'saves' && <SavesDialog t={t} locale={settings.locale} matches={snap.matches} busy={snap.busy} onClose={close} onOpen={resumeGame} />}
+    {modal?.kind === 'saves' && <SavesDialog t={t} locale={settings.locale} matches={snap.matches} busy={!snap.ready || Boolean(snap.storageProblem) || snap.busy} onClose={close} onOpen={resumeGame} />}
     {modal?.kind === 'capture' && <CaptureDialog t={t} locale={settings.locale} captures={captures} side={modal.side} onClose={close} />}
     {modal?.kind === 'settings' && <SettingsDialog t={t} settings={settings} onClose={close} onChange={changeSettings}
       exportFile={session && !lesson ? download : undefined} importFile={file => { close(); void cabinet.loadFile(file); }}

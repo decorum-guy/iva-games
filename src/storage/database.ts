@@ -1,5 +1,5 @@
 import { openDB } from 'idb';
-import type { DBSchema, IDBPDatabase } from 'idb';
+import type { DBSchema, IDBPDatabase, IDBPTransaction, StoreNames } from 'idb';
 import { ENGINE_VERSION, getPreset, PRESET_VERSION } from '../engine/presets';
 import { calculateElo, initialProfile, RATING_VERSION, scoreOf } from '../rating/elo';
 import type { Profile, RatingEntry } from '../rating/elo';
@@ -15,6 +15,17 @@ interface RemorseDatabase extends DBSchema {
 }
 
 const WRITE_STORES = ['profiles', 'matches', 'ratingLedger'] as const;
+export const STORAGE_TIMEOUT_MS = 6000;
+export type StorageProblem = 'storage' | 'storageTimeout' | 'storageBlocked' | 'storageClosed';
+
+export class StorageError extends SessionError {
+  constructor(code: StorageProblem) { super(code); }
+}
+
+interface StorageOptions {
+  readonly timeoutMs?: number;
+  readonly onUnavailable?: (problem: StorageProblem) => void;
+}
 
 function sameRatedConfig(current: SessionConfig, next: SessionConfig): boolean {
   const saved = current.rating;
@@ -28,57 +39,162 @@ function sameRatedConfig(current: SessionConfig, next: SessionConfig): boolean {
     && saved.engineVersion === proposed.engineVersion && saved.presetVersion === proposed.presetVersion);
 }
 
-export async function openGameStore(name = 'remorse-v1'): Promise<GameStore> {
-  const db = await openDB<RemorseDatabase>(name, 1, {
-    upgrade(database, previousVersion) {
-      if (previousVersion < 1) {
-        database.createObjectStore('profiles', { keyPath: 'id' });
-        database.createObjectStore('matches', { keyPath: 'id' });
-        database.createObjectStore('ratingLedger', { keyPath: 'matchId' });
-        database.createObjectStore('learning');
-      }
-    },
-    blocking() { db.close(); },
+export function openGameStore(name = 'remorse-v1', options: StorageOptions = {}): Promise<GameStore> {
+  return new Promise((resolve, reject) => {
+    let abandoned = false;
+    let store: GameStore | undefined;
+    const fail = (problem: StorageProblem) => {
+      if (abandoned) return;
+      abandoned = true;
+      clearTimeout(timer);
+      reject(new StorageError(problem));
+      options.onUnavailable?.(problem);
+    };
+    const timer = setTimeout(() => fail('storageTimeout'), options.timeoutMs ?? STORAGE_TIMEOUT_MS);
+    let opening: Promise<IDBPDatabase<RemorseDatabase>>;
+    try { opening = openDB<RemorseDatabase>(name, 1, {
+      upgrade(database, previousVersion) {
+        if (previousVersion < 1) {
+          database.createObjectStore('profiles', { keyPath: 'id' });
+          database.createObjectStore('matches', { keyPath: 'id' });
+          database.createObjectStore('ratingLedger', { keyPath: 'matchId' });
+          database.createObjectStore('learning');
+        }
+      },
+      blocked() { fail('storageBlocked'); },
+      blocking() { store?.unavailable('storageClosed'); },
+      terminated() { store?.unavailable('storageClosed'); },
+    }); } catch (error) {
+      clearTimeout(timer);
+      abandoned = true;
+      reject(error);
+      return;
+    }
+    void opening.then(db => {
+      clearTimeout(timer);
+      // An IDB open request cannot be cancelled. Never retain a connection
+      // delivered after the caller has already entered recovery.
+      if (abandoned) { db.close(); return; }
+      store = new GameStore(db, options);
+      resolve(store);
+    }, error => {
+      clearTimeout(timer);
+      abandoned = true;
+      reject(error);
+    });
   });
-  return new GameStore(db);
 }
 
 export class GameStore {
-  constructor(private readonly db: IDBPDatabase<RemorseDatabase>) {}
+  private closed = false;
+  private readonly pending = new Set<() => void>();
 
-  close(): void { this.db.close(); }
+  constructor(private readonly db: IDBPDatabase<RemorseDatabase>, private readonly options: StorageOptions = {}) {}
 
-  async overview() {
-    const tx = this.db.transaction(WRITE_STORES, 'readonly');
-    const [profile, matches, ledger] = await Promise.all([
-      tx.objectStore('profiles').get('local'),
-      tx.objectStore('matches').getAll(),
-      tx.objectStore('ratingLedger').getAll(),
-      tx.done,
-    ]);
-    return {
-      profile: profile ?? initialProfile,
-      matches: matches.sort((a, b) => b.updatedAt - a.updatedAt),
-      ledger: ledger.sort((a, b) => b.timestamp - a.timestamp),
-    };
+  close(): void {
+    if (this.closed) return;
+    this.closed = true;
+    for (const cancel of this.pending) cancel();
+    this.db.close();
   }
 
-  getMatch(id: string) { return this.db.get('matches', id); }
-  getLearning() { return this.db.get('learning', 'progress'); }
-  putLearning(data: unknown) { return this.db.put('learning', data, 'progress'); }
+  unavailable(problem: StorageProblem): void {
+    if (this.closed) return;
+    this.close();
+    this.options.onUnavailable?.(problem);
+  }
+
+  private transact<Names extends ArrayLike<StoreNames<RemorseDatabase>>, Mode extends IDBTransactionMode, Result>(
+    names: Names, mode: Mode,
+    action: (tx: IDBPTransaction<RemorseDatabase, Names, Mode>) => Promise<Result>,
+  ): Promise<Result> {
+    if (this.closed) return Promise.reject(new StorageError('storageClosed'));
+    const tx = this.db.transaction(names, mode);
+    return new Promise((resolve, reject) => {
+      let finished = false;
+      const finish = (complete: () => void) => {
+        if (finished) return;
+        finished = true;
+        clearTimeout(timer);
+        this.pending.delete(cancel);
+        complete();
+      };
+      const abort = () => {
+        try { tx.abort(); } catch { /* It may have committed before completion delivery. Recovery rereads it. */ }
+      };
+      const cancel = () => { abort(); finish(() => reject(new StorageError('storageClosed'))); };
+      const timer = setTimeout(() => {
+        // Abort the actual transaction, including one queued behind another tab.
+        // A timeout never grants permission to continue from an unverified revision.
+        abort();
+        finish(() => reject(new StorageError('storageTimeout')));
+        this.unavailable('storageTimeout');
+      }, this.options.timeoutMs ?? STORAGE_TIMEOUT_MS);
+      this.pending.add(cancel);
+      // Subscribe before issuing a request: a synchronous DataCloneError must
+      // still consume the rejection from aborting this transaction.
+      const done = tx.done;
+      void done.catch(() => undefined);
+      let result: Promise<Result>;
+      try { result = action(tx); } catch (error) {
+        abort();
+        finish(() => reject(error));
+        return;
+      }
+      void Promise.all([result, done]).then(([result]) => {
+        finish(() => resolve(result));
+      }, error => {
+        abort();
+        finish(() => reject(error));
+      });
+    });
+  }
+
+  async overview() {
+    return this.transact(WRITE_STORES, 'readonly', async tx => {
+      const [profile, matches, ledger] = await Promise.all([
+        tx.objectStore('profiles').get('local'),
+        tx.objectStore('matches').getAll(),
+        tx.objectStore('ratingLedger').getAll(),
+      ]);
+      return {
+        profile: profile ?? initialProfile,
+        matches: matches.sort((a, b) => b.updatedAt - a.updatedAt),
+        ledger: ledger.sort((a, b) => b.timestamp - a.timestamp),
+      };
+    });
+  }
+
+  getMatch(id: string) { return this.transact(['matches'], 'readonly', tx => tx.objectStore('matches').get(id)); }
+  getLearning() { return this.transact(['learning'], 'readonly', tx => tx.objectStore('learning').get('progress')); }
+  putLearning(data: unknown) { return this.transact(['learning'], 'readwrite', tx => tx.objectStore('learning').put(data, 'progress')); }
 
   async addPractice(session: GameSession): Promise<void> {
     const { record } = session;
     if (record.config.mode === 'rated' || record.config.mode === 'tutorial') throw new SessionError('ratedLocked');
-    await this.db.add('matches', record);
+    await this.transact(['matches'], 'readwrite', tx => tx.objectStore('matches').add(record));
+  }
+
+  async savePracticeOnReconnect(session: GameSession): Promise<void> {
+    const { record } = session;
+    if (record.config.mode === 'rated' || record.config.mode === 'tutorial') throw new SessionError('ratedLocked');
+    await this.transact(['matches'], 'readwrite', async tx => {
+      const matches = tx.objectStore('matches');
+      const existing = await matches.get(record.id);
+      // A previous attempt may have committed before its completion was lost.
+      // Accept that exact record; never replace another revision or fork.
+      if (existing) {
+        if (JSON.stringify(existing) !== JSON.stringify(record)) throw new SessionError('stale');
+        return;
+      }
+      await matches.add(record);
+    });
   }
 
   async reserveRated(human: Side, level: number, names?: SessionConfig['names']): Promise<GameSession> {
     const preset = getPreset(level);
     if (!preset) throw new SessionError('invalidCommand');
-    const tx = this.db.transaction(WRITE_STORES, 'readwrite');
-    const done = tx.done.catch(() => undefined);
-    try {
+    return this.transact(WRITE_STORES, 'readwrite', async tx => {
       const profiles = tx.objectStore('profiles');
       const profile = await profiles.get('local') ?? initialProfile;
       if (profile.ratedId) throw new SessionError('ratedOccupied');
@@ -92,22 +208,15 @@ export class GameStore {
       });
       await tx.objectStore('matches').add(session.record);
       await profiles.put({ ...profile, revision, ratedId: session.record.id });
-      await tx.done;
       return session;
-    } catch (error) {
-      try { tx.abort(); } catch { /* Already closed. */ }
-      await done;
-      throw error;
-    }
+    });
   }
 
   async commit(previous: GameSession, next: GameSession): Promise<RatingEntry | undefined> {
     const { id, revision, config } = previous.record;
     if (previous === next || id !== next.record.id || next.record.revision !== revision + 1
       || config.mode === 'tutorial') throw new SessionError('stale');
-    const tx = this.db.transaction(WRITE_STORES, 'readwrite');
-    const done = tx.done.catch(() => undefined);
-    try {
+    return this.transact(WRITE_STORES, 'readwrite', async tx => {
       const matches = tx.objectStore('matches');
       const profiles = tx.objectStore('profiles');
       const ledger = tx.objectStore('ratingLedger');
@@ -117,13 +226,11 @@ export class GameStore {
         const last = (match: MatchRecord) => match.actions.at(match.cursor - 1)?.id;
         if (next.record.status !== 'finished' || last(current) !== last(next.record)) throw new SessionError('stale');
         const existing = await ledger.get(id);
-        await tx.done;
         return existing;
       }
       if (current.revision !== revision || current.config.mode !== config.mode) throw new SessionError('stale');
       if (config.mode !== 'rated') {
         await matches.put(next.record);
-        await tx.done;
         return;
       }
 
@@ -153,21 +260,14 @@ export class GameStore {
         });
       }
       await matches.put(next.record);
-      await tx.done;
       return entry;
-    } catch (error) {
-      try { tx.abort(); } catch { /* Already closed. */ }
-      await done;
-      throw error;
-    }
+    });
   }
 
   async closeRated(session: GameSession, technical = false): Promise<void> {
     const { id, revision, config } = session.record;
     if (config.mode !== 'rated') throw new SessionError('ratedLocked');
-    const tx = this.db.transaction(['matches', 'profiles'], 'readwrite');
-    const done = tx.done.catch(() => undefined);
-    try {
+    return this.transact(['matches', 'profiles'], 'readwrite', async tx => {
       const matches = tx.objectStore('matches');
       const profiles = tx.objectStore('profiles');
       const current = await matches.get(id);
@@ -179,11 +279,6 @@ export class GameStore {
         ...current, revision: revision + 1, status: technical ? 'technical' : 'canceled', updatedAt: Date.now(),
       });
       await profiles.put({ ...profile, ratedId: null, revision: profile.revision + 1 });
-      await tx.done;
-    } catch (error) {
-      try { tx.abort(); } catch { /* Already closed. */ }
-      await done;
-      throw error;
-    }
+    });
   }
 }

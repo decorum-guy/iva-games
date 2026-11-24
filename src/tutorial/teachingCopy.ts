@@ -367,9 +367,9 @@ export const TEACHING_BEATS: Readonly<Record<string, readonly TeachingBeat[]>> =
       ),
       rule: copy(
         'При жажде крови тоже можно сделать до двух действий за ход, но оба — только со взятием. Можно брать своих, кроме короля.',
-        'Bloodlust still allows up to two actions per turn, both captures. It may also take allies other than the king.',
+        'A piece in bloodlust can take up to two actions per turn, both captures. It may also capture allies other than the king.',
       ),
-      action: copy('Как считается такой ход?', 'How does this turn count?'),
+      action: copy('Как считается такой ход?', 'Do both actions count as one turn?'),
       focus: { square: 'h4', subject: 'piece' },
     },
     {
@@ -411,7 +411,7 @@ export const TEACHING_BEATS: Readonly<Record<string, readonly TeachingBeat[]>> =
       ),
       rule: copy(
         'Своя ладья не попадает в ряд взятых врагов. От дополнительного взятия можно отказаться.',
-        'Your own rook is not added to captured enemies. You may decline the extra capture.',
+        'Your own rook does not appear in your captured-piece row. You may decline the extra capture.',
       ),
       action: copy('Как завершить ход?', 'How do I end the turn?'),
       focus: { square: 'f5', subject: 'piece' },

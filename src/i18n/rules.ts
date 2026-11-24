@@ -76,8 +76,8 @@ export const sourceRules: readonly RuleSection[] = [
       ru: 'Если фигура в ярости первым действием берёт другую фигуру, она получает ещё одно действие в тот же ход. Бонус даёт и то взятие, при котором выпала шестёрка. Ход без взятия бонуса не даёт.',
       en: 'If a berserk piece captures on the first action of your turn, it earns one extra action that turn. This includes the capture that first rolls 6. A quiet move earns no bonus.',
     }, {
-      ru: 'Дополнительное действие делает та же фигура: она может просто пойти или взять. За ход можно сделать не больше двух действий. Бонус можно пропустить кнопкой «Завершить ход», если король останется в безопасности после всех эффектов.',
-      en: 'The same piece takes the bonus action: a quiet move or a capture. Two actions per turn is the limit. You may skip the bonus with “End turn” if your king will remain safe after all effects resolve.',
+      ru: 'Дополнительное действие делает та же фигура: она может просто пойти или взять. За ход можно сделать не больше двух действий. Если допустимого дополнительного действия нет, ход завершается автоматически. Бонус можно пропустить кнопкой «Завершить ход», если король останется в безопасности после всех эффектов.',
+      en: 'The same piece takes the bonus action: a quiet move or a capture. Two actions per turn is the limit. If no legal bonus action is available, the turn ends automatically. You may skip the bonus with “End turn” if your king will remain safe after all effects resolve.',
     }, {
       ru: 'При трёх и более взятиях фигура в ярости получает жажду крови. Учитываются все её взятия, даже до шестёрки, милосердные и свои. Обращение в другую армию и превращение в слона обнуляют этот счётчик.',
       en: 'A berserk piece with three or more captures enters bloodlust. All its captures count, including those before the 6, mercy captures, and friendly captures. Conversion and promotion to a bishop reset this count.',
