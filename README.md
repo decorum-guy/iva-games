@@ -47,7 +47,8 @@ Playwright запускает production preview, если подходящий 
 | [Движок и архитектура](docs/ENGINE_AND_ARCHITECTURE.md) | Правила, поиск, Worker, сохранения и граница будущего сетевого режима. |
 | [Рейтинг и сложность](docs/RATING_AND_DIFFICULTY.md) | Профили ИИ, внутренний Elo и правила начисления. |
 | [Покрытие обучения](docs/TUTORIAL_COVERAGE.md) | Сценарии и действия в девяти уроках. |
-| [Приёмка](docs/VALIDATION.md) | Проведённые проверки и границы подтверждения. |
+| [Текущая приёмка](docs/VALIDATION_PLAYABILITY.md) | Проверки после первого плейтеста, включая Terra. |
+| [История первой поставки](docs/VALIDATION.md) | Приёмка исходной версии. |
 | [Текущая доработка](docs/BUILD_STATUS.md) | Состояние исправлений после первого пользовательского теста. |
 | [Задание исполнителю](prompts/FINISH_PLAYABILITY.md) | Завершение доработки на Mac и визуальная приёмка 6.1 Terra / high. |
-| [Авторы и лицензии](THIRD_PARTY_NOTICES.md) | Правила Bardelo Bardalini, модели Poly Haven, шрифты и библиотеки. |
+| [Авторы и лицензии](THIRD_PARTY_NOTICES.md) | Правила Bardelo Bardalini, модели Poly Haven, звуковые записи, шрифты и библиотеки. |

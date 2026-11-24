@@ -1,6 +1,6 @@
 # Acceptance — a finished playable game
 
-These are requirements for the implementing Codex agent. **They have not been executed in the preparation-only repository.** Record actual commands, outcomes and limitations in `docs/VALIDATION.md` after implementation.
+Use these requirements to review each game revision. The [current report](VALIDATION_PLAYABILITY.md) records the playability revision and [the first delivery](VALIDATION.md) records the earlier run.
 
 ## Completion gates
 
