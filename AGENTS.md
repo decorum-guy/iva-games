@@ -4,7 +4,7 @@
 
 Build a finished, beautiful, playable web game on the owner's Mac: Remorse Chess versus a real variant-aware AI with ten difficulty levels, local Elo progression, local two-player play, and a mandatory interactive tutorial. Laptop and phone interfaces and complete Russian/English localization are required. The owner has delegated routine implementation decisions and does not want questions during the build.
 
-The preparation package and implementation are both present. Read `docs/BUILD_STATUS.md` for the current verification state; do not describe planned or unverified work as accepted. The latest personal playthrough is `docs/VALIDATION_ROOT_PLAYTHROUGH.md`; the current Mac activation task is `prompts/ACTIVATE_STORAGE_RECOVERY_BUILD.md`.
+The preparation package and implementation are both present. Read `docs/BUILD_STATUS.md` for the current verification state; do not describe planned or unverified work as accepted. The full personal playthrough is `docs/VALIDATION_ROOT_PLAYTHROUGH.md`; the latest focused live review is `docs/VALIDATION_DICE_AND_FOCUS.md`. The current Mac activation task is `prompts/ACTIVATE_DICE_DOCK_BUILD.md`, followed by the separately scoped online-room stage.
 
 ## Read before implementation
 
@@ -46,7 +46,7 @@ The preparation package and implementation are both present. Read `docs/BUILD_ST
 - State effects must visibly affect the actual 3D figure's material; rings, badges and cell highlights alone are insufficient. Preserve readable shape and independent material state per piece.
 - The specified approximate bot ratings are provisional internal Remorse anchors. Do not present them as measured external/human Elo or invent strength calibration, engine integration, tests, screenshots, FPS measurements, author endorsement, or deployment success.
 - Keep QA screenshots, recordings, Playwright traces, caches, and generated reports outside Git and GitHub Actions artifacts. Small production runtime assets and concise textual validation reports belong in Git.
-- Do not add accounts, a live multiplayer backend, paid services, API keys, unrelated integrations, or notifications. Prepare the multiplayer boundary described in the architecture document.
+- The owner requested real online play on 24 November 2026, superseding the original local-only delivery scope. Implement that next stage only under `docs/ONLINE_ROOMS_V1.md` and `prompts/IMPLEMENT_ONLINE_ROOMS.md`, after the current dice presentation is accepted. Keep accounts, paid services, API keys, unrelated integrations and notifications outside this stage. Do not describe the existing transport interface as a working multiplayer backend.
 - Commit logical milestones. Push the implementation to this repository without force-pushing or rewriting unrelated history. On an unchanged new repository, `main` is the intended delivery branch; handle concurrent work safely if the situation has changed.
 
 ## Completion
