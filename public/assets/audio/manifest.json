@@ -90,7 +90,7 @@
         "mateLanding": "E+G+D"
       },
       "recipe": "scripts/build-royal-showcase-mix.py",
-      "changes": "The selected steel hit retains its attack and adds stereo room decay. E, G and D play as one landing. A separate raw rock recording supplies the fragment release.",
+      "changes": "The selected steel hit retains its attack and adds stereo room decay. E, G and D play as one landing. The separate fragment release combines a fresh stereo fracture and scattered chips.",
       "check": {
         "file": "showcase/royal-check.mp3",
         "bytes": 18476,
@@ -109,15 +109,6 @@
           "page": "https://freesound.org/people/Sandermotions/sounds/275441/",
           "publicPreview": "https://cdn.freesound.org/previews/275/275441_1402315-hq.mp3",
           "previewSha256": "bdd930f424ef02688fbd4c0f7632da0362f7df6e61bfa845337243c9e70e0bd5",
-          "license": "CC0-1.0",
-          "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/"
-        },
-        "rockBreak": {
-          "author": "themightyglider",
-          "title": "rock_break.ogg",
-          "page": "https://opengameart.org/content/breaking-rock",
-          "download": "https://opengameart.org/sites/default/files/rock_break.ogg",
-          "sourceSha256": "b645f35d21194e7855dd4a5405b1e8e6bec070731b92df6abcb202676b8e9f2e",
           "license": "CC0-1.0",
           "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/"
         },
@@ -165,17 +156,44 @@
           "sourceSha256": "8cf645664df3cf4922064e5e5a704624e670e4056f960cf6cab5b57904890168",
           "license": "CC0-1.0",
           "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/"
+        },
+        "rockCrack": {
+          "author": "themightyglider",
+          "title": "rock_break.ogg",
+          "page": "https://opengameart.org/content/breaking-rock",
+          "download": "https://opengameart.org/sites/default/files/rock_break.ogg",
+          "sourceSha256": "b645f35d21194e7855dd4a5405b1e8e6bec070731b92df6abcb202676b8e9f2e",
+          "license": "CC0-1.0",
+          "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+          "original": {
+            "author": "SoundCollectah",
+            "title": "stone falls and breaks low pitch.aiff",
+            "page": "https://freesound.org/people/SoundCollectah/sounds/109360/",
+            "license": "CC0-1.0"
+          }
+        },
+        "rockDebris": {
+          "author": "rubberduck",
+          "title": "bfh1_rock_falling_03.ogg",
+          "page": "https://opengameart.org/content/75-cc0-breaking-falling-hit-sfx",
+          "download": "https://opengameart.org/sites/default/files/sfx_breaking_and_falling.zip",
+          "sourceSha256": "16080f9bc90924b0e4ede52922529e30e34e72af32a505b39bdfc5ebcbb9248c",
+          "license": "CC0-1.0",
+          "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/"
         }
       },
       "mateRecipe": "scripts/build-mate-showcase-mix.py",
       "mateFragments": {
         "file": "showcase/royal-mate-fragments.mp3",
         "bytes": 11564,
-        "sha256": "c254facb2c3dab02a331903519f16f490ccdf1d255179fe01838aaf39d58e8b7",
+        "sha256": "c810f763bb7be00291f0426e4d471ae6216cf5c1978ad20a7118d0908c7a742f",
         "playSeconds": 0.42,
         "reducedPlaySeconds": 0.36,
-        "source": "rockBreak",
-        "changes": "Trim 14 ms of lead-in, slow to 94%, filter, fade and limit. Plays at the mate discharge."
+        "changes": "Start the trimmed crack on the discharge. Add stone chips 45 ms later with a 10 ms spread across the channels. Pitch, filter, equalize, peak-limit and fade out the short voice.",
+        "sources": [
+          "rockCrack",
+          "rockDebris"
+        ]
       },
       "mateGround": {
         "file": "showcase/royal-mate-ground.mp3",
