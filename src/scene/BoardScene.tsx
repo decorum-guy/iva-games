@@ -1,0 +1,365 @@
+import {
+  Component, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState,
+} from 'react'
+import type { PointerEvent, ReactNode } from 'react'
+import { Canvas, useFrame, useLoader, useThree } from '@react-three/fiber'
+import type { RootState } from '@react-three/fiber'
+import { EnvironmentMap } from '@react-three/drei'
+import { EquirectangularReflectionMapping, PerspectiveCamera, Plane, Raycaster, Vector2, Vector3 } from 'three'
+import { HDRLoader } from 'three/addons/loaders/HDRLoader.js'
+import type { GameEvent } from '../core/types'
+import { BoardSurface } from './BoardSurface'
+import { DepartingPiece, VisualPiece } from './Piece'
+import { clearChessAssetLoad, studioHDR, useChessAssets } from './assets'
+import { squarePoint, worldSquare } from './types'
+import type { BoardSceneProps, SceneMark } from './types'
+import './scene.css'
+
+export type { BoardSceneProps, SceneMark, ScenePiece } from './types'
+
+class GraphicsBoundary extends Component<{ children: ReactNode; onFailure?: () => void }, { failed: boolean }> {
+  state = { failed: false }
+
+  static getDerivedStateFromError() {
+    return { failed: true }
+  }
+
+  componentDidCatch() {
+    this.props.onFailure?.()
+  }
+
+  render() {
+    return this.state.failed ? null : this.props.children
+  }
+}
+
+const emptyEvents: readonly GameEvent[] = []
+const emptyMarks: readonly SceneMark[] = []
+const toRadians = Math.PI / 180
+const lookAt = new Vector3(0, .30, 0)
+const yAxis = new Vector3(0, 1, 0)
+const corners = [-4.8, 4.8].flatMap(x => [-4.8, 4.8].flatMap(z => [
+  new Vector3(x, -.38, z).sub(lookAt),
+  new Vector3(x, .01, z).sub(lookAt),
+  new Vector3(x * .75, 1.58, z * .73).sub(lookAt),
+]))
+
+function setCamera(camera: PerspectiveCamera, elevation: number, yaw: number, snug: boolean) {
+  const view = new Vector3(Math.cos(elevation) * Math.sin(yaw), Math.sin(elevation), Math.cos(elevation) * Math.cos(yaw))
+  const horizontal = yAxis.clone().cross(view).normalize()
+  const vertical = view.clone().cross(horizontal)
+  const tanHeight = Math.tan(camera.fov * toRadians / 2)
+  const room = snug ? .992 : .968
+  const tanWidth = tanHeight * camera.aspect * room
+  const tanVertical = tanHeight * room
+  function fit(axis: Vector3, aperture: number) {
+    let upper = -Infinity
+    let lower = -Infinity
+    for (const corner of corners) {
+      const depth = corner.dot(view)
+      const offset = corner.dot(axis) / aperture
+      upper = Math.max(upper, depth + offset)
+      lower = Math.max(lower, depth - offset)
+    }
+    return { distance: (upper + lower) / 2, center: (upper - lower) * aperture / 2 }
+  }
+  const x = fit(horizontal, tanWidth)
+  const y = fit(vertical, tanVertical)
+  const center = lookAt.clone().addScaledVector(horizontal, x.center).addScaledVector(vertical, y.center)
+  camera.position.copy(view).multiplyScalar(Math.max(x.distance, y.distance)).add(center)
+  camera.lookAt(center)
+  camera.updateMatrixWorld()
+}
+
+function Viewpoint({ flipped, preset, reduced }: {
+  flipped: boolean
+  preset: NonNullable<BoardSceneProps['camera']>
+  reduced: boolean
+}) {
+  const camera = useThree(state => state.camera) as PerspectiveCamera
+  const size = useThree(state => state.size)
+  const invalidate = useThree(state => state.invalidate)
+  const mobile = size.width < 515
+  const height = (preset === 'top' ? 89.98 : preset === 'tactical' ? 75 : mobile ? 67 : 58) * toRadians
+  const yaw = (preset === 'studio' ? (mobile ? .6 : 3.5) : 0) * toRadians + (flipped ? Math.PI : 0)
+  const angle = useRef<{ height: number; yaw: number; change?: {
+    fromHeight: number; fromYaw: number; heightDiff: number; yawDiff: number; start: number
+  } }>(null)
+  const configured = useRef({ height, yaw })
+
+  useLayoutEffect(() => {
+    camera.fov = preset === 'top' ? 26 : 35
+    camera.aspect = size.width / Math.max(1, size.height)
+    camera.updateProjectionMatrix()
+    const previous = configured.current
+    const switching = previous.height !== height || previous.yaw !== yaw
+    if (!angle.current || reduced) {
+      angle.current = { height, yaw }
+      setCamera(camera, height, yaw, mobile)
+    } else if (switching) {
+      const wrapped = ((yaw - angle.current.yaw + Math.PI * 4) % (Math.PI * 2))
+      angle.current.change = {
+        fromHeight: angle.current.height,
+        fromYaw: angle.current.yaw,
+        heightDiff: height - angle.current.height,
+        yawDiff: wrapped > Math.PI ? wrapped - 2 * Math.PI : wrapped,
+        start: performance.now(),
+      }
+    } else {
+      setCamera(camera, angle.current.height, angle.current.yaw, mobile)
+    }
+    configured.current = { height, yaw }
+    invalidate()
+  }, [camera, height, yaw, invalidate, mobile, preset, reduced, size.width, size.height])
+
+  useFrame(() => {
+    const current = angle.current
+    const change = current?.change
+    if (!current || !change) return
+    const t = Math.min(1, (performance.now() - change.start) / 310)
+    const p = 1 - (1 - t) ** 3
+    current.height = change.fromHeight + change.heightDiff * p
+    current.yaw = change.fromYaw + change.yawDiff * p
+    setCamera(camera, current.height, current.yaw, mobile)
+    if (t === 1) angle.current = { height, yaw }
+    else if (!document.hidden) invalidate()
+  })
+
+  return null
+}
+
+function Reflections({ low }: { low: boolean }) {
+  const texture = useLoader(HDRLoader, studioHDR)
+  texture.mapping = EquirectangularReflectionMapping
+  return <EnvironmentMap map={texture} environmentIntensity={low ? .60 : .78} environmentRotation={[0, .63, 0]} />
+}
+
+function Lighting({ low }: { low: boolean }) {
+  return (
+    <>
+      <hemisphereLight color="#f4eee5" groundColor="#505b71" intensity={.60} />
+      <directionalLight
+        castShadow={!low} position={[-3.8, 9.4, 5.7]} color="#fff0d5" intensity={1.95}
+        shadow-mapSize-width={1536} shadow-mapSize-height={1536}
+        shadow-camera-left={-7} shadow-camera-right={7} shadow-camera-top={7} shadow-camera-bottom={-7}
+        shadow-camera-near={.5} shadow-camera-far={24} shadow-normalBias={.022} shadow-bias={-.00016} shadow-radius={2.8}
+      />
+      <directionalLight position={[4.5, 5, -5.8]} color="#c4d9ff" intensity={1.30} />
+      <directionalLight position={[4.9, 4.5, 1.5]} color="#fff4e3" intensity={.30} />
+      <GraphicsBoundary>
+        <Suspense fallback={null}>
+          <Reflections low={low} />
+        </Suspense>
+      </GraphicsBoundary>
+    </>
+  )
+}
+
+function ContextLifecycle({ onFailure }: { onFailure: () => void }) {
+  const { gl, invalidate } = useThree()
+  useEffect(() => {
+    const canvas = gl.domElement
+    const contextLost = (event: Event) => {
+      event.preventDefault()
+      onFailure()
+    }
+    const refresh = () => { if (!document.hidden) invalidate() }
+    canvas.addEventListener('webglcontextlost', contextLost)
+    document.addEventListener('visibilitychange', refresh)
+    return () => {
+      canvas.removeEventListener('webglcontextlost', contextLost)
+      document.removeEventListener('visibilitychange', refresh)
+    }
+  }, [gl, invalidate, onFailure])
+  return null
+}
+
+function eventPieceId(event: GameEvent) {
+  if ('piece' in event) return event.piece.id
+  if (event.type === 'capture') return event.capturer.id
+  return null
+}
+
+function MarbleSet({ pieces, marks, events, flipped, low, reduced, onReady }: {
+  pieces: BoardSceneProps['pieces']
+  marks: readonly SceneMark[]
+  events: readonly GameEvent[]
+  flipped: boolean
+  low: boolean
+  reduced: boolean
+  onReady: () => void
+}) {
+  const assets = useChessAssets()
+  const initialEvent = useRef(events.at(-1)?.id)
+  const currentEvents = events.at(-1)?.id === initialEvent.current ? emptyEvents : events
+  const eventsById = useMemo(() => {
+    const map = new Map<string, GameEvent[]>()
+    for (const event of currentEvents) {
+      const key = eventPieceId(event)
+      if (!key) continue
+      const list = map.get(key)
+      if (list) list.push(event)
+      else map.set(key, [event])
+    }
+    return map
+  }, [currentEvents])
+
+  useEffect(onReady, [onReady])
+  return (
+    <>
+      <BoardSurface assets={assets} marks={marks} flipped={flipped} />
+      <group name="remorse-pieces">
+        {pieces.map(piece => (
+          <VisualPiece
+            key={piece.id} piece={piece} assets={assets} events={eventsById.get(piece.id) ?? emptyEvents}
+            low={low} flipped={flipped} reduced={reduced}
+          />
+        ))}
+      </group>
+      {!reduced && currentEvents.map(event =>
+        event.type === 'capture' || event.type === 'remove'
+          ? <DepartingPiece key={event.id} snapshot={event.type === 'capture' ? event.victim : event.piece} capture={event.type === 'capture'} events={currentEvents} assets={assets} />
+          : null,
+      )}
+    </>
+  )
+}
+
+function useReducedMotion(force: boolean) {
+  const query = '(prefers-reduced-motion: reduce)'
+  const [system, setSystem] = useState(() => window.matchMedia(query).matches)
+  useEffect(() => {
+    const media = window.matchMedia(query)
+    const change = () => setSystem(media.matches)
+    media.addEventListener('change', change)
+    return () => media.removeEventListener('change', change)
+  }, [])
+  return force || system
+}
+
+interface PointerOrigin {
+  id: number
+  square: string | null
+  x: number
+  y: number
+}
+
+export default function BoardScene({
+  pieces, marks = emptyMarks, events = emptyEvents, flipped = false,
+  camera = 'studio', quality, reducedMotion = false, motionKey,
+  onSquare, onDragSquare, onFailure, loadingLabel,
+}: BoardSceneProps) {
+  const reduced = useReducedMotion(reducedMotion)
+  const pointer = useRef<PointerOrigin>(null)
+  const scene = useRef<RootState>(null)
+  const [ready, setReady] = useState(false)
+  const [compact, setCompact] = useState(() => window.innerWidth < 650)
+  const [dragTarget, setDragTarget] = useState<string | null>(null)
+  const low = quality ? quality === 'low' : compact
+  const board = useRef<HTMLDivElement>(null)
+  const legal = new Set(marks.filter(mark => ['move', 'capture', 'friendly'].includes(mark.kind)).map(mark => mark.square))
+  const picking = useMemo(() => ({
+    point: new Vector2(),
+    point3: new Vector3(),
+    plane: new Plane(new Vector3(0, 1, 0), -.006),
+    ray: new Raycaster(),
+  }), [])
+  const onReady = useCallback(() => setReady(true), [])
+  const shownMarks: readonly SceneMark[] = dragTarget && !marks.some(mark => mark.square === dragTarget && mark.kind === 'focus')
+    ? [...marks, { square: dragTarget, kind: 'focus' }]
+    : marks
+
+  useEffect(() => {
+    const element = board.current
+    if (!element) return
+    const observer = new ResizeObserver(entries => {
+      if (entries[0]) setCompact(entries[0].contentRect.width < 515)
+    })
+    observer.observe(element)
+    return () => observer.disconnect()
+  }, [])
+
+  function pick(event: PointerEvent<HTMLDivElement>, preference: 'piece' | 'board' = 'piece') {
+    const current = scene.current?.get()
+    if (!current || !ready) return null
+    const rect = current.gl.domElement.getBoundingClientRect()
+    const px = (event.clientX - rect.left) / rect.width
+    const py = (event.clientY - rect.top) / rect.height
+    if (px < 0 || px > 1 || py < 0 || py > 1) return null
+    picking.point.set(px * 2 - 1, 1 - py * 2)
+    picking.ray.setFromCamera(picking.point, current.camera)
+    const point = picking.ray.ray.intersectPlane(picking.plane, picking.point3)
+    const base = point ? worldSquare(point.x, point.z) : null
+    // Exact square centers and marked destinations stay selectable when a tall
+    // neighboring piece crosses the sightline. Elsewhere the visible figure wins.
+    if (preference === 'board') return base
+    if (base && point) {
+      const [x, z] = squarePoint(base)
+      if (legal.has(base) || Math.max(Math.abs(point.x - x), Math.abs(point.z - z)) <= .24) return base
+    }
+    const pieces = current.scene.getObjectByName('remorse-pieces')
+    if (!pieces) return base
+    const model = picking.ray.intersectObjects(pieces.children, true)
+      .find(hit => typeof hit.object.userData.square === 'string')
+    return (model?.object.userData.square as string | undefined) ?? base
+  }
+
+  function startPointer(event: PointerEvent<HTMLDivElement>) {
+    if (!event.isPrimary || event.button !== 0) return
+    pointer.current = { id: event.pointerId, square: pick(event), x: event.clientX, y: event.clientY }
+    if (event.pointerType === 'mouse' && onDragSquare) event.currentTarget.setPointerCapture(event.pointerId)
+  }
+
+  function movePointer(event: PointerEvent<HTMLDivElement>) {
+    const origin = pointer.current
+    if (!onDragSquare || event.pointerType !== 'mouse' || origin?.id !== event.pointerId ||
+      !origin.square || !pieces.some(piece => piece.square === origin.square) ||
+      Math.hypot(event.clientX - origin.x, event.clientY - origin.y) < 8) return
+    setDragTarget(pick(event, 'board'))
+  }
+
+  function finishPointer(event: PointerEvent<HTMLDivElement>) {
+    const origin = pointer.current
+    if (origin?.id !== event.pointerId) return
+    pointer.current = null
+    setDragTarget(null)
+    if (Math.hypot(event.clientX - origin.x, event.clientY - origin.y) >= 10) {
+      if (origin.square && onDragSquare && event.pointerType === 'mouse') {
+        const destination = pick(event, 'board')
+        if (destination && destination !== origin.square) onDragSquare(origin.square, destination)
+      }
+      return
+    }
+    const square = origin.square ?? pick(event)
+    if (square) onSquare(square)
+  }
+
+  return (
+    <div
+      ref={board} className="remorse-scene" data-renderer="3d" data-scene-ready={ready ? 'true' : 'false'}
+      onPointerDown={startPointer} onPointerUp={finishPointer} onPointerMove={movePointer}
+      onPointerCancel={() => { pointer.current = null; setDragTarget(null) }}
+    >
+      <GraphicsBoundary onFailure={() => { clearChessAssetLoad(); onFailure() }}>
+        <Canvas
+          frameloop="demand" dpr={low ? [1, 1.5] : [1, 1.75]}
+          gl={{ antialias: true, alpha: true, powerPreference: 'high-performance' }}
+          camera={{ near: .18, far: 60, position: [1, 15, 10], fov: 35 }}
+          shadows={low ? false : 'percentage'}
+          onCreated={state => { scene.current = state; state.gl.toneMappingExposure = .97 }}
+        >
+          <Viewpoint flipped={flipped} preset={camera} reduced={reduced} />
+          <ContextLifecycle onFailure={onFailure} />
+          <Lighting low={low} />
+          <Suspense fallback={null}>
+            <MarbleSet
+              key={motionKey ?? 'marble-set'} pieces={pieces} marks={shownMarks} events={events}
+              flipped={flipped} low={low} reduced={reduced} onReady={onReady}
+            />
+          </Suspense>
+        </Canvas>
+      </GraphicsBoundary>
+      {!ready && loadingLabel && <div className="remorse-scene__loader" role="status">{loadingLabel}</div>}
+    </div>
+  )
+}

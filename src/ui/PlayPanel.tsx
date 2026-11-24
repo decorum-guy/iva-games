@@ -1,0 +1,160 @@
+import type { ReactNode } from 'react';
+import { CYCLE, cyclesRemaining } from '../core';
+import type { Command, GameEvent, GameState, Piece } from '../core';
+import { countText, numberText } from '../i18n/catalog';
+import type { Locale, Translate } from '../i18n/catalog';
+import { displayDelta } from '../rating/elo';
+import type { RatingEntry } from '../rating/elo';
+import { instruction } from '../tutorial/controller';
+import type { Learning } from '../tutorial/controller';
+import { LESSONS } from '../tutorial/lessons';
+import { tutorialHistory } from '../session/match';
+import type { GameSession } from '../session/match';
+import { ReactionDie } from '../scene/ReactionDie';
+import { eloChange } from './Dialogs';
+import { Icon } from './icons';
+import { PieceIcon, StateMark } from './pieces';
+import { describeEvent } from './projections';
+
+export function PanelNotice({ children, onClose, label }: { children: ReactNode; onClose: () => void; label: string }) {
+  return <div className="notice" role="status"><span>{children}</span>
+    <button onClick={onClose} className="icon-button" type="button" aria-label={label}><Icon name="close" /></button>
+  </div>;
+}
+
+export function Inspector({ t, locale, piece, state }: { t: Translate; locale: Locale; piece: Piece | undefined; state: GameState }) {
+  if (!piece) return <div className="inspector idle-inspector">{t('game.inspect')}</div>;
+  const duration = cyclesRemaining(piece, state);
+  const cure = piece.cureArmedAt === null ? null : Math.max(0, Math.ceil((piece.cureArmedAt + CYCLE - state.turnSerial) / CYCLE));
+  const shame = piece.shameArmedAt === null ? null : Math.max(0, Math.ceil((piece.shameArmedAt + CYCLE - state.turnSerial) / CYCLE));
+  return <div className="inspector" data-testid="inspector" data-selected={piece.square} data-state={piece.affliction}>
+    <div className="inspector-heading">
+      <PieceIcon type={piece.type} side={piece.side} />
+      <div><h3>{t('game.pieceSquare', { piece: t(`piece.${piece.type}`), square: piece.square })}</h3>
+        <span className={`affliction-label ${piece.affliction}`}><StateMark state={piece.affliction} />{t(`state.${piece.affliction}`)}</span></div>
+    </div>
+    <div className="inspector-timers">
+      {duration !== null && <span>{t('game.removalDue', { count: countText(locale, 'cycle', duration) })}
+        {piece.devastationDue !== null && <> ({countText(locale, 'turn', piece.devastationDue - state.turnSerial)})</>}</span>}
+      {cure !== null && <span>{t('game.cureDue', { count: countText(locale, 'cycle', cure) })}</span>}
+      {shame !== null && <span>{t('game.shameDue', { count: countText(locale, 'cycle', shame) })}</span>}
+    </div>
+    <details className="piece-details">
+      <summary>{t('game.selected')}</summary>
+      <p>{t(`state.${piece.affliction}Detail`)}</p>
+      {piece.type === 'bishop' && <p>{t('state.bishopDetail')}</p>}
+      {piece.type === 'king' && <p>{t('state.kingDetail')}</p>}
+      <dl className="piece-metrics">
+        <div><dt>{t('game.reaction')}</dt><dd>{t(`state.${piece.captureReaction}`)}</dd></div>
+        <div><dt>{t('game.captures')}</dt><dd>{numberText(locale, piece.capturesSinceRebirth)}</dd></div>
+      </dl>
+    </details>
+  </div>;
+}
+
+export function RollCard({ t, session, rollId, reduced, animate }: {
+  t: Translate; session: GameSession; rollId: string; reduced: boolean; animate: boolean;
+}) {
+  const action = session.record.actions[session.record.cursor - 1];
+  if (!action || action.id !== rollId || !action.roll) return null;
+  const reaction = session.current.events.find((event): event is Extract<GameEvent, { type: 'reaction' }> => event.type === 'reaction' && event.face !== undefined);
+  return <div className="roll-card" data-testid="roll" data-face={action.roll.face} data-fixed={action.roll.fixed}>
+    <ReactionDie face={action.roll.face} rollKey={`${session.record.id}/${rollId}`} reducedMotion={reduced || !animate}
+      label={t('die.face', { face: action.roll.face })} />
+    <div>
+      <span className="die-label">{t('die.label')}</span>
+      <strong className="die-result">{t(!reaction || reaction.affliction === 'neutral' ? 'state.unaffected' : `state.${reaction.affliction}`)}</strong>
+      {action.roll.fixed && <small>{t('die.tutorial')}</small>}
+      {!animate && <span className="sr-only" role="status">{t('die.face', { face: action.roll.face })}</span>}
+    </div>
+  </div>;
+}
+
+export function LessonPanel({ t, locale, learning, guide, blocked, onAdvance, onHandoff, onNew, onRepeat, onRestart, onRestartAll }: {
+  t: Translate; locale: Locale; learning: Learning; guide: readonly Command[]; blocked: boolean;
+  onAdvance: () => void; onHandoff: () => void; onNew: () => void; onRepeat: () => void; onRestart: () => void;
+  onRestartAll: () => void;
+}) {
+  const { complete } = learning;
+  const lesson = LESSONS[learning.lesson];
+  const step = instruction(learning);
+  const phase = complete ? 'complete' : step?.kind ?? 'position-complete';
+  const moves = guide.filter(cmd => cmd.type === 'move');
+  const forced = moves[0] && moves.every(move => move.from === moves[0].from && move.to === moves[0].to);
+  return <section className="lesson-panel" data-testid="tutorial" data-lesson={lesson.id}
+    data-position={learning.position} data-step={step?.id ?? phase} data-kind={phase}>
+    <div className="lesson-meta">
+      <span>{t('tutorial.progress', { current: learning.lesson + 1, total: LESSONS.length })}</span>
+      <div className="lesson-track" aria-hidden="true">
+        {LESSONS.map((item, index) => <i key={item.id} className={index <= learning.lesson ? 'reached' : ''} />)}
+      </div>
+    </div>
+    <h2>{complete ? t('tutorial.finish') : lesson.title[locale]}</h2>
+    <p>{complete ? t('tutorial.finishDetail') : step?.text[locale] ?? t('tutorial.positionDone')}</p>
+    {step?.kind === 'inspect' && <div className="lesson-target">{t('tutorial.inspect', { square: step.square })}</div>}
+    {forced && !complete && <div className="lesson-target">{t('tutorial.try', { from: moves[0].from, to: moves[0].to })}</div>}
+    {complete ? <div className="lesson-actions">
+      <button type="button" className="button primary" onClick={onHandoff} disabled={blocked} data-testid="lesson-continue">
+        <span>{t('tutorial.continue')}<small>{t('tutorial.continueDetail')}</small></span><Icon name="arrow" />
+      </button>
+      <button type="button" className="button" onClick={onNew} data-testid="lesson-new" disabled={blocked}>{t('home.new')}</button>
+      <button type="button" className="text-button" onClick={onRestartAll} disabled={blocked}>{t('tutorial.restartAll')}</button>
+    </div> : <>
+      {(!step || step.kind === 'read') && <button type="button" className="button primary" onClick={onAdvance}
+        disabled={blocked} data-testid="lesson-next">{t(!step ? 'tutorial.newPosition' : 'nav.next')}<Icon name="arrow" /></button>}
+      <div className="lesson-tools">
+        <button type="button" className="text-button" onClick={onRepeat}>{t('tutorial.repeat')}</button>
+        <button type="button" className="text-button" onClick={onRestart} data-testid="lesson-restart">{t('tutorial.restart')}</button>
+      </div>
+    </>}
+  </section>;
+}
+
+export function History({ t, session, latest, review, onReview }: {
+  t: Translate; session: GameSession; latest: readonly GameEvent[]; review: number | null;
+  onReview: (cursor: number | null) => void;
+}) {
+  const tutorial = session.record.config.mode === 'tutorial';
+  const total = session.record.cursor;
+  const notable = latest.filter(event => event.type !== 'turn' || event.check);
+  const tutorialEvents = tutorialHistory(session).filter(event => event.type !== 'turn' || event.check);
+  const events = (review === null ? session.events : session.eventsAt(review)).filter(event => event.type !== 'turn' || event.check);
+  return <section className="history" data-testid="history">
+    {notable.length > 0 && <div className="recent-event">{describeEvent(t, notable[notable.length - 1], tutorial)}</div>}
+    <details>
+      <summary><Icon name="history" />{t('log.title')}</summary>
+      {(session.record.config.provenance === 'handoff' || tutorialEvents.length > 0) && <p>{t('log.handoff')}</p>}
+      {tutorialEvents.length > 0 && <ol className="root-history">
+        {tutorialEvents.map(event => <li key={event.id}>{describeEvent(t, event, true)}</li>)}
+      </ol>}
+      {events.length ? <ol>{events.map(event => <li key={event.id}>{describeEvent(t, event, tutorial)}</li>)}</ol>
+        : <p>{t('log.empty')}</p>}
+      {!tutorial && total > 0 && <div className="review-controls">
+        {review === null ? <button type="button" className="button compact" onClick={() => onReview(total)}>{t('log.review')}</button>
+          : <>
+            <label>{t('log.step', { current: review, total })}
+              <input type="range" min={0} max={total} value={review} onChange={event => onReview(Number(event.target.value))} /></label>
+            <button type="button" className="button compact" onClick={() => onReview(null)}>{t('log.return')}</button>
+          </>}
+      </div>}
+    </details>
+  </section>;
+}
+
+export function Result({ t, locale, session, entry, onNew }: {
+  t: Translate; locale: Locale; session: GameSession; entry?: RatingEntry; onNew: () => void;
+}) {
+  const { outcome } = session.state;
+  if (!outcome) return null;
+  const human = session.record.config.human;
+  const title = outcome.winner === null ? 'game.draw' : human ? (human === outcome.winner ? 'game.win' : 'game.loss')
+    : outcome.winner === 'white' ? 'game.whiteWins' : 'game.blackWins';
+  return <div className="result" data-testid="game-result" data-reason={outcome.reason}>
+    <h2>{t(title)}</h2>
+    <p>{t(`result.${outcome.reason}`)}</p>
+    {entry ? <div className="result-rating"><span>{t('result.ratingChange')}</span><strong>{eloChange(locale, entry)}</strong>
+      {displayDelta(entry.before, entry.after) === 0 && entry.exactDelta !== 0 && <small>{t('result.lessThanOne')}</small>}
+    </div> : <p className="field-note">{t('result.noRating')}</p>}
+    <button type="button" className="button primary" onClick={onNew}>{t('home.new')}<Icon name="arrow" /></button>
+  </div>;
+}
