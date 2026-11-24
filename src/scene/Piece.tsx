@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import {
-  CanvasTexture, Group, Mesh, MeshBasicMaterial, Sprite, SpriteMaterial, SRGBColorSpace, Vector3,
+  CanvasTexture, Group, Mesh, MeshBasicMaterial, MeshStandardMaterial, Sprite, SpriteMaterial, SRGBColorSpace, Vector3,
 } from 'three'
 import type { GameEvent, Piece } from '../core/types'
 import type { ChessAssets } from './assets'
@@ -16,9 +16,10 @@ import {
 import { conditionCode, setArmySurface, stoneMaterial } from './stone'
 import { squarePoint, stateColors } from './types'
 import type { SceneFocus, ScenePiece } from './types'
+import { kingFracture } from './kingFracture'
 import { kingFallPose } from './kingFall'
 import type { KingFall } from './kingFall'
-import { easeRange, sampleMateFall, sampleRoyal } from './royalMotion'
+import { easeRange, royalTiming, sampleMateFall, sampleRoyal } from './royalMotion'
 import type { RoyalCue } from './royalMotion'
 import { samplePromotion } from './promotionMotion'
 import type { PromotionCue } from './promotionMotion'
@@ -264,6 +265,36 @@ export function VisualPiece({ piece, assets, events, flipped, low, reduced, focu
     () => stoneMaterial(assets.pieces.white.pawn.material, 'white', seed(piece.id)),
     [assets, piece.id],
   )
+  const chips = useRef<(Mesh | null)[]>([])
+  const fracture = useMemo(() => piece.kind === 'king' && fall ? kingFracture(asset.geometry, fall) : null,
+    [asset.geometry, piece.kind, fall])
+  const fractureMaterials = useMemo(() => {
+    if (!fracture) return null
+    const interior = new MeshStandardMaterial({
+      color: piece.side === 'white' ? '#846a56' : '#606c7c',
+      emissive: piece.side === 'white' ? '#443027' : '#373d49', emissiveIntensity: .27,
+      roughness: .99, metalness: .015, envMapIntensity: .48, flatShading: true,
+    })
+    interior.onBeforeCompile = shader => {
+      shader.vertexShader = shader.vertexShader.replace('#include <common>', '#include <common>\nvarying vec2 vBreakUV;')
+        .replace('#include <begin_vertex>', '#include <begin_vertex>\nvBreakUV = uv;')
+      shader.fragmentShader = shader.fragmentShader.replace('#include <common>', '#include <common>\nvarying vec2 vBreakUV;')
+        .replace('#include <color_fragment>', `
+          #include <color_fragment>
+          vec2 crystal = floor(vBreakUV * 115.0);
+          float grain = fract(sin(dot(crystal, vec2(13.17, 37.71))) * 4312.18);
+          diffuseColor.rgb *= .67 + .63 * grain + .18 * smoothstep(.87, .98, grain);
+        `)
+    }
+    return [material, interior]
+  }, [fracture, material, piece.side])
+  const renderer = useThree(state => state.get)
+  useLayoutEffect(() => {
+    if (!fracture || !fractureMaterials) return
+    const { gl, scene, camera } = renderer()
+    void gl.compileAsync(new Mesh(fracture.body, fractureMaterials), camera, scene).catch(() => undefined)
+  }, [fracture, fractureMaterials, renderer])
+  useEffect(() => () => fractureMaterials?.[1].dispose(), [fractureMaterials])
   useEffect(() => () => material.dispose(), [material])
   useEffect(() => {
     if (!fire) return
@@ -459,6 +490,25 @@ export function VisualPiece({ piece, assets, events, flipped, low, reduced, focu
       if (fall) {
         const elapsed = royal ? now - royal.startedAt : Infinity
         const fraction = royal?.kind === 'mate' ? sampleMateFall(royal, elapsed) : 1
+        const age = royal?.kind === 'mate' ? (elapsed - royalTiming(royal).impact) / 1000 : Infinity
+        if (fracture && fractureMaterials) {
+          mesh.current.geometry = age >= 0 ? fracture.body : asset.geometry
+          mesh.current.material = age >= 0 ? fractureMaterials : material
+          for (const [i, shard] of fracture.chips.entries()) {
+            const fragment = chips.current[i]
+            if (!fragment) continue
+            fragment.visible = !reduced && age >= 0 && age < 1.08
+            if (!fragment.visible) continue
+            const t = age
+            const radius = 1.05 + i * .13
+            fragment.position.copy(shard.center)
+            fragment.position.x += shard.direction.x * radius * t
+            fragment.position.z += shard.direction.z * radius * t
+            fragment.position.y = Math.max(.035, shard.center.y + (1.05 + .14 * (i % 3)) * t - 4.4 * t * t)
+            fragment.rotation.set((i % 2 ? -3.4 : 2.6) * t, (.74 + i) * t, (i % 2 ? 1.8 : -2.4) * t)
+            fragment.scale.setScalar(1 - easeRange(.71, 1.08, t))
+          }
+        }
         const pose = kingFallPose(fall, fraction)
         tiltAxis.set(fall.dz, 0, -fall.dx)
         mesh.current.quaternion.setFromAxisAngle(tiltAxis, pose.angle)
@@ -469,6 +519,8 @@ export function VisualPiece({ piece, assets, events, flipped, low, reduced, focu
         shadow.current.scale.set(1 + 1.26 * fraction, 1 - .17 * fraction, 1)
         wasFallen.current = true
       } else if (wasFallen.current) {
+        mesh.current.geometry = asset.geometry
+        mesh.current.material = material
         mesh.current.quaternion.identity()
         mesh.current.position.set(0, 0, 0)
         shadow.current.position.set(body.current.position.x, .011, body.current.position.z)
@@ -500,6 +552,9 @@ export function VisualPiece({ piece, assets, events, flipped, low, reduced, focu
       </mesh>
       <group ref={body}>
         <mesh ref={mesh} material={material} userData={{ square: piece.square }} castShadow={!low} receiveShadow={!low} dispose={null} />
+        {fracture && fractureMaterials && !reduced && fracture.chips.map((shard, i) =>
+          <mesh key={i} ref={node => { chips.current[i] = node }} name={`king-chip-${i}`}
+            geometry={shard.geometry} material={fractureMaterials} visible={false} dispose={null} />)}
         {fire && <BerserkFire model={asset.geometry} seed={seed(piece.id)} low={low} reduced={reduced} burst={fire} />}
       </group>
       {!reduced && ghostDelay.slice(0, low ? 2 : 3).map((_, i) => (
