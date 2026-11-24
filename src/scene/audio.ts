@@ -7,7 +7,7 @@ import { actionPlan, isCaptureReaction } from './actionPresentation'
 import type { ActionPlan, PromotionPlayback } from './actionPresentation'
 import { promotionFamily, promotionTiming } from './promotionMotion'
 import { mateGroundContact, royalTiming } from './royalMotion'
-import type { RoyalCue } from './royalMotion'
+import type { RoyalAction, RoyalCue } from './royalMotion'
 import { reactionSoundLevel, replaceShowcaseCues, showcaseDice, showcaseSoundForCue, showcaseSources } from './showcaseSfx'
 import type { ShowcaseSound } from './showcaseSfx'
 
@@ -592,15 +592,20 @@ export function playSceneCue(events: readonly GameEvent[], options: SceneAudioOp
   return playBatch(options.batchId ?? events.at(-1)?.id, planSceneCues(events, live), live)
 }
 
-export function playRoyalCue(cue: RoyalCue) {
+export function planRoyalCues(cue: RoyalAction): SceneCue[] {
   const { impact, resolution } = royalTiming(cue)
-  const cues: SceneCue[] = cue.kind === 'check'
-    ? [{ kind: 'royalCheck', at: impact / 1000 }]
-    : [
-      ...(cue.fromPromotion && !cue.reduced ? [] : [{ kind: 'royalCharge' as const, at: (impact - 760) / 1000 }]),
-      { kind: 'royalBreak', at: impact / 1000 },
-      { kind: 'royalGround', at: mateGroundContact(cue) / 1000 },
-      { kind: cue.tone === 'win' ? 'royalWin' : cue.tone === 'loss' ? 'royalLoss' : 'royalEnd', at: resolution / 1000 },
-    ]
+  if (cue.kind === 'check') return [{ kind: 'royalCheck', at: impact / 1000 }]
+  const contact = mateGroundContact(cue) / 1000
+  return [
+    ...(cue.fromPromotion && !cue.reduced ? [] : [{ kind: 'royalCharge' as const, at: (impact - 760) / 1000 }]),
+    { kind: 'royalGround', at: contact },
+    // The two unchanged recordings form one contact without stacking their sharp transients.
+    { kind: 'royalBreak', at: contact + .018 },
+    { kind: cue.tone === 'win' ? 'royalWin' : cue.tone === 'loss' ? 'royalLoss' : 'royalEnd', at: resolution / 1000 },
+  ]
+}
+
+export function playRoyalCue(cue: RoyalCue) {
+  const cues = planRoyalCues(cue)
   return playBatch(`royal/${cue.id}`, cues, { reducedMotion: cue.reduced, startedAt: cue.startedAt })
 }

@@ -73,6 +73,28 @@ test('the committed die is read before mate, and skip and restore only change th
   await expect(page.getByTestId('dice-reveal')).toHaveCount(0)
 })
 
+test('flat mate fragments appear during the finish and persist through reload until undo', async ({ page }) => {
+  const duel = cornerMate()
+  await load(page, duel.record)
+  const debris = page.getByTestId('flat-mate-debris')
+  const chips = debris.locator('path')
+  await expect(chips).toHaveCount(0)
+  await clickMove(page, 'g6', 'g7')
+  await expect(gameView(page)).toHaveAttribute('data-royal', 'mate')
+  await expect(chips.first()).toBeHidden()
+  await expect(chips.first()).toBeVisible()
+  await expect(page.getByTestId('game-result')).toHaveAttribute('data-reason', 'checkmate')
+  await expect(debris.locator('[data-settled="true"]')).toBeAttached()
+  await expect(chips).toHaveCount(11)
+  const finalTransforms = await chips.evaluateAll(nodes => nodes.map(node => node.getAttribute('transform')))
+  await page.reload()
+  await expect(page.getByTestId('game-result')).toHaveAttribute('data-reason', 'checkmate')
+  await expect(chips.first()).toBeVisible()
+  expect(await chips.evaluateAll(nodes => nodes.map(node => node.getAttribute('transform')))).toEqual(finalTransforms)
+  await page.getByTestId('undo').click()
+  await expect(chips).toHaveCount(0)
+})
+
 test('the optional bonus defers mate and a passive removal can deliver it', async ({ page }) => {
   const duel = optionalMate()
   await load(page, duel.record, true)

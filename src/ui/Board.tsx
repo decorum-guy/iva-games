@@ -7,7 +7,7 @@ import type { SceneFocus, SceneMark } from '../scene/types';
 import type { RoyalCue } from '../scene/royalMotion';
 import type { PromotionCue } from '../scene/promotionMotion';
 import { FlatPromotion } from './FlatPromotion';
-import { FlatRoyal } from './FlatRoyal';
+import { FlatMateDebris, FlatRoyal } from './FlatRoyal';
 import { PieceIcon, StateMark } from './pieces';
 
 const BoardScene = lazy(() => import('../scene/BoardScene'));
@@ -63,6 +63,7 @@ export function Board(props: BoardProps) {
   const pointerFocus = useRef(false);
   const flatBoard = useRef<HTMLDivElement>(null);
   const pieces = useMemo(() => new Map(state.pieces.map(piece => [piece.square, piece])), [state.pieces]);
+  const fallenKing = props.flat && state.pieces.find(piece => piece.id === props.defeatedKing);
   const scenePieces = useMemo(() => state.pieces.map(piece => ({
     id: piece.id, square: piece.square, side: piece.side, kind: piece.type, affliction: piece.affliction,
     countdown: cyclesRemaining(piece, state) ?? undefined,
@@ -162,6 +163,8 @@ export function Board(props: BoardProps) {
       </div>}
       {props.promotion && <FlatPromotion cue={props.promotion} flipped={flipped} reduced={props.reducedMotion} board={flatBoard} />}
       {props.royal && <FlatRoyal cue={props.royal} flipped={flipped} board={flatBoard} />}
+      {fallenKing && <FlatMateDebris piece={fallenKing} pieces={state.pieces} flipped={flipped} reduced={props.reducedMotion}
+        cue={props.royal?.kind === 'mate' ? props.royal : undefined} />}
     </div> : <SceneLoaderBoundary onFailure={props.onFailure}><Suspense fallback={<div className="scene-loading" role="status">{t('settings.loadingScene')}</div>}>
       <BoardScene pieces={scenePieces} marks={activeMarks} events={props.events} flipped={flipped}
         camera={props.camera} quality={props.low ? 'low' : 'high'} reducedMotion={props.reducedMotion}

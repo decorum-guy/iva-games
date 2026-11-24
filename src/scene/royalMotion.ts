@@ -57,11 +57,13 @@ export function sampleRoyal(cue: RoyalAction, elapsed: number) {
   const { duration, impact, resolution } = royalTiming(cue)
   const mate = cue.kind === 'mate'
   const reduced = cue.reduced
-  const afterImpact = elapsed - impact
+  const contact = mate ? mateGroundContact(cue) : impact
+  const afterImpact = elapsed - contact
   const charge = easeRange(0, impact, elapsed)
-  const discharge = easeRange(reduced ? -75 : -26, reduced ? 185 : 22, afterImpact) *
+  const flashLead = mate ? 0 : reduced ? -75 : -26
+  const discharge = easeRange(flashLead, reduced ? 185 : 22, afterImpact) *
     (1 - easeRange(reduced ? 220 : 58, reduced ? 650 : mate ? 640 : 303, afterImpact))
-  const decay = 1 - easeRange(impact + (mate ? 165 : 20), resolution, elapsed)
+  const decay = 1 - easeRange(contact + (mate ? 165 : 20), resolution, elapsed)
   const surface = (charge * (mate ? .68 : .73) * decay + discharge * (mate ? 1.13 : .77)) *
     (reduced ? .78 : 1)
   const wave = clampUnit(afterImpact / (mate ? 1170 : 485))
@@ -79,7 +81,7 @@ export function sampleRoyal(cue: RoyalAction, elapsed: number) {
   }
 }
 
-/** The body meets the board after the crown discharge, on its own audio marker. */
+/** Shared board-contact timestamp for the fall, fracture, flash and audio. */
 export function mateGroundContact(cue: RoyalAction) {
   return royalTiming(cue).impact + (cue.reduced ? 410 : 670)
 }

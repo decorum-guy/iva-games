@@ -3,9 +3,11 @@ import { createDemo } from '../auditions/demos'
 import type { Group } from '../auditions/demos'
 import { applyResolvedCommand, createPosition } from '../core'
 import { actionPlan } from './actionPresentation'
-import { planSceneCues } from './audio'
+import { planRoyalCues, planSceneCues } from './audio'
 import { getDieMotionTiming } from './diceMotion'
 import { promotionTiming } from './promotionMotion'
+import { sampleMateFall, sampleRoyal } from './royalMotion'
+import type { RoyalAction } from './royalMotion'
 import { replaceShowcaseCues, showcaseSources } from './showcaseSfx'
 import type { ShowcaseSound } from './showcaseSfx'
 
@@ -44,20 +46,26 @@ describe('selected showcase playback', () => {
     ])
   })
 
-  it.each([false, true])('plays separate fragment and E/G/D landing recordings (reduced=%s)', reduced => {
-    const release = reduced ? 1.02 : 1.03
-    const landing = reduced ? 1.43 : 1.70
-    const charge = { kind: 'royalCharge', at: release - .76 } as const
-    const end = { kind: 'royalEnd', at: reduced ? 2.08 : 2.37 } as const
-    const { stock, clips } = replaceShowcaseCues([
-      charge, { kind: 'royalBreak', at: release }, { kind: 'royalGround', at: landing }, end,
-    ], buffers, undefined, undefined, false, reduced)
-    expect(stock).toEqual([charge, end])
+  it.each([
+    { reduced: false, fromPromotion: false, contact: 1700 },
+    { reduced: true, fromPromotion: false, contact: 1430 },
+    { reduced: false, fromPromotion: true, contact: 1385 },
+  ])('combines the two accepted sounds at the same fall contact ($contact ms)', ({ reduced, fromPromotion, contact }) => {
+    const mate: RoyalAction = {
+      id: 'mate', kind: 'mate', square: 'h8', pieceId: 'black-king', side: 'black', tone: 'neutral',
+      reduced, fromPromotion,
+    }
+    const cues = planRoyalCues(mate)
+    const { stock, clips } = replaceShowcaseCues(cues, buffers, undefined, undefined, false, reduced)
+    expect(stock.map(cue => cue.kind)).toEqual(fromPromotion ? ['royalEnd'] : ['royalCharge', 'royalEnd'])
+    expect(sampleMateFall(mate, contact - 90)).toBeGreaterThan(.4)
+    expect(sampleRoyal(mate, contact - 1)).toMatchObject({ discharge: 0, waveStrength: 0 })
+    expect(sampleMateFall(mate, contact)).toBe(1)
+    expect(sampleRoyal(mate, contact + 25).discharge).toBeGreaterThan(0)
     expect(clips).toMatchObject([
-      { buffer: buffers.get('royalBreak'), at: release, offset: 0, duration: 1.32 },
-      { buffer: buffers.get('royalGround'), at: landing, offset: 0, duration: .92 },
+      { buffer: buffers.get('royalGround'), at: contact / 1000, offset: 0, duration: .92 },
+      { buffer: buffers.get('royalBreak'), at: contact / 1000 + .018, offset: 0, duration: 1.32 },
     ])
-    expect(clips[0].at + clips[0].duration).toBeGreaterThan(clips[1].at)
     expect(clips[0].at + clips[0].duration).toBeLessThan(clips[1].at + clips[1].duration)
   })
 

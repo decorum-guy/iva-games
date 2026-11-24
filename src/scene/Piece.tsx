@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import {
-  CanvasTexture, Group, Mesh, MeshBasicMaterial, MeshStandardMaterial, Sprite, SpriteMaterial, SRGBColorSpace, Vector3,
+  CanvasTexture, Group, Mesh, MeshBasicMaterial, MeshStandardMaterial, Quaternion, Sprite, SpriteMaterial, SRGBColorSpace, Vector3,
 } from 'three'
 import type { GameEvent, Piece } from '../core/types'
 import type { ChessAssets } from './assets'
@@ -16,10 +16,11 @@ import {
 import { conditionCode, setArmySurface, stoneMaterial } from './stone'
 import { squarePoint, stateColors } from './types'
 import type { SceneFocus, ScenePiece } from './types'
+import { planKingDebris, sampleKingDebris, type DebrisField } from './kingDebris'
 import { kingFracture } from './kingFracture'
 import { kingFallPose } from './kingFall'
 import type { KingFall } from './kingFall'
-import { easeRange, royalTiming, sampleMateFall, sampleRoyal } from './royalMotion'
+import { easeRange, mateGroundContact, sampleMateFall, sampleRoyal } from './royalMotion'
 import type { RoyalCue } from './royalMotion'
 import { samplePromotion } from './promotionMotion'
 import type { PromotionCue } from './promotionMotion'
@@ -233,7 +234,7 @@ function PieceBadge({ piece, flipped, low, reduced, focus }: {
   )
 }
 
-export function VisualPiece({ piece, assets, events, flipped, low, reduced, focus, threatened, royal, promotion, fall }: {
+export function VisualPiece({ piece, assets, events, flipped, low, reduced, focus, threatened, royal, promotion, fall, debrisField }: {
   piece: ScenePiece
   assets: ChessAssets
   events: readonly GameEvent[]
@@ -243,6 +244,7 @@ export function VisualPiece({ piece, assets, events, flipped, low, reduced, focu
   focus?: SceneFocus
   threatened: boolean
   fall?: KingFall
+  debrisField?: DebrisField
   royal?: RoyalCue
   promotion?: PromotionCue
 }) {
@@ -268,6 +270,9 @@ export function VisualPiece({ piece, assets, events, flipped, low, reduced, focu
   const chips = useRef<(Mesh | null)[]>([])
   const fracture = useMemo(() => piece.kind === 'king' && fall ? kingFracture(asset.geometry, fall) : null,
     [asset.geometry, piece.kind, fall])
+  const debris = useMemo(() => fall && fracture && debrisField ? planKingDebris(fracture.chips, fall, debrisField) : null,
+    [fall, fracture, debrisField])
+  const debrisRotation = useMemo(() => new Quaternion(), [])
   const fractureMaterials = useMemo(() => {
     if (!fracture) return null
     const interior = new MeshStandardMaterial({
@@ -490,24 +495,16 @@ export function VisualPiece({ piece, assets, events, flipped, low, reduced, focu
       if (fall) {
         const elapsed = royal ? now - royal.startedAt : Infinity
         const fraction = royal?.kind === 'mate' ? sampleMateFall(royal, elapsed) : 1
-        const age = royal?.kind === 'mate' ? (elapsed - royalTiming(royal).impact) / 1000 : Infinity
+        const age = royal?.kind === 'mate' ? (elapsed - mateGroundContact(royal)) / 1000 : Infinity
         if (fracture && fractureMaterials) {
           values.uBroken.value = Number(age >= 0)
           mesh.current.geometry = age >= 0 ? fracture.body : asset.geometry
           mesh.current.material = age >= 0 ? fractureMaterials : material
-          for (const [i, shard] of fracture.chips.entries()) {
+          if (debris) for (const [i, frames] of debris.entries()) {
             const fragment = chips.current[i]
             if (!fragment) continue
-            fragment.visible = !reduced && age >= 0 && age < 1.08
-            if (!fragment.visible) continue
-            const t = age
-            const radius = 1.05 + i * .13
-            fragment.position.copy(shard.center)
-            fragment.position.x += shard.direction.x * radius * t
-            fragment.position.z += shard.direction.z * radius * t
-            fragment.position.y = Math.max(.035, shard.center.y + (1.05 + .14 * (i % 3)) * t - 4.4 * t * t)
-            fragment.rotation.set((i % 2 ? -3.4 : 2.6) * t, (.74 + i) * t, (i % 2 ? 1.8 : -2.4) * t)
-            fragment.scale.setScalar(1 - easeRange(.71, 1.08, t))
+            fragment.visible = age >= 0
+            if (fragment.visible) sampleKingDebris(frames, reduced ? Infinity : age, fragment.position, fragment.quaternion, debrisRotation)
           }
         }
         const pose = kingFallPose(fall, fraction)
@@ -554,9 +551,9 @@ export function VisualPiece({ piece, assets, events, flipped, low, reduced, focu
       </mesh>
       <group ref={body}>
         <mesh ref={mesh} material={material} userData={{ square: piece.square }} castShadow={!low} receiveShadow={!low} dispose={null} />
-        {fracture && fractureMaterials && !reduced && fracture.chips.map((shard, i) =>
+        {fracture && fractureMaterials && fracture.chips.map((shard, i) =>
           <mesh key={i} ref={node => { chips.current[i] = node }} name={`king-chip-${i}`}
-            geometry={shard.geometry} material={fractureMaterials} visible={false} dispose={null} />)}
+            geometry={shard.geometry} material={fractureMaterials} castShadow={!low} receiveShadow={!low} visible={false} dispose={null} />)}
         {fire && <BerserkFire model={asset.geometry} seed={seed(piece.id)} low={low} reduced={reduced} burst={fire} />}
       </group>
       {!reduced && ghostDelay.slice(0, low ? 2 : 3).map((_, i) => (

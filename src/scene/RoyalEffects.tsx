@@ -1,7 +1,7 @@
 import { useLayoutEffect, useMemo, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import {
-  CanvasTexture, Color, InstancedMesh, MeshBasicMaterial, MeshStandardMaterial, Object3D, PointLight,
+  CanvasTexture, Color, InstancedMesh, MeshBasicMaterial, Object3D, PointLight,
 } from 'three'
 import { easeRange, sampleRoyal } from './royalMotion'
 import type { RoyalCue } from './royalMotion'
@@ -9,10 +9,8 @@ import { samplePromotion } from './promotionMotion'
 import type { PromotionCue } from './promotionMotion'
 import { squarePoint } from './types'
 
-const solidCount = 48
 const sparkCount = 48
 const dustCount = 17
-const prismColors = ['#795044', '#eeb685', '#663d44', '#b76854', '#ddd0bd', '#8899ac']
 const sparkColors = ['#ffd08f', '#f09352', '#c95443', '#ffe0a8']
 
 function unit(index: number, salt: number) {
@@ -20,22 +18,17 @@ function unit(index: number, salt: number) {
   return value - Math.floor(value)
 }
 
-function fragments(count: number, sparks: boolean) {
-  return Array.from({ length: count }, (_, i) => ({
-    angle: i * 2.399963 + unit(i, 1) * .35,
-    height: .47 + 1.06 * unit(i, 2),
-    distance: .14 + .25 * unit(i, 3),
-    speed: (sparks ? 1.34 : .91) + 1.79 * unit(i, 4),
-    lift: .70 + 1.73 * unit(i, 5),
-    size: (sparks ? .013 : .024) + unit(i, 6) ** .75 * (sparks ? .018 : .054),
-    spin: (unit(i, 7) - .5) * 11,
-    life: (sparks ? .38 : .62) + .64 * unit(i, 8),
-    lag: unit(i, 9) * .095,
-  }))
-}
-
-const prisms = fragments(solidCount, false)
-const sparks = fragments(sparkCount, true)
+const sparks = Array.from({ length: sparkCount }, (_, i) => ({
+  angle: i * 2.399963 + unit(i, 1) * .35,
+  height: unit(i, 2),
+  distance: .14 + .25 * unit(i, 3),
+  speed: 1.34 + 1.79 * unit(i, 4),
+  lift: .70 + 1.73 * unit(i, 5),
+  size: .013 + unit(i, 6) ** .75 * .018,
+  spin: (unit(i, 7) - .5) * 11,
+  life: .38 + .64 * unit(i, 8),
+  lag: unit(i, 9) * .095,
+}))
 
 let mist: CanvasTexture | undefined
 function dustTexture() {
@@ -59,7 +52,6 @@ export function RoyalEffects({ cue, promotion, low, reduced }: {
 }) {
   const warm = useRef<PointLight>(null)
   const rim = useRef<PointLight>(null)
-  const solids = useRef<InstancedMesh>(null)
   const flecks = useRef<InstancedMesh>(null)
   const powder = useRef<InstancedMesh>(null)
   const object = useMemo(() => new Object3D(), [])
@@ -70,9 +62,9 @@ export function RoyalEffects({ cue, promotion, low, reduced }: {
   const camera = useThree(state => state.camera)
 
   useLayoutEffect(() => {
-    for (const [mesh, palette, n] of [[solids.current, prismColors, solidCount], [flecks.current, sparkColors, sparkCount]] as const) {
-      if (!mesh) continue
-      for (let i = 0; i < n; i++) mesh.setColorAt(i, new Color(palette[i % palette.length]))
+    const mesh = flecks.current
+    if (mesh) {
+      for (let i = 0; i < sparkCount; i++) mesh.setColorAt(i, new Color(sparkColors[i % sparkColors.length]))
       if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true
     }
     // Three compiles mesh materials regardless of visibility. Warm the
@@ -84,8 +76,8 @@ export function RoyalEffects({ cue, promotion, low, reduced }: {
 
   useFrame(({ camera }) => {
     const light = warm.current, edge = rim.current
-    const chunks = solids.current, embers = flecks.current, dustMesh = powder.current
-    if (!light || !edge || !chunks || !embers || !dustMesh) return
+    const embers = flecks.current, dustMesh = powder.current
+    if (!light || !edge || !embers || !dustMesh) return
     const elapsed = cue ? performance.now() - cue.startedAt : 0
     const pulse = cue ? sampleRoyal(cue, elapsed) : null
     const mate = cue?.kind === 'mate'
@@ -116,39 +108,33 @@ export function RoyalEffects({ cue, promotion, low, reduced }: {
     }
     const airborne = pulse?.flight ?? -1
     const launched = airborne >= 0 && airborne < 1.38
-    chunks.visible = launched && mate
     embers.visible = launched && (mate || airborne < .64)
     dustMesh.visible = Boolean(mate && airborne >= .07 && airborne < 1.30)
 
-    function fill(mesh: InstancedMesh, pool: typeof prisms, isSpark: boolean) {
-      mesh.count = mate ? (low ? Math.floor(pool.length * .54) : pool.length) : low ? 9 : 16
+    if (embers.visible) {
+      embers.count = mate ? (low ? Math.floor(sparks.length * .54) : sparks.length) : low ? 9 : 16
       const flightScale = mate ? 1 : .66
       const inward = Math.atan2(-z, -x)
-      for (let i = 0; i < mesh.count; i++) {
-        const shard = pool[i]
+      for (let i = 0; i < embers.count; i++) {
+        const shard = sparks[i]
         const t = Math.max(0, airborne - shard.lag)
         const angle = shard.angle + inward
         const trajectory = shard.distance + shard.speed * t * flightScale
-        const grounded = shard.height + shard.lift * t - 3.75 * t * t
-        const life = (isSpark && !mate ? .49 : 1) * shard.life
+        const originHeight = mate ? .08 + .27 * shard.height : .47 + 1.06 * shard.height
+        const grounded = originHeight + shard.lift * t - 3.75 * t * t
+        const life = (mate ? 1 : .49) * shard.life
         const fade = easeRange(0, .045, airborne - shard.lag) * (1 - easeRange(life * .62, life, t))
         const y = grounded >= .021 ? grounded : .021 + .095 * Math.sin(Math.min(1, (t / life)) * Math.PI) ** 2
         object.position.set(x + Math.cos(angle) * trajectory, y, z + Math.sin(angle) * trajectory)
         object.rotation.set(.55 + shard.spin * t, angle + t * (i % 2 ? 4.3 : -3.6), shard.spin * t + .5)
         const size = Math.max(.0001, fade * shard.size * (mate ? 1 : .88))
-        object.scale.set(size * .81, size * (isSpark ? 3.3 : 2.45), size * (isSpark ? .47 : 1.13))
+        object.scale.set(size * .81, size * 3.3, size * .47)
         object.updateMatrix()
-        mesh.setMatrixAt(i, object.matrix)
+        embers.setMatrixAt(i, object.matrix)
       }
-      mesh.instanceMatrix.needsUpdate = true
+      embers.instanceMatrix.needsUpdate = true
     }
 
-    if (chunks.visible) {
-      const material = chunks.material as MeshStandardMaterial
-      material.emissiveIntensity = .08 + (pulse?.discharge ?? 0) * .39
-      fill(chunks, prisms, false)
-    }
-    if (embers.visible) fill(embers, sparks, true)
     if (dustMesh.visible) {
       dustMesh.count = low ? 8 : dustCount
       const age = airborne - .07
@@ -171,10 +157,6 @@ export function RoyalEffects({ cue, promotion, low, reduced }: {
   return <>
     <pointLight ref={warm} color="#ff6a3b" intensity={0} distance={4.8} decay={2} />
     <pointLight ref={rim} color="#a2c0f2" intensity={0} distance={3.6} decay={2} />
-    <instancedMesh ref={solids} args={[undefined, undefined, solidCount]} frustumCulled={false} visible={false}>
-      <icosahedronGeometry args={[1, 0]} />
-      <meshStandardMaterial color="#ead6c5" metalness={.57} roughness={.30} emissive="#b64e25" emissiveIntensity={.08} />
-    </instancedMesh>
     <instancedMesh ref={flecks} args={[undefined, undefined, sparkCount]} frustumCulled={false} visible={false}>
       <tetrahedronGeometry args={[1, 0]} />
       <meshBasicMaterial color="#ffd6a0" />

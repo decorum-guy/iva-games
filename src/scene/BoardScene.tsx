@@ -248,6 +248,17 @@ function MarbleSet({ pieces, marks, events, flipped, low, reduced, focus, royal,
   const defeated = royal?.kind === 'mate' ? pieces.find(piece => piece.id === royal.pieceId)
     : pieces.find(piece => piece.defeated && piece.kind === 'king')
   const fall = useMemo(() => defeated ? planKingFall(defeated, pieces, assets) : undefined, [defeated, pieces, assets])
+  const debrisField = useMemo(() => {
+    if (!defeated) return undefined
+    const [x, z] = squarePoint(defeated.square)
+    const neighbors = pieces.filter(piece => piece.id !== defeated.id).map(piece => {
+      const [nx, nz] = squarePoint(piece.square)
+      const box = assets.pieces[piece.side][piece.kind].geometry.boundingBox!
+      const radius = Math.max(box.max.x, -box.min.x, box.max.z, -box.min.z)
+      return { x: nx - x, z: nz - z, radius }
+    }).filter(point => Math.hypot(point.x, point.z) < 4)
+    return { x, z, neighbors }
+  }, [defeated, pieces, assets])
   const initialEvent = useRef(events.at(-1)?.id)
   const currentEvents = events.at(-1)?.id === initialEvent.current ? emptyEvents : events
   const eventsById = useMemo(() => {
@@ -273,6 +284,7 @@ function MarbleSet({ pieces, marks, events, flipped, low, reduced, focus, royal,
             low={low} flipped={flipped} reduced={reduced}
             focus={piece.square === focus?.square ? focus : undefined}
             fall={piece === defeated ? fall : undefined}
+            debrisField={piece === defeated ? debrisField : undefined}
             threatened={piece.kind === 'king' && marks.some(mark => mark.kind === 'check' && mark.square === piece.square)}
             royal={piece.id === royal?.pieceId ? royal : undefined}
             promotion={piece.id === promotion?.pieceId ? promotion : undefined}
