@@ -167,3 +167,11 @@ Verify variant tactics; no live RNG mutation by search; public root/path repetit
 Verify the rating formula and exactly-once IndexedDB transaction through duplicate delivery, reload, conflicting tabs and interrupted finalization. Prove Rated/Practice restrictions through the session API, all import/tutorial exclusions, suspension versus resignation, and no Elo from technical errors or practice undo. Verify capture-event snapshots, root-ledger handoff, branch-aware capture rows and material recalculation without speculative HUD mutation. Do not report these as passed before executable checks and browser inspection actually run.
 
 Verify ru/en switching during an active AI search, bonus phase and tutorial step: the state/hash, RNG, rating eligibility and controller identity stay unchanged while current and historical UI text changes language. Follow the full two-language coverage checks in `LOCALIZATION.md`.
+
+## Implementation in this repository
+
+`GameSession` accepts identified commands with an actor and expected revision. Its snapshot exposes the public rules state, committed events and root capture ledger. The local implementation returns a new session after a valid decision. A future remote transport can preserve the same interface, validate the seat on the server and return an authoritative snapshot on reconnect.
+
+Version 1 saves use a validated root snapshot, its private RNG seed and a log of accepted commands with resolved dice. The cursor selects the current history branch. Loading verifies the schema and replays the commands through the same core used during play. The optional tutorial origin preserves the educational history as read-only evidence, outside the practice undo range. Imports allocate a new unrated identity.
+
+The bot receives only public state and the request identity. A worker result has to match the active game, revision, session generation and preset, and its command must still pass the normal session checks. The controller terminates a superseded worker and retries a failure once before offering recovery. Rated reservation and settlement use IndexedDB transactions, with the rating ledger keyed by match ID.
