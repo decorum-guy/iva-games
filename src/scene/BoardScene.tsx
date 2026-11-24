@@ -6,13 +6,17 @@ import { Canvas, useFrame, useLoader, useThree } from '@react-three/fiber'
 import type { RootState } from '@react-three/fiber'
 import { EnvironmentMap } from '@react-three/drei'
 import { EquirectangularReflectionMapping, PerspectiveCamera, Plane, Raycaster, Vector2, Vector3 } from 'three'
+import type { DirectionalLight, HemisphereLight } from 'three'
 import { HDRLoader } from 'three/addons/loaders/HDRLoader.js'
 import type { GameEvent } from '../core/types'
 import { BoardSurface } from './BoardSurface'
 import { DepartingPiece, VisualPiece } from './Piece'
 import { clearChessAssetLoad, studioHDR, useChessAssets } from './assets'
-import { CAMERA_OVERSCAN, CAMERA_TRAVEL_MS, frameCamera, frameCameraOrbit, overscanFov, sameCameraRig, sampleCameraTravel } from './cameraFocus'
+import { CAMERA_OVERSCAN, CAMERA_TRAVEL_MS, frameCamera, frameCameraOrbit, frameRoyalCamera, overscanFov, sameCameraRig, sampleCameraTravel } from './cameraFocus'
 import type { CameraFrame, CameraRig } from './cameraFocus'
+import { easeRange, sampleRoyal } from './royalMotion'
+import type { RoyalCue } from './royalMotion'
+import { RoyalEffects } from './RoyalEffects'
 import { squarePoint, worldSquare } from './types'
 import type { BoardSceneProps, SceneFocus, SceneMark } from './types'
 import './scene.css'
@@ -39,11 +43,12 @@ const emptyEvents: readonly GameEvent[] = []
 const emptyMarks: readonly SceneMark[] = []
 const toRadians = Math.PI / 180
 
-function Viewpoint({ flipped, preset, reduced, focus, onOrbit }: {
+function Viewpoint({ flipped, preset, reduced, focus, royal, onOrbit }: {
   flipped: boolean
   preset: NonNullable<BoardSceneProps['camera']>
   reduced: boolean
   focus?: SceneFocus
+  royal?: RoyalCue
   onOrbit: (active: boolean) => void
 }) {
   const camera = useThree(state => state.camera) as PerspectiveCamera
@@ -57,6 +62,8 @@ function Viewpoint({ flipped, preset, reduced, focus, onOrbit }: {
   const applied = useRef<CameraFrame | null>(null)
   const change = useRef<{ from: CameraRig; to: CameraRig; start: number; orbitFrom?: CameraFrame } | null>(null)
   const configured = useRef<CameraRig | null>(null)
+  const lastRoyal = useRef<CameraFrame | null>(null)
+  const returnRoyal = useRef<{ from: CameraFrame; start: number } | null>(null)
 
   function apply(value: CameraRig, frame = frameCamera(value, aspect, mobile)) {
     camera.fov = overscanFov(value.fov)
@@ -93,18 +100,51 @@ function Viewpoint({ flipped, preset, reduced, focus, onOrbit }: {
     invalidate()
   }, [aspect, camera, height, yaw, invalidate, mobile, onOrbit, preset, reduced, focus?.square, focus?.key])
 
+  useLayoutEffect(() => {
+    if (!royal && lastRoyal.current && !change.current && !reduced) {
+      returnRoyal.current = { from: lastRoyal.current, start: performance.now() }
+    } else returnRoyal.current = null
+    lastRoyal.current = null
+    invalidate()
+  }, [royal?.id, reduced, invalidate])
+
   useFrame(() => {
+    if (!rig.current) return
+    const now = performance.now()
     const travel = change.current
-    if (!travel) return
-    const elapsed = performance.now() - travel.start
-    rig.current = sampleCameraTravel(travel.from, travel.to, elapsed)
-    apply(rig.current, travel.orbitFrom
-      ? frameCameraOrbit(rig.current, travel.orbitFrom, frameCamera(travel.to, aspect, mobile), elapsed)
-      : undefined)
-    if (elapsed >= CAMERA_TRAVEL_MS) {
-      change.current = null
-      onOrbit(false)
-    } else if (!document.hidden) invalidate()
+    let overview: CameraFrame | undefined
+    if (travel) {
+      const elapsed = now - travel.start
+      rig.current = sampleCameraTravel(travel.from, travel.to, elapsed)
+      overview = travel.orbitFrom
+        ? frameCameraOrbit(rig.current, travel.orbitFrom, frameCamera(travel.to, aspect, mobile), elapsed)
+        : frameCamera(rig.current, aspect, mobile)
+      if (elapsed >= CAMERA_TRAVEL_MS) {
+        change.current = null
+        onOrbit(false)
+      } else if (!document.hidden) invalidate()
+    }
+    if (royal && !royal.reduced && !reduced) {
+      const shot = sampleRoyal(royal, now - royal.startedAt)
+      const frame = frameRoyalCamera(rig.current, aspect, mobile, squarePoint(royal.square),
+        royal.kind === 'mate', shot.camera, shot.recoil, overview)
+      apply(rig.current, frame)
+      lastRoyal.current = shot.camera > .001 ? frame : null
+      if (!document.hidden) invalidate()
+    } else if (overview) {
+      apply(rig.current, overview)
+    } else if (returnRoyal.current) {
+      const { from, start } = returnRoyal.current
+      const target = frameCamera(rig.current, aspect, mobile)
+      const t = easeRange(0, 290, now - start)
+      apply(rig.current, {
+        position: from.position.clone().lerp(target.position, t),
+        target: from.target.clone().lerp(target.target, t),
+        distance: from.distance + (target.distance - from.distance) * t,
+      })
+      if (t === 1) returnRoyal.current = null
+      else if (!document.hidden) invalidate()
+    }
   })
 
   return null
@@ -116,17 +156,26 @@ function Reflections({ low }: { low: boolean }) {
   return <EnvironmentMap map={texture} environmentIntensity={low ? .55 : .66} environmentRotation={[0, .63, 0]} />
 }
 
-function Lighting({ low }: { low: boolean }) {
+function Lighting({ low, royal }: { low: boolean; royal?: RoyalCue }) {
+  const ambient = useRef<HemisphereLight>(null)
+  const key = useRef<DirectionalLight>(null)
+  const fill = useRef<DirectionalLight>(null)
+  useFrame(() => {
+    const shade = royal ? sampleRoyal(royal, performance.now() - royal.startedAt).dusk : 0
+    if (ambient.current) ambient.current.intensity = .44 - shade * .11
+    if (key.current) key.current.intensity = 1.70 - shade * .64
+    if (fill.current) fill.current.intensity = 1.12 - shade * .32
+  })
   return (
     <>
-      <hemisphereLight color="#f1eee8" groundColor="#4b5870" intensity={.44} />
+      <hemisphereLight ref={ambient} color="#f1eee8" groundColor="#4b5870" intensity={.44} />
       <directionalLight
-        castShadow={!low} position={[-3.8, 9.4, 5.7]} color="#fff1dc" intensity={1.70}
+        ref={key} castShadow={!low} position={[-3.8, 9.4, 5.7]} color="#fff1dc" intensity={1.70}
         shadow-mapSize-width={1536} shadow-mapSize-height={1536}
         shadow-camera-left={-7} shadow-camera-right={7} shadow-camera-top={7} shadow-camera-bottom={-7}
         shadow-camera-near={.5} shadow-camera-far={24} shadow-normalBias={.022} shadow-bias={-.00016} shadow-radius={2.8}
       />
-      <directionalLight position={[4.5, 5, -5.8]} color="#b9d3ff" intensity={1.12} />
+      <directionalLight ref={fill} position={[4.5, 5, -5.8]} color="#b9d3ff" intensity={1.12} />
       <directionalLight position={[4.9, 4.5, 1.5]} color="#fff4e3" intensity={.24} />
       <GraphicsBoundary>
         <Suspense fallback={null}>
@@ -162,7 +211,7 @@ function eventPieceId(event: GameEvent) {
   return null
 }
 
-function MarbleSet({ pieces, marks, events, flipped, low, reduced, focus, onReady }: {
+function MarbleSet({ pieces, marks, events, flipped, low, reduced, focus, royal, onReady }: {
   pieces: BoardSceneProps['pieces']
   marks: readonly SceneMark[]
   events: readonly GameEvent[]
@@ -170,6 +219,7 @@ function MarbleSet({ pieces, marks, events, flipped, low, reduced, focus, onRead
   low: boolean
   reduced: boolean
   focus?: SceneFocus
+  royal?: RoyalCue
   onReady: () => void
 }) {
   const assets = useChessAssets()
@@ -190,13 +240,15 @@ function MarbleSet({ pieces, marks, events, flipped, low, reduced, focus, onRead
   useEffect(onReady, [onReady])
   return (
     <>
-      <BoardSurface assets={assets} marks={marks} flipped={flipped} />
+      <BoardSurface assets={assets} marks={marks} flipped={flipped} royal={royal} />
       <group name="remorse-pieces">
         {pieces.map(piece => (
           <VisualPiece
             key={piece.id} piece={piece} assets={assets} events={eventsById.get(piece.id) ?? emptyEvents}
             low={low} flipped={flipped} reduced={reduced}
             focus={piece.square === focus?.square ? focus : undefined}
+            threatened={piece.kind === 'king' && marks.some(mark => mark.kind === 'check' && mark.square === piece.square)}
+            royal={piece.id === royal?.pieceId ? royal : undefined}
           />
         ))}
       </group>
@@ -231,7 +283,7 @@ interface PointerOrigin {
 export default function BoardScene({
   pieces, marks = emptyMarks, events = emptyEvents, flipped = false,
   camera = 'studio', quality, reducedMotion = false, motionKey,
-  focus, onSquare, onDragSquare, onFailure, loadingLabel,
+  focus, royal, onSquare, onDragSquare, onFailure, loadingLabel,
 }: BoardSceneProps) {
   const reduced = useReducedMotion(reducedMotion)
   const pointer = useRef<PointerOrigin>(null)
@@ -342,13 +394,14 @@ export default function BoardScene({
           shadows={low ? false : 'percentage'}
           onCreated={state => { scene.current = state; state.gl.toneMappingExposure = .97 }}
         >
-          <Viewpoint flipped={flipped} preset={camera} reduced={reduced} focus={activeFocus} onOrbit={onOrbit} />
+          <Viewpoint flipped={flipped} preset={camera} reduced={reduced} focus={activeFocus} royal={royal} onOrbit={onOrbit} />
           <ContextLifecycle onFailure={onFailure} />
-          <Lighting low={low} />
+          <Lighting low={low} royal={royal} />
+          <RoyalEffects cue={royal} low={low} />
           <Suspense fallback={null}>
             <MarbleSet
               key={motionKey ?? 'marble-set'} pieces={pieces} marks={focusedMarks} events={events}
-              flipped={flipped} low={low} reduced={reduced} focus={activeFocus} onReady={onReady}
+              flipped={flipped} low={low} reduced={reduced} focus={activeFocus} royal={royal} onReady={onReady}
             />
           </Suspense>
         </Canvas>

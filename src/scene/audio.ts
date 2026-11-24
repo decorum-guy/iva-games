@@ -2,17 +2,21 @@ import type { Affliction, GameEvent, Side } from '../core/types'
 import { sampleWindow, sceneAudioPath } from './audioSamples'
 import type { SampleName } from './audioSamples'
 import { getDieMotionTiming } from './diceMotion'
+import { royalTiming } from './royalMotion'
+import type { RoyalCue } from './royalMotion'
 
 export interface SceneAudioOptions {
   readonly reducedMotion?: boolean
   readonly humanSide?: Side | null
   /** performance.now() at the live presentation commit, shared with its animation. */
   readonly startedAt?: number
+  readonly royal?: boolean
 }
 
 type CueKind = 'move' | 'capture' | 'mercy' | 'friendlyCapture' | 'dice' | 'unaffected'
   | 'guilt' | 'devastated' | 'berserk' | 'bloodlust' | 'heal' | 'convert' | 'remove'
-  | 'promotion' | 'bonus' | 'check' | 'turn' | 'win' | 'loss' | 'draw' | 'finish'
+  | 'promotion' | 'bonus' | 'check' | 'turn' | 'win' | 'loss' | 'draw' | 'finish' | RoyalSound
+type RoyalSound = 'royalCheck' | 'royalCharge' | 'royalBreak' | 'royalWin' | 'royalLoss' | 'royalEnd'
 
 interface SceneCue {
   readonly kind: CueKind
@@ -54,17 +58,17 @@ export function planSceneCues(events: readonly GameEvent[], options: SceneAudioO
   if (rolled) cues.push({ kind: 'dice', at: 0 })
 
   let accent: CueKind | undefined
-  if (outcome) {
+  if (outcome && !options.royal) {
     const winner = outcome.outcome.winner
     accent = winner === null ? 'draw' : !options.humanSide ? 'finish' : winner === options.humanSide ? 'win' : 'loss'
-  } else if (checked) accent = 'check'
+  } else if (checked && !options.royal) accent = 'check'
   else accent = importantEffect(events, rolled)
 
   if (accent) {
     const at = rolled ? getDieMotionTiming(reduced).motionMs / 1000 + DIE_SETTLE_SOUND_GAP
       : cues.length ? (reduced ? .084 : .258) : .018
     cues.push({ kind: accent, at })
-  } else if (!cues.length && events.some(event => event.type === 'turn')) cues.push({ kind: 'turn', at: .018 })
+  } else if (!options.royal && !cues.length && events.some(event => event.type === 'turn')) cues.push({ kind: 'turn', at: .018 })
   return cues
 }
 
@@ -73,6 +77,7 @@ interface AudioGraph {
   readonly input: GainNode
   readonly master: GainNode
   samples?: AudioBuffer
+  charge?: AudioBuffer
 }
 
 interface Voice {
@@ -94,7 +99,7 @@ interface SampleVoice {
   readonly gain: number
 }
 
-const regular: Record<Exclude<CueKind, 'dice'>, SampleVoice> = {
+const regular: Record<Exclude<CueKind, 'dice' | RoyalSound>, SampleVoice> = {
   move: { sample: 'stone', rate: 1, gain: .47 },
   capture: { sample: 'capture', rate: 1, gain: .68 },
   mercy: { sample: 'stone', rate: .87, gain: .40 },
@@ -116,6 +121,35 @@ const regular: Record<Exclude<CueKind, 'dice'>, SampleVoice> = {
   draw: { sample: 'resonance', rate: .93, gain: .48 },
   finish: { sample: 'capture', rate: .84, gain: .61 },
 }
+
+// The castle scenes remix the same recorded stone, metal and resonance bank.
+// The layers share a compressed output and one contact time for the whole hit.
+const royalLayers = {
+  royalCheck: [
+    [0, { sample: 'capture', rate: 1.17, gain: .68 }],
+    [.012, { sample: 'diceEdge', rate: .81, gain: .35 }],
+    [.038, { sample: 'resonance', rate: .84, gain: .31 }],
+  ],
+  royalBreak: [
+    [0, { sample: 'capture', rate: .68, gain: .92 }],
+    [.009, { sample: 'fracture', rate: .80, gain: .61 }],
+    [.024, { sample: 'diceEdge', rate: .84, gain: .41 }],
+    [.072, { sample: 'resonance', rate: .61, gain: .42 }],
+    [.190, { sample: 'stone', rate: .63, gain: .18 }],
+  ],
+  royalWin: [
+    [0, { sample: 'resonance', rate: .98, gain: .39 }],
+    [.085, { sample: 'resonance', rate: 1.46, gain: .27 }],
+  ],
+  royalLoss: [
+    [0, { sample: 'resonance', rate: .61, gain: .36 }],
+    [.067, { sample: 'stone', rate: .65, gain: .21 }],
+  ],
+  royalEnd: [
+    [0, { sample: 'stone', rate: .74, gain: .26 }],
+    [.039, { sample: 'resonance', rate: .79, gain: .31 }],
+  ],
+} as const satisfies Record<Exclude<RoyalSound, 'royalCharge'>, readonly (readonly [number, SampleVoice])[]>
 const diceImpacts: readonly SampleVoice[] = [
   { sample: 'diceBody', rate: .93, gain: 1.05 },
   { sample: 'diceBounce', rate: 1.03, gain: .80 },
@@ -207,7 +241,17 @@ function buildGraph(audio: AudioContext): AudioGraph {
   const result: AudioGraph = { audio, input, master }
   if (typeof audio.decodeAudioData === 'function') {
     void prepareSceneAudio().then(async bytes => {
-      if (bytes && audio.state !== 'closed') result.samples = await audio.decodeAudioData(bytes.slice(0))
+      if (!bytes || audio.state === 'closed') return
+      const samples = await audio.decodeAudioData(bytes.slice(0))
+      result.samples = samples
+      const resonance = sampleWindow('resonance')
+      const begin = Math.round(resonance.offset * samples.sampleRate)
+      const length = Math.round(resonance.duration * samples.sampleRate)
+      const charge = audio.createBuffer(1, length, samples.sampleRate)
+      const target = charge.getChannelData(0)
+      const recorded = samples.getChannelData(0)
+      for (let i = 0; i < length; i++) target[i] = recorded[begin + length - 1 - i] * (i / length)
+      result.charge = charge
     }).catch(() => undefined)
   }
   return result
@@ -304,6 +348,21 @@ function renderCue(g: AudioGraph, kind: CueKind, when: number, reduced: boolean)
     }
     return
   }
+  if (kind === 'royalCharge') {
+    if (!g.charge || when < g.audio.currentTime) return
+    const source = g.audio.createBufferSource()
+    source.buffer = g.charge
+    source.playbackRate.setValueAtTime(.247, when)
+    connectVoice(g, source, reduced ? .24 : .35)
+    source.start(when)
+    return
+  }
+  if (kind === 'royalCheck' || kind === 'royalBreak' || kind === 'royalWin' || kind === 'royalLoss' || kind === 'royalEnd') {
+    for (const [delay, layer] of royalLayers[kind]) {
+      playContact(g, when + delay, reduced ? { ...layer, gain: layer.gain * .73 } : layer)
+    }
+    return
+  }
   const sound = regular[kind]
   const rate = reduced && (kind === 'move' || kind === 'capture' || kind === 'mercy' || kind === 'friendlyCapture')
     ? sound.rate * 1.42 : sound.rate
@@ -323,17 +382,14 @@ function scheduleCues(g: AudioGraph, cues: readonly SceneCue[], options: SceneAu
   for (const cue of future) renderCue(g, cue.kind, base + cue.at, reduced)
 }
 
-/** Accept only newly committed live events. Never call this with restored/review/search history. */
-export function playSceneCue(events: readonly GameEvent[], options: SceneAudioOptions = {}): boolean {
+function playBatch(batchId: string | undefined, cues: readonly SceneCue[], options: SceneAudioOptions): boolean {
   if (!enabled || masterVolume === 0 || !graph || !visible()) return false
-  const batchId = events.at(-1)?.id
   if (!batchId || seenBatches.has(batchId)) return false
   const now = nowMs()
   const startedAt = typeof options.startedAt === 'number' && Number.isFinite(options.startedAt) && options.startedAt >= 0
     ? Math.min(now, options.startedAt) : now
   const elapsedMs = now - startedAt
   if (elapsedMs > MAX_CUE_AGE_MS) return false
-  const cues = planSceneCues(events, options)
   if (!cues.length) return false
   try {
     if (graph.audio.state === 'running') scheduleCues(graph, cues, options, elapsedMs)
@@ -346,4 +402,21 @@ export function playSceneCue(events: readonly GameEvent[], options: SceneAudioOp
     stopSceneAudio()
     return false
   }
+}
+
+/** Accept only newly committed live events. Never call this with restored/review/search history. */
+export function playSceneCue(events: readonly GameEvent[], options: SceneAudioOptions = {}): boolean {
+  return playBatch(events.at(-1)?.id, planSceneCues(events, options), options)
+}
+
+export function playRoyalCue(cue: RoyalCue) {
+  const { impact, resolution } = royalTiming(cue)
+  const cues: SceneCue[] = cue.kind === 'check'
+    ? [{ kind: 'royalCheck', at: impact / 1000 }]
+    : [
+      { kind: 'royalCharge', at: (impact - 760) / 1000 },
+      { kind: 'royalBreak', at: impact / 1000 },
+      { kind: cue.tone === 'win' ? 'royalWin' : cue.tone === 'loss' ? 'royalLoss' : 'royalEnd', at: resolution / 1000 },
+    ]
+  return playBatch(`royal/${cue.id}`, cues, { reducedMotion: cue.reduced, startedAt: cue.startedAt })
 }

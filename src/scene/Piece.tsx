@@ -13,6 +13,8 @@ import {
 import { conditionCode, setArmySurface, stoneMaterial } from './stone'
 import { squarePoint, stateColors } from './types'
 import type { SceneFocus, ScenePiece } from './types'
+import { easeRange, sampleRoyal } from './royalMotion'
+import type { RoyalCue } from './royalMotion'
 
 const restHeight = .005
 const flatRotation: [number, number, number] = [-Math.PI / 2, 0, 0]
@@ -226,7 +228,7 @@ function PieceBadge({ piece, flipped, low, reduced, focus }: {
   )
 }
 
-export function VisualPiece({ piece, assets, events, flipped, low, reduced, focus }: {
+export function VisualPiece({ piece, assets, events, flipped, low, reduced, focus, threatened, royal }: {
   piece: ScenePiece
   assets: ChessAssets
   events: readonly GameEvent[]
@@ -234,6 +236,8 @@ export function VisualPiece({ piece, assets, events, flipped, low, reduced, focu
   low: boolean
   reduced: boolean
   focus?: SceneFocus
+  threatened: boolean
+  royal?: RoyalCue
 }) {
   const mesh = useRef<Mesh>(null)
   const body = useRef<Group>(null)
@@ -242,6 +246,7 @@ export function VisualPiece({ piece, assets, events, flipped, low, reduced, focu
   const move = useRef<Travel | null>(null)
   const change = useRef<Change | null>(null)
   const focusStart = useRef<number | null>(null)
+  const threat = useRef({ rest: Number(threatened), from: Number(threatened), to: Number(threatened), start: 0 })
   const previous = useRef<{ piece: ScenePiece; eventId?: string }>(null)
   const invalidate = useThree(state => state.invalidate)
   const asset = assets.pieces[piece.side][piece.kind]
@@ -255,6 +260,14 @@ export function VisualPiece({ piece, assets, events, flipped, low, reduced, focu
     values.uFocus.value = focus && reduced ? sampleFigureEmphasis(0, true) : 0
     invalidate()
   }, [focus?.key, focus?.subject, reduced, values, invalidate])
+
+  useLayoutEffect(() => {
+    const next = Number(threatened)
+    if (threat.current.to !== next) {
+      threat.current = { rest: threat.current.rest, from: threat.current.rest, to: next, start: performance.now() }
+    }
+    invalidate()
+  }, [threatened, royal?.id, invalidate])
 
   function stoneState(affliction: ScenePiece['affliction'], amount: number) {
     values.uCondition.value = conditionCode[affliction]
@@ -392,6 +405,18 @@ export function VisualPiece({ piece, assets, events, flipped, low, reduced, focu
       const elapsed = now - focusStart.current
       values.uFocus.value = sampleFigureEmphasis(elapsed, reduced)
       if (!reduced && elapsed < FOCUS_EMPHASIS_MS) active = true
+    }
+    if (piece.kind === 'king') {
+      const mark = threat.current
+      const blend = easeRange(0, reduced ? 160 : 240, now - mark.start)
+      mark.rest = mark.from + (mark.to - mark.from) * blend
+      const beam = royal ? sampleRoyal(royal, now - royal.startedAt) : null
+      const uniform = values.uRoyal.value
+      uniform.x = mark.rest
+      uniform.y = beam?.surface ?? 0
+      uniform.z = beam?.sweep ?? 0
+      uniform.w = beam?.discharge ?? 0
+      if (beam || (mark.from !== mark.to && blend < 1)) active = true
     }
     if (active && !document.hidden) invalidate()
   })

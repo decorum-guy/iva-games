@@ -104,6 +104,37 @@ export function frameCamera(rig: CameraRig, aspect: number, compact: boolean): C
   return { position: target.clone().addScaledVector(view, distance), target, distance }
 }
 
+export function frameRoyalCamera(
+  rig: CameraRig, aspect: number, compact: boolean, [x, z]: GroundPoint,
+  mate: boolean, amount: number, recoil: number, overview = frameCamera(rig, aspect, compact),
+): CameraFrame {
+  if (amount === 0) return overview
+  // Move inward on either side of the table. The corner of the board can leave
+  // the shot, while the crown and the ground contact remain inside the frame.
+  const viewSide = (x * Math.cos(rig.yaw) - z * Math.sin(rig.yaw)) >= 0 ? -1 : 1
+  const angle = mate ? 10 : 2.5
+  const cinematic = {
+    ...rig, yaw: rig.yaw + viewSide * angle * radians * amount,
+    elevation: rig.elevation - (mate ? 11 : 2.5) * radians * amount,
+  }
+  const view = viewDirection(cinematic)
+  const extent = mate ? 1.27 : .89
+  const bounds = [-extent, extent].flatMap(dx => [-.14, mate ? 2.22 : 1.86].flatMap(y =>
+    [-extent, extent].map(dz => [x + dx, y, z + dz] as const)))
+  const portrait = fitFrame(bounds, new Vector3(x, .93, z), view, rig.fov, aspect, mate ? .84 : .94)
+  const distanceLimit = overview.distance * (mate ? .47 : .71)
+  const closest = Math.min(overview.distance, Math.max(portrait.distance, distanceLimit))
+  const distance = overview.distance + (closest - overview.distance) * amount + recoil * .15
+  const target = overview.target.clone().lerp(portrait.target, amount * (mate ? .99 : .63))
+  // Keep some board context under the crown at a corner of the table.
+  if (mate) {
+    target.x *= 1 - amount * .12
+    target.z *= 1 - amount * .12
+  }
+  target.y -= .034 * recoil
+  return { target, distance, position: target.clone().addScaledVector(view, distance) }
+}
+
 export function sameCameraRig(a: CameraRig, b: CameraRig): boolean {
   return a.elevation === b.elevation && a.yaw === b.yaw && a.fov === b.fov && a.focusAmount === b.focusAmount
     && a.focusPoint[0] === b.focusPoint[0] && a.focusPoint[1] === b.focusPoint[1]

@@ -4,6 +4,8 @@ import type { SearchRequest, SearchResponse } from '../engine/protocol';
 import { initialProfile } from '../rating/elo';
 import { getDieMotionTiming, getDieThrowDuration } from '../scene/diceMotion';
 import { CAMERA_TRAVEL_MS } from '../scene/cameraFocus';
+import { royalAction, royalLeadIn, royalTiming } from '../scene/royalMotion';
+import type { RoyalCue } from '../scene/royalMotion';
 import type { Profile, RatingEntry } from '../rating/elo';
 import { openGameStore } from '../storage/database';
 import type { GameStore, StorageProblem } from '../storage/database';
@@ -40,7 +42,10 @@ interface CabinetState {
   readonly rollPhase: 'idle' | 'throwing' | 'settled';
   readonly rollReduced: boolean;
   readonly rollStartedAt: number | null;
-  readonly audioCue: { readonly id: string; readonly events: readonly GameEvent[]; readonly human: Side | null; readonly startedAt: number } | null;
+  readonly audioCue: { readonly id: string; readonly events: readonly GameEvent[]; readonly human: Side | null; readonly startedAt: number; readonly royal: boolean } | null;
+  readonly royalPending: boolean;
+  readonly royalCue: RoyalCue | null;
+  readonly royalResolved: boolean;
 }
 
 function preference(key: string, setting?: string) {
@@ -70,6 +75,7 @@ export class Cabinet {
     ready: false, durable: false, storageProblem: null, busy: false, animating: false, teachingReturning: false, thinking: false, searchFailed: false,
     profile: initialProfile, ledger: [], matches: [], view: 'home', game: null, learning: null,
     error: null, motionKey: 'home', rollId: null, rollPhase: 'idle', rollReduced: false, rollStartedAt: null, audioCue: null,
+    royalPending: false, royalCue: null, royalResolved: false,
   };
   private readonly listeners = new Set<() => void>();
   private store: GameStore | null = null;
@@ -79,6 +85,7 @@ export class Cabinet {
   private scheduled: ReturnType<typeof setTimeout> | undefined;
   private reveal: ReturnType<typeof setTimeout> | undefined;
   private settle: ReturnType<typeof setTimeout> | undefined;
+  private royalEnd: ReturnType<typeof setTimeout> | undefined;
   private teachingReturn: ReturnType<typeof setTimeout> | undefined;
   private attempts = 0;
   private shortMotion = false;
@@ -223,6 +230,7 @@ export class Cabinet {
   setShortMotion(shortMotion: boolean) {
     this.shortMotion = shortMotion;
     if (shortMotion && this.data.teachingReturning) this.finishTeachingReturn();
+    if (shortMotion && this.data.royalCue && !this.data.royalCue.reduced) this.finishRoyal();
   }
 
   setTeachingCamera(enabled: boolean) {
@@ -243,10 +251,11 @@ export class Cabinet {
     clearTimeout(this.scheduled);
     clearTimeout(this.reveal);
     clearTimeout(this.settle);
+    clearTimeout(this.royalEnd);
     clearTimeout(this.teachingReturn);
     this.attempts = 0;
     this.patch({ thinking: false, animating: false, teachingReturning: false, searchFailed: false, motionKey: newId(), rollId: null,
-      rollPhase: 'idle', rollStartedAt: null, audioCue: null });
+      rollPhase: 'idle', rollStartedAt: null, audioCue: null, royalPending: false, royalCue: null, royalResolved: false });
   }
 
   private async run(action: () => void | Promise<void>): Promise<boolean> {
@@ -375,27 +384,46 @@ export class Cabinet {
     // This is a live, committed action. Restores/reviews never call present and
     // therefore cannot replay old sounds. Results need a cue even without motion.
     const startedAt = performance.now();
-    const audioCue = { id: `${game.record.id}/${action.id}`, events: game.current.events, human: game.record.config.human, startedAt };
+    const { events } = game.current;
+    const { human, mode } = game.record.config;
+    const royal = mode === 'tutorial' ? null : royalAction(game.state, events, human, this.shortMotion);
+    const audioCue = { id: `${game.record.id}/${action.id}`, events, human, startedAt, royal: Boolean(royal) };
     const showsMotion = action.command.type === 'move' || action.command.type === 'endTurn';
     if (!showsMotion) { this.patch({ audioCue }); return; }
     clearTimeout(this.reveal);
     clearTimeout(this.settle);
     const rollId = action.roll ? action.id : null;
-    const duration = rollId ? getDieThrowDuration(this.shortMotion) : this.shortMotion ? 75 : 330;
+    const motion = rollId ? getDieMotionTiming(this.shortMotion).motionMs : null;
+    const baseDuration = rollId ? getDieThrowDuration(this.shortMotion) : this.shortMotion ? 75 : 330;
+    const duration = royal ? royalLeadIn(events, baseDuration, motion, this.shortMotion) : baseDuration;
     this.patch({ audioCue, animating: true, rollId, rollPhase: rollId ? 'throwing' : 'idle', rollReduced: this.shortMotion,
-      rollStartedAt: rollId ? startedAt : null });
-    if (rollId) this.settle = setTimeout(() => {
+      rollStartedAt: rollId ? startedAt : null, royalPending: Boolean(royal) });
+    if (motion !== null) this.settle = setTimeout(() => {
       this.patch({ rollPhase: 'settled' });
-    }, getDieMotionTiming(this.shortMotion).motionMs);
+    }, motion);
     this.reveal = setTimeout(() => {
-      this.patch({ animating: false, rollPhase: 'idle' });
-      this.pump();
+      const cue = royal && (typeof document === 'undefined' || !document.hidden)
+        ? { ...royal, reduced: this.shortMotion, startedAt: performance.now() } : null;
+      this.patch({ animating: false, rollPhase: 'idle', royalPending: false, royalCue: cue, royalResolved: false });
+      if (!cue) { this.pump(); return; }
+      const { duration, resolution } = royalTiming(cue);
+      this.royalEnd = cue.kind === 'check' ? setTimeout(this.finishRoyal, duration) : setTimeout(() => {
+        this.patch({ royalResolved: true });
+        this.royalEnd = setTimeout(this.finishRoyal, duration - resolution);
+      }, resolution);
     }, duration);
   }
 
+  finishRoyal = () => {
+    if (!this.data.royalCue) return;
+    clearTimeout(this.royalEnd);
+    this.patch({ royalCue: null, royalResolved: false });
+    this.pump();
+  };
+
   command = (command: Command) => this.run(async () => {
     this.requireStorageRecovery();
-    if ((this.data.animating || this.data.teachingReturning) && command.type !== 'resign') return;
+    if ((this.data.animating || this.data.teachingReturning || this.data.royalCue) && command.type !== 'resign') return;
     if (this.data.view === 'learn' && this.data.learning) {
       const current = this.data.learning;
       const { progress, explanation } = learnerAction(current, command);
@@ -530,8 +558,8 @@ export class Cabinet {
   private pump() {
     clearTimeout(this.scheduled);
     if (!this.data.ready || this.data.storageProblem) return;
-    const { view, busy, game, learning, animating, teachingReturning, thinking, searchFailed } = this.data;
-    if (busy || animating || teachingReturning || thinking || searchFailed) return;
+    const { view, busy, game, learning, animating, teachingReturning, royalCue, thinking, searchFailed } = this.data;
+    if (busy || animating || teachingReturning || royalCue || thinking || searchFailed) return;
     if (view === 'learn' && learning && !learning.pendingTeaching && instruction(learning)?.kind === 'script' && this.data.error !== 'tutorialBroken') {
       const generation = this.generation;
       this.scheduled = setTimeout(() => {

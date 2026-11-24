@@ -59,6 +59,7 @@ export const messages = {
   'storage.memory': ['Партия пока хранится только в этой вкладке. Восстановите доступ, чтобы сохранить её.', 'This game is only in this tab for now. Reconnect to save it.'],
   'game.script': ['Ход наставника', 'Tutor’s move'],
   'game.check': ['Шах', 'Check'],
+  'game.skipFinale': ['Пропустить анимацию', 'Skip animation'],
   'game.bonus': ['Дополнительное действие', 'Bonus action'],
   'game.bonusHelp': ['Можно сделать ещё одно действие той же фигурой или завершить ход.', 'Take one more action with the same piece, or end the turn.'],
   'game.bonusRequired': ['Нужно второе действие той же фигурой, чтобы король остался в безопасности.', 'The same piece must take a second action to keep your king safe.'],

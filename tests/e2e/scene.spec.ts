@@ -42,6 +42,30 @@ async function cellCenter(canvas: Locator, square: string, flipped = false) {
 
 test.use({ reducedMotion: 'reduce' })
 
+test('the flat board accepts a normal desktop drag and a mobile tap move', async ({ page, hasTouch }) => {
+  await page.goto('/')
+  await page.getByTestId('flat-mode').click()
+  await startHotseat(page)
+  const from = page.locator('[data-square="e2"]')
+  const to = page.locator('[data-square="e4"]')
+  if (hasTouch) {
+    await from.tap()
+    await to.tap()
+  } else {
+    const start = (await from.boundingBox())!
+    const finish = (await to.boundingBox())!
+    const center = (rect: typeof start) => [rect.x + rect.width / 2, rect.y + rect.height / 2] as const
+    await page.mouse.move(...center(start))
+    await page.mouse.down()
+    await page.mouse.move(...center(finish), { steps: 12 })
+    await page.mouse.move(...center(finish))
+    await page.mouse.up()
+  }
+  await expect(page.getByTestId('playfield')).toHaveAttribute('data-revision', '1')
+  await expect(page.getByTestId('playfield')).toHaveAttribute('data-active-side', 'black')
+  await expect(to).toHaveAccessibleName(/Пешка|Pawn/)
+})
+
 test('live 3D hotseat accepts pointer input, flips and recovers the same game after context loss', async ({ page, hasTouch }, testInfo) => {
   const errors: string[] = []
   const failedAssets: string[] = []

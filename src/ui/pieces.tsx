@@ -1,3 +1,4 @@
+import { useId } from 'react';
 import type { Affliction, PieceType, Side } from '../core';
 
 const silhouettes: Record<PieceType, string> = {
@@ -9,9 +10,46 @@ const silhouettes: Record<PieceType, string> = {
   king: 'M11.1 2.8h1.8v2h2.2v1.8h-2.2v2h-1.8v-2H8.9V4.8h2.2v-2Zm.9 6.8c1.6-1.7 4.4-2.3 6-.5 1.9 2.2.1 4.6-2.4 7.3H8.4c-2.5-2.7-4.3-5.1-2.4-7.3 1.6-1.8 4.4-1.2 6 .5Zm-3.6 8.1h7.2l2.1 2.4H6.3l2.1-2.4Z',
 };
 
-export function PieceIcon({ type, side, className = '' }: { type: PieceType; side?: Side; className?: string }) {
-  return <svg aria-hidden="true" className={`piece-icon ${side ?? ''} ${className}`} viewBox="0 0 24 24">
+function CrownInlay() {
+  const shape = useId();
+  const light = useId();
+  const metal = useId();
+  return <>
+    <defs>
+      <clipPath id={shape}><path d={silhouettes.king} /></clipPath>
+      <linearGradient id={light} x1="0" x2="0" y1="1" y2="0">
+        <stop offset="4%" stopColor="#c74438" />
+        <stop offset="45%" stopColor="#f78b50" />
+        <stop offset="100%" stopColor="#ffe5af" />
+      </linearGradient>
+      <linearGradient id={metal} x1="0" x2="1" y1="1" y2="0">
+        <stop offset="0%" stopColor="#312739" />
+        <stop offset="34%" stopColor="#7d2a3d" />
+        <stop offset="64%" stopColor="#d67d59" />
+        <stop offset="82%" stopColor="#f8cd95" />
+        <stop offset="100%" stopColor="#7792b4" />
+      </linearGradient>
+    </defs>
+    <g className="crown-inlay" clipPath={`url(#${shape})`}>
+      <path className="crown-metal" d={silhouettes.king} fill={`url(#${metal})`} />
+      <path className="crown-facets" d="M7.8 10.7 12 9l-1 5.1-2 3.8-1.8-2.1zm7.3.4 2.9 1.5-2.1 5.6-2.1-2.8zM7 19l6.6-1.6-1.9 3.3-4.7.6Z" />
+      <path className="crown-outline" d={silhouettes.king} />
+      <g className="crown-faults">
+        <path className="crown-seams" d="M9 21l2.3-3.8-1-2.4 2.5-2.6-.6-3.4 1.6-2.5-.8-4M17.7 18.7l-2.8-2.1 1-2.6-3.6-2.5m-.9 5.6-3.9-1.8m4.7-6.9-3 1.2m5.7 7 3 .3" />
+        <path d="M9 21l2.3-3.8-1-2.4 2.5-2.6-.6-3.4 1.6-2.5-.8-4M17.7 18.7l-2.8-2.1 1-2.6-3.6-2.5m-.9 5.6-3.9-1.8m4.7-6.9-3 1.2m5.7 7 3 .3"
+          fill="none" stroke={`url(#${light})`} strokeWidth="1.16" />
+      </g>
+    </g>
+  </>;
+}
+
+export function PieceIcon({ type, side, className = '', threatened }: {
+  type: PieceType; side?: Side; className?: string; threatened?: boolean
+}) {
+  return <svg aria-hidden="true" className={`piece-icon ${side ?? ''} ${className}`} viewBox="0 0 24 24"
+    data-threatened={type === 'king' && threatened ? true : undefined}>
     <path d={silhouettes[type]} fillRule="evenodd" />
+    {type === 'king' && threatened !== undefined && <CrownInlay />}
   </svg>;
 }
 

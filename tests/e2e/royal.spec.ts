@@ -1,0 +1,143 @@
+import { expect, test } from './fixtures'
+import type { Page } from '@playwright/test'
+import { createPosition } from '../../src/core'
+import { createMatch } from '../../src/session/match'
+import type { MatchRecord } from '../../src/session/match'
+import { clickMove, gameView, readRecords, readyGame, seedRecords, square } from './qaRecords'
+import { cornerMate, localDuel, optionalMate, ordinaryCheck, passiveMate } from './royalFixtures'
+
+async function load(page: Page, record: MatchRecord, reduced = false) {
+  await page.addInitScript(reduced => localStorage.setItem('remorse-settings-v1',
+    JSON.stringify({ board: '2d', reduce: reduced, sound: false })), reduced)
+  await page.goto('/')
+  await page.getByTestId('mode-hotseat').waitFor()
+  await seedRecords(page, [record], `game/${record.id}`)
+  await page.reload()
+  await expect(gameView(page)).toHaveAttribute('data-game-id', record.id)
+}
+
+test('check stays on the threatened king, fades after a defence, and can be earned again', async ({ page }) => {
+  await load(page, ordinaryCheck().record)
+  await clickMove(page, 'a2', 'e2')
+  await expect(gameView(page)).toHaveAttribute('data-royal', 'check')
+  await expect(gameView(page)).toHaveAttribute('data-royal-side', 'black')
+  await expect(gameView(page)).toHaveAttribute('data-royal-square', 'e8')
+  await expect(square(page, 'e8')).toHaveClass(/mark-check/)
+  await expect(page.getByTestId('flat-royal')).toBeVisible()
+  await readyGame(page)
+  await expect(square(page, 'e8')).toHaveClass(/mark-check/)
+  await expect(page.getByTestId('flat-royal')).toHaveCount(0)
+  await clickMove(page, 'e8', 'd8')
+  await readyGame(page)
+  await expect(square(page, 'd8')).not.toHaveClass(/mark-check/)
+  await clickMove(page, 'e2', 'd2')
+  await expect(gameView(page)).toHaveAttribute('data-royal-square', 'd8')
+  await readyGame(page)
+  await page.reload()
+  await expect(square(page, 'd8')).toHaveClass(/mark-check/)
+  await expect(gameView(page)).toHaveAttribute('data-royal', 'none')
+})
+
+test('the committed die is read before mate, and skip and restore only change the presentation', async ({ page }) => {
+  const duel = cornerMate('black', true)
+  await load(page, duel.record)
+  await clickMove(page, 'g3', 'g2')
+  await expect(gameView(page)).toHaveAttribute('data-dice', 'throwing')
+  await expect(gameView(page)).toHaveAttribute('data-royal', 'pending')
+  await expect(page.getByTestId('game-result')).toHaveCount(0)
+  await expect(page.getByTestId('dice-reveal')).toHaveAttribute('data-phase', 'settled')
+  await expect(page.getByTestId('dice-reveal')).toContainText(/без изменений/i)
+  await expect(gameView(page)).toHaveAttribute('data-royal', 'mate')
+  await expect(gameView(page)).toHaveAttribute('data-royal-side', 'white')
+  await expect(gameView(page)).toHaveAttribute('data-royal-square', 'h1')
+  await expect(page.getByTestId('dice-reveal')).toHaveCount(0)
+  await page.getByTestId('lang-en').click()
+  await expect(gameView(page)).toHaveAttribute('data-royal', 'mate')
+  await page.getByTestId('skip-royal').click()
+  await expect(page.getByTestId('game-result')).toContainText('Black wins')
+  await expect(gameView(page)).toHaveAttribute('data-royal', 'none')
+  const stored = (await readRecords<MatchRecord>(page, 'matches')).find(match => match.id === duel.record.id)!
+  expect(stored.actions).toHaveLength(1)
+  expect(stored.actions[0].roll).toEqual({ face: 4, fixed: false })
+  await page.reload()
+  await expect(page.getByTestId('game-result')).toHaveAttribute('data-reason', 'checkmate')
+  await expect(gameView(page)).toHaveAttribute('data-royal', 'none')
+  await expect(page.getByTestId('dice-reveal')).toHaveCount(0)
+})
+
+test('the optional bonus defers mate and a passive removal can deliver it', async ({ page }) => {
+  const duel = optionalMate()
+  await load(page, duel.record, true)
+  await clickMove(page, 'c7', 'b7')
+  await expect(gameView(page)).toHaveAttribute('data-phase', 'bonus')
+  await readyGame(page)
+  await expect(gameView(page)).toHaveAttribute('data-royal', 'none')
+  await expect(page.getByTestId('game-result')).toHaveCount(0)
+  await page.getByTestId('end-turn').click()
+  await expect(gameView(page)).toHaveAttribute('data-royal-square', 'a8')
+  await expect(gameView(page)).toHaveAttribute('data-royal-reduced', 'true')
+  await page.getByTestId('skip-royal').click()
+  await expect(page.getByTestId('game-result')).toHaveAttribute('data-reason', 'checkmate')
+
+  const discovered = passiveMate()
+  await seedRecords(page, [discovered.record], `game/${discovered.record.id}`)
+  await page.reload()
+  await expect(gameView(page)).toHaveAttribute('data-game-id', discovered.record.id)
+  await clickMove(page, 'a2', 'a3')
+  await expect(square(page, 'h6')).toHaveAccessibleName('h6')
+  await expect(gameView(page)).toHaveAttribute('data-royal-square', 'h8')
+  await expect(page.getByTestId('game-result')).toHaveAttribute('data-reason', 'checkmate')
+  await readyGame(page)
+})
+
+test('a real worker mate announces defeat, while a human mate announces victory', async ({ page }) => {
+  const practice = { mode: 'practice', human: 'white', level: 4, provenance: 'standard' } as const
+  const loser = cornerMate('black', false, practice)
+  await load(page, loser.record, true)
+  await expect(gameView(page)).toHaveAttribute('data-royal-square', 'h1', { timeout: 12_000 })
+  await page.getByTestId('lang-en').click()
+  await page.getByTestId('skip-royal').click()
+  await expect(page.getByTestId('game-result')).toContainText('You lost')
+  const winner = cornerMate('white', false, practice)
+  await seedRecords(page, [winner.record], `game/${winner.record.id}`)
+  await page.reload()
+  await page.getByTestId('lang-en').click()
+  await expect(gameView(page)).toHaveAttribute('data-game-id', winner.record.id)
+  await clickMove(page, 'g6', 'g7')
+  await expect(gameView(page)).toHaveAttribute('data-royal-square', 'h8')
+  await expect(page.getByTestId('game-result')).toContainText('You won')
+  await readyGame(page)
+  expect(await readRecords(page, 'ratingLedger')).toEqual([])
+})
+
+test('a second action or a promotion can give check, then menu cancellation restores a clean renderer', async ({ page }) => {
+  const bonus = optionalMate()
+  await load(page, bonus.record, true)
+  await clickMove(page, 'c7', 'b7')
+  await expect(gameView(page)).toHaveAttribute('data-phase', 'bonus')
+  await readyGame(page)
+  await clickMove(page, 'b7', 'a7')
+  await expect(gameView(page)).toHaveAttribute('data-royal', 'check')
+  await readyGame(page)
+  await expect(gameView(page)).toHaveAttribute('data-turn', '1')
+
+  const promotion = createMatch(localDuel, { root: createPosition({ pieces: [
+    { side: 'white', type: 'king', square: 'e1' }, { side: 'black', type: 'king', square: 'e8' },
+    { side: 'white', type: 'pawn', square: 'g7' }, { side: 'black', type: 'rook', square: 'h6' },
+  ] }) })
+  await seedRecords(page, [promotion.record], `game/${promotion.record.id}`)
+  await page.reload()
+  await expect(gameView(page)).toHaveAttribute('data-game-id', promotion.record.id)
+  await clickMove(page, 'g7', 'g8')
+  await expect(gameView(page)).toHaveAttribute('data-royal', 'none')
+  await page.getByTestId('promotion-queen').click()
+  await expect(square(page, 'g8')).toHaveAccessibleName(/Ферзь/)
+  await expect(gameView(page)).toHaveAttribute('data-royal-square', 'e8')
+  await page.getByTestId('leave-game').click()
+  await page.getByTestId('mode-hotseat').click()
+  await page.getByTestId('setup-start').click()
+  await expect(gameView(page)).toHaveAttribute('data-mode', 'hotseat')
+  await expect(gameView(page)).toHaveAttribute('data-royal', 'none')
+  await expect(gameView(page)).toHaveAttribute('data-animating', 'false')
+  await expect(gameView(page)).toHaveAttribute('data-turn', '0')
+})

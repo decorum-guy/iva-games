@@ -473,7 +473,13 @@ for (const locale of ['ru', 'en'] as const) {
                 await expect(page.getByTestId('counter-read')).toBeVisible()
                 await expect(page.locator('.board-stage')).toHaveAttribute('data-focus-square', step.square)
                 await expect(page.locator('.board-stage')).toHaveAttribute('data-focus-subject', 'countdown')
-                await expect(square(page, step.square).locator('.cell-state')).toContainText('3')
+                const counter = page.getByTestId('flat-counter')
+                await expect(counter).toContainText('3')
+                await expect(counter).toContainText(step.square)
+                await expect(counter).toBeInViewport({ ratio: 1 })
+                const boardBox = (await page.locator('.flat-board').boundingBox())!
+                const counterBox = (await counter.boundingBox())!
+                expect(counterBox.x >= boardBox.x + boardBox.width || counterBox.y >= boardBox.y + boardBox.height).toBe(true)
                 await changeLanguage(page, locale === 'en' ? 'ru' : 'en')
                 await expect(page.getByTestId('counter-read')).toBeVisible()
                 await expect(tutorial(page)).toHaveAttribute('data-step', step.id)

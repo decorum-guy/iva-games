@@ -35,6 +35,7 @@ uniform float uFade;
 uniform float uSeed;
 uniform vec3 uTincture;
 uniform vec3 uSweepTint;
+uniform vec4 uRoyal;
 
 float grain(vec3 p) {
   p = fract(p * 0.319 + vec3(0.1, 0.2, 0.3));
@@ -88,9 +89,11 @@ export function stoneMaterial(source: MeshStandardMaterial, side: Side, seed: nu
     uSeed: { value: seed },
     uTincture: { value: new Color(stateColors.neutral) },
     uSweepTint: { value: new Color('#b4dbca') },
+    // Resting threat, live strength, travel up the model, and the discharge.
+    uRoyal: { value: { x: 0, y: 0, z: 0, w: 0 } },
   }
 
-  material.customProgramCacheKey = () => 'remorse-marble-3'
+  material.customProgramCacheKey = () => 'remorse-marble-4'
   material.onBeforeCompile = shader => {
     Object.assign(shader.uniforms, values)
     shader.vertexShader = shader.vertexShader
@@ -110,6 +113,7 @@ export function stoneMaterial(source: MeshStandardMaterial, side: Side, seed: nu
         }
         float wearMap = 0.0;
         float fault = 0.0;
+        vec3 royalGlow = vec3(0.0);
         if (uWear > 0.001) {
           // Broad dark fissures frame a narrower colored inlay. The old hairline
           // treatment vanished when an entire figure occupied only a few pixels.
@@ -129,11 +133,32 @@ export function stoneMaterial(source: MeshStandardMaterial, side: Side, seed: nu
           diffuseColor.rgb *= 1.0 - fault * mix(.35, .78, stoneLightness);
           diffuseColor.rgb = mix(diffuseColor.rgb, uTincture * mix(.88, .58, stoneLightness), wearMap * .86);
         }
+        if (uRoyal.x + uRoyal.y > .002) {
+          float height = clamp(pStone.y / 1.64, 0.0, 1.0);
+          float crown = smoothstep(.62, .99, height);
+          float front = uRoyal.z * 1.24 - .12;
+          float reach = 1.0 - smoothstep(front - .025, front + .15, height);
+          float pulse = 1.0 - smoothstep(.025, .24, abs(height - front));
+          float lightStone = smoothstep(.15, .66, dot(diffuseColor.rgb, vec3(.21, .72, .07)));
+          float power = uRoyal.x * mix(.36, .68, lightStone) + uRoyal.y * (.18 + .82 * reach);
+          vec3 veinPoint = vec3(pStone.x * 1.15 + .07 * sin(pStone.y * 7.3), pStone.y * .79, pStone.z * 1.28);
+          float seam = faultLine(veinPoint);
+          float aa = clamp(fwidth(seam), .018, .095);
+          float recess = 1.0 - smoothstep(.12, .26 + aa, seam);
+          float thread = 1.0 - smoothstep(.029, .081 + aa * .56 + uRoyal.w * .065, seam);
+          float facets = .61 + .39 * smoothstep(-.55, .75, sin(16.0 * pStone.x + 13.0 * pStone.y - 9.0 * pStone.z));
+          diffuseColor.rgb *= 1.0 - recess * min(.64, power * .48);
+          diffuseColor.rgb = mix(diffuseColor.rgb, vec3(.21, .018, .031), recess * min(.39, power * .30));
+          vec3 mineral = mix(vec3(.83, .049, .023), vec3(1.49, .61, .132),
+            clamp(.12 + .50 * crown + .32 * pulse + .33 * uRoyal.w, 0.0, 1.0));
+          royalGlow = mineral * thread * power * facets;
+        }
       `)
       .replace('#include <roughnessmap_fragment>', /* glsl */ `
         #include <roughnessmap_fragment>
         if (uCondition > 1.5 && uCondition < 2.5) roughnessFactor = mix(roughnessFactor, .94, uWear * .82);
         roughnessFactor = mix(roughnessFactor, .38, wearMap * .52);
+        roughnessFactor = mix(roughnessFactor, .43, min(.34, uRoyal.y * .24));
       `)
       .replace('#include <emissivemap_fragment>', /* glsl */ `
         #include <emissivemap_fragment>
@@ -150,6 +175,13 @@ export function stoneMaterial(source: MeshStandardMaterial, side: Side, seed: nu
           totalEmissiveRadiance += uSweepTint * sweep * .68;
         }
         totalEmissiveRadiance += uTincture * edgeFade * .44;
+        if (uRoyal.x + uRoyal.y > .002) {
+          float rim = pow(1.0 - abs(dot(normal, normalize(vViewPosition))), 3.7);
+          float crown = smoothstep(.99, 1.57, pStone.y);
+          totalEmissiveRadiance += royalGlow;
+          totalEmissiveRadiance += vec3(.25, .42, .66) * rim * (uRoyal.x * .055 + uRoyal.y * .29);
+          totalEmissiveRadiance += vec3(.91, .252, .061) * crown * rim * uRoyal.w * .43;
+        }
       `)
   }
   return { material, values }

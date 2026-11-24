@@ -6,7 +6,7 @@ import { Cabinet } from '../session/cabinet';
 import { captureLedger } from '../session/match';
 import { exportMatch } from '../session/save';
 import { guideCommands, instruction, teachingBeat } from '../tutorial/controller';
-import { muteAudio, playSceneCue, prepareSceneAudio, setAudioVolume, stopSceneAudio, unlockAudio } from '../scene/audio';
+import { muteAudio, playRoyalCue, playSceneCue, prepareSceneAudio, setAudioVolume, stopSceneAudio, unlockAudio } from '../scene/audio';
 import type { SceneFocus, SceneMark } from '../scene/types';
 import { Board } from './Board';
 import {
@@ -58,6 +58,7 @@ export function App() {
   const snap = useSyncExternalStore(cabinet.subscribe, cabinet.getSnapshot);
   const [settings, setSettings] = useState(loadSettings);
   const sounded = useRef<string | undefined>(undefined);
+  const soundedRoyal = useRef<string | undefined>(undefined);
   const [modal, setModal] = useState<Modal | null>(null);
   const [selection, setSelection] = useState<{ key: string; id: string } | null>(null);
   const [promotion, setPromotion] = useState<{ key: string; move: Move } | null>(null);
@@ -74,6 +75,8 @@ export function App() {
   const lesson = view === 'learn' ? learning : null;
   const session = view === 'game' ? game : lesson?.session ?? null;
   const reviewing = review && review.key === snap.motionKey && session ? review.cursor : null;
+  const royal = reviewing === null ? snap.royalCue : null;
+  const animating = snap.animating || royal !== null;
   const position = (reviewing !== null ? session?.review(reviewing).state : session?.state) ?? preview;
   const config = session?.record.config;
   const actor = position.side;
@@ -95,7 +98,7 @@ export function App() {
   const selected = position.pieces.find(piece => piece.id === selectedId);
   const tutorialMode = !lesson ? 'none' : beat ? 'result' : lesson.complete ? 'complete' : step?.kind ?? 'position-complete';
   const teachingMove = !lesson || step?.kind === 'move' || step?.kind === 'illegal';
-  const canInput = active && snap.ready && !snap.storageProblem && !snap.animating && !snap.teachingReturning && !snap.busy && humanActing && !snap.thinking && teachingMove && !lesson?.complete;
+  const canInput = active && snap.ready && !snap.storageProblem && !animating && !snap.teachingReturning && !snap.busy && humanActing && !snap.thinking && teachingMove && !lesson?.complete;
   const canLeaveForPractice = !position.outcome && !beat && !snap.animating && !snap.teachingReturning;
   const shownMoves = lesson ? step?.kind === 'move' ? guidance : [] : moves;
   const mayEnd = moves.some(move => move.type === 'endTurn') && (!lesson || guidance.some(move => move.type === 'endTurn'));
@@ -132,6 +135,7 @@ export function App() {
       ? [command.promotion] : []) as Promotion[] : undefined;
   const lastMove = [...latest].reverse().find(event => event.type === 'move');
   const kingThreat = isInCheck(position);
+  const showThreat = kingThreat && !rollPending && !snap.royalPending;
   const captures = useMemo(() => session
     ? reviewing === null ? captureLedger(session) : [
       ...session.record.rootLedger, ...session.eventsAt(reviewing).filter(event => event.type === 'capture'),
@@ -148,7 +152,10 @@ export function App() {
     document.documentElement.lang = settings.locale;
     try { localStorage.setItem(PREFS_KEY, JSON.stringify(settings)); } catch { /* A private profile may deny writes. */ }
   }, [settings]);
-  useEffect(() => { cabinet.setShortMotion(reduced); }, [reduced]);
+  useEffect(() => {
+    if (reduced && royal?.reduced === false) stopSceneAudio();
+    cabinet.setShortMotion(reduced);
+  }, [reduced, royal?.reduced]);
   useEffect(() => { cabinet.setTeachingCamera(!flat); }, [flat]);
   useEffect(() => {
     if (view !== 'home') void prepareDieRenderer();
@@ -178,22 +185,41 @@ export function App() {
     sounded.current = cue.id;
     if (settings.sound && view !== 'home' && reviewing === null) {
       playSceneCue(cue.events, { reducedMotion: cue.events.some(event => event.type === 'reaction' && event.face !== undefined)
-        ? snap.rollReduced : reduced, humanSide: cue.human, startedAt: cue.startedAt });
+        ? snap.rollReduced : reduced, humanSide: cue.human, startedAt: cue.startedAt, royal: cue.royal });
     }
   }, [snap.audioCue, snap.rollReduced, settings.sound, view, reviewing, reduced]);
+  useEffect(() => {
+    if (!royal || soundedRoyal.current === royal.id) return;
+    soundedRoyal.current = royal.id;
+    if (settings.sound) playRoyalCue(royal);
+  }, [royal, settings.sound]);
+  useEffect(() => {
+    const finishHidden = () => { if (document.hidden) cabinet.finishRoyal(); };
+    document.addEventListener('visibilitychange', finishHidden);
+    return () => document.removeEventListener('visibilitychange', finishHidden);
+  }, []);
 
   const onFailure = useCallback(() => { setGraphicsFailed(true); }, []);
   const close = () => setModal(null);
+
+  function skipRoyal() {
+    if (snap.royalCue) {
+      stopSceneAudio();
+      cabinet.finishRoyal();
+    }
+  }
 
   function changeSettings(fields: Partial<Settings>) {
     if (fields.volume !== undefined) setAudioVolume(fields.volume);
     if (fields.sound === true) void unlockAudio();
     if (fields.sound === false) muteAudio();
+    if (fields.camera !== undefined || fields.board !== undefined || fields.reduce !== undefined) skipRoyal();
     if (fields.board === '3d') setGraphicsFailed(false);
     setSettings(current => ({ ...current, ...fields }));
   }
 
   function openSetup(hotseat = false, choice = true) {
+    skipRoyal();
     setModal({ kind: 'setup', hotseat, choice });
   }
 
@@ -212,7 +238,7 @@ export function App() {
   }
 
   function useSquare(square: Square) {
-    if (!session || snap.busy || snap.animating || snap.teachingReturning || beat) return;
+    if (!session || snap.busy || animating || snap.teachingReturning || beat) return;
     const occupant = pieceAt(position, square);
     if (lesson && step?.kind === 'inspect' && step.square === square) {
       if (occupant) setSelection({ key: snap.motionKey, id: occupant.id });
@@ -233,7 +259,7 @@ export function App() {
   const marks: SceneMark[] = [];
   if (lastMove && reviewing === null) marks.push({ square: lastMove.from, kind: 'last' }, { square: lastMove.to, kind: 'last' });
   const king = kingThreat && position.pieces.find(piece => piece.type === 'king' && piece.side === actor);
-  if (king && !rollPending) marks.push({ square: king.square, kind: 'check' });
+  if (king && showThreat) marks.push({ square: king.square, kind: 'check' });
   if (selected) {
     marks.push({ square: selected.square, kind: 'selected' });
     if (canInput && selected.side === actor) {
@@ -321,7 +347,9 @@ export function App() {
       data-active-side={actor} data-turn={position.turnSerial} data-phase={position.phase}
       data-revision={session?.record.revision ?? 0} data-game-id={session?.record.id ?? 'preview'}
       data-storage-problem={snap.storageProblem ?? 'none'}
-      data-busy={snap.busy} data-animating={snap.animating} data-thinking={snap.thinking}>
+      data-royal={royal?.kind ?? (snap.royalPending ? 'pending' : 'none')} data-royal-side={royal?.side}
+      data-royal-square={royal?.square} data-royal-reduced={royal?.reduced}
+      data-busy={snap.busy} data-animating={animating} data-thinking={snap.thinking}>
       <div className="table-column" data-testid="board">
         <PlayerRow t={t} locale={settings.locale} side={farSide} config={config} active={active && actor === farSide}
           teachingFocus={farSide === teachingHudSide ? teachingHud : undefined}
@@ -331,6 +359,7 @@ export function App() {
           flat={flat} reducedMotion={reduced} camera={settings.camera} low={low}
           canMove={canInput}
           focus={tutorialFocus}
+          royal={royal ?? undefined}
           motionKey={`${snap.motionKey}/${reviewing ?? 'live'}`} onSquare={useSquare}
           onDragSquare={(from, to) => enter({ type: 'move', from, to })} onFailure={onFailure}
           onClear={() => setSelection(null)}
@@ -347,7 +376,7 @@ export function App() {
             <button type="button" aria-pressed={flat} data-testid="flat-mode" onClick={() => changeSettings({ board: '2d' })}>2D</button>
           </div>
           <button type="button" className="icon-button" data-testid="flip" title={t('settings.flip')}
-            aria-label={t('settings.flip')} onClick={() => setFlip(value => !value)}><Icon name="flip" /></button>
+            aria-label={t('settings.flip')} onClick={() => { skipRoyal(); setFlip(value => !value); }}><Icon name="flip" /></button>
           <button type="button" className="icon-button camera-toggle" aria-label={t('settings.camera')} title={t('settings.camera')}
             onClick={() => changeSettings({ camera: settings.camera === 'studio' ? 'tactical' : settings.camera === 'tactical' ? 'top' : 'studio' })}
             disabled={flat}><Icon name="camera" /></button>
@@ -392,15 +421,17 @@ export function App() {
           {notice}
           {storageNotice}
           <div className="decision-row" hidden={Boolean(lesson && beat)}>
-          {session.state.outcome && !lesson && !rollPending ? <Result t={t} locale={settings.locale} session={session}
+          {session.state.outcome && !lesson && !rollPending && !snap.royalPending && (royal?.kind !== 'mate' || snap.royalResolved) ? <Result t={t} locale={settings.locale} session={session}
             entry={snap.ledger.find(entry => entry.matchId === session.record.id)} onNew={() => openSetup(mode === 'hotseat')} />
-            : <div className="turn-panel" data-testid="turn-panel">
+            : royal?.kind === 'mate' ? <div className="finale-controls">
+              <button type="button" className="text-button" onClick={skipRoyal} data-testid="skip-royal">{t('game.skipFinale')}</button>
+            </div> : <div className="turn-panel" data-testid="turn-panel">
               <div className="turn-heading" role="status"><span className={`mini-stamp ${actor}`} aria-hidden="true" />
                 <strong>{t(!snap.ready ? 'storage.opening' : snap.storageProblem ? 'storage.paused' : snap.busy ? 'storage.saving' : rollPending ? 'die.rolling' : snap.thinking ? 'game.thinking' : step?.kind === 'script' ? 'game.script' : lesson && !teachingMove ?
                   step?.kind === 'inspect' ? 'tutorial.selectCue' : lesson.complete ? 'tutorial.finish' : !step ? 'tutorial.positionDone' : 'tutorial.readCue' : boosted ? 'game.bonus' :
                   config?.mode === 'practice' || config?.mode === 'rated' ? humanActing ? 'game.yourTurn' : 'game.thinking' :
                     actor === 'white' ? 'game.turn' : 'game.turnBlack')}</strong>
-                {kingThreat && !rollPending && <span className="check-label">{t('game.check')}</span>}</div>
+                {showThreat && <span className="check-label">{t('game.check')}</span>}</div>
               {!rollPending && boosted && teachingMove && (!lesson || mayEnd) && <div className="bonus-action">
                 <button type="button" className="button primary compact" disabled={!canInput || !mayEnd} data-testid="end-turn"
                   onClick={() => perform({ type: 'endTurn' })}>{t('game.endTurn')}</button>
@@ -422,7 +453,7 @@ export function App() {
             onHandoff={() => void cabinet.handoff()} onNew={() => openSetup()}
             onRepeat={() => setModal({ kind: 'repeat' })} onRestart={() => setModal({ kind: 'restart' })}
             onRestartAll={() => setModal({ kind: 'restart-all' })} />}
-          {!lesson && !rollPending && (selected || mobileDetails) && <Inspector t={t} locale={settings.locale}
+          {!lesson && !rollPending && royal?.kind !== 'mate' && (selected || mobileDetails) && <Inspector t={t} locale={settings.locale}
             piece={selected} state={position} compact={!mobileDetails} />}
           <div className={`secondary-panel ${mobileDetails && !rollPending ? '' : 'collapsed'}`}>
             {lesson && <Inspector t={t} locale={settings.locale} piece={selected} state={position} />}

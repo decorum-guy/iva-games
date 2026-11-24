@@ -4,7 +4,7 @@ import { MeshStandardMaterial, PerspectiveCamera, Vector3 } from 'three'
 import type { PieceType, Side } from '../core/types'
 import {
   BOARD_FRAMING_POINTS, CAMERA_OVERSCAN, CAMERA_TRAVEL_MS, COUNTER_FOCUS_DELAY_MS, COUNTER_FOCUS_MS, COUNTER_OFFSET,
-  FOCUS_EMPHASIS_MS, MAX_FOCUS_ZOOM, frameCamera, frameCameraOrbit, overscanFov, sampleCameraTravel,
+  FOCUS_EMPHASIS_MS, MAX_FOCUS_ZOOM, frameCamera, frameCameraOrbit, frameRoyalCamera, overscanFov, sampleCameraTravel,
   sampleCounterEmphasis, sampleFigureEmphasis,
 } from './cameraFocus'
 import type { CameraFrame, CameraRig, GroundPoint, Point3 } from './cameraFocus'
@@ -62,6 +62,27 @@ const layouts = [
   { name: 'phone tactical', aspect: 342 / 430, elevation: 75, yaw: 0, fov: 35, compact: true },
   { name: 'phone top', aspect: 342 / 430, elevation: 89.98, yaw: 0, fov: 26, compact: true },
 ]
+
+describe('royal camera framing', () => {
+  it.each(layouts)('preserves the full threatened model in either army and orientation: $name', layout => {
+    const { aspect, compact, fov, elevation, yaw } = layout
+    for (const flipped of [false, true]) for (const point of corners) {
+      const rig: CameraRig = {
+        elevation: elevation * radians, yaw: yaw * radians + (flipped ? Math.PI : 0), fov,
+        focusAmount: 0, focusPoint: point,
+      }
+      const overview = frameCamera(rig, aspect, compact)
+      expect(frameRoyalCamera(rig, aspect, compact, point, true, 0, 0)).toEqual(overview)
+      for (const mate of [false, true]) for (const progress of [.2, .55, .82, 1]) {
+        const shot = frameRoyalCamera(rig, aspect, compact, point, mate, progress, mate ? 1 : 0)
+        const camera = cameraFor(rig, aspect, shot)
+        for (const side of ['white', 'black'] as const) {
+          expect(screenExtent(modelBounds(side, 'king', point), camera)).toBeLessThan(.99)
+        }
+      }
+    }
+  })
+})
 
 describe('teaching camera framing', () => {
   it.each(layouts)('keeps every real piece and its enlarged counter in frame at all four corners: $name', layout => {
