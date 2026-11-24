@@ -10,6 +10,8 @@ import { sampleWindow } from '../../src/scene/audioSamples'
 import { learnerAction, saveLearning, scriptAction, startLesson } from '../../src/tutorial/controller'
 import type { Learning } from '../../src/tutorial/controller'
 import { move } from '../../src/tutorial/lessonTypes'
+import { LESSONS } from '../../src/tutorial/lessons'
+import { CAMERA_TRAVEL_MS } from '../../src/scene/cameraFocus'
 
 const hotseat = { mode: 'hotseat', level: null, human: null, provenance: 'standard' } as const
 const playfield = (page: Page) => page.getByTestId('playfield')
@@ -21,6 +23,7 @@ test.use({ hasTouch: true, reducedMotion: 'no-preference' })
 async function ready(page: Page) {
   await expect(playfield(page)).toHaveAttribute('data-busy', 'false')
   await expect(playfield(page)).toHaveAttribute('data-animating', 'false')
+  await expect(playfield(page)).toHaveAttribute('data-teaching-returning', 'false')
 }
 
 async function open(page: Page, locale: 'ru' | 'en' = 'en', reduce = true) {
@@ -65,8 +68,10 @@ async function restoreGame(page: Page, record: MatchRecord) {
   await expect(playfield(page)).toHaveAttribute('data-game-id', record.id)
 }
 
-async function restoreLesson(page: Page, progress: Learning) {
-  await persist(page, 'learning', saveLearning(progress), 'learn')
+async function restoreLesson(page: Page, progress: Learning, legacy = false) {
+  const saved = saveLearning(progress)
+  if (legacy) delete (saved as { pendingTeaching?: unknown }).pendingTeaching
+  await persist(page, 'learning', saved, 'learn')
   await expect(playfield(page)).toHaveAttribute('data-game-id', progress.session.record.id)
 }
 
@@ -149,7 +154,7 @@ for (const viewport of [
     await expect(playfield(page)).toHaveAttribute('data-active-side', 'black')
 
     const checkpoint = scriptAction(learnerAction(startLesson(2, 2), move('g2', 'g3')).progress)
-    await restoreLesson(page, checkpoint)
+    await restoreLesson(page, checkpoint, true)
     const lesson = page.getByTestId('tutorial')
     const next = page.getByTestId('lesson-next')
     const t = translator(viewport.locale)
@@ -219,7 +224,7 @@ test('sound starts enabled and remembers both mute and the selected volume', asy
   await expect(volume).toHaveValue('35')
 })
 
-async function committedThrow(page: Page, face: DieFace, actor: Side, affliction: Affliction) {
+async function committedThrow(page: Page, face: DieFace, actor: Side, affliction: Affliction, teaching = false) {
   const reveal = page.getByTestId('dice-reveal')
   const die = page.getByTestId('die-throw')
   await expect(playfield(page)).toHaveAttribute('data-dice', 'throwing')
@@ -242,7 +247,8 @@ async function committedThrow(page: Page, face: DieFace, actor: Side, affliction
   await expect(die).toHaveAttribute('data-phase', 'settled')
   const result = translator('en')(affliction === 'neutral' ? 'state.unaffected' : `state.${affliction}`)
   await expect(reveal.locator('.dice-caption')).toHaveText(`${face} · ${result}`)
-  await expect(page.getByTestId('roll')).toContainText(result)
+  if (teaching) await expect(page.getByTestId('teaching-cause')).toBeVisible()
+  else await expect(page.getByTestId('roll')).toContainText(result)
   await page.clock.runFor(349)
   await expect(reveal).toBeVisible()
   await expect(playfield(page)).toHaveAttribute('data-animating', 'true')
@@ -290,14 +296,26 @@ test('real captures by either side show the committed 3D die in 2D, without repl
   await expect(playfield(page)).toHaveAttribute('data-revision', '3')
   const saved = await recorded<ReturnType<typeof saveLearning>>(page, 'learning', 'progress')
   expect(saved.match.actions.at(-1)?.roll).toEqual({ face: 4, fixed: true })
-  await committedThrow(page, saved.match.actions.at(-1)!.roll!.face, 'white', 'neutral')
-  await expect(page.getByTestId('tutorial')).toHaveAttribute('data-step', 'faces-and-material')
+  await committedThrow(page, saved.match.actions.at(-1)!.roll!.face, 'white', 'neutral', true)
+  const firstResult = LESSONS[0].positions[0].steps.find(step => step.id === 'capture-and-roll')!.after![0]
+  await expect(page.getByTestId('tutorial')).toHaveAttribute('data-beat', firstResult.id)
+  await expect(page.getByTestId('tutorial').getByRole('heading', { name: firstResult.title.en, exact: true })).toBeVisible()
   await visibleAction(page.getByTestId('lesson-next'))
   await expect(page.locator('body')).not.toContainText(diceExplanations)
   await page.reload()
   await ready(page)
   await page.clock.runFor(2000)
   await expect(page.getByTestId('die-throw')).toHaveCount(0)
+  await expect(page.getByTestId('tutorial')).toHaveAttribute('data-beat', firstResult.id)
+  await expect(page.getByTestId('teaching-cause')).toHaveText(firstResult.text.en)
+  await page.getByTestId('lesson-next').click()
+  await page.clock.runFor(CAMERA_TRAVEL_MS)
+  await ready(page)
+  const legend = page.getByTestId('dice-legend')
+  await expect(legend).toBeVisible()
+  await expect(legend.locator('[data-reaction="unaffected"]')).toHaveAttribute('data-current', 'true')
+  await expect(legend.locator('[data-reaction="guilt"]')).toContainText('2–3')
+  await page.getByTestId('lesson-next').click()
   await expect(page.getByTestId('tutorial')).toHaveAttribute('data-step', 'faces-and-material')
 })
 

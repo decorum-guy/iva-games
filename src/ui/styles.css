@@ -526,6 +526,31 @@ html.in-match, .in-match body { height: 100%; overflow: hidden; overscroll-behav
 .view-learn:is([data-tutorial-mode="move"], [data-tutorial-mode="illegal"], [data-tutorial-mode="inspect"], [data-tutorial-mode="script"])::before { background: #060b1261; }
 .view-learn:is([data-dice="throwing"], [data-dice="settled"]) .table-column { z-index: 23; }
 .view-learn[data-tutorial-focus="true"] .table-column { z-index: 21; }
+.view-learn .decision-row[hidden] { display: none; }
+.view-learn[data-tutorial-mode="result"] .lesson-panel {
+  border-color: #f3d69f; box-shadow: 0 0 0 2px #ecd09c4d, 0 0 30px #d5b57642;
+}
+.lesson-panel[data-kind="result"] .lesson-instruction { min-height: 0; }
+.lesson-panel .lesson-rule {
+  margin-top: 9px; padding-inline-start: 10px; border-inline-start: 2px solid #c9ad7b;
+  color: #f2e9da; font-weight: 650;
+}
+.lesson-dice-legend {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 5px 9px; margin-top: 10px;
+}
+.lesson-dice-legend > div {
+  display: flex; align-items: center; gap: 7px; padding: 5px 6px;
+  border: 1px solid #51595f; border-radius: 4px; font-size: .76rem;
+}
+.lesson-dice-legend strong { color: #e6d3b1; min-width: 24px; }
+.lesson-dice-legend [data-current="true"] { background: #3c423c; border-color: #e3c78f; }
+.player-row[data-teaching-hud] { position: relative; z-index: 21; }
+.player-row[data-teaching-hud="captures"] .trophies,
+.player-row[data-teaching-hud="material"] .material,
+.player-row[data-teaching-hud="material"] .capture-line:not(:has(.material)) {
+  outline: 2px solid #f1d89f; outline-offset: 4px; background: #343d43;
+  box-shadow: 0 0 18px #e6ca8870; border-radius: 3px;
+}
 .cell[data-teaching-focus] .piece-icon { filter: drop-shadow(0 0 3px #edc77b); }
 .cell[data-teaching-focus="countdown"] .cell-state {
   font-size: .85rem; border: 2px solid #e7c77c; padding: 3px 4px; box-shadow: 0 0 0 2px #162430;
@@ -580,6 +605,9 @@ html.in-match, .in-match body { height: 100%; overflow: hidden; overscroll-behav
   .lesson-panel h2 { font-size: 1.48rem; margin-block: 4px; }
   .lesson-action-label { font-size: .73rem; margin-bottom: 5px; }
   .lesson-panel p { font-size: .79rem; line-height: 1.4; }
+  .lesson-panel .lesson-rule { margin-top: 7px; }
+  .lesson-dice-legend { margin-top: 7px; gap: 4px 6px; }
+  .lesson-dice-legend > div { padding: 4px 5px; font-size: .72rem; }
   .lesson-panel > .button.primary { margin-top: 8px; }
   .lesson-target { margin-top: 6px; padding: 5px 8px; font-size: .75rem; }
   .lesson-tools { margin-block: 1px -3px; }
@@ -615,6 +643,14 @@ html.in-match, .in-match body { height: 100%; overflow: hidden; overscroll-behav
 .home-intro .home-introduction { max-width: 39ch; }
 
 @media (max-height: 375px) and (orientation: landscape) {
+  .in-match .lesson-panel[data-kind="result"] { padding: 5px 8px; }
+  .in-match .lesson-panel[data-kind="result"] h2 { font-size: 1.26rem; margin-block: 3px; }
+  .in-match .lesson-panel[data-kind="result"] p { font-size: .75rem; line-height: 1.3; }
+  .in-match .lesson-panel[data-kind="result"] .lesson-rule { margin-top: 5px; }
+  .lesson-panel[data-kind="result"] > .button.primary { margin-top: 6px; min-height: 38px; padding-block: 5px; font-size: .78rem; }
+  .lesson-panel[data-kind="result"] .lesson-tools .text-button { min-height: 26px; }
+  .lesson-panel[data-kind="result"] .lesson-dice-legend { margin-top: 5px; gap: 3px; }
+  .lesson-panel[data-kind="result"] .lesson-dice-legend > div { padding: 3px; font-size: .68rem; gap: 3px; }
   .in-match .lesson-panel[data-kind="complete"] .lesson-actions {
     grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
     align-items: stretch;

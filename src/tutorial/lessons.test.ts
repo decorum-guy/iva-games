@@ -6,7 +6,7 @@ import { nextDie } from '../session/random'
 import { restoreMatch } from '../session/save'
 import {
   advanceLesson, confirmInspection, guideCommands, instruction, learnerAction, restoreLearning,
-  saveLearning, scriptAction, startLesson,
+  saveLearning, scriptAction, startLesson, teachingBeat,
 } from './controller'
 import type { Learning } from './controller'
 import { LESSONS } from './lessons'
@@ -22,12 +22,41 @@ function restored(progress: Learning): Learning {
 
 function transfer(progress: Learning, command: Command) {
   const result = learnerAction(progress, command)
-  return result.progress
+  return acknowledged(result.progress)
+}
+
+function acknowledged(progress: Learning): Learning {
+  while (progress.pendingTeaching) {
+    const beat = teachingBeat(progress)!
+    for (const field of [beat.title, beat.text, beat.rule, beat.action].filter(value => value !== undefined)) {
+      expect(field.ru.trim()).not.toBe('')
+      expect(field.en.trim()).not.toBe('')
+    }
+    expect(progress.complete).toBe(false)
+    expect(guideCommands(progress)).toEqual([])
+    if (beat.focus) {
+      const piece = progress.session.state.pieces.find(piece => piece.square === beat.focus!.square)
+      expect(piece, `${beat.id} must focus a living piece`).toBeDefined()
+      if (beat.focus.subject === 'countdown') expect(cyclesRemaining(piece!, progress.session.state)).toBeGreaterThan(0)
+    }
+    const restoredProgress = restored(progress)
+    expect(teachingBeat(restoredProgress)?.id).toBe(beat.id)
+    const index = progress.index
+    const session = progress.session
+    progress = advanceLesson(progress)
+    expect(progress.index).toBe(index)
+    expect(progress.session).toBe(session)
+  }
+  return progress
+}
+
+function scripted(progress: Learning) {
+  return acknowledged(scriptAction(progress))
 }
 
 describe('interactive lesson fixtures', () => {
   it('restores the lesson 3 reading and position boundaries without inventing a required king move', () => {
-    let progress = scriptAction(transfer(startLesson(2, 2), move('g2', 'g3')))
+    let progress = scripted(transfer(startLesson(2, 2), move('g2', 'g3')))
     expect(instruction(progress)).toMatchObject({ id: 'removal-material-only', kind: 'read' })
     expect(commandRejection(progress.session.state, move('h1', 'g1'))).toBeNull()
 
@@ -49,14 +78,14 @@ describe('interactive lesson fixtures', () => {
   })
 
   it('restores the actual king instruction in lesson 4 and completes both cures', () => {
-    const beforeKing = restored(scriptAction(transfer(startLesson(3), move('c1', 'e3'))))
+    const beforeKing = restored(scripted(transfer(startLesson(3), move('c1', 'e3'))))
     expect(instruction(beforeKing)?.id).toBe('cure-two-pieces')
     expect(commandRejection(beforeKing.session.state, move('h1', 'g2'))).toBeNull()
     expect(guideCommands(beforeKing)).toEqual([move('h1', 'g1')])
     expect(() => learnerAction(beforeKing, move('h1', 'g2'))).toThrow('tutorialChoice')
     const afterKing = transfer(beforeKing, move('h1', 'g1'))
     expect(afterKing.session.current.events.filter(event => event.type === 'cure')).toHaveLength(2)
-    expect(instruction(scriptAction(afterKing))?.id).toBe('bishop-pacifism')
+    expect(instruction(scripted(afterKing))?.id).toBe('bishop-pacifism')
   })
 
   it.each([0, 1, 2])('teaches every directed step with full state restored and promotion alternative %i', promotionIndex => {
@@ -93,7 +122,7 @@ describe('interactive lesson fixtures', () => {
             progress = confirmInspection(progress, current.square)
             break
           case 'script':
-            progress = scriptAction(progress)
+            progress = scripted(progress)
             break
           case 'read':
             progress = advanceLesson(progress)
@@ -110,9 +139,9 @@ describe('interactive lesson fixtures', () => {
           }
           case 'illegal': {
             const result = learnerAction(progress, current.move)
-            expect(result.explanation).toBe(current.reason)
+            expect(result.explanation).toBe(current.after?.length ? undefined : current.reason)
             expect(result.progress.session).toBe(session)
-            progress = result.progress
+            progress = acknowledged(result.progress)
             break
           }
         }
@@ -123,18 +152,18 @@ describe('interactive lesson fixtures', () => {
     expect(LESSONS).toHaveLength(9)
     expect(positions).toBe(14)
     expect(steps).toBe(55)
-    expect(focusSteps).toEqual(['inspect-countdown', 'promotion-clears-bonus'])
+    expect(focusSteps).toEqual(['inspect-countdown'])
     expect(progress.session.state).toMatchObject({ side: 'white', phase: 'primary', outcome: null })
     expect(captureLedger(progress.session).map(event => event.victim.square)).toEqual(['c5'])
   })
 
   it('responds legally and exits to a stable position for every accepted open move', () => {
     const fixture = startLesson(LESSONS.length - 1)
-    const open = scriptAction(transfer(fixture, move('d4', 'c5')))
+    const open = scripted(transfer(fixture, move('d4', 'c5')))
     const choices = guideCommands(open)
     expect(choices.length).toBeGreaterThan(8)
     for (const command of choices) {
-      const afterReply = scriptAction(transfer(open, command))
+      const afterReply = scripted(transfer(open, command))
       const completed = advanceLesson(afterReply)
       expect(completed.complete).toBe(true)
       expect(completed.session.state).toMatchObject({ side: 'white', phase: 'primary', outcome: null })
@@ -143,8 +172,8 @@ describe('interactive lesson fixtures', () => {
   })
 
   it('uses the ordinary seed on a new capture after handoff and keeps the practice root as the undo floor', () => {
-    const open = scriptAction(transfer(startLesson(LESSONS.length - 1), move('d4', 'c5')))
-    const complete = advanceLesson(scriptAction(transfer(open, move('a1', 'a2'))))
+    const open = scripted(transfer(startLesson(LESSONS.length - 1), move('d4', 'c5')))
+    const complete = advanceLesson(scripted(transfer(open, move('a1', 'a2'))))
     const handoff = createContinuation(complete.session)
     expect(handoff.record.config).toMatchObject({ mode: 'practice', level: 4, provenance: 'handoff' })
     expect(handoff.record.root).toEqual(complete.session.state)

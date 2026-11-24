@@ -9,6 +9,7 @@ import { restoreMatch } from '../../src/session/save'
 import { learnerAction, saveLearning, scriptAction, startLesson } from '../../src/tutorial/controller'
 import type { Learning } from '../../src/tutorial/controller'
 import { move } from '../../src/tutorial/lessonTypes'
+import type { Step } from '../../src/tutorial/lessonTypes'
 import { LESSONS } from '../../src/tutorial/lessons'
 import { describeEvent } from '../../src/ui/projections'
 
@@ -37,10 +38,11 @@ async function recorded<T>(page: Page, store: string, key: string): Promise<T> {
   return value as T
 }
 
-async function restoreTutorialCheckpoint(page: Page, learning: Learning) {
+async function restoreTutorialCheckpoint(page: Page, learning: Learning, legacy = false) {
   // Use the actual v1 saved format so this exercises existing users' progress,
   // not a test-only navigation shortcut or a freshly restarted lesson.
   const saved = saveLearning(learning)
+  if (legacy) delete (saved as { pendingTeaching?: unknown }).pendingTeaching
   await page.evaluate(async value => {
     const db = await new Promise<IDBDatabase>((resolve, reject) => {
       const opening = indexedDB.open('remorse-v1')
@@ -75,10 +77,42 @@ async function boardIdentity(page: Page) {
 async function interactable(page: Page) {
   await expect(playfield(page)).toHaveAttribute('data-busy', 'false')
   await expect(playfield(page)).toHaveAttribute('data-animating', 'false')
+  await expect(playfield(page)).toHaveAttribute('data-teaching-returning', 'false')
 }
 
 function activate(locator: Locator, mobile: boolean) {
   return mobile ? locator.tap() : locator.click()
+}
+
+async function acknowledgeResults(page: Page, step: Step, locale: 'ru' | 'en', mobile: boolean) {
+  for (const beat of step.after ?? []) {
+    await expect(tutorial(page)).toHaveAttribute('data-kind', 'result')
+    await expect(tutorial(page)).toHaveAttribute('data-source-step', step.id)
+    await expect(tutorial(page)).toHaveAttribute('data-beat', beat.id)
+    await interactable(page)
+    await expect(tutorial(page).getByRole('heading', { name: beat.title[locale], exact: true })).toBeVisible()
+    await expect(page.getByTestId('teaching-cause')).toHaveText(beat.text[locale])
+    if (beat.rule) await expect(page.getByTestId('teaching-rule')).toHaveText(beat.rule[locale])
+    else await expect(page.getByTestId('teaching-rule')).toHaveCount(0)
+    if (beat.focus) {
+      await expect(page.locator('.board-stage')).toHaveAttribute('data-focus-square', beat.focus.square)
+      await expect(page.locator('.board-stage')).toHaveAttribute('data-focus-subject', beat.focus.subject)
+    }
+    if (beat.diceLegend) {
+      const legend = page.getByTestId('dice-legend')
+      for (const [state, faces] of [['devastated', '1'], ['guilt', '2–3'], ['unaffected', '4–5'], ['berserk', '6']] as const) {
+        const entry = legend.locator(`[data-reaction="${state}"]`)
+        await expect(entry).toContainText(faces)
+        await expect(entry).toContainText(translator(locale)(`state.${state}`))
+      }
+      await expect(legend.locator('[data-reaction="unaffected"]')).toHaveAttribute('data-current', 'true')
+    }
+    const next = page.getByTestId('lesson-next')
+    await expect(next).toHaveAccessibleName(beat.action?.[locale] ?? translator(locale)('tutorial.readAction'))
+    await expect(next).toBeInViewport({ ratio: 1 })
+    await expect(page.locator('.flat-board [draggable="true"]')).toHaveCount(0)
+    await activate(next, mobile)
+  }
 }
 
 async function play(page: Page, command: Command, mobile: boolean) {
@@ -179,7 +213,7 @@ for (const locale of ['ru', 'en'] as const) {
       await page.getByTestId('flat-mode').click()
 
       const nearExpiry = learnerAction(startLesson(2, 2), move('g2', 'g3')).progress
-      const saved = await restoreTutorialCheckpoint(page, scriptAction(nearExpiry))
+      const saved = await restoreTutorialCheckpoint(page, scriptAction(nearExpiry), true)
       await expect(tutorial(page)).toHaveAttribute('data-step', 'removal-material-only')
       expect(await recorded(page, 'learning', 'progress')).toEqual(saved)
       const before = await boardIdentity(page)
@@ -201,12 +235,14 @@ for (const locale of ['ru', 'en'] as const) {
       await expect(tutorial(page)).toHaveAttribute('data-step', 'start-two-cures')
       await interactable(page)
       await play(page, move('c1', 'e3'), mobile)
+      await acknowledgeResults(page, LESSONS[3].positions[0].steps.find(step => step.id === 'start-two-cures')!, locale, mobile)
       await expect(tutorial(page)).toHaveAttribute('data-step', 'cure-two-pieces')
       await interactable(page)
       await activate(square(page, 'h1'), mobile)
       await expect(square(page, 'g1')).toHaveClass(/mark-move/)
       await expect(square(page, 'g2')).not.toHaveClass(/mark-move/)
       await activate(square(page, 'g1'), mobile)
+      await acknowledgeResults(page, LESSONS[3].positions[0].steps.find(step => step.id === 'cure-two-pieces')!, locale, mobile)
       await expect(tutorial(page)).toHaveAttribute('data-step', 'bishop-pacifism')
       const healed = await recorded<ReturnType<typeof saveLearning>>(page, 'learning', 'progress')
       const state = restoreMatch(healed.match).state
@@ -248,8 +284,16 @@ for (const locale of ['ru', 'en'] as const) {
         await expect(tutorial(page).getByText(lesson.title[locale], { exact: true })).toBeVisible()
         for (const [positionIndex, position] of lesson.positions.entries()) {
           await expect(tutorial(page)).toHaveAttribute('data-position', String(positionIndex))
-          for (const step of position.steps) {
-            if (step.kind === 'script') continue
+          for (const [stepIndex, step] of position.steps.entries()) {
+            if (step.kind === 'script') {
+              const commandId = `${lessonIndex}/${positionIndex}/${stepIndex}/${step.id}`
+              await expect.poll(async () => {
+                const saved = await recorded<ReturnType<typeof saveLearning>>(page, 'learning', 'progress')
+                return saved.match.actions.some(action => action.id === commandId)
+              }).toBe(true)
+              await acknowledgeResults(page, step, locale, mobile)
+              continue
+            }
             await expect(tutorial(page)).toHaveAttribute('data-step', step.id)
             await expect(tutorial(page).getByText(step.text[locale], { exact: true })).toBeVisible()
             await interactable(page)
@@ -324,8 +368,9 @@ for (const locale of ['ru', 'en'] as const) {
             } else if (step.kind === 'illegal') {
               const before = await boardIdentity(page)
               await play(page, step.move, mobile)
-              await expect(tutorial(page)).not.toHaveAttribute('data-step', step.id)
-              await expect(page.getByTestId('game-aside').getByText(translator(locale)(`error.${step.reason}`), { exact: true })).toBeVisible()
+              await expect(tutorial(page)).toHaveAttribute('data-kind', 'result')
+              await expect(tutorial(page)).toHaveAttribute('data-source-step', step.id)
+              await expect(page.getByTestId('game-aside').getByText(translator(locale)(`error.${step.reason}`), { exact: true })).toHaveCount(0)
               expect(await boardIdentity(page)).toEqual(before)
             } else if (step.kind === 'inspect') {
               const before = await boardIdentity(page)
@@ -354,21 +399,26 @@ for (const locale of ['ru', 'en'] as const) {
             }
 
             if (step.id === 'capture-and-roll') {
-              const roll = page.getByTestId('roll')
-              await expect(roll).toHaveAttribute('data-face', '4')
-              await expect(roll).toContainText(translator(locale)('state.unaffected'))
-              await expect(roll).not.toContainText(scriptedDiceNotice)
+              const beat = step.after![0]
+              await interactable(page)
+              await expect(tutorial(page).getByRole('heading', { name: beat.title[locale], exact: true })).toBeVisible()
+              await expect(page.getByTestId('teaching-cause')).toHaveText(beat.text[locale])
+              await expect(tutorial(page)).not.toContainText(scriptedDiceNotice)
+              const saved = await recorded<ReturnType<typeof saveLearning>>(page, 'learning', 'progress')
+              expect(saved.match.actions.at(-1)?.roll?.face).toBe(4)
               const before = await boardIdentity(page)
               const alternate = locale === 'en' ? 'ru' : 'en'
               await changeLanguage(page, alternate)
-              await expect(roll).toHaveAttribute('data-face', '4')
-              await expect(roll).toContainText(translator(alternate)('state.unaffected'))
-              await expect(roll).not.toContainText(scriptedDiceNotice)
+              await expect(tutorial(page).getByRole('heading', { name: beat.title[alternate], exact: true })).toBeVisible()
+              await expect(page.getByTestId('teaching-cause')).toHaveText(beat.text[alternate])
+              await expect(tutorial(page)).toHaveAttribute('data-beat', beat.id)
               expect(await boardIdentity(page)).toEqual(before)
+              expect(await recorded<ReturnType<typeof saveLearning>>(page, 'learning', 'progress')).toEqual(saved)
               await changeLanguage(page, locale)
               await expect(page.locator('.player-row[data-side="white"] .trophy-group')).toHaveCount(1)
               await expect(page.locator('.player-row[data-side="white"] .material')).toHaveText('+1')
             }
+            await acknowledgeResults(page, step, locale, mobile)
             if (step.id === 'friendly-capture') {
               await expect(playfield(page)).toHaveAttribute('data-phase', 'bonus')
               await expect(tutorial(page)).toHaveAttribute('data-step', 'decline-optional-bonus')
@@ -393,7 +443,8 @@ for (const locale of ['ru', 'en'] as const) {
             }
           }
           const final = lessonIndex === LESSONS.length - 1 && positionIndex === lesson.positions.length - 1
-          if (!final) {
+          const advancedWithResult = Boolean(position.steps.at(-1)?.after?.length)
+          if (!final && !advancedWithResult) {
             await expect(tutorial(page)).toHaveAttribute('data-step', 'position-complete')
             await interactable(page)
             await activate(page.getByTestId('lesson-next'), mobile)

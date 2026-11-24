@@ -206,6 +206,7 @@ export const messages = {
   'tutorial.moveCue': ['Сделайте ход', 'Make your move'],
   'tutorial.illegalCue': ['Проверьте правило', 'Try the rule'],
   'tutorial.readAction': ['Понятно', 'Got it'],
+  'tutorial.diceLegend': ['Реакции на кубике', 'Die reactions'],
   'tutorial.why': ['Почему так', 'Why this happens'],
   'tutorial.endAction': ['Нажмите «Завершить ход»', 'Choose “End turn”'],
   'tutorial.finish': ['Обучение пройдено', 'Tutorial complete'],

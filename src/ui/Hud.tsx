@@ -7,9 +7,10 @@ import type { SessionConfig } from '../session/match';
 import { PieceIcon } from './pieces';
 import { trophies } from './projections';
 
-export function PlayerRow({ t, locale, side, config, active, captures, advantage, rating, onCaptures }: {
+export function PlayerRow({ t, locale, side, config, active, captures, advantage, rating, onCaptures, teachingFocus }: {
   t: Translate; locale: Locale; side: Side; config?: SessionConfig; active: boolean;
   captures: readonly CaptureEvent[]; advantage: number; rating: number; onCaptures: (side: Side) => void;
+  teachingFocus?: 'captures' | 'material';
 }) {
   const list = trophies(captures, side);
   const bot = Boolean(config?.human && config.human !== side && config.mode !== 'tutorial');
@@ -19,7 +20,7 @@ export function PlayerRow({ t, locale, side, config, active, captures, advantage
   const isHuman = config?.human === side && config.mode !== 'tutorial';
   const notation = `+${numberText(locale, advantage)}`;
   const level = preset && t('setup.levelValue', { level: preset.id, elo: preset.anchor });
-  return <div className={`player-row ${active ? 'player-active' : ''}`} data-side={side}>
+  return <div className={`player-row ${active ? 'player-active' : ''}`} data-side={side} data-teaching-hud={teachingFocus}>
     <span className={`side-stamp ${side}`} aria-label={t(`side.${side}`)} title={t(`side.${side}`)} />
     <div className="player-detail">
       <div className="player-heading">

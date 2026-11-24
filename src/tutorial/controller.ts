@@ -4,7 +4,13 @@ import { createMatch, SessionError } from '../session/match';
 import type { GameSession, MatchRecord, TutorialRollProvider } from '../session/match';
 import { restoreMatch } from '../session/save';
 import { LESSONS } from './lessons';
-import type { FixedRoll, Step } from './lessonTypes';
+import type { FixedRoll, Step, TeachingBeat } from './lessonTypes';
+
+export interface PendingTeaching {
+  /** The original completed step, whose index has already advanced once. */
+  readonly stepId: string;
+  readonly beatIndex: number;
+}
 
 export interface Learning {
   readonly lesson: number;
@@ -12,6 +18,7 @@ export interface Learning {
   readonly index: number;
   readonly complete: boolean;
   readonly session: GameSession;
+  readonly pendingTeaching?: PendingTeaching;
 }
 
 interface LearningSave {
@@ -21,10 +28,26 @@ interface LearningSave {
   readonly index: number;
   readonly complete: boolean;
   readonly match: MatchRecord;
+  /** Optional in v1: older checkpoints retain their exact original progress. */
+  readonly pendingTeaching?: PendingTeaching;
 }
 
 export function instruction(progress: Learning): Step | undefined {
   return LESSONS[progress.lesson].positions[progress.position].steps[progress.index];
+}
+
+/** Required result copy is separate from the next still-unexecuted instruction. */
+export function teachingBeat(progress: Learning): TeachingBeat | undefined {
+  const pending = progress.pendingTeaching;
+  if (!pending) return undefined;
+  const source = LESSONS[progress.lesson].positions[progress.position].steps[progress.index - 1];
+  return source?.id === pending.stepId ? source.after?.[pending.beatIndex] : undefined;
+}
+
+function isComplete(progress: Pick<Learning, 'lesson' | 'position' | 'index' | 'pendingTeaching'>) {
+  const lesson = LESSONS[progress.lesson];
+  return !progress.pendingTeaching && progress.lesson === LESSONS.length - 1
+    && progress.position === lesson.positions.length - 1 && progress.index === lesson.positions[progress.position].steps.length;
 }
 
 export function startLesson(lesson = 0, position = 0): Learning {
@@ -36,8 +59,9 @@ export function startLesson(lesson = 0, position = 0): Learning {
 }
 
 export function saveLearning(progress: Learning): LearningSave {
-  const { lesson, position, index, complete, session } = progress;
-  return { version: 1, lesson, position, index, complete, match: session.record };
+  const { lesson, position, index, complete, session, pendingTeaching } = progress;
+  return { version: 1, lesson, position, index, complete, match: session.record,
+    ...(pendingTeaching ? { pendingTeaching } : {}) };
 }
 
 export function restoreLearning(value: unknown): Learning {
@@ -46,9 +70,9 @@ export function restoreLearning(value: unknown): Learning {
     !Number.isInteger(saved.position) || !Number.isInteger(saved.index) || typeof saved.complete !== 'boolean') {
     throw new SessionError('invalidSave');
   }
-  const { lesson, position, index, complete } = saved as LearningSave;
+  const { lesson, position, index, complete, pendingTeaching } = saved as LearningSave;
   const fixture = LESSONS[lesson]?.positions[position];
-  const expectComplete = lesson === LESSONS.length - 1 && position === LESSONS[lesson].positions.length - 1
+  const expectComplete = !pendingTeaching && lesson === LESSONS.length - 1 && position === LESSONS[lesson].positions.length - 1
     && index === fixture?.steps.length;
   if (!fixture || index < 0 || index > fixture.steps.length || complete !== expectComplete) {
     throw new SessionError('invalidSave');
@@ -56,14 +80,28 @@ export function restoreLearning(value: unknown): Learning {
   const session = restoreMatch(saved.match);
   if (session.record.config.mode !== 'tutorial' || session.record.config.human !== 'white'
     || JSON.stringify(session.record.root) !== JSON.stringify(fixture.setup())) throw new SessionError('invalidSave');
-  return { lesson, position, index, complete, session };
+  if (pendingTeaching !== undefined) {
+    const source = fixture.steps[index - 1];
+    if (!pendingTeaching || typeof pendingTeaching !== 'object' || typeof pendingTeaching.stepId !== 'string'
+      || !Number.isInteger(pendingTeaching.beatIndex) || pendingTeaching.beatIndex < 0
+      || source?.id !== pendingTeaching.stepId || !source.after?.[pendingTeaching.beatIndex]
+      || !['move', 'script', 'illegal'].includes(source.kind)) throw new SessionError('invalidSave');
+    // An explanation must refer to the actual action at this checkpoint; it
+    // cannot be relinked to an earlier roll or used to skip a future command.
+    if (source.kind === 'illegal') {
+      if (commandRejection(session.state, source.move) !== source.reason) throw new SessionError('invalidSave');
+    }
+    const committedIndex = fixture.steps.slice(0, index).findLastIndex(step => step.kind === 'move' || step.kind === 'script');
+    const action = session.record.actions[session.record.cursor - 1];
+    if (committedIndex === -1 ? session.record.cursor !== 0
+      : action?.id !== `${lesson}/${position}/${committedIndex}/${fixture.steps[committedIndex].id}`) throw new SessionError('invalidSave');
+  }
+  return { lesson, position, index, complete, session, ...(pendingTeaching ? { pendingTeaching } : {}) };
 }
 
 function bump(progress: Learning, session = progress.session): Learning {
   const index = progress.index + 1;
-  const lesson = LESSONS[progress.lesson];
-  const allDone = progress.lesson === LESSONS.length - 1 && progress.position === lesson.positions.length - 1
-    && index === lesson.positions[progress.position].steps.length;
+  const allDone = isComplete({ ...progress, index });
   const position = session.state;
   if (allDone && (position.outcome || position.phase !== 'primary' || !legalCommands(position).length)) {
     throw new SessionError('tutorialBroken');
@@ -71,7 +109,27 @@ function bump(progress: Learning, session = progress.session): Learning {
   return { ...progress, index, session, complete: allDone };
 }
 
+function afterAction(progress: Learning, step: Step, session = progress.session): Learning {
+  const next = bump(progress, session);
+  return step.after?.length
+    ? { ...next, complete: false, pendingTeaching: { stepId: step.id, beatIndex: 0 } }
+    : next;
+}
+
+/** Acknowledgement changes only teaching progress, never the committed game. */
+export function acknowledgeTeaching(progress: Learning): Learning {
+  const pending = progress.pendingTeaching;
+  if (!pending || !teachingBeat(progress)) throw new SessionError('tutorialChoice');
+  const source = LESSONS[progress.lesson].positions[progress.position].steps[progress.index - 1];
+  const beatIndex = pending.beatIndex + 1;
+  if (source.after?.[beatIndex]) return { ...progress, pendingTeaching: { ...pending, beatIndex } };
+  const { lesson, position, index, session } = progress;
+  const next = { lesson, position, index, session };
+  return { ...next, complete: isComplete(next) };
+}
+
 export function advanceLesson(progress: Learning): Learning {
+  if (progress.pendingTeaching) return acknowledgeTeaching(progress);
   const current = instruction(progress);
   if (current?.kind === 'read') return bump(progress);
   if (current || progress.complete) throw new SessionError('tutorialChoice');
@@ -81,6 +139,7 @@ export function advanceLesson(progress: Learning): Learning {
 }
 
 export function confirmInspection(progress: Learning, square: string): Learning {
+  if (progress.pendingTeaching) return progress;
   const step = instruction(progress);
   if (step?.kind !== 'inspect' || step.square !== square) return progress;
   return bump(progress);
@@ -114,6 +173,7 @@ function quietResults(state: GameState): { command: Move; state: GameState }[] {
 }
 
 export function guideCommands(progress: Learning): readonly Command[] {
+  if (progress.pendingTeaching) return [];
   const step = instruction(progress);
   if (step?.kind === 'illegal') return [step.move];
   if (step?.kind !== 'move') return [];
@@ -132,15 +192,19 @@ function accept(progress: Learning, step: Extract<Step, { kind: 'move' | 'script
   const next = session.submit({ ...env, commandId: id }, step.kind === 'script' ? 'script' : 'human',
     provider(step, step.roll, command, id));
   if (step.expect && !step.expect(next.current.events, next.state)) throw new SessionError('tutorialBroken');
-  return bump(progress, next);
+  return afterAction(progress, step, next);
 }
 
 export function learnerAction(progress: Learning, command: Command):
   { progress: Learning; explanation?: SessionError['code'] } {
+  if (progress.pendingTeaching) throw new SessionError('tutorialChoice');
   const step = instruction(progress);
   const rejection = commandRejection(progress.session.state, command);
   if (step?.kind === 'illegal' && sameCommand(step.move, command) && rejection === step.reason) {
-    return { progress: bump(progress), explanation: step.reason };
+    const next = afterAction(progress, step);
+    // A correct, requested experiment is a completed lesson objective. Its
+    // authored result explains the rule without treating success as an error.
+    return { progress: next, ...(!next.pendingTeaching ? { explanation: step.reason } : {}) };
   }
   if (rejection) throw new SessionError(rejection);
   if (step?.kind !== 'move' || !guideCommands(progress).some(candidate => sameCommand(candidate, command))) {
@@ -150,6 +214,7 @@ export function learnerAction(progress: Learning, command: Command):
 }
 
 export function scriptAction(progress: Learning): Learning {
+  if (progress.pendingTeaching) throw new SessionError('tutorialChoice');
   const step = instruction(progress);
   if (step?.kind !== 'script') throw new SessionError('tutorialBroken');
   const command = step.move === 'reply' ? scriptedReply(progress.session.state) : step.move;

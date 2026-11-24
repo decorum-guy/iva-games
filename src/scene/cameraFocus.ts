@@ -2,7 +2,9 @@ import { Vector3 } from 'three'
 
 export const CAMERA_TRAVEL_MS = 850
 export const CAMERA_OVERSCAN = 1.68
-export const FOCUS_EMPHASIS_MS = 1000
+// Keep the new state prominent when the camera has actually arrived, not only
+// during its approach. One restrained fade then leaves the resting material.
+export const FOCUS_EMPHASIS_MS = CAMERA_TRAVEL_MS + 950
 export const COUNTER_FOCUS_DELAY_MS = CAMERA_TRAVEL_MS + 180
 export const COUNTER_FOCUS_MS = 240
 export const MAX_FOCUS_ZOOM = 2.6
@@ -129,7 +131,8 @@ export function sampleCameraTravel(from: CameraRig, to: CameraRig, elapsedMs: nu
 export function sampleFigureEmphasis(elapsedMs: number, reduced: boolean): number {
   if (reduced) return .48
   if (elapsedMs < 0 || elapsedMs >= FOCUS_EMPHASIS_MS) return 0
-  return smooth(elapsedMs / 180) * (1 - smooth((elapsedMs - 360) / (FOCUS_EMPHASIS_MS - 360)))
+  const holdUntil = CAMERA_TRAVEL_MS + 300
+  return smooth(elapsedMs / 180) * (1 - smooth((elapsedMs - holdUntil) / (FOCUS_EMPHASIS_MS - holdUntil)))
 }
 
 /** Wait for the camera and the material cue before framing the counter. */

@@ -48,9 +48,9 @@ Each teaching step has:
 2. A highlighted source piece, target square and subtle directional cue.
 3. A real player action accepted by the normal rules core.
 4. A real, validated scripted opponent response when necessary.
-5. The real effect animation and a concise explanation of what changed.
+5. The real effect animation and a concise required explanation of its cause, result and practical rule, held until acknowledgement.
 
-Use one anchored modal/coachmark at a time with a spotlight, one idea, one expected action and about 1–3 short sentences. Show lesson/step progress and put detail in expandable help. Release board interaction when the step asks for a move; pointer events must reach the highlighted target through the spotlight. Reposition the callout after camera/viewport changes if it would cover the source, destination or promotion controls. On a phone use a compact bottom sheet and a fitted board/camera; never shrink the desktop coachmark until its text or target is unusable.
+Use one anchored modal/coachmark at a time with a spotlight, one idea, one expected action and about 1–3 short sentences. Show lesson/step progress and put optional exceptions in expandable help. The first dice mapping, cause of an emotion, its functional rule and the timer's unit are required learning content, never optional-only detail. Release board interaction when the step asks for a move; pointer events must reach the highlighted target through the spotlight. Reposition the callout after camera/viewport changes if it would cover the source, destination or promotion controls. On a phone use a compact bottom sheet and a fitted board/camera; never shrink the desktop coachmark until its text or target is unusable.
 
 Support keyboard focus, touch, 2D and reduced motion. Supply «Повторить объяснение», «Начать урок заново» and exit controls. Do not allow a modal, AI request or missing animation event to trap the player.
 
@@ -100,11 +100,17 @@ Use an injected **`TutorialRollProvider`**, separate from the ordinary provider.
 
 ### Playtest corrections
 
-- Keep the main instruction to one short observation or action; longer reasoning belongs behind optional help. State clearly whether the player should read, select, move, or press the primary button.
+- Keep each instruction concise while teaching the actual reason and rule. Hold the new result before an opponent demonstration or another exercise; do not replace explanation with coordinates. State clearly whether the player should read, select, move, or press the primary button.
 - On `read` and completed-position steps, hide move affordances and prevent dragging. A legal chess move must not be advertised while the tutorial expects a UI transition. The primary button stays in the viewport.
 - Selecting a counter in an `inspect` step does not immediately launch the next scripted turn. Show the count, allow a camera close-up, and advance only after «Понятно» / “Got it”. The controller IDs and old checkpoints remain compatible.
-- Use authored focus targets for inspection; never zoom to an empty/removed figure. Emphasize the actual surface state briefly, then the counter, and return to the whole board on the next action. Do not hide a move destination with a close-up.
+- Use authored focus targets for the current event/inspection; never zoom to an empty/removed figure or scan old events after an exercise. Start focus at the die's settled reveal, together with the material state and required result text. Keep the surface emphasis strong through camera arrival, then show the counter and return to the board before the next action. Input and scripts wait for that return, including transitions to a new prepared position.
 - Fit the board and essential instructions in one dynamic viewport on laptops and phones. Only deliberately opened secondary details may scroll internally.
+
+### Required result checkpoints
+
+`Step.after` supplies authored bilingual `TeachingBeat` observations attached to completed actions. `pendingTeaching` is saved independently of the underlying next step. While a beat is pending, no next instruction, script or board exercise is available. Acknowledgement changes learning progress only; it cannot roll, settle a turn or modify the authoritative game. Correct requested illegal attempts also use a held, constructive rule explanation without replaying the previous action.
+
+Preserve old step IDs, order and fixtures. Version-1 saves without the optional field resume their existing index without retroactively injecting old observations. Validate new pending references against the completed source step and committed action. The last beat may directly advance an otherwise empty position boundary in one Cabinet persistence operation. A failed save retains the old position and explanation. See [the current review](TUTORIAL_CLARITY_REVIEW.md) and [Mac completion brief](../prompts/FINISH_TUTORIAL.md).
 
 No hidden production setting such as `forceNextRoll` may survive lesson completion. Save tutorial state as tutorial state; an imported normal save must not accidentally reactivate a script. Reject or explicitly route tutorial-save imports to the tutorial controller.
 

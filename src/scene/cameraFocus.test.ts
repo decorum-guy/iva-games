@@ -154,11 +154,12 @@ describe('teaching camera framing', () => {
 })
 
 describe('ordered figure and counter emphasis', () => {
-  it('emphasizes the material once, returns to its ordinary intensity, then frames the counter', () => {
+  it('keeps the material visible through camera arrival, then fades while the counter stays framed', () => {
     expect(sampleFigureEmphasis(0, false)).toBe(0)
     expect(sampleFigureEmphasis(180, false)).toBe(1)
     expect(sampleFigureEmphasis(360, false)).toBe(1)
-    expect(sampleFigureEmphasis(CAMERA_TRAVEL_MS, false)).toBeLessThan(.15)
+    expect(sampleFigureEmphasis(CAMERA_TRAVEL_MS, false)).toBe(1)
+    expect(sampleFigureEmphasis(CAMERA_TRAVEL_MS + 300, false)).toBe(1)
     expect(sampleFigureEmphasis(FOCUS_EMPHASIS_MS, false)).toBe(0)
     expect(sampleFigureEmphasis(20_000, false)).toBe(0)
     expect(sampleCounterEmphasis(CAMERA_TRAVEL_MS, false)).toBe(0)

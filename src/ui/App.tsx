@@ -5,7 +5,7 @@ import { translator } from '../i18n/catalog';
 import { Cabinet } from '../session/cabinet';
 import { captureLedger } from '../session/match';
 import { exportMatch } from '../session/save';
-import { guideCommands, instruction } from '../tutorial/controller';
+import { guideCommands, instruction, teachingBeat } from '../tutorial/controller';
 import { muteAudio, playSceneCue, prepareSceneAudio, setAudioVolume, stopSceneAudio, unlockAudio } from '../scene/audio';
 import type { SceneFocus, SceneMark } from '../scene/types';
 import { Board } from './Board';
@@ -82,7 +82,10 @@ export function App() {
   const reversed = (config?.mode === 'hotseat' && settings.autoFlip ? actor === 'black' : config?.human === 'black') !== flip;
   const nearSide = reversed ? 'black' : 'white';
   const farSide = opposite(nearSide);
-  const step = lesson ? instruction(lesson) : null;
+  const beat = lesson ? teachingBeat(lesson) : undefined;
+  // A required observation owns the screen until the learner acknowledges it.
+  // Do not leak the next opponent move or exercise into that explanation.
+  const step = lesson && !beat ? instruction(lesson) : null;
   const moves = useMemo(() => session && !position.outcome ? session.legal() : [], [session, position.outcome]);
   const guidance = useMemo(() => lesson ? guideCommands(lesson) : [], [lesson]);
   const active = Boolean(session && !position.outcome && reviewing === null);
@@ -90,9 +93,9 @@ export function App() {
   const boosted = active && position.phase === 'bonus';
   const selectedId = selection?.key === snap.motionKey ? selection.id : boosted ? position.bonusPieceId : null;
   const selected = position.pieces.find(piece => piece.id === selectedId);
-  const tutorialMode = !lesson ? 'none' : lesson.complete ? 'complete' : step?.kind ?? 'position-complete';
+  const tutorialMode = !lesson ? 'none' : beat ? 'result' : lesson.complete ? 'complete' : step?.kind ?? 'position-complete';
   const teachingMove = !lesson || step?.kind === 'move' || step?.kind === 'illegal';
-  const canInput = active && !snap.animating && !snap.busy && humanActing && !snap.thinking && teachingMove && !lesson?.complete;
+  const canInput = active && !snap.animating && !snap.teachingReturning && !snap.busy && humanActing && !snap.thinking && teachingMove && !lesson?.complete;
   const shownMoves = lesson ? step?.kind === 'move' ? guidance : [] : moves;
   const mayEnd = moves.some(move => move.type === 'endTurn') && (!lesson || guidance.some(move => move.type === 'endTurn'));
   const showRoll = reviewing === null && session && snap.rollId && session.record.cursor > 0;
@@ -111,20 +114,16 @@ export function App() {
     ? `${snap.motionKey}/${lesson.lesson}/${lesson.position}/${step.id}` : null;
   const inspected = inspectionKey !== null && inspectedStep === inspectionKey;
   const tutorialFocus = useMemo<SceneFocus | undefined>(() => {
-    if (!lesson || lesson.complete || snap.animating) return undefined;
-    const key = `${snap.motionKey}/${lesson.lesson}/${lesson.position}/${step?.id ?? 'position-complete'}`;
-    if (step?.focus) return { ...step.focus, key };
-    if (step?.kind === 'inspect') return { square: step.square, subject: 'piece', key };
-    if (step || !session) return undefined;
-    // Give a completed example a moment to show its surviving state. Ordinary
-    // game moves never trigger the tutorial camera.
-    for (const event of [...session.events].reverse()) {
-      if (event.type !== 'reaction' && event.type !== 'affliction') continue;
-      const piece = position.pieces.find(piece => piece.id === event.piece.id && piece.affliction !== 'neutral');
-      if (piece) return { square: piece.square, subject: piece.affliction === 'devastated' ? 'countdown' : 'piece', key };
-    }
-    return undefined;
-  }, [lesson, step, session, position.pieces, snap.animating, snap.motionKey]);
+    if (!lesson || lesson.complete || rollPending || snap.teachingReturning) return undefined;
+    const target = beat?.focus ?? step?.focus
+      ?? (step?.kind === 'inspect' ? { square: step.square, subject: 'piece' as const } : undefined);
+    if (!target || !position.pieces.some(piece => piece.square === target.square)) return undefined;
+    const identity = beat ? `${lesson.pendingTeaching!.stepId}/${beat.id}` : step?.id;
+    // Start the close-up on the same reveal as the newly visible material.
+    // No historical-event scan: finishing an exercise must not replay its effect.
+    return { ...target, key: `${snap.motionKey}/${lesson.lesson}/${lesson.position}/${identity}` };
+  }, [lesson, beat, step, position.pieces, rollPending, snap.teachingReturning, snap.motionKey]);
+  const teachingHud = !rollPending ? beat?.hud ?? step?.hud : undefined;
   const activePromotion = promotion?.key === snap.motionKey ? promotion.move : null;
   const allowedPromotions = activePromotion && lesson ? guidance.flatMap(command =>
     command.type === 'move' && command.from === activePromotion.from && command.to === activePromotion.to && command.promotion
@@ -136,6 +135,8 @@ export function App() {
       ...session.record.rootLedger, ...session.eventsAt(reviewing).filter(event => event.type === 'capture'),
     ] : [], [reviewing, session]);
   const balance = materialBalance(position);
+  const teachingHudSide = teachingHud === 'material' && balance !== 0
+    ? balance > 0 ? 'white' : 'black' : config?.human;
   const pending = snap.matches.find(match => match.id === snap.profile.ratedId);
   const resume = snap.matches.find(match => match.status === 'open' && match.config.mode !== 'rated') ??
     (!snap.durable && game?.record.status === 'open' ? game.record : undefined);
@@ -208,7 +209,7 @@ export function App() {
   }
 
   function useSquare(square: Square) {
-    if (!session || snap.busy || snap.animating) return;
+    if (!session || snap.busy || snap.animating || snap.teachingReturning || beat) return;
     const occupant = pieceAt(position, square);
     if (lesson && step?.kind === 'inspect' && step.square === square) {
       if (occupant) setSelection({ key: snap.motionKey, id: occupant.id });
@@ -301,12 +302,15 @@ export function App() {
     <main className={`playfield view-${view}`} data-testid="playfield" data-view={view} data-mode={mode ?? 'preview'}
       data-tutorial-mode={tutorialMode}
       data-tutorial-focus={tutorialFocus ? 'true' : 'false'}
+      data-tutorial-hud={teachingHud}
+      data-teaching-returning={snap.teachingReturning}
       data-dice={showRoll && snap.animating ? snap.rollPhase : 'none'}
       data-active-side={actor} data-turn={position.turnSerial} data-phase={position.phase}
       data-revision={session?.record.revision ?? 0} data-game-id={session?.record.id ?? 'preview'}
       data-busy={snap.busy} data-animating={snap.animating} data-thinking={snap.thinking}>
       <div className="table-column" data-testid="board">
         <PlayerRow t={t} locale={settings.locale} side={farSide} config={config} active={active && actor === farSide}
+          teachingFocus={farSide === teachingHudSide ? teachingHud : undefined}
           captures={captures} advantage={farSide === 'white' ? balance : -balance} rating={snap.profile.rating}
           onCaptures={side => setModal({ kind: 'capture', side })} />
         <Board t={t} state={boardPosition} marks={marks} events={boardEvents} flipped={reversed}
@@ -316,9 +320,10 @@ export function App() {
           motionKey={`${snap.motionKey}/${reviewing ?? 'live'}`} onSquare={useSquare}
           onDragSquare={(from, to) => enter({ type: 'move', from, to })} onFailure={onFailure}
           onClear={() => setSelection(null)}
-          overlay={showRoll && snap.animating && <RollReveal t={t} session={session} rollId={snap.rollId!}
+          overlay={showRoll && snap.animating && snap.rollPhase !== 'idle' && <RollReveal t={t} session={session} rollId={snap.rollId!}
             reduced={snap.rollReduced} low={low} pending={snap.rollPhase === 'throwing'} startedAt={snap.rollStartedAt ?? undefined} />} />
         <PlayerRow t={t} locale={settings.locale} side={nearSide} config={config} active={active && actor === nearSide}
+          teachingFocus={nearSide === teachingHudSide ? teachingHud : undefined}
           captures={captures} advantage={nearSide === 'white' ? balance : -balance} rating={snap.profile.rating}
           onCaptures={side => setModal({ kind: 'capture', side })} />
         <div className="board-toolbar">
@@ -366,7 +371,7 @@ export function App() {
           </div>
         </section> : session && <>
           {notice}
-          <div className="decision-row">
+          <div className="decision-row" hidden={Boolean(lesson && beat)}>
           {session.state.outcome && !lesson && !rollPending ? <Result t={t} locale={settings.locale} session={session}
             entry={snap.ledger.find(entry => entry.matchId === session.record.id)} onNew={() => openSetup(mode === 'hotseat')} />
             : <div className="turn-panel" data-testid="turn-panel">
@@ -390,10 +395,10 @@ export function App() {
             </div>}
             {!!showRoll && <RollCard t={t} session={session} rollId={snap.rollId!} pending={snap.rollPhase === 'throwing'} />}
           </div>
-          {lesson && <LessonPanel t={t} locale={settings.locale} learning={lesson} guide={guidance} blocked={snap.busy || snap.animating}
+          {lesson && <LessonPanel t={t} locale={settings.locale} learning={lesson} guide={guidance} blocked={snap.busy || snap.animating || snap.teachingReturning}
             rolling={snap.rollPhase === 'throwing'}
             inspected={inspected}
-            onAdvance={() => { if (step?.kind === 'inspect') void cabinet.inspect(step.square); else void cabinet.advance(); }}
+            onAdvance={() => { if (!beat && step?.kind === 'inspect') void cabinet.inspect(step.square); else void cabinet.advance(); }}
             onHandoff={() => void cabinet.handoff()} onNew={() => openSetup()}
             onRepeat={() => setModal({ kind: 'repeat' })} onRestart={() => setModal({ kind: 'restart' })}
             onRestartAll={() => setModal({ kind: 'restart-all' })} />}
@@ -433,13 +438,14 @@ export function App() {
       exportFile={session && !lesson ? download : undefined} importFile={file => { close(); void cabinet.loadFile(file); }}
       level={config?.level ?? undefined} changeLevel={mode === 'practice' && canInput && !boosted ? level => { void cabinet.edit(level); } : undefined} />}
     {modal?.kind === 'repeat' && lesson && <Dialog title={t('tutorial.repeat')} closeLabel={t('nav.close')} onClose={close}>
-      <p>{step?.detail?.[settings.locale] ?? step?.text[settings.locale] ?? t('tutorial.positionDone')}</p>
+      {beat ? <><p>{beat.text[settings.locale]}</p>{beat.rule && <p>{beat.rule[settings.locale]}</p>}</>
+        : <p>{step?.detail?.[settings.locale] ?? step?.text[settings.locale] ?? t('tutorial.positionDone')}</p>}
     </Dialog>}
     {modal?.kind === 'exit' && lesson && <Dialog title={t('tutorial.exit')} closeLabel={t('nav.close')} onClose={close}>
       <p>{t('tutorial.exitDetail')}</p>
       <div className="dialog-actions">
         <button type="button" className="button" onClick={() => { close(); void cabinet.home(); }}>{t('nav.menu')}</button>
-        {!position.outcome && <button type="button" className="button primary" onClick={() => { close(); void cabinet.handoff(); }}>{t('tutorial.continue')}</button>}
+        {!position.outcome && !beat && !snap.animating && !snap.teachingReturning && <button type="button" className="button primary" onClick={() => { close(); void cabinet.handoff(); }}>{t('tutorial.continue')}</button>}
       </div>
     </Dialog>}
     {modal && ['resign', 'draw', 'restart', 'restart-all', 'technical'].includes(modal.kind) && <Dialog

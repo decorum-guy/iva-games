@@ -6,7 +6,7 @@ import { countText, numberText } from '../i18n/catalog';
 import type { Locale, Translate } from '../i18n/catalog';
 import { displayDelta } from '../rating/elo';
 import type { RatingEntry } from '../rating/elo';
-import { instruction } from '../tutorial/controller';
+import { instruction, teachingBeat } from '../tutorial/controller';
 import type { Learning } from '../tutorial/controller';
 import { LESSONS } from '../tutorial/lessons';
 import { tutorialHistory } from '../session/match';
@@ -123,8 +123,11 @@ export function LessonPanel({ t, locale, learning, guide, blocked, rolling = fal
 }) {
   const { complete } = learning;
   const lesson = LESSONS[learning.lesson];
-  const step = instruction(learning);
-  const phase = complete ? 'complete' : step?.kind ?? 'position-complete';
+  const beat = teachingBeat(learning);
+  const step = beat ? undefined : instruction(learning);
+  const phase = beat ? 'result' : complete ? 'complete' : step?.kind ?? 'position-complete';
+  const resultVisible = Boolean(beat && !rolling);
+  const face = learning.session.record.actions[learning.session.record.cursor - 1]?.roll?.face;
   const moves = guide.filter(cmd => cmd.type === 'move');
   const forced = moves[0] && moves.every(move => move.from === moves[0].from && move.to === moves[0].to);
   const read = step?.kind === 'read';
@@ -135,18 +138,31 @@ export function LessonPanel({ t, locale, learning, guide, blocked, rolling = fal
     step.kind === 'inspect' ? 'tutorial.selectCue' : step.kind === 'script' ? 'game.script' :
       step.kind === 'illegal' ? 'tutorial.illegalCue' : 'tutorial.moveCue';
   return <section className="lesson-panel" data-testid="tutorial" data-lesson={lesson.id}
-    data-position={learning.position} data-step={step?.id ?? phase} data-kind={phase} aria-label={lesson.title[locale]}>
+    data-position={learning.position} data-step={beat ? `result:${learning.pendingTeaching!.stepId}:${beat.id}` : step?.id ?? phase}
+    data-source-step={learning.pendingTeaching?.stepId} data-beat={beat?.id} data-kind={phase} aria-label={lesson.title[locale]}>
     <div className="lesson-meta">
       <span>{t('tutorial.progress', { current: learning.lesson + 1, total: LESSONS.length })}</span>
       <div className="lesson-track" aria-hidden="true">
         {LESSONS.map((item, index) => <i key={item.id} className={index <= learning.lesson ? 'reached' : ''} />)}
       </div>
     </div>
-    <h2>{complete ? t('tutorial.finish') : lesson.title[locale]}</h2>
-    {!complete && <div className="lesson-action-label" role="status"><Icon name={read || inspected || !step ? 'check' : step.kind === 'inspect' ? 'info' : 'arrow'} />{t(rolling ? 'die.watch' : inspected ? 'tutorial.readCue' : actionTitle)}</div>}
-    <p className="lesson-instruction" data-testid={inspected ? 'counter-read' : undefined}>{rolling ? t('die.rolling')
+    <h2>{complete ? t('tutorial.finish') : resultVisible ? beat!.title[locale] : lesson.title[locale]}</h2>
+    {!complete && !resultVisible && <div className="lesson-action-label" role="status"><Icon name={read || inspected || !step ? 'check' : step.kind === 'inspect' ? 'info' : 'arrow'} />{t(rolling ? 'die.watch' : inspected ? 'tutorial.readCue' : actionTitle)}</div>}
+    <p className="lesson-instruction" data-testid={resultVisible ? 'teaching-cause' : inspected ? 'counter-read' : undefined} role={resultVisible ? 'status' : undefined}>{rolling ? t('die.rolling')
+      : resultVisible ? beat!.text[locale]
       : inspected && remaining !== null ? t('tutorial.counterRead', { count: countText(locale, 'cycle', remaining) })
         : complete ? t('tutorial.finishDetail') : step?.text[locale] ?? t('tutorial.positionDoneDetail')}</p>
+    {resultVisible && beat?.rule && <p className="lesson-rule" data-testid="teaching-rule">{beat.rule[locale]}</p>}
+    {resultVisible && beat?.diceLegend && <div className="lesson-dice-legend" data-testid="dice-legend" role="group" aria-label={t('tutorial.diceLegend')}>
+      {([
+        { faces: '1', state: 'devastated', active: face === 1 },
+        { faces: '2–3', state: 'guilt', active: face === 2 || face === 3 },
+        { faces: '4–5', state: 'unaffected', active: face === 4 || face === 5 },
+        { faces: '6', state: 'berserk', active: face === 6 },
+      ] as const).map(entry => <div key={entry.state} data-reaction={entry.state} data-current={entry.active}>
+        <strong>{entry.faces}</strong><span>{t(`state.${entry.state}`)}</span>
+      </div>)}
+    </div>}
     {!rolling && !inspected && step?.kind === 'inspect' && <div className="lesson-target">{t('tutorial.inspect', { square: step.square })}</div>}
     {!rolling && forced && !complete && <div className="lesson-target">{t('tutorial.try', { from: moves[0].from, to: moves[0].to })}</div>}
     {!rolling && step?.kind === 'move' && !moves.length && guide.some(command => command.type === 'endTurn') &&
@@ -158,8 +174,9 @@ export function LessonPanel({ t, locale, learning, guide, blocked, rolling = fal
       <button type="button" className="button" onClick={onNew} data-testid="lesson-new" disabled={blocked}>{t('home.new')}</button>
       <button type="button" className="text-button" onClick={onRestartAll} disabled={blocked}>{t('tutorial.restartAll')}</button>
     </div> : <>
-      {(!step || step.kind === 'read' || inspected) && <button type="button" className={`button primary ${rolling ? 'awaiting-roll' : ''}`} onClick={onAdvance}
-        disabled={blocked} data-testid="lesson-next">{t(!step ? nextPosition ? 'tutorial.newPosition' : 'tutorial.nextLesson' : 'tutorial.readAction')}<Icon name="arrow" /></button>}
+      {(beat || !step || step.kind === 'read' || inspected) && <button type="button" className={`button primary ${rolling ? 'awaiting-roll' : ''}`} onClick={onAdvance}
+        disabled={blocked} data-testid="lesson-next">{beat ? beat.action?.[locale] ?? t('tutorial.readAction')
+          : t(!step ? nextPosition ? 'tutorial.newPosition' : 'tutorial.nextLesson' : 'tutorial.readAction')}<Icon name="arrow" /></button>}
       <div className="lesson-tools">
         {step && <button type="button" className="text-button" onClick={onRepeat}>{t(step.detail ? 'tutorial.why' : 'tutorial.repeat')}</button>}
         <button type="button" className="text-button" onClick={onRestart} data-testid="lesson-restart">{t('tutorial.restart')}</button>

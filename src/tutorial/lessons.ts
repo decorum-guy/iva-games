@@ -2,6 +2,7 @@ import { createInitialState, createPosition, isInCheck } from '../core'
 import type { GameState, Piece, Square } from '../core/types'
 import { fixed, move } from './lessonTypes'
 import type { Copy, Lesson } from './lessonTypes'
+import { TEACHING_BEATS } from './teachingCopy'
 
 const copy = (ru: string, en: string): Copy => ({ ru, en })
 const at = (state: GameState, square: Square): Piece | undefined =>
@@ -11,7 +12,7 @@ const kings = [
   { side: 'black', type: 'king', square: 'a8' },
 ] as const
 
-export const LESSONS: readonly Lesson[] = [
+const lessonPositions: readonly Lesson[] = [
   {
     id: 'first-capture',
     title: copy('Первое взятие', 'First capture'),
@@ -21,8 +22,8 @@ export const LESSONS: readonly Lesson[] = [
         {
           id: 'open-with-e4', kind: 'move', moves: [move('e2', 'e4')],
           text: copy(
-            'Передвиньте белую пешку: e2 → e4.',
-            'Move the white pawn: e2 → e4.',
+            'Цель — поставить мат. Здесь взятия меняют состояние фигур. Начнём с белой пешки: e2 → e4.',
+            'The goal is checkmate. Here, captures affect a piece’s state. Start with the white pawn: e2 → e4.',
           ),
           detail: copy(
             'Цель партии — поставить мат. Выберите белую пешку e2 и передвиньте её на выделенную клетку e4.',
@@ -44,8 +45,8 @@ export const LESSONS: readonly Lesson[] = [
           id: 'capture-and-roll', kind: 'move', moves: [move('e4', 'd5')], roll: fixed(4, 'e4', 'd5'),
           expect: events => events.some(event => event.type === 'reaction' && event.face === 4),
           text: copy(
-            'Возьмите пешку: e4 → d5. Кубик определит реакцию вашей пешки.',
-            'Capture the pawn: e4 → d5. The die will set your pawn’s reaction.',
+            'При первом взятии кубик покажет, как ваша пешка его переживёт. Возьмите пешку: e4 → d5.',
+            'On its first capture, the die shows how your pawn reacts. Capture the pawn: e4 → d5.',
           ),
           detail: copy(
             'Возьмите чёрную пешку на d5. Первое обычное взятие определяет реакцию вашей фигуры броском кубика.',
@@ -54,9 +55,10 @@ export const LESSONS: readonly Lesson[] = [
         },
         {
           id: 'faces-and-material', kind: 'read',
+          hud: 'captures',
           text: copy(
-            'Реакция запомнена. Под именем — взятая пешка, рядом +1 материала.',
-            'The reaction is remembered. Your captured pawn and +1 material appear below your name.',
+            'Посмотрите под своё имя: там взятая пешка. Рядом +1 — ваш перевес по фигурам на доске.',
+            'Look below your name: there is the captured pawn. The +1 beside it is your material lead on the board.',
           ),
           detail: copy(
             'Пешка запомнила выпавшую реакцию. 1 — опустошение, 2–3 — вина, 4–5 — без изменений, 6 — ярость. Под вашим именем появилась взятая пешка, а +1 показывает перевес по фигурам на доске.',
@@ -83,8 +85,8 @@ export const LESSONS: readonly Lesson[] = [
           id: 'guilt-roll', kind: 'move', moves: [move('c3', 'c4')], roll: fixed(2, 'c3', 'c4'),
           expect: (_, state) => at(state, 'c4')?.affliction === 'guilt' && !isInCheck(state, 'black'),
           text: copy(
-            'Возьмите пешку ладьёй: c3 → c4. Посмотрите, как изменится её состояние.',
-            'Capture with the rook: c3 → c4. Watch how its state changes.',
+            'Фигура может жалеть о взятии — это вина. Возьмите пешку ладьёй: c3 → c4.',
+            'A piece may regret a capture — that is guilt. Capture the pawn with your rook: c3 → c4.',
           ),
           detail: copy(
             'Возьмите пешку ладьёй с c3 на c4. Виноватая фигура может ходить, но не может брать фигуры и шаховать.',
@@ -142,8 +144,8 @@ export const LESSONS: readonly Lesson[] = [
             id: 'devastation-roll', kind: 'move', moves: [move('c3', 'c4')], roll: fixed(1, 'c3', 'c4'),
             expect: (_, state) => at(state, 'c4')?.devastationDue === state.turnSerial + 6,
             text: copy(
-              'Возьмите пешку ладьёй: c3 → c4. Единица вызовет опустошение.',
-              'Capture with the rook: c3 → c4. A 1 will cause devastation.',
+              'Бывает, фигура не может пережить взятие — это опустошение. Возьмите пешку ладьёй: c3 → c4.',
+              'Sometimes a piece cannot bear a capture — that is devastation. Capture the pawn with your rook: c3 → c4.',
             ),
             detail: copy(
               'Ладьёй с c3 возьмите пешку на c4. При единице фигура впадает в опустошение.',
@@ -154,8 +156,8 @@ export const LESSONS: readonly Lesson[] = [
             id: 'inspect-countdown', kind: 'inspect', square: 'c4',
             focus: { square: 'c4', subject: 'countdown' },
             text: copy(
-              'Нажмите на ладью c4 и посмотрите её отсчёт до исчезновения.',
-              'Select the rook on c4 to see its removal countdown.',
+              'У ладьи 3 цикла до исчезновения. Цикл — по одному ходу каждого игрока. Нажмите на ладью c4: покажем счётчик.',
+              'The rook has 3 cycles before removal. A cycle is one turn by each player. Select c4 to see its counter.',
             ),
             detail: copy(
               'Выберите ладью на c4 и посмотрите на счётчик. Он начнётся с трёх полных циклов. Каждый цикл включает два завершённых хода, по одному за сторону.',
@@ -220,8 +222,8 @@ export const LESSONS: readonly Lesson[] = [
             id: 'near-expiry', kind: 'move', moves: [move('g2', 'g3')],
             expect: (_, state) => at(state, 'c4')?.devastationDue === state.turnSerial + 1,
             text: copy(
-              'Передвиньте пешку: g2 → g3. До исчезновения ладьи осталось мало времени.',
-              'Move the pawn: g2 → g3. The rook’s removal is approaching.',
+              'В этой позиции ладье остался 1 цикл, а помощь не успеет. Передвиньте пешку: g2 → g3.',
+              'In this position, the rook has 1 cycle left and help will come too late. Move the pawn: g2 → g3.',
             ),
             detail: copy(
               'В этой позиции у опустошённой ладьи остался один цикл. Сделайте ход пешкой с g2 на g3.',
@@ -243,9 +245,10 @@ export const LESSONS: readonly Lesson[] = [
           },
           {
             id: 'removal-material-only', kind: 'read',
+            hud: 'material',
             text: copy(
-              'Ладья исчезла сама. Материал изменился, но взятия не было.',
-              'The rook removed itself. Material changed, but no capture took place.',
+              'Ладья не получила помощи и исчезла. Перевес +5 пропал, но значок взятой ладьи никому не добавился.',
+              'The rook received no help and disappeared. Your +5 lead vanished, but neither player gained a captured-rook icon.',
             ),
             detail: copy(
               'Исчезновение изменило баланс фигур на доске. Никто не получил значок взятой ладьи.',
@@ -275,8 +278,8 @@ export const LESSONS: readonly Lesson[] = [
             expect: (_, state) => at(state, 'e4')?.cureArmedAt === state.turnSerial
               && at(state, 'f4')?.cureArmedAt === state.turnSerial,
             text: copy(
-              'Передвиньте слона: c1 → e3. Он начнёт лечить две соседние фигуры.',
-              'Move the bishop: c1 → e3. It will start healing both neighboring pieces.',
+              'Слон помогает своим соседям: здесь ладье с виной и опустошённому коню. Передвиньте слона: c1 → e3.',
+              'A bishop helps nearby allies: here, a guilty rook and a devastated knight. Move the bishop: c1 → e3.',
             ),
             detail: copy(
               'Передвиньте слона с c1 на e3. Отпущение вины начнётся одновременно у двух соседних фигур.',
@@ -386,8 +389,8 @@ export const LESSONS: readonly Lesson[] = [
             expect: (_, state) => at(state, 'e4')?.shameArmedAt === state.turnSerial
               && at(state, 'd4')?.shameArmedAt === null,
             text: copy(
-              'Передвиньте слона: c1 → e3. Рядом с чёрной ладьёй начнётся стыд.',
-              'Move the bishop: c1 → e3. It will begin shaming the black rook.',
+              'Свой слон лечит, вражеский вызывает стыд. Подведите слона к чёрной ладье: c1 → e3.',
+              'A friendly bishop heals; an enemy bishop causes shame. Bring your bishop beside the black rook: c1 → e3.',
             ),
             detail: copy(
               'Поставьте слона на e3 рядом с чёрной ладьёй. Соседство запускает стыд. Конь d4 в ярости к нему невосприимчив.',
@@ -409,8 +412,8 @@ export const LESSONS: readonly Lesson[] = [
             id: 'shame-does-not-stack', kind: 'move', moves: [move('g4', 'f3')],
             expect: (_, state) => at(state, 'e4')?.affliction === 'guilt' && at(state, 'd4')?.affliction === 'berserk',
             text: copy(
-              'Передвиньте второго слона: g4 → f3. Два слона не ускоряют стыд.',
-              'Move the second bishop: g4 → f3. Two bishops do not speed up shame.',
+              'Сохраните соседство с ладьёй и завершите цикл вторым слоном: g4 → f3.',
+              'Keep a bishop beside the rook and finish the cycle with your second bishop: g4 → f3.',
             ),
             detail: copy(
               'Поставьте второго слона на f3. Два соседних слона действуют с той же скоростью, что и один. Через полный цикл ладья испытывает вину.',
@@ -432,8 +435,8 @@ export const LESSONS: readonly Lesson[] = [
             id: 'shame-devastation', kind: 'move', moves: [move('h2', 'h3')],
             expect: (_, state) => at(state, 'e4')?.affliction === 'devastated',
             text: copy(
-              'Передвиньте пешку: h2 → h3. Ладья станет опустошённой.',
-              'Move the pawn: h2 → h3. The rook will become devastated.',
+              'Ещё цикл рядом со слоном усилит стыд. Завершите его ходом пешки: h2 → h3.',
+              'Another cycle beside the bishop will deepen shame. Complete it with a pawn move: h2 → h3.',
             ),
             detail: copy(
               'Продвиньте пешку на h3. В конце второго цикла ладья станет опустошённой.',
@@ -457,8 +460,8 @@ export const LESSONS: readonly Lesson[] = [
               && at(state, 'e4')?.side === 'white' && at(state, 'e4')?.captureReaction === 'unassigned'
               && at(state, 'e4')?.capturesSinceRebirth === 0,
             text: copy(
-              'Передвиньте пешку: h3 → h4. Чёрная ладья перейдёт к белым.',
-              'Move the pawn: h3 → h4. The black rook will join White.',
+              'Третий цикл рядом со слоном обратит ладью в вашу армию. Завершите его: h3 → h4.',
+              'A third cycle beside the bishop will convert the rook to your army. Complete it: h3 → h4.',
             ),
             detail: copy(
               'Сыграйте h4. Ладья перейдёт к белым на той же клетке. Обращение меняет баланс материала без взятия.',
@@ -558,8 +561,8 @@ export const LESSONS: readonly Lesson[] = [
           expect: (events, state) => events.filter(event => event.type === 'cure' && event.cause === 'rally').length === 2
             && at(state, 'h3')?.affliction === 'berserk' && at(state, 'f1')?.affliction === 'guilt',
           text: copy(
-            'Передвиньте короля: h1 → g2. Он сразу исцелит соседние свои фигуры.',
-            'Move your king: h1 → g2. It will instantly heal nearby friendly pieces.',
+            'Король поддерживает своих соседей сразу, без ожидания. Подведите его к ладье и коню: h1 → g2.',
+            'The king supports nearby allies immediately, without waiting. Bring it beside the rook and knight: h1 → g2.',
           ),
           detail: copy(
             'Передвиньте короля с h1 на g2. Сбор войск сразу снимет вину и опустошение со своих соседей. Конь в ярости и чёрная ладья сохранят свои состояния.',
@@ -611,8 +614,8 @@ export const LESSONS: readonly Lesson[] = [
           expect: (events, state) => at(state, 'd2')?.capturesSinceRebirth === 1
             && !events.some(event => event.type === 'reaction'),
           text: copy(
-            'Возьмите пешку конём: b1 → d2. Первое взятие коня — без кубика.',
-            'Capture with the knight: b1 → d2. Its first capture needs no die roll.',
+            'Конь обучен бою: первое обычное взятие не вызовет реакции. Возьмите пешку: b1 → d2.',
+            'The knight is trained for battle: its first ordinary capture causes no reaction. Take the pawn: b1 → d2.',
           ),
           detail: copy(
             'Конём с b1 возьмите пешку на d2. Первое обычное взятие коня обходится без броска.',
@@ -635,8 +638,8 @@ export const LESSONS: readonly Lesson[] = [
           expect: (events, state) => events.some(event => event.type === 'reaction' && event.face === 6)
             && at(state, 'f3')?.affliction === 'berserk' && state.phase === 'bonus' && state.turnSerial === 2,
           text: copy(
-            'Возьмите пешку: d2 → f3. Шестёрка даст коню второй ход.',
-            'Capture the pawn: d2 → f3. A 6 will give the knight a bonus move.',
+            'Это второе взятие коня — теперь его реакцию определит кубик. Возьмите пешку: d2 → f3.',
+            'This is the knight’s second capture, so the die will set its reaction. Capture the pawn: d2 → f3.',
           ),
           detail: copy(
             'Возьмите пешку на f3. Шестёрка приведёт коня в ярость, и он получит ещё одно действие в этот же ход.',
@@ -650,8 +653,8 @@ export const LESSONS: readonly Lesson[] = [
             && events.some(event => event.type === 'capture' && event.victim.type === 'bishop')
             && !events.some(event => event.type === 'reaction' || event.type === 'bonus'),
           text: copy(
-            'Тем же конём возьмите слона: f3 → h4. Третье взятие вызовет жажду крови.',
-            'Capture the bishop with the same knight: f3 → h4. Its third capture triggers bloodlust.',
+            'В ярости конь не боится брать слона. Используйте второе действие тем же конём: f3 → h4.',
+            'A berserk knight is not afraid to take a bishop. Use the bonus action with the same knight: f3 → h4.',
           ),
           detail: copy(
             'Пока конь в ярости, дополнительное действие может быть обычным ходом. Тем же конём возьмите слона на h4. Ярость защищает от опустошения за взятие слона, а третье взятие вызовет жажду крови.',
@@ -736,6 +739,7 @@ export const LESSONS: readonly Lesson[] = [
           },
           {
             id: 'promoted-material', kind: 'read',
+            hud: 'material',
             text: copy(
               'Пешка превратилась — материал изменился. Новых взятий не было.',
               'Promotion changed the material balance. No new capture took place.',
@@ -773,10 +777,9 @@ export const LESSONS: readonly Lesson[] = [
           },
           {
             id: 'promotion-clears-bonus', kind: 'read',
-            focus: { square: 'h8', subject: 'piece' },
             text: copy(
-              'Превращение в слона сняло ярость. Дополнительного хода не будет.',
-              'Promotion to a bishop cleared berserk. There is no bonus move.',
+              'Запомните выбор: ферзь, ладья и конь сохраняют прошлое пешки; слон начинает заново.',
+              'Remember the choice: a queen, rook, or knight keeps the pawn’s past; a bishop starts fresh.',
             ),
             detail: copy(
               'Пешка выбросила шестёрку, но превращение в слона сняло ярость до дополнительного действия.',
@@ -837,8 +840,8 @@ export const LESSONS: readonly Lesson[] = [
         {
           id: 'open-quiet-choice', kind: 'move', moves: 'open',
           text: copy(
-            'Выберите любой подсвеченный ход без взятия.',
-            'Choose any highlighted quiet move.',
+            'Теперь решайте сами. Можно помочь опустошённому коню своим слоном или выбрать другой подсвеченный ход.',
+            'Now make your own decision. You could help the devastated knight with your bishop, or choose another highlighted move.',
           ),
           detail: copy(
             'Теперь ваш выбор. Выберите любой из подсвеченных ходов без взятия. Слон может помочь своим фигурам, а опустошённому коню нужно успеть до конца отсчёта.',
@@ -860,8 +863,8 @@ export const LESSONS: readonly Lesson[] = [
         {
           id: 'practice-ready', kind: 'read',
           text: copy(
-            'Нажмите «Понятно», чтобы выбрать продолжение или новую партию.',
-            'Press “Got it” to choose between continuing and starting a new game.',
+            'Основные правила вы попробовали. Дальше можно доиграть эту позицию с ИИ или начать новую партию.',
+            'You have tried the main rules. Next, continue this position against the AI or start a new game.',
           ),
           detail: copy(
             'Эту позицию можно доиграть с Remorse Engine в тренировочном режиме. Фигуры сохранят свои состояния и запомненные реакции.',
@@ -872,3 +875,14 @@ export const LESSONS: readonly Lesson[] = [
     }],
   },
 ]
+
+// Append acknowledged explanations without inserting/reordering saved steps.
+export const LESSONS: readonly Lesson[] = lessonPositions.map(lesson => ({
+  ...lesson,
+  positions: lesson.positions.map(position => ({
+    ...position,
+    steps: position.steps.map(step => TEACHING_BEATS[step.id]
+      ? { ...step, after: TEACHING_BEATS[step.id] }
+      : step),
+  })),
+}))

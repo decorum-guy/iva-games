@@ -4,7 +4,10 @@ import { createPosition } from '../core'
 import type { Command } from '../core'
 import type { SearchRequest, SearchResponse } from '../engine/protocol'
 import { getDieMotionTiming } from '../scene/diceMotion'
+import { CAMERA_TRAVEL_MS } from '../scene/cameraFocus'
 import * as database from '../storage/database'
+import { acknowledgeTeaching, learnerAction, saveLearning, scriptAction, startLesson, teachingBeat } from '../tutorial/controller'
+import type { Learning } from '../tutorial/controller'
 import { Cabinet } from './cabinet'
 import { createMatch, SessionError } from './match'
 import { nextDie } from './random'
@@ -325,5 +328,206 @@ describe('Cabinet shared die presentation timeline', () => {
     expect(cabinet.getSnapshot().audioCue).toBeNull()
     expect(TestWorker.instances).toHaveLength(0)
     expect(ids).toHaveLength(1)
+  })
+})
+
+describe('Cabinet acknowledged tutorial results', () => {
+  function acknowledgeAll(progress: Learning): Learning {
+    while (progress.pendingTeaching) progress = acknowledgeTeaching(progress)
+    return progress
+  }
+
+  async function tutorialReady(progress = startLesson(1)) {
+    await store.putLearning(saveLearning(progress))
+    const current = new Cabinet()
+    cabinets.push(current)
+    await current.initialize()
+    await current.learn()
+    return current
+  }
+
+  async function acknowledgeResults(current: Cabinet) {
+    while (current.getSnapshot().learning?.pendingTeaching) {
+      await current.advance()
+      if (current.getSnapshot().learning?.pendingTeaching && current.getSnapshot().teachingReturning) {
+        await vi.advanceTimersByTimeAsync(CAMERA_TRAVEL_MS)
+      }
+    }
+  }
+
+  it.each([false, true])('waits for the result acknowledgement and camera return before the opponent moves (reduced=%s)', async reduced => {
+    const current = await tutorialReady()
+    current.setShortMotion(reduced)
+    const timing = getDieMotionTiming(reduced)
+    await current.command(move('c3', 'c4'))
+    const committed = current.getSnapshot().learning!
+    expect(committed.pendingTeaching?.stepId).toBe('guilt-roll')
+    expect(teachingBeat(committed)?.focus?.square).toBe('c4')
+    expect(current.getSnapshot().rollPhase).toBe('throwing')
+    const saved = await store.getLearning()
+    expect(saved).toEqual(saveLearning(committed))
+
+    // A premature click cannot consume result text while its die still spins.
+    await current.advance()
+    expect(current.getSnapshot().learning).toBe(committed)
+    await vi.advanceTimersByTimeAsync(timing.motionMs)
+    expect(current.getSnapshot().rollPhase).toBe('settled')
+    expect(current.getSnapshot().learning).toBe(committed)
+    await vi.advanceTimersByTimeAsync(timing.holdMs + 5000)
+    expect(current.getSnapshot().animating).toBe(false)
+    expect(current.getSnapshot().learning?.session.record.cursor).toBe(1)
+    expect(current.getSnapshot().learning?.pendingTeaching).toEqual(committed.pendingTeaching)
+
+    await acknowledgeResults(current)
+    const acknowledged = current.getSnapshot()
+    expect(acknowledged.learning?.session).toBe(committed.session)
+    expect(acknowledged.learning?.index).toBe(committed.index)
+    expect(acknowledged.teachingReturning).toBe(!reduced)
+    if (!reduced) {
+      await current.command(move('c8', 'c7'))
+      expect(current.getSnapshot().learning?.session.record.cursor).toBe(1)
+      expect(current.getSnapshot().error).toBeNull()
+      await vi.advanceTimersByTimeAsync(CAMERA_TRAVEL_MS - 1)
+      expect(current.getSnapshot().teachingReturning).toBe(true)
+      expect(current.getSnapshot().learning?.session.record.cursor).toBe(1)
+      await vi.advanceTimersByTimeAsync(1)
+      expect(current.getSnapshot().teachingReturning).toBe(false)
+    }
+    const scriptDelay = reduced ? 100 : 320
+    await vi.advanceTimersByTimeAsync(scriptDelay - 1)
+    expect(current.getSnapshot().learning?.session.record.cursor).toBe(1)
+    await vi.advanceTimersByTimeAsync(1)
+    await settled(current)
+    expect(current.getSnapshot().learning?.session.record.cursor).toBe(2)
+    expect(current.getSnapshot().learning?.session.state.pieces.find(piece => piece.type === 'king' && piece.side === 'black')?.square).toBe('c7')
+    expect(current.getSnapshot().learning?.session.record.actions.filter(action => action.roll)).toHaveLength(1)
+  })
+
+  it('restores a pending explanation without another roll, sound or scripted opponent action', async () => {
+    const current = await tutorialReady()
+    await current.command(move('c3', 'c4'))
+    const committed = current.getSnapshot().learning!
+    const loaded = new Cabinet()
+    cabinets.push(loaded)
+    await loaded.initialize()
+    expect(loaded.getSnapshot().view).toBe('learn')
+    expect(loaded.getSnapshot().learning?.pendingTeaching).toEqual(committed.pendingTeaching)
+    expect(loaded.getSnapshot().learning?.session.current).toEqual(committed.session.current)
+    expect(loaded.getSnapshot().audioCue).toBeNull()
+    expect(loaded.getSnapshot().rollPhase).toBe('idle')
+    expect(loaded.getSnapshot().teachingReturning).toBe(false)
+    await vi.advanceTimersByTimeAsync(10_000)
+    expect(loaded.getSnapshot().learning?.session.record.cursor).toBe(1)
+    expect(loaded.getSnapshot().audioCue).toBeNull()
+    expect(loaded.getSnapshot().learning?.session.state.repetition).toEqual(committed.session.state.repetition)
+  })
+
+  it.each(['home', 'restartLesson'] as const)('cancels the camera return and delayed script when %s interrupts', async action => {
+    const current = await tutorialReady()
+    await current.command(move('c3', 'c4'))
+    await finishMotion()
+    await acknowledgeResults(current)
+    expect(current.getSnapshot().teachingReturning).toBe(true)
+    await current[action]()
+    const stopped = current.getSnapshot()
+    // Restart may own a fresh return for its new board; the old script and
+    // previous generation's timer must still be canceled.
+    expect(stopped.teachingReturning).toBe(action === 'restartLesson')
+    expect(stopped.audioCue).toBeNull()
+    await vi.advanceTimersByTimeAsync(10_000)
+    expect(current.getSnapshot().learning).toBe(stopped.learning)
+    expect(current.getSnapshot().teachingReturning).toBe(false)
+    expect(current.getSnapshot().audioCue).toBeNull()
+  })
+
+  it('treats the requested illegal capture as success without replaying the preceding action', async () => {
+    const guilty = acknowledgeAll(learnerAction(startLesson(1), move('c3', 'c4')).progress)
+    const before = acknowledgeAll(scriptAction(guilty))
+    const current = await tutorialReady(before)
+    const ids = observeCues(current)
+    const session = current.getSnapshot().learning!.session
+    expect(await current.command(move('c4', 'd4'))).toBe(true)
+    expect(current.getSnapshot().error).toBeNull()
+    expect(current.getSnapshot().animating).toBe(false)
+    expect(current.getSnapshot().audioCue).toBeNull()
+    expect(current.getSnapshot().learning?.session).toBe(session)
+    expect(current.getSnapshot().learning?.pendingTeaching?.stepId).toBe('guilt-forbids-capture')
+    await vi.advanceTimersByTimeAsync(10_000)
+    expect(ids).toEqual([])
+    expect(current.getSnapshot().learning?.session.record.cursor).toBe(session.record.cursor)
+  })
+
+  it('does not hand a still-unacknowledged tutorial result to ordinary play', async () => {
+    const current = await tutorialReady()
+    await current.command(move('c3', 'c4'))
+    await finishMotion()
+    const pending = current.getSnapshot().learning
+    expect(await current.handoff()).toBe(false)
+    expect(current.getSnapshot().view).toBe('learn')
+    expect(current.getSnapshot().learning).toBe(pending)
+    expect(current.getSnapshot().game).toBeNull()
+  })
+
+  it('uses the last result CTA to enter the next example once without replacing a normal game', async () => {
+    await cabinet.startGame(hotseat)
+    await cabinet.command(move('e2', 'e4'))
+    await finishMotion()
+    const game = cabinet.getSnapshot().game!
+    const current = await tutorialReady(startLesson(2, 1))
+    await current.command(move('c3', 'c4'))
+    await finishMotion()
+    const completedExample = current.getSnapshot().learning!
+    expect(completedExample.pendingTeaching?.stepId).toBe('mercy-capture')
+    expect(completedExample.index).toBe(1)
+    await current.advance()
+    const next = current.getSnapshot()
+    expect(next.learning).toMatchObject({ lesson: 2, position: 2, index: 0, complete: false })
+    expect(next.learning?.pendingTeaching).toBeUndefined()
+    expect(next.learning?.session.record.id).not.toBe(completedExample.session.record.id)
+    expect(next.learning?.session.record.cursor).toBe(0)
+    expect(next.teachingReturning).toBe(true)
+    expect(await store.getLearning()).toEqual(saveLearning(next.learning!))
+    expect(await store.getMatch(game.record.id)).toMatchObject(game.record)
+    expect(cabinet.getSnapshot().game).toBe(game)
+    await current.command(move('g2', 'g3'))
+    expect(current.getSnapshot().learning?.session.record.cursor).toBe(0)
+    await vi.advanceTimersByTimeAsync(CAMERA_TRAVEL_MS - 1)
+    expect(current.getSnapshot().teachingReturning).toBe(true)
+    await vi.advanceTimersByTimeAsync(1)
+    expect(current.getSnapshot().teachingReturning).toBe(false)
+    await vi.advanceTimersByTimeAsync(5000)
+    expect(current.getSnapshot().learning).toBe(next.learning)
+  })
+
+  it('returns from a focused result before accepting a move in the restarted lesson', async () => {
+    const current = await tutorialReady()
+    await current.command(move('c3', 'c4'))
+    await finishMotion()
+    const oldKey = current.getSnapshot().motionKey
+    await current.restartLesson()
+    expect(current.getSnapshot().motionKey).not.toBe(oldKey)
+    expect(current.getSnapshot().learning).toMatchObject({ lesson: 1, position: 0, index: 0 })
+    expect(current.getSnapshot().teachingReturning).toBe(true)
+    await current.command(move('c3', 'c4'))
+    expect(current.getSnapshot().learning?.session.record.cursor).toBe(0)
+    await vi.advanceTimersByTimeAsync(CAMERA_TRAVEL_MS)
+    expect(current.getSnapshot().teachingReturning).toBe(false)
+    expect(current.getSnapshot().learning?.session.record.cursor).toBe(0)
+  })
+
+  it.each(['advance', 'restartLesson'] as const)('does not discard a focused result when saving %s fails', async action => {
+    const current = await tutorialReady()
+    await current.command(move('c3', 'c4'))
+    await finishMotion()
+    const before = current.getSnapshot()
+    vi.spyOn(store, 'putLearning').mockRejectedValueOnce(new SessionError('storage'))
+    expect(await current[action]()).toBe(false)
+    expect(current.getSnapshot().learning).toBe(before.learning)
+    expect(current.getSnapshot().motionKey).toBe(before.motionKey)
+    expect(current.getSnapshot().teachingReturning).toBe(false)
+    expect(current.getSnapshot().error).toBe('storage')
+    await vi.advanceTimersByTimeAsync(5000)
+    expect(current.getSnapshot().learning).toBe(before.learning)
+    expect(await store.getLearning()).toEqual(saveLearning(before.learning!))
   })
 })

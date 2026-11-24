@@ -10,6 +10,18 @@ export interface FixedRoll {
 
 type Objective = (events: readonly GameEvent[], state: GameState) => boolean;
 
+/** A required, acknowledged explanation of one already committed action. */
+export interface TeachingBeat {
+  readonly id: string;
+  readonly title: Copy;
+  readonly text: Copy;
+  readonly rule?: Copy;
+  readonly action?: Copy;
+  readonly focus?: { readonly square: string; readonly subject: 'piece' | 'countdown' };
+  readonly diceLegend?: boolean;
+  readonly hud?: 'captures' | 'material';
+}
+
 type Guidance =
   | { readonly kind: 'move'; readonly moves: readonly Command[] | 'open'; readonly roll?: FixedRoll; readonly expect?: Objective }
   | { readonly kind: 'script'; readonly move: Command | 'reply'; readonly roll?: FixedRoll; readonly expect?: Objective }
@@ -25,6 +37,9 @@ export type Step = Guidance & {
   readonly detail?: Copy;
   /** Deliberate inspection target; never inferred from the previous move. */
   readonly focus?: { readonly square: string; readonly subject: 'piece' | 'countdown' };
+  /** These observations pause before the next move, script or fixture reset. */
+  readonly after?: readonly TeachingBeat[];
+  readonly hud?: 'captures' | 'material';
 };
 
 export interface Position {

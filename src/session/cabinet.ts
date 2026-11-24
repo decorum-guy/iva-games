@@ -3,12 +3,13 @@ import { ENGINE_VERSION, getPreset, PRESET_VERSION } from '../engine/presets';
 import type { SearchRequest, SearchResponse } from '../engine/protocol';
 import { initialProfile } from '../rating/elo';
 import { getDieMotionTiming, getDieThrowDuration } from '../scene/diceMotion';
+import { CAMERA_TRAVEL_MS } from '../scene/cameraFocus';
 import type { Profile, RatingEntry } from '../rating/elo';
 import { openGameStore } from '../storage/database';
 import type { GameStore } from '../storage/database';
 import {
   advanceLesson, confirmInspection, instruction, learnerAction, restoreLearning, saveLearning,
-  scriptAction, startLesson,
+  scriptAction, startLesson, teachingBeat,
 } from '../tutorial/controller';
 import type { Learning } from '../tutorial/controller';
 import { createContinuation, createMatch, SessionError } from './match';
@@ -23,6 +24,7 @@ interface CabinetState {
   readonly durable: boolean;
   readonly busy: boolean;
   readonly animating: boolean;
+  readonly teachingReturning: boolean;
   readonly thinking: boolean;
   readonly searchFailed: boolean;
   readonly profile: Profile;
@@ -60,7 +62,7 @@ function errorCode(error: unknown): SessionCode {
 
 export class Cabinet {
   private data: CabinetState = {
-    ready: false, durable: false, busy: false, animating: false, thinking: false, searchFailed: false,
+    ready: false, durable: false, busy: false, animating: false, teachingReturning: false, thinking: false, searchFailed: false,
     profile: initialProfile, ledger: [], matches: [], view: 'home', game: null, learning: null,
     error: null, motionKey: 'home', rollId: null, rollPhase: 'idle', rollReduced: false, rollStartedAt: null, audioCue: null,
   };
@@ -72,6 +74,7 @@ export class Cabinet {
   private scheduled: ReturnType<typeof setTimeout> | undefined;
   private reveal: ReturnType<typeof setTimeout> | undefined;
   private settle: ReturnType<typeof setTimeout> | undefined;
+  private teachingReturn: ReturnType<typeof setTimeout> | undefined;
   private attempts = 0;
   private shortMotion = false;
   private initialized = false;
@@ -144,8 +147,9 @@ export class Cabinet {
     clearTimeout(this.scheduled);
     clearTimeout(this.reveal);
     clearTimeout(this.settle);
+    clearTimeout(this.teachingReturn);
     this.attempts = 0;
-    this.patch({ thinking: false, animating: false, searchFailed: false, motionKey: newId(), rollId: null,
+    this.patch({ thinking: false, animating: false, teachingReturning: false, searchFailed: false, motionKey: newId(), rollId: null,
       rollPhase: 'idle', rollStartedAt: null, audioCue: null });
   }
 
@@ -277,10 +281,13 @@ export class Cabinet {
   }
 
   command = (command: Command) => this.run(async () => {
-    if (this.data.animating && command.type !== 'resign') return;
+    if ((this.data.animating || this.data.teachingReturning) && command.type !== 'resign') return;
     if (this.data.view === 'learn' && this.data.learning) {
-      const { progress, explanation } = learnerAction(this.data.learning, command);
-      await this.updateLearning(progress, !explanation ? () => this.present(progress.session) : undefined);
+      const current = this.data.learning;
+      const { progress, explanation } = learnerAction(current, command);
+      // A requested illegal attempt can now produce a positive teaching beat;
+      // its unchanged session must not replay the previous move, die or sound.
+      await this.updateLearning(progress, progress.session !== current.session ? () => this.present(progress.session) : undefined);
       if (explanation) this.patch({ error: explanation });
       return;
     }
@@ -310,6 +317,23 @@ export class Cabinet {
     this.patch({ learning });
   }
 
+  private returnFromTeaching(previous: Learning, next: Learning, alreadyReturning = false) {
+    const focusOf = (learning: Learning) => {
+      if (learning.pendingTeaching) return teachingBeat(learning)?.focus;
+      const step = instruction(learning);
+      return step?.focus ?? (step?.kind === 'inspect' ? { square: step.square, subject: 'piece' } : undefined);
+    };
+    if ((!focusOf(previous) && !alreadyReturning) || focusOf(next) || this.shortMotion) return;
+    clearTimeout(this.teachingReturn);
+    const generation = this.generation;
+    this.patch({ teachingReturning: true });
+    this.teachingReturn = setTimeout(() => {
+      if (this.generation !== generation) return;
+      this.patch({ teachingReturning: false });
+      this.pump();
+    }, CAMERA_TRAVEL_MS);
+  }
+
   learn = (restart = false) => this.run(async () => {
     const learning = !restart && this.data.learning ? this.data.learning : startLesson();
     await this.updateLearning(learning);
@@ -319,28 +343,43 @@ export class Cabinet {
   });
 
   inspect = (square: string) => this.run(async () => {
-    if (!this.data.learning || this.data.view !== 'learn' || this.data.animating) return;
-    const next = confirmInspection(this.data.learning, square);
-    if (next !== this.data.learning) await this.updateLearning(next);
+    if (!this.data.learning || this.data.view !== 'learn' || this.data.animating || this.data.teachingReturning) return;
+    const current = this.data.learning;
+    const next = confirmInspection(current, square);
+    if (next !== current) await this.updateLearning(next, () => this.returnFromTeaching(current, next));
   });
 
   advance = () => this.run(async () => {
     const current = this.data.learning;
-    if (!current || this.data.view !== 'learn') return;
-    const next = advanceLesson(current);
-    await this.updateLearning(next);
-    if (next.session.record.id !== current.session.record.id) this.invalidate();
+    if (!current || this.data.view !== 'learn' || this.data.animating || this.data.teachingReturning) return;
+    let next = advanceLesson(current);
+    // A result's contextual CTA already announces the next example. Do not
+    // interpose a second empty completion screen after that acknowledgement.
+    // Legacy checkpoints with no pending result retain their normal boundary.
+    if (current.pendingTeaching && !next.pendingTeaching && !instruction(next) && !next.complete) next = advanceLesson(next);
+    await this.updateLearning(next, () => {
+      if (next.session.record.id !== current.session.record.id) this.invalidate();
+      // The scene camera survives fixture changes. A new generation must own
+      // the return gate, so a new board cannot accept input while still close.
+      this.returnFromTeaching(current, next);
+    });
   });
 
   restartLesson = () => this.run(async () => {
     if (!this.data.learning || this.data.view !== 'learn') return;
-    await this.updateLearning(startLesson(this.data.learning.lesson));
-    this.invalidate();
+    const previous = this.data.learning;
+    const next = startLesson(previous.lesson);
+    const alreadyReturning = this.data.teachingReturning;
+    await this.updateLearning(next, () => {
+      this.invalidate();
+      this.returnFromTeaching(previous, next, alreadyReturning);
+    });
   });
 
   handoff = () => this.run(async () => {
     const { learning, view } = this.data;
     if (!learning || view !== 'learn') return;
+    if (learning.pendingTeaching || this.data.animating || this.data.teachingReturning) throw new SessionError('tutorialChoice');
     const game = createContinuation(learning.session);
     if (this.store) await this.store.addPractice(game);
     this.enterGame(game);
@@ -355,9 +394,9 @@ export class Cabinet {
 
   private pump() {
     clearTimeout(this.scheduled);
-    const { view, busy, game, learning, animating, thinking, searchFailed } = this.data;
-    if (busy || animating || thinking || searchFailed) return;
-    if (view === 'learn' && learning && instruction(learning)?.kind === 'script' && this.data.error !== 'tutorialBroken') {
+    const { view, busy, game, learning, animating, teachingReturning, thinking, searchFailed } = this.data;
+    if (busy || animating || teachingReturning || thinking || searchFailed) return;
+    if (view === 'learn' && learning && !learning.pendingTeaching && instruction(learning)?.kind === 'script' && this.data.error !== 'tutorialBroken') {
       const generation = this.generation;
       this.scheduled = setTimeout(() => {
         if (this.generation !== generation || this.data.learning !== learning || this.data.view !== 'learn') return;

@@ -56,6 +56,8 @@ Drive both Chromium and available WebKit. A Playwright mobile viewport is an emu
 - Trails are visible while moving, fade out, do not pile up and do not obscure legal targets.
 - The visible 3D die drops, tumbles and settles on the committed face for both colors and AI; state badge and event log agree. State effects reveal after the shared settling time. Restores/undo do not replay throws. Preset-dice notices are absent from the tutorial UI; no production roll is forced accidentally.
 - Capture/reaction/bonus and cure/shame/conversion/removal events appear in an understandable order.
+- At a new tutorial reaction, the actual die face, its meaning, the affected figure and the practical rule are visible in the required flow. The opponent waits for acknowledgement. Evaluate this first from the screen without consulting the scripted route; completing a known move list does not prove comprehension.
+- Tutorial close-up and material emphasis accompany the current reveal and remain readable after camera arrival. Finishing an exercise does not trigger a historical effect close-up. Moves/scripts remain blocked during return, including a change of fixture; restore and locale changes do not replay the action or consume another result.
 - Countdown text matches the digital full-cycle rule and never decreases on each berserk movement.
 - Tutorial callouts never cover the requested piece, square, promotion option or finish action on laptop or phone.
 - Mobile browser chrome, safe areas and changing viewport height do not hide the board controls. During play/tutorial the document does not scroll; required controls remain inside the viewport. Optional help/history scroll internally. Preserve browser zoom.
