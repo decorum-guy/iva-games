@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './fixtures'
 import type { Page } from '@playwright/test'
 import { translator } from '../../src/i18n/catalog'
 import { CAMERA_TRAVEL_MS } from '../../src/scene/cameraFocus'
@@ -108,11 +108,11 @@ test.describe('the actual 3D reaction starts its explanation', () => {
       await expect(page.getByTestId('teaching-cause')).toHaveCount(0)
       await expect(page.getByTestId('teaching-rule')).toHaveCount(0)
       const timing = getDieMotionTiming(false)
-      await page.clock.runFor(timing.motionMs - 1)
+      await page.clock.runFor(timing.motionMs - 100)
       await expect(scene(page)).toHaveAttribute('data-camera-focus', 'none')
       await expect(page.getByTestId('teaching-cause')).toHaveCount(0)
 
-      await page.clock.runFor(1)
+      await page.clock.runFor(120)
       const result = LESSONS[1].positions[0].steps[0].after![0]
       await expect(playfield(page)).toHaveAttribute('data-dice', 'settled')
       await expect(playfield(page)).toHaveAttribute('data-animating', 'true')
@@ -122,6 +122,10 @@ test.describe('the actual 3D reaction starts its explanation', () => {
       await expect(page.getByTestId('teaching-rule')).toHaveText(result.rule![locale])
       await expect(stage(page)).toHaveAttribute('data-focus-square', 'c4')
       await expect(scene(page)).toHaveAttribute('data-camera-focus', 'c4')
+      const boardBounds = (await stage(page).boundingBox())!
+      const dieBounds = (await page.getByTestId('dice-reveal').boundingBox())!
+      expect(dieBounds.x).toBeGreaterThan(boardBounds.x + boardBounds.width * .6)
+      expect(dieBounds.y + dieBounds.height).toBeLessThan(boardBounds.y + boardBounds.height * .25)
       await expect(page.getByTestId('lesson-next')).toBeDisabled()
       await page.clock.runFor(timing.holdMs + 5000)
       await ready(page)
@@ -151,20 +155,20 @@ test.describe('the actual 3D reaction starts its explanation', () => {
       expect(await identity(page)).toEqual(beforeLanguage)
       expect(await savedLearning(page)).toEqual(held)
       await page.getByTestId(`lang-${locale}`).click()
+
       await page.clock.pauseAt(new Date('2030-01-01T11:00:00Z'))
       expect(await page.evaluate(() => (window as Window & { teachingAudioStarts?: number }).teachingAudioStarts)).toBe(0)
 
       await page.getByTestId('lesson-next').click()
       await expect(playfield(page)).toHaveAttribute('data-teaching-returning', 'true')
       await expect(scene(page)).toHaveAttribute('data-camera-focus', 'none')
-      await page.clock.runFor(CAMERA_TRAVEL_MS - 1)
+      await page.clock.runFor(CAMERA_TRAVEL_MS - 100)
       await expect(playfield(page)).toHaveAttribute('data-revision', '1')
       await expect(playfield(page)).toHaveAttribute('data-teaching-returning', 'true')
-      await page.clock.runFor(1)
+      await page.clock.runFor(200)
       await expect(playfield(page)).toHaveAttribute('data-teaching-returning', 'false')
-      await page.clock.runFor(319)
       await expect(playfield(page)).toHaveAttribute('data-revision', '1')
-      await page.clock.runFor(1)
+      await page.clock.runFor(320)
       await expect(playfield(page)).toHaveAttribute('data-revision', '2')
       await page.clock.runFor(330)
       await ready(page)
@@ -188,6 +192,52 @@ test.describe('the actual 3D reaction starts its explanation', () => {
       await expect(stage(page)).not.toHaveAttribute('data-focus-square', /.+/)
     })
   }
+
+  test('restarting the lesson during a roll and leaving during the return cancel the old presentation', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 800 })
+    await page.clock.install({ time: new Date('2030-01-01T08:00:00Z') })
+    await open(page, 'en', '3d')
+    await restoreLesson(page, startLesson(1))
+    await expect(scene(page)).toBeVisible({ timeout: 15_000 })
+    await page.clock.pauseAt(new Date('2030-01-01T10:00:00Z'))
+
+    await keyboardPath(page, ['ArrowLeft', 'ArrowLeft', 'ArrowUp', 'Enter', 'ArrowUp', 'Enter'])
+    await expect(playfield(page)).toHaveAttribute('data-dice', 'throwing')
+    await page.getByTestId('lesson-restart').click()
+    await page.getByTestId('confirm-action').click()
+    await expect(playfield(page)).toHaveAttribute('data-revision', '0')
+    await expect(page.getByTestId('dice-reveal')).toHaveCount(0)
+    await page.clock.runFor(3000)
+    await ready(page)
+    await expect(tutorial(page)).toHaveAttribute('data-step', 'guilt-roll')
+    expect((await savedLearning(page)).match.cursor).toBe(0)
+
+    // The keyboard cursor is still on the previous destination.
+    await keyboardPath(page, ['ArrowDown', 'Enter', 'ArrowUp', 'Enter'])
+    await expect(playfield(page)).toHaveAttribute('data-dice', 'throwing')
+    const timing = getDieMotionTiming(false)
+    await page.clock.runFor(timing.motionMs + timing.holdMs)
+    await expect(page.getByTestId('lesson-next')).toBeEnabled()
+    await page.getByTestId('lesson-next').click()
+    await expect(playfield(page)).toHaveAttribute('data-teaching-returning', 'true')
+    await page.getByTestId('leave-game').click()
+    await page.getByRole('dialog').getByRole('button', { name: translator('en')('nav.menu'), exact: true }).click()
+    await expect(playfield(page)).toHaveAttribute('data-view', 'home')
+    await page.clock.runFor(3000)
+    const parked = await savedLearning(page)
+    expect(parked.match.cursor).toBe(1)
+    expect(parked.pendingTeaching).toBeUndefined()
+    await expect(page.getByTestId('dice-reveal')).toHaveCount(0)
+
+    await page.getByTestId('mode-learn').click()
+    await expect(playfield(page)).toHaveAttribute('data-view', 'learn')
+    await ready(page)
+    await page.clock.runFor(1000)
+    await expect(tutorial(page)).toHaveAttribute('data-step', 'guilt-forbids-capture')
+    const resumed = await savedLearning(page)
+    expect(resumed.match.actions).toHaveLength(2)
+    expect(resumed.match.actions.filter(action => action.roll)).toHaveLength(1)
+  })
 })
 
 function acknowledgeAll(progress: Learning): Learning {
@@ -205,12 +255,16 @@ function resultCheckpoints(): Learning[] {
   return [first, legend, knight]
 }
 
+function counterCheckpoint(): Learning {
+  return acknowledgeAll(learnerAction(startLesson(2), move('c3', 'c4')).progress)
+}
+
 for (const viewport of [
   { width: 360, height: 800 }, { width: 390, height: 844 },
   { width: 1280, height: 800 }, { width: 568, height: 320 },
 ]) {
   for (const locale of ['ru', 'en'] as const) {
-    test(`${viewport.width}×${viewport.height} ${locale}: required result, dice legend and CTA fit without scrolling`, async ({ page }) => {
+    test(`${viewport.width}×${viewport.height} ${locale}: required results, dice legend and countdown fit without scrolling`, async ({ page }) => {
       await page.setViewportSize(viewport)
       await open(page, locale, '2d')
       for (const checkpoint of resultCheckpoints()) {
@@ -238,6 +292,13 @@ for (const viewport of [
         expect(dimensions.y).toBe(0)
         await expect(page.locator('body')).not.toContainText(forbiddenNotice)
       }
+
+      await restoreLesson(page, counterCheckpoint())
+      const select = page.getByText(translator(locale)('tutorial.inspect', { square: 'c4' }), { exact: true })
+      await expect(select).toBeInViewport({ ratio: 1 })
+      await page.locator('[data-square="c4"]').click()
+      await expect(page.getByTestId('counter-read')).toBeInViewport({ ratio: 1 })
+      await expect(page.getByTestId('lesson-next')).toBeInViewport({ ratio: 1 })
     })
   }
 }

@@ -77,6 +77,7 @@ export class Cabinet {
   private teachingReturn: ReturnType<typeof setTimeout> | undefined;
   private attempts = 0;
   private shortMotion = false;
+  private teachingCamera = true;
   private initialized = false;
   private updates: BroadcastChannel | undefined;
 
@@ -132,7 +133,15 @@ export class Cabinet {
     this.pump();
   };
 
-  setShortMotion(shortMotion: boolean) { this.shortMotion = shortMotion; }
+  setShortMotion(shortMotion: boolean) {
+    this.shortMotion = shortMotion;
+    if (shortMotion && this.data.teachingReturning) this.finishTeachingReturn();
+  }
+
+  setTeachingCamera(enabled: boolean) {
+    this.teachingCamera = enabled;
+    if (!enabled && this.data.teachingReturning) this.finishTeachingReturn();
+  }
   dismissError = () => this.patch({ error: null });
 
   private stopWorker() {
@@ -323,15 +332,21 @@ export class Cabinet {
       const step = instruction(learning);
       return step?.focus ?? (step?.kind === 'inspect' ? { square: step.square, subject: 'piece' } : undefined);
     };
-    if ((!focusOf(previous) && !alreadyReturning) || focusOf(next) || this.shortMotion) return;
+    if (!this.teachingCamera || this.shortMotion || (!focusOf(previous) && !alreadyReturning) || focusOf(next)) return;
     clearTimeout(this.teachingReturn);
     const generation = this.generation;
     this.patch({ teachingReturning: true });
     this.teachingReturn = setTimeout(() => {
       if (this.generation !== generation) return;
-      this.patch({ teachingReturning: false });
-      this.pump();
+      this.finishTeachingReturn();
     }, CAMERA_TRAVEL_MS);
+  }
+
+  private finishTeachingReturn() {
+    clearTimeout(this.teachingReturn);
+    this.teachingReturn = undefined;
+    this.patch({ teachingReturning: false });
+    this.pump();
   }
 
   learn = (restart = false) => this.run(async () => {

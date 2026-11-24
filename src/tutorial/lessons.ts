@@ -156,8 +156,8 @@ const lessonPositions: readonly Lesson[] = [
             id: 'inspect-countdown', kind: 'inspect', square: 'c4',
             focus: { square: 'c4', subject: 'countdown' },
             text: copy(
-              'У ладьи 3 цикла до исчезновения. Цикл — по одному ходу каждого игрока. Нажмите на ладью c4: покажем счётчик.',
-              'The rook has 3 cycles before removal. A cycle is one turn by each player. Select c4 to see its counter.',
+              'До исчезновения ладьи — три полных цикла. За цикл оба игрока делают по одному ходу.',
+              'The rook has three full cycles before it disappears. In each cycle, both players take one turn.',
             ),
             detail: copy(
               'Выберите ладью на c4 и посмотрите на счётчик. Он начнётся с трёх полных циклов. Каждый цикл включает два завершённых хода, по одному за сторону.',
@@ -840,8 +840,8 @@ const lessonPositions: readonly Lesson[] = [
         {
           id: 'open-quiet-choice', kind: 'move', moves: 'open',
           text: copy(
-            'Теперь решайте сами. Можно помочь опустошённому коню своим слоном или выбрать другой подсвеченный ход.',
-            'Now make your own decision. You could help the devastated knight with your bishop, or choose another highlighted move.',
+            'Выберите фигуру, чтобы увидеть доступные ходы. Например, подведите слона к опустошённому коню.',
+            'Select a piece to see its available moves. For example, bring your bishop beside the devastated knight.',
           ),
           detail: copy(
             'Теперь ваш выбор. Выберите любой из подсвеченных ходов без взятия. Слон может помочь своим фигурам, а опустошённому коню нужно успеть до конца отсчёта.',

@@ -355,9 +355,12 @@ describe('Cabinet acknowledged tutorial results', () => {
     }
   }
 
-  it.each([false, true])('waits for the result acknowledgement and camera return before the opponent moves (reduced=%s)', async reduced => {
+  it.each([
+    { reduced: false, camera: true }, { reduced: true, camera: true }, { reduced: false, camera: false },
+  ])('waits for acknowledgement and any camera return before the opponent moves ($reduced, $camera)', async ({ reduced, camera }) => {
     const current = await tutorialReady()
     current.setShortMotion(reduced)
+    current.setTeachingCamera(camera)
     const timing = getDieMotionTiming(reduced)
     await current.command(move('c3', 'c4'))
     const committed = current.getSnapshot().learning!
@@ -382,8 +385,9 @@ describe('Cabinet acknowledged tutorial results', () => {
     const acknowledged = current.getSnapshot()
     expect(acknowledged.learning?.session).toBe(committed.session)
     expect(acknowledged.learning?.index).toBe(committed.index)
-    expect(acknowledged.teachingReturning).toBe(!reduced)
-    if (!reduced) {
+    const cameraReturn = camera && !reduced
+    expect(acknowledged.teachingReturning).toBe(cameraReturn)
+    if (cameraReturn) {
       await current.command(move('c8', 'c7'))
       expect(current.getSnapshot().learning?.session.record.cursor).toBe(1)
       expect(current.getSnapshot().error).toBeNull()
@@ -401,6 +405,21 @@ describe('Cabinet acknowledged tutorial results', () => {
     expect(current.getSnapshot().learning?.session.record.cursor).toBe(2)
     expect(current.getSnapshot().learning?.session.state.pieces.find(piece => piece.type === 'king' && piece.side === 'black')?.square).toBe('c7')
     expect(current.getSnapshot().learning?.session.record.actions.filter(action => action.roll)).toHaveLength(1)
+  })
+
+  it('releases the pending script once if the learner switches to 2D during the return', async () => {
+    const current = await tutorialReady()
+    await current.command(move('c3', 'c4'))
+    await finishMotion()
+    await current.advance()
+    expect(current.getSnapshot().teachingReturning).toBe(true)
+    current.setTeachingCamera(false)
+    expect(current.getSnapshot().teachingReturning).toBe(false)
+    await vi.advanceTimersByTimeAsync(320)
+    await settled(current)
+    expect(current.getSnapshot().learning?.session.record.cursor).toBe(2)
+    await vi.advanceTimersByTimeAsync(CAMERA_TRAVEL_MS + 1000)
+    expect(current.getSnapshot().learning?.session.record.cursor).toBe(2)
   })
 
   it('restores a pending explanation without another roll, sound or scripted opponent action', async () => {

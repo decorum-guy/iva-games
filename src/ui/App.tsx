@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
-import { canClaimRepetition, createInitialState, isInCheck, opposite, pieceAt } from '../core';
+import { canClaimRepetition, createInitialState, fileOf, isInCheck, opposite, pieceAt } from '../core';
 import type { Command, GameEvent, Move, Promotion, Side, Square } from '../core';
 import { translator } from '../i18n/catalog';
 import { Cabinet } from '../session/cabinet';
@@ -96,6 +96,7 @@ export function App() {
   const tutorialMode = !lesson ? 'none' : beat ? 'result' : lesson.complete ? 'complete' : step?.kind ?? 'position-complete';
   const teachingMove = !lesson || step?.kind === 'move' || step?.kind === 'illegal';
   const canInput = active && !snap.animating && !snap.teachingReturning && !snap.busy && humanActing && !snap.thinking && teachingMove && !lesson?.complete;
+  const canLeaveForPractice = !position.outcome && !beat && !snap.animating && !snap.teachingReturning;
   const shownMoves = lesson ? step?.kind === 'move' ? guidance : [] : moves;
   const mayEnd = moves.some(move => move.type === 'endTurn') && (!lesson || guidance.some(move => move.type === 'endTurn'));
   const showRoll = reviewing === null && session && snap.rollId && session.record.cursor > 0;
@@ -123,6 +124,7 @@ export function App() {
     // No historical-event scan: finishing an exercise must not replay its effect.
     return { ...target, key: `${snap.motionKey}/${lesson.lesson}/${lesson.position}/${identity}` };
   }, [lesson, beat, step, position.pieces, rollPending, snap.teachingReturning, snap.motionKey]);
+  const rollDock = tutorialFocus && ((fileOf(tutorialFocus.square) >= 4) !== reversed ? 'left' : 'right');
   const teachingHud = !rollPending ? beat?.hud ?? step?.hud : undefined;
   const activePromotion = promotion?.key === snap.motionKey ? promotion.move : null;
   const allowedPromotions = activePromotion && lesson ? guidance.flatMap(command =>
@@ -147,6 +149,7 @@ export function App() {
     try { localStorage.setItem(PREFS_KEY, JSON.stringify(settings)); } catch { /* A private profile may deny writes. */ }
   }, [settings]);
   useEffect(() => { cabinet.setShortMotion(reduced); }, [reduced]);
+  useEffect(() => { cabinet.setTeachingCamera(!flat); }, [flat]);
   useEffect(() => {
     if (view !== 'home') void prepareDieRenderer();
   }, [view]);
@@ -321,7 +324,8 @@ export function App() {
           onDragSquare={(from, to) => enter({ type: 'move', from, to })} onFailure={onFailure}
           onClear={() => setSelection(null)}
           overlay={showRoll && snap.animating && snap.rollPhase !== 'idle' && <RollReveal t={t} session={session} rollId={snap.rollId!}
-            reduced={snap.rollReduced} low={low} pending={snap.rollPhase === 'throwing'} startedAt={snap.rollStartedAt ?? undefined} />} />
+            reduced={snap.rollReduced} low={low} pending={snap.rollPhase === 'throwing'}
+            startedAt={snap.rollStartedAt ?? undefined} focusDock={rollDock} />} />
         <PlayerRow t={t} locale={settings.locale} side={nearSide} config={config} active={active && actor === nearSide}
           teachingFocus={nearSide === teachingHudSide ? teachingHud : undefined}
           captures={captures} advantage={nearSide === 'white' ? balance : -balance} rating={snap.profile.rating}
@@ -368,6 +372,9 @@ export function App() {
           <div className="home-footer">
             <button type="button" className="text-button" data-testid="saved-games" onClick={() => setModal({ kind: 'saves' })}><Icon name="folder" />{t('home.saved')}</button>
             <button type="button" className="text-button" onClick={() => setModal({ kind: 'profile' })}>{t('nav.profile')}</button>
+            {learning && !learning.complete && <button type="button" className="text-button" onClick={() => setModal({ kind: 'restart-all' })}>
+              {t('tutorial.restartAll')}
+            </button>}
           </div>
         </section> : session && <>
           {notice}
@@ -393,7 +400,7 @@ export function App() {
                 {mode === 'rated' && <button type="button" className="text-button" onClick={() => setModal({ kind: 'technical' })}>{t('settings.abort')}</button>}
               </div>}
             </div>}
-            {!!showRoll && <RollCard t={t} session={session} rollId={snap.rollId!} pending={snap.rollPhase === 'throwing'} />}
+            {!!showRoll && !lesson && <RollCard t={t} session={session} rollId={snap.rollId!} pending={snap.rollPhase === 'throwing'} />}
           </div>
           {lesson && <LessonPanel t={t} locale={settings.locale} learning={lesson} guide={guidance} blocked={snap.busy || snap.animating || snap.teachingReturning}
             rolling={snap.rollPhase === 'throwing'}
@@ -442,10 +449,10 @@ export function App() {
         : <p>{step?.detail?.[settings.locale] ?? step?.text[settings.locale] ?? t('tutorial.positionDone')}</p>}
     </Dialog>}
     {modal?.kind === 'exit' && lesson && <Dialog title={t('tutorial.exit')} closeLabel={t('nav.close')} onClose={close}>
-      <p>{t('tutorial.exitDetail')}</p>
+      <p>{t(canLeaveForPractice ? 'tutorial.exitDetail' : 'tutorial.exitSaved')}</p>
       <div className="dialog-actions">
         <button type="button" className="button" onClick={() => { close(); void cabinet.home(); }}>{t('nav.menu')}</button>
-        {!position.outcome && !beat && !snap.animating && !snap.teachingReturning && <button type="button" className="button primary" onClick={() => { close(); void cabinet.handoff(); }}>{t('tutorial.continue')}</button>}
+        {canLeaveForPractice && <button type="button" className="button primary" onClick={() => { close(); void cabinet.handoff(); }}>{t('tutorial.continue')}</button>}
       </div>
     </Dialog>}
     {modal && ['resign', 'draw', 'restart', 'restart-all', 'technical'].includes(modal.kind) && <Dialog
@@ -458,7 +465,7 @@ export function App() {
           onClick={() => {
             close();
             if (modal.kind === 'restart') void cabinet.restartLesson();
-            else if (modal.kind === 'restart-all') void cabinet.learn(true);
+            else if (modal.kind === 'restart-all') { void cabinet.learn(true); setFlip(false); }
             else if (modal.kind === 'technical' && session) void cabinet.closeRated(session.record.id, true);
             else if (modal.kind === 'resign' || modal.kind === 'draw') perform({ type: modal.kind === 'resign' ? 'resign' : 'agreeDraw' });
           }}>{t('nav.confirm')}</button>

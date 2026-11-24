@@ -219,6 +219,7 @@ export const messages = {
   'tutorial.restartConfirm': ['Текущая учебная позиция вернётся к началу урока.', 'The training board will return to the start of this lesson.'],
   'tutorial.exit': ['Выйти из обучения', 'Exit tutorial'],
   'tutorial.exitDetail': ['Прогресс сохраняется. Можно вернуться в меню или доиграть текущую позицию против ИИ.', 'Your progress is saved. Return to the menu or play out the current position against AI.'],
+  'tutorial.exitSaved': ['Прогресс сохранится. Из меню можно вернуться к этому месту.', 'Your progress will be saved. Resume from this point from the menu.'],
   'tutorial.repeat': ['Повторить объяснение', 'Repeat explanation'],
   'tutorial.practice': ['Учебная партия не меняет рейтинг.', 'Tutorial games leave your rating unchanged.'],
   'tutorial.inspect': ['Нажмите на фигуру {square}', 'Tap the piece on {square}'],

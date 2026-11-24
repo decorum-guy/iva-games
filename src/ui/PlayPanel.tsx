@@ -84,8 +84,9 @@ export function RollCard({ t, session, rollId, pending }: {
   </div>;
 }
 
-export function RollReveal({ t, session, rollId, reduced, low, pending, startedAt }: {
+export function RollReveal({ t, session, rollId, reduced, low, pending, startedAt, focusDock }: {
   t: Translate; session: GameSession; rollId: string; reduced: boolean; low: boolean; pending: boolean; startedAt?: number;
+  focusDock?: 'left' | 'right';
 }) {
   const [Renderer, setRenderer] = useState(() => preparedDie);
   useEffect(() => {
@@ -105,7 +106,7 @@ export function RollReveal({ t, session, rollId, reduced, low, pending, startedA
     {pending ? <span className="dice-loading-body" /> : <ReactionDie face={action.roll.face} rollKey={rollId} reducedMotion />}
   </div>;
   return <div className="dice-reveal" data-testid="dice-reveal" data-actor={action.actor}
-    data-phase={pending ? 'throwing' : 'settled'}>
+    data-phase={pending ? 'throwing' : 'settled'} data-focus-dock={pending ? undefined : focusDock}>
     <span className="dice-actor">{t('die.actor', { side: t(`side.${action.actor}`) })}</span>
     {Renderer ? <DieLoadBoundary fallback={placeholder}>
       <Renderer face={action.roll.face} rollKey={`${session.record.id}/${rollId}`} reduced={reduced} quality={low ? 'low' : 'high'} startedAt={startedAt} />

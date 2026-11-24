@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './fixtures'
 import type { Locator, Page } from '@playwright/test'
 import { createPosition } from '../../src/core'
 import type { Affliction, DieFace, Side } from '../../src/core'
@@ -11,7 +11,6 @@ import { learnerAction, saveLearning, scriptAction, startLesson } from '../../sr
 import type { Learning } from '../../src/tutorial/controller'
 import { move } from '../../src/tutorial/lessonTypes'
 import { LESSONS } from '../../src/tutorial/lessons'
-import { CAMERA_TRAVEL_MS } from '../../src/scene/cameraFocus'
 
 const hotseat = { mode: 'hotseat', level: null, human: null, provenance: 'standard' } as const
 const playfield = (page: Page) => page.getByTestId('playfield')
@@ -309,7 +308,7 @@ test('real captures by either side show the committed 3D die in 2D, without repl
   await expect(page.getByTestId('tutorial')).toHaveAttribute('data-beat', firstResult.id)
   await expect(page.getByTestId('teaching-cause')).toHaveText(firstResult.text.en)
   await page.getByTestId('lesson-next').click()
-  await page.clock.runFor(CAMERA_TRAVEL_MS)
+  // The board is in 2D. Acknowledgement works with the clock still paused.
   await ready(page)
   const legend = page.getByTestId('dice-legend')
   await expect(legend).toBeVisible()
@@ -339,7 +338,7 @@ interface AudioProbe {
 
 async function instrumentNativeAudio(page: Page) {
   await page.addInitScript(() => {
-    // Duplicate the master into an analyser. The normal native destination still plays.
+    // Observe the native master before the test fixture's silent output.
     const probe: AudioProbe = { context: 'none', starts: [], stops: [], signal: [] }
     Object.assign(window, { remorseAudioProbe: probe })
     const connect = AudioNode.prototype.connect

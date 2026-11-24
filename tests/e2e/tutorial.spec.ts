@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './fixtures'
 import type { Locator, Page, Route } from '@playwright/test'
 import { createInitialState } from '../../src/core'
 import type { Command } from '../../src/core/types'
@@ -6,7 +6,7 @@ import { translator } from '../../src/i18n/catalog'
 import type { MatchRecord } from '../../src/session/match'
 import { nextDie } from '../../src/session/random'
 import { restoreMatch } from '../../src/session/save'
-import { learnerAction, saveLearning, scriptAction, startLesson } from '../../src/tutorial/controller'
+import { learnerAction, restoreLearning, saveLearning, scriptAction, startLesson } from '../../src/tutorial/controller'
 import type { Learning } from '../../src/tutorial/controller'
 import { move } from '../../src/tutorial/lessonTypes'
 import type { Step } from '../../src/tutorial/lessonTypes'
@@ -199,6 +199,59 @@ async function verifyContinuation(page: Page, locale: 'en' | 'ru', mobile: boole
   expect(await recorded(page, 'profiles', 'local')).toEqual(initialProfile)
   await changeLanguage(page, locale)
 }
+
+test('a held explanation survives the rules and menu, and restarting from the menu preserves a rated game', async ({ page }) => {
+  const t = translator('en')
+  await page.goto('/')
+  await expect(page.getByTestId('mode-learn')).toBeVisible()
+  await changeLanguage(page, 'en')
+  await page.getByTestId('flat-mode').click()
+  await page.getByTestId('mode-ai').click()
+  await page.getByTestId('setup-rated').click()
+  await page.getByTestId('setup-white').click()
+  await page.getByTestId('setup-start').click()
+  await expect(playfield(page)).toHaveAttribute('data-mode', 'rated')
+  await interactable(page)
+  const ratedId = (await playfield(page).getAttribute('data-game-id'))!
+  const rated = await recorded<MatchRecord>(page, 'matches', ratedId)
+  const profile = await recorded(page, 'profiles', 'local')
+  await page.getByTestId('leave-game').click()
+
+  const held = learnerAction(startLesson(1), move('c3', 'c4')).progress
+  const saved = saveLearning(restoreLearning(await restoreTutorialCheckpoint(page, held)))
+  const before = await boardIdentity(page)
+  await page.getByRole('button', { name: t('nav.rules'), exact: true }).click()
+  await expect(page.getByRole('dialog')).toBeVisible()
+  await page.getByTestId('dialog-close').click()
+  expect(await boardIdentity(page)).toEqual(before)
+
+  async function returnToMenu() {
+    await page.getByTestId('leave-game').click()
+    const dialog = page.getByRole('dialog')
+    await expect(dialog).toContainText(t('tutorial.exitSaved'))
+    await expect(dialog.getByRole('button', { name: t('tutorial.continue'), exact: true })).toHaveCount(0)
+    await dialog.getByRole('button', { name: t('nav.menu'), exact: true }).click()
+    await expect(playfield(page)).toHaveAttribute('data-view', 'home')
+  }
+  await returnToMenu()
+  await page.getByTestId('mode-learn').click()
+  await expect(tutorial(page)).toHaveAttribute('data-source-step', 'guilt-roll')
+  await expect(page.getByTestId('dice-reveal')).toHaveCount(0)
+  expect(await boardIdentity(page)).toEqual(before)
+  expect(await recorded(page, 'learning', 'progress')).toEqual(saved)
+  await returnToMenu()
+
+  const restart = page.getByRole('button', { name: t('tutorial.restartAll'), exact: true })
+  await restart.click()
+  await page.getByRole('dialog').getByRole('button', { name: t('nav.cancel'), exact: true }).click()
+  expect(await recorded(page, 'learning', 'progress')).toEqual(saved)
+  await restart.click()
+  await page.getByTestId('confirm-action').click()
+  await expect(tutorial(page)).toHaveAttribute('data-step', 'open-with-e4')
+  expect(await recorded(page, 'learning', 'progress')).toMatchObject({ lesson: 0, position: 0, index: 0 })
+  expect(await recorded(page, 'matches', ratedId)).toEqual(rated)
+  expect(await recorded(page, 'profiles', 'local')).toEqual(profile)
+})
 
 for (const locale of ['ru', 'en'] as const) {
   test.describe(`complete tutorial · ${locale}`, () => {
