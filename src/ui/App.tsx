@@ -243,10 +243,32 @@ export function App() {
     if (settings.sound) playRoyalCue(royal);
   }, [royal, settings.sound]);
   useEffect(() => {
-    const finishHidden = () => { if (document.hidden) cabinet.finishHiddenPresentation(); };
-    document.addEventListener('visibilitychange', finishHidden);
-    return () => document.removeEventListener('visibilitychange', finishHidden);
+    const syncVisibility = () => cabinet.setPageVisible(!document.hidden);
+    syncVisibility();
+    document.addEventListener('visibilitychange', syncVisibility);
+    return () => document.removeEventListener('visibilitychange', syncVisibility);
   }, []);
+  const readableResult = view === 'game' && liveAction?.id === snap.resultRead?.cueId && snap.pageVisible
+    && reviewing === null && !modal && !activePromotion && !concealingResult && !waitingForBloodlust
+    && !promotionStage && !snap.royalPending && !royal;
+  useEffect(() => {
+    const read = snap.resultRead;
+    if (!read) return;
+    if (!readableResult) {
+      cabinet.deferResultReading(read.id);
+      return;
+    }
+    let secondFrame = 0;
+    // The first frame precedes a paint; acknowledge on the following frame,
+    // after React has committed the actual result. Hidden tabs cannot unlock it.
+    const firstFrame = requestAnimationFrame(() => {
+      secondFrame = requestAnimationFrame(() => cabinet.acknowledgeResult(read.id));
+    });
+    return () => {
+      cancelAnimationFrame(firstFrame);
+      cancelAnimationFrame(secondFrame);
+    };
+  }, [snap.resultRead, readableResult]);
 
   const onFailure = useCallback(() => { setGraphicsFailed(true); }, []);
   const close = () => setModal(null);
@@ -311,7 +333,8 @@ export function App() {
       enter({ type: 'move', from: selected.square, to: square });
       return;
     }
-    setSelection(occupant ? { key: snap.motionKey, id: occupant.id, pickedFor: selectionStep } : null);
+    if (occupant) setSelection({ key: snap.motionKey, id: occupant.id, pickedFor: selectionStep });
+    else clearSelection();
     cabinet.dismissError();
   }
 

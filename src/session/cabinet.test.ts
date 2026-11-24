@@ -386,6 +386,7 @@ describe('Cabinet shared die presentation timeline', () => {
     expect(cabinet.getSnapshot().awaitingReaction).toBe(true)
     await vi.advanceTimersByTimeAsync(1)
     expect(cabinet.getSnapshot().awaitingReaction).toBe(false)
+    cabinet.acknowledgeResult(cabinet.getSnapshot().resultRead!.id)
     await vi.advanceTimersByTimeAsync(plan.end - roll.reveal - 1)
     expect(cabinet.getSnapshot().animating).toBe(true)
     expect(TestWorker.instances).toHaveLength(0)

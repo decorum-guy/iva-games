@@ -31,6 +31,8 @@ interface CabinetState {
   readonly teachingReturning: boolean;
   readonly thinking: boolean;
   readonly searchFailed: boolean;
+  readonly pageVisible: boolean;
+  readonly resultRead: { readonly id: number; readonly cueId: string; readonly durationMs: number } | null;
   readonly profile: Profile;
   readonly ledger: readonly RatingEntry[];
   readonly matches: readonly MatchRecord[];
@@ -78,9 +80,14 @@ function storageProblem(code: SessionCode): code is StorageProblem {
   return code === 'storage' || code === 'storageTimeout' || code === 'storageBlocked' || code === 'storageClosed';
 }
 
+function documentVisible() {
+  return typeof document === 'undefined' || !document.hidden;
+}
+
 export class Cabinet {
   private data: CabinetState = {
     ready: false, durable: false, storageProblem: null, busy: false, animating: false, teachingReturning: false, thinking: false, searchFailed: false,
+    pageVisible: documentVisible(), resultRead: null,
     profile: initialProfile, ledger: [], matches: [], view: 'home', game: null, learning: null,
     error: null, motionKey: 'home', rollId: null, rollPhase: 'idle', awaitingReaction: false, rollReduced: false, rollStartedAt: null, audioCue: null,
     promotionStage: null, waitingForBloodlust: false, royalPending: false, royalCue: null, royalResolved: false,
@@ -92,6 +99,8 @@ export class Cabinet {
   private workerDeadline: ReturnType<typeof setTimeout> | undefined;
   private replyTimer: ReturnType<typeof setTimeout> | undefined;
   private workerReply: { game: GameSession; next: GameSession; readyAt: number } | undefined;
+  private readUntil: number | null = null;
+  private readSequence = 0;
   private scheduled: ReturnType<typeof setTimeout> | undefined;
   private presentationTimers: ReturnType<typeof setTimeout>[] = [];
   private fastForwardPresentation: (() => void) | undefined;
@@ -249,6 +258,38 @@ export class Cabinet {
   }
   dismissError = () => this.patch({ error: null });
 
+  private newResultRead(cue: NonNullable<CabinetState['audioCue']>) {
+    this.readUntil = null;
+    return { id: ++this.readSequence, cueId: cue.id, durationMs: cue.plan.reduced ? 650 : 840 };
+  }
+
+  /** The view calls this after the current result has had a visible paint opportunity. */
+  acknowledgeResult = (id: number) => {
+    const read = this.data.resultRead;
+    if (!read || read.id !== id || read.cueId !== this.data.audioCue?.id || this.readUntil !== null
+      || this.data.view !== 'game' || !this.data.pageVisible || !documentVisible()) return;
+    this.readUntil = performance.now() + read.durationMs;
+    this.pump();
+  };
+
+  /** A modal or history view must not count as time spent reading the live result. */
+  deferResultReading = (id: number) => {
+    if (this.data.resultRead?.id !== id) return;
+    this.readUntil = null;
+    clearTimeout(this.replyTimer);
+  };
+
+  setPageVisible = (visible: boolean) => {
+    if (this.data.pageVisible === visible) return;
+    clearTimeout(this.replyTimer);
+    clearTimeout(this.scheduled);
+    const cue = this.data.audioCue;
+    const resultRead = this.data.resultRead && cue ? this.newResultRead(cue) : null;
+    this.patch({ pageVisible: visible, resultRead });
+    if (!visible) this.finishHiddenPresentation();
+    this.pump();
+  };
+
   private stopWorker() {
     this.worker?.terminate();
     this.worker = null;
@@ -265,8 +306,9 @@ export class Cabinet {
     clearTimeout(this.royalEnd);
     clearTimeout(this.teachingReturn);
     this.attempts = 0;
+    this.readUntil = null;
     this.patch({ thinking: false, animating: false, teachingReturning: false, searchFailed: false, motionKey: newId(), rollId: null,
-      rollPhase: 'idle', awaitingReaction: false, rollStartedAt: null, audioCue: null, promotionStage: null, waitingForBloodlust: false, royalPending: false, royalCue: null, royalResolved: false });
+      rollPhase: 'idle', awaitingReaction: false, rollStartedAt: null, audioCue: null, resultRead: null, promotionStage: null, waitingForBloodlust: false, royalPending: false, royalCue: null, royalResolved: false });
   }
 
   private async run(action: () => void | Promise<void>): Promise<boolean> {
@@ -418,14 +460,19 @@ export class Cabinet {
     const plan = actionPlan(events, Boolean(action.roll), this.shortMotion, Boolean(royal),
       { deferUnrolledBloodlust: mode !== 'tutorial' });
     const audioCue = { id: `${game.record.id}/${action.id}`, events, human, startedAt, royal, plan, playback };
+    const needsRead = mode !== 'tutorial' && game.record.config.level !== null && game.record.status === 'open'
+      && (Boolean(plan.roll) || events.some(event => event.type === 'reaction' || event.type === 'affliction'));
+    const reveal = (fields: Partial<CabinetState>) => this.patch({ ...fields,
+      ...(needsRead ? { resultRead: this.newResultRead(audioCue) } : {}) });
     const showsMotion = action.command.type === 'move' || action.command.type === 'endTurn';
     if (!showsMotion) { this.patch({ audioCue }); return; }
 
     this.clearPresentation();
+    this.readUntil = null;
     const { roll, promotion } = plan;
     const resumeAt = playback === 'formation' ? promotion?.formationAt ?? 0 : 0;
     const holdAt = playback === 'reaction' ? promotion?.reactionAt ?? null : null;
-    this.patch({ audioCue, animating: true, rollId: roll && resumeAt ? action.id : null,
+    this.patch({ audioCue, resultRead: null, animating: true, rollId: roll && resumeAt ? action.id : null,
       rollPhase: 'idle', awaitingReaction: Boolean(roll && !resumeAt), rollReduced: plan.reduced,
       rollStartedAt: resumeAt ? this.data.rollStartedAt : null, royalPending: Boolean(royal),
       promotionStage: promotion ? resumeAt ? 'formation' : 'contact' : null, waitingForBloodlust: plan.escalationAt !== null });
@@ -440,7 +487,7 @@ export class Cabinet {
         promotionStage: promotion ? 'roll' : null,
       }));
       at(roll.settle, () => this.patch({ rollPhase: 'settled' }));
-      if (holdAt === null) at(roll.reveal, () => this.patch({ awaitingReaction: false,
+      if (holdAt === null) at(roll.reveal, () => reveal({ awaitingReaction: false,
         ...(promotion ? { promotionStage: 'reaction' as const } : {}) }));
     }
     if (holdAt !== null) {
@@ -452,13 +499,14 @@ export class Cabinet {
       };
       this.fastForwardPresentation = () => hold(true);
       at(holdAt, hold);
+      if (!this.data.pageVisible || !documentVisible()) this.finishHiddenPresentation();
       return;
     }
-    if (plan.escalationAt !== null) at(plan.escalationAt, () => this.patch({ waitingForBloodlust: false }));
+    if (plan.escalationAt !== null) at(plan.escalationAt, () => reveal({ waitingForBloodlust: false }));
     if (promotion) {
       if (!resumeAt) {
-        if (!roll && promotion.reactionAt !== null) at(promotion.reactionAt, () => this.patch({ promotionStage: 'reaction' }));
-        if (promotion.surgeAt !== null) at(promotion.surgeAt, () => this.patch({ promotionStage: 'surge' }));
+        if (!roll && promotion.reactionAt !== null) at(promotion.reactionAt, () => reveal({ promotionStage: 'reaction' }));
+        if (promotion.surgeAt !== null) at(promotion.surgeAt, () => reveal({ promotionStage: 'surge' }));
         at(promotion.formationAt, () => this.patch({ promotionStage: 'formation', rollPhase: 'idle' }));
       }
       if (promotion.aftermathAt < plan.end) at(promotion.aftermathAt, () => this.patch({ promotionStage: 'aftermath' }));
@@ -469,6 +517,7 @@ export class Cabinet {
         ? { ...royal, fromPromotion: Boolean(promotion), continuingCamera: promotion?.aftermathAt === plan.end,
           reduced: this.shortMotion, startedAt: performance.now() } : null;
       this.patch({ animating: false, rollPhase: 'idle', awaitingReaction: false, promotionStage: null, waitingForBloodlust: false, royalPending: false, royalCue: cue, royalResolved: false,
+        ...(needsRead && this.data.resultRead === null ? { resultRead: this.newResultRead(audioCue) } : {}),
         ...(roll ? { rollId: action.id } : {}) });
       if (!cue) { this.pump(); return; }
       const { duration, resolution } = royalTiming(cue);
@@ -479,6 +528,9 @@ export class Cabinet {
     };
     this.fastForwardPresentation = finish;
     at(plan.end, finish);
+    // A transaction begun while visible can finish after the tab was hidden.
+    // Keep its committed result; there may be no further visibility event.
+    if (!this.data.pageVisible || !documentVisible()) this.finishHiddenPresentation();
   }
 
   finishRoyal = () => {
@@ -637,7 +689,10 @@ export class Cabinet {
       const reply = this.workerReply;
       if (reply?.game === game) {
         clearTimeout(this.replyTimer);
-        const remaining = Math.ceil(reply.readyAt - performance.now());
+        // Search may finish while hidden or before the result is painted. Only
+        // consuming its answer is gated; do not put Infinity into a timer.
+        if (!this.data.pageVisible || !documentVisible() || (this.data.resultRead && this.readUntil === null)) return;
+        const remaining = Math.ceil(Math.max(reply.readyAt, this.readUntil ?? 0) - performance.now());
         if (remaining > 0) {
           this.replyTimer = setTimeout(() => this.pump(), remaining);
           return;
@@ -655,10 +710,12 @@ export class Cabinet {
       } else if (!thinking) this.search(game);
       return;
     }
-    if (view === 'learn' && learning && !learning.pendingTeaching && instruction(learning)?.kind === 'script' && this.data.error !== 'tutorialBroken') {
+    if (this.data.pageVisible && documentVisible() && view === 'learn' && learning && !learning.pendingTeaching
+      && instruction(learning)?.kind === 'script' && this.data.error !== 'tutorialBroken') {
       const generation = this.generation;
       this.scheduled = setTimeout(() => {
-        if (this.generation !== generation || this.data.learning !== learning || this.data.view !== 'learn') return;
+        if (this.generation !== generation || this.data.learning !== learning || this.data.view !== 'learn'
+          || !this.data.pageVisible || !documentVisible()) return;
         void this.run(async () => {
           const next = scriptAction(learning);
           await this.updateLearning(next, () => this.present(next.session));
@@ -672,10 +729,7 @@ export class Cabinet {
     if (!preset) return;
     // Search runs during the pause. Presentation jitter never touches the saved die stream.
     const thinkMs = this.shortMotion ? 210 + Math.random() * 220 : 330 + Math.random() * 310;
-    const cue = this.data.audioCue?.events === game.current.events ? this.data.audioCue : null;
-    const reveal = cue?.plan.promotion?.surgeAt ?? cue?.plan.escalationAt ?? cue?.plan.roll?.reveal;
-    const readableUntil = cue && reveal !== undefined ? cue.startedAt + reveal + (cue.plan.reduced ? 650 : 840) : 0;
-    const readyAt = Math.max(performance.now() + thinkMs, readableUntil);
+    const readyAt = performance.now() + thinkMs;
     const request: SearchRequest = {
       type: 'search', requestId: newId(), gameId: game.record.id, gameRevision: game.record.revision,
       sessionGeneration: this.generation, rulesVersion: game.state.rulesVersion, engineVersion: ENGINE_VERSION,

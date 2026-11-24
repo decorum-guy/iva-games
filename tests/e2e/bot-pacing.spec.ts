@@ -106,6 +106,91 @@ for (const rolled of [true, false]) {
   })
 }
 
+test('keeps the result readable when a long task delays its first paint', async ({ page }, testInfo) => {
+  const reduced = testInfo.project.name === 'webkit'
+  await page.addInitScript(({ reduced }) => {
+    localStorage.setItem('remorse-settings-v1', JSON.stringify({ board: '2d', locale: 'en', reduce: reduced, sound: false }))
+    const sample = { blocked: false, revealFrameAt: 0, nextAt: 0 }
+    Object.assign(window, { delayedResultSample: sample })
+    new MutationObserver(() => {
+      const view = document.querySelector('[data-testid="playfield"]')
+      const revision = view?.getAttribute('data-revision')
+      if (!sample.blocked && revision === '1' && view?.querySelector('[data-testid="bloodlust-result"]')) {
+        sample.blocked = true
+        // Simulate a busy main thread after the DOM changed but before paint.
+        const until = performance.now() + 1100
+        while (performance.now() < until) { /* deliberate long task */ }
+        requestAnimationFrame(() => { sample.revealFrameAt = performance.now() })
+      }
+      if (revision === '2' && sample.nextAt === 0) sample.nextAt = performance.now()
+    }).observe(document, { subtree: true, childList: true, attributes: true })
+  }, { reduced })
+  const { record } = botCapture(false)
+  await page.goto('/')
+  await page.getByTestId('mode-ai').waitFor()
+  await seedRecords(page, [record], 'game/' + record.id)
+  await page.reload()
+  await expect(gameView(page)).toHaveAttribute('data-revision', '2', { timeout: 15_000 })
+  const sample = await page.evaluate(() => (window as unknown as {
+    delayedResultSample: { blocked: boolean; revealFrameAt: number; nextAt: number }
+  }).delayedResultSample)
+  expect(sample.blocked).toBe(true)
+  expect(sample.revealFrameAt).toBeGreaterThan(0)
+  expect(sample.nextAt - sample.revealFrameAt).toBeGreaterThan(reduced ? 550 : 760)
+})
+
+test('waits for the returned result after visibility changes during the AI die', async ({ page }, testInfo) => {
+  const reduced = testInfo.project.name === 'webkit'
+  await page.addInitScript(({ reduced }) => {
+    localStorage.setItem('remorse-settings-v1', JSON.stringify({ board: '2d', locale: 'en', reduce: reduced, sound: false }))
+    const sample = { hidden: false, hidOnce: false, returnedAt: 0, nextAt: 0 }
+    Object.assign(window, { resultVisibilitySample: sample })
+    // Exercise the page's real visibility listener deterministically in both
+    // browser engines. This is a simulated tab-visibility change, not OS focus.
+    Object.defineProperty(document, 'hidden', { configurable: true, get: () => sample.hidden })
+    Object.defineProperty(document, 'visibilityState', {
+      configurable: true, get: () => sample.hidden ? 'hidden' : 'visible',
+    })
+    new MutationObserver(() => {
+      const view = document.querySelector('[data-testid="playfield"]')
+      if (!sample.hidOnce && view?.getAttribute('data-revision') === '1'
+        && view.getAttribute('data-dice') === 'throwing') {
+        sample.hidden = true
+        sample.hidOnce = true
+        document.dispatchEvent(new Event('visibilitychange'))
+      }
+      if (view?.getAttribute('data-revision') === '2' && sample.nextAt === 0) sample.nextAt = performance.now()
+    }).observe(document, { subtree: true, childList: true, attributes: true })
+  }, { reduced })
+  const { record } = botCapture(true)
+  await page.goto('/')
+  await page.getByTestId('mode-ai').waitFor()
+  await seedRecords(page, [record], 'game/' + record.id)
+  await page.reload()
+  await expect(page.getByTestId('bloodlust-result')).toHaveText('Bloodlust on d5')
+  expect(await page.evaluate(() => document.hidden)).toBe(true)
+  await page.waitForTimeout(1800)
+  await expect(gameView(page)).toHaveAttribute('data-revision', '1')
+  const before = (await readRecords<MatchRecord>(page, 'matches')).find(match => match.id === record.id)!
+  expect(before.actions).toHaveLength(1)
+  expect(before.actions[0].roll?.face).toBe(6)
+  await page.evaluate(() => {
+    const sample = (window as unknown as { resultVisibilitySample: { hidden: boolean; returnedAt: number } }).resultVisibilitySample
+    sample.hidden = false
+    sample.returnedAt = performance.now()
+    document.dispatchEvent(new Event('visibilitychange'))
+  })
+  await expect(gameView(page)).toHaveAttribute('data-revision', '2', { timeout: 15_000 })
+  const interval = await page.evaluate(() => {
+    const sample = (window as unknown as { resultVisibilitySample: { returnedAt: number; nextAt: number } }).resultVisibilitySample
+    return sample.nextAt - sample.returnedAt
+  })
+  expect(interval).toBeGreaterThan(reduced ? 550 : 760)
+  const after = (await readRecords<MatchRecord>(page, 'matches')).find(match => match.id === record.id)!
+  expect(after.actions).toHaveLength(2)
+  expect(after.actions.filter(action => action.roll)).toHaveLength(1)
+})
+
 test('a selected figure can be cleared again, including a restored bonus', async ({ page, hasTouch }) => {
   await page.addInitScript(() => {
     localStorage.setItem('remorse-settings-v1', JSON.stringify({ board: '2d', reduce: true, sound: false }))
@@ -139,11 +224,19 @@ test('a selected figure can be cleared again, including a restored bonus', async
   await pick('d5')
   await expect(square(page, 'd5')).not.toHaveClass(/mark-selected/)
   await expect(square(page, 'e5')).not.toHaveClass(/mark-capture/)
+  // An empty square must not bring back the cleared bonus selection.
+  await pick('d6')
+  await expect(square(page, 'd5')).not.toHaveClass(/mark-selected/)
+  await expect(square(page, 'e5')).not.toHaveClass(/mark-capture/)
+  await expect(gameView(page)).toHaveAttribute('data-revision', '1')
   await expect(page.getByTestId('end-turn')).toBeEnabled()
   await pick('d5')
   await expect(square(page, 'd5')).toHaveClass(/mark-selected/)
   await page.locator('.board-stage').press('Escape')
   await expect(square(page, 'd5')).not.toHaveClass(/mark-selected/)
+  await pick('d6')
+  await expect(square(page, 'd5')).not.toHaveClass(/mark-selected/)
+  await expect(square(page, 'e5')).not.toHaveClass(/mark-capture/)
   await expect(gameView(page)).toHaveAttribute('data-revision', '1')
   await clickMove(page, 'd5', 'e5')
   await expect(gameView(page)).toHaveAttribute('data-revision', '2')
