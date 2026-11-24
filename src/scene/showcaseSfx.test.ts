@@ -54,10 +54,11 @@ describe('selected showcase playback', () => {
     ], buffers, undefined, undefined, false, reduced)
     expect(stock).toEqual([charge, end])
     expect(clips).toMatchObject([
-      { buffer: buffers.get('royalBreak'), at: release, offset: 0, duration: reduced ? .38 : .62 },
+      { buffer: buffers.get('royalBreak'), at: release, offset: 0, duration: 1.32 },
       { buffer: buffers.get('royalGround'), at: landing, offset: 0, duration: .92 },
     ])
-    expect(clips[0].at + clips[0].duration).toBeLessThan(clips[1].at)
+    expect(clips[0].at + clips[0].duration).toBeGreaterThan(clips[1].at)
+    expect(clips[0].at + clips[0].duration).toBeLessThan(clips[1].at + clips[1].duration)
   })
 
   it('uses the short chant and the requested per-state levels', () => {

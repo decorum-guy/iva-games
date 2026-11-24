@@ -90,7 +90,7 @@
         "mateLanding": "E+G+D"
       },
       "recipe": "scripts/build-royal-showcase-mix.py",
-      "changes": "The selected steel hit retains its attack and adds stereo room decay. E, G and D play as one landing. The first mate sound combines the restored rock crack, a hot pressure burst, stereo echoes and room decay before landing.",
+      "changes": "Selected steel with stereo room decay. E, G and D play once on landing. The first mate contact combines the restored crack, hot pressure burst, stereo echoes and independent room decay that continues through the landing.",
       "check": {
         "file": "showcase/royal-check.mp3",
         "bytes": 18476,
@@ -211,11 +211,11 @@
       "mateRecipe": "scripts/build-mate-showcase-mix.py",
       "mateFragments": {
         "file": "showcase/royal-mate-fragments.mp3",
-        "bytes": 16222,
-        "sha256": "c5e304b17397853a00dda0da4c30f82b16e524b61547ebe90c4b48ccdbc10206",
-        "playSeconds": 0.62,
-        "reducedPlaySeconds": 0.38,
-        "changes": "Restore the earlier stone crack under the filtered punch and steam at discharge. Add three filtered stereo echoes and a diffuse room tail. Fade before contact in each animation mode.",
+        "bytes": 32926,
+        "sha256": "fa53f4a17e5098982ded2eb4976e66cf55ec7d0301ae1c334cc23597e38f3772",
+        "playSeconds": 1.32,
+        "reducedPlaySeconds": 1.32,
+        "changes": "Restore the earlier stone crack under the punch and steam. Add three stereo echoes and a pronounced hall convolution. A fixed room envelope outlasts the landing in both animation modes.",
         "sources": [
           "pressurePunch",
           "steamRelease",
@@ -234,6 +234,10 @@
             220,
             249
           ]
+        ],
+        "roomPredelayMs": [
+          23,
+          31
         ]
       },
       "mateGround": {
