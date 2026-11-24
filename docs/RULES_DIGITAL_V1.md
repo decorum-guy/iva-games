@@ -6,7 +6,7 @@ Ruleset ID: `remorse-digital-v1`. Preparation date: 2026-11-24, Europe/Moscow.
 
 The source is the **user-supplied one-page PDF transcript**, preserved in `reference/remorse-chess-official-rules.pdf` and `reference/transcript.md`. Its title is “Remorse Chess_ Official Rules”. It contains explanations beginning at 00:00, 00:59, 02:01 and 03:02; it is not a formal specification covering every interaction.
 
-Section 2 summarizes rules directly stated in that supplied source. Sections 3–11 specify **our implementation decisions** where the transcript is incomplete. The project owner explicitly authorized filling these gaps. They are binding for this implementation, but must not be attributed to the original creator as official clarifications. Expose them in a concise in-game “Digital rules” appendix.
+Section 2 summarizes rules directly stated in that supplied source. Sections 3–11 specify **our implementation decisions** where the transcript is incomplete. The project owner explicitly authorized filling these gaps. They are binding for this implementation, but must not be attributed to the original creator as official clarifications. Expose them in a concise in-game “Digital rules” appendix fully available in Russian and English. The normative document and supplied PDF do not require duplicate translated files; the player-facing explanation does.
 
 If an actual contradiction is found during implementation, document the smallest consistent correction and add a focused test. Do not silently replace this variant with orthodox chess or mix in older web descriptions of Remorse.
 
@@ -39,7 +39,7 @@ A piece has a stable identity, current owner, type and square, plus:
 - `affliction`: neutral, guilt, devastated, berserk, or bloodlust. This is the **current functional state**.
 - `capturesSinceRebirth`: every actual capture made by that identity since the most recent conversion/bishop rebirth.
 - Devastation deadline and applicable aura progress.
-- Movement history and any original castling eligibility.
+- Movement history, original pawn double-step eligibility and any original castling eligibility.
 
 Intrinsic bishop pacifism is not the same thing as guilt. A healthy bishop is still unable to capture or check. Healing a guilty rook clears its affliction but retains its assigned reaction: if that reaction is guilt, its next ordinary qualifying capture makes it guilty again without rolling.
 
@@ -82,7 +82,7 @@ Kings are immune to every mental affliction, conversion and self-removal. Rally 
 
 An unprotected susceptible target exposed for a full cycle advances once: neutral → guilt → devastated → conversion. An already guilty or devastated target uses its current state. Start a new period for each stage. Interruption resets partial progress, not an already applied stage.
 
-On conversion: keep ID, type and square; change owner; clear current affliction and remembered reaction; reset captures since rebirth; cancel old timers and contact progress. Revoke original castling eligibility permanently. A pawn's forward direction becomes that of its new owner. No extra action is granted by conversion. Any resulting new aura begins a new period rather than acting again in the same boundary.
+On conversion: keep ID, type and square; change owner; clear current affliction and remembered reaction; reset captures since rebirth; cancel old timers and contact progress. Revoke original castling eligibility and pawn double-step eligibility permanently. A pawn's forward direction becomes that of its new owner; rebirth does not restore its original double step. No extra action is granted by conversion. Any resulting new aura begins a new period rather than acting again in the same boundary.
 
 Devastation causes **automatic removal** at its deadline; no additional die is rolled. This is our interpretation of “at risk”, since the source specifies no second probability. Self-removal is not a capture: no capturer, capture credit, reaction or bonus. Healing or conversion maturing at that same boundary rescues the piece before removal.
 
@@ -142,7 +142,7 @@ The total is at most two actions in the player's turn. Capturing again on action
 
 The bonus is optional when ending the turn is legal. Provide an explicit End Turn command. If mandatory end-of-turn effects would expose the mover's king, but the bonus can prevent it, that bonus is required and End Turn is disabled with an explanation.
 
-A berserk piece becomes bloodlust immediately when its **total captures since rebirth reaches three**, including captures before the roll of 6. If it reaches that threshold on action one, action two must be a capture. Bloodlust permits captures of friendly non-king pieces using the piece's normal capture geometry. Friendly en passant does not exist.
+A berserk piece becomes bloodlust immediately when its **total captures since rebirth is at least three**, including captures before the roll of 6. Check `capturesSinceRebirth >= 3` whenever berserk is assigned or retained, not only when the counter changes from two to three. For example, a first reaction of 6 on the fourth capture after earlier mercy captures immediately produces bloodlust. If bloodlust applies after action one, action two must be a capture. Bloodlust permits captures of friendly non-king pieces using the piece's normal capture geometry. Friendly en passant does not exist.
 
 Bloodlust restricts the actions of that piece; it does not force the whole army to choose it. A player may select another legal piece. If no capture exists for the bloodlust piece, that piece simply cannot move. Declining a bonus remains allowed when ending is safe.
 
@@ -174,6 +174,8 @@ Never physically capture either king, including by bloodlust. Do not replace che
 
 Orthodox geometry, initial setup and side-to-move conventions apply where not overridden here.
 
+**Pawn double step:** an original pawn may advance two squares only while its original double-step right remains, from its current side's home pawn rank, with both intervening and destination squares empty. Its first movement or any ownership conversion permanently clears that right. Returning to a home rank by a change of ownership, conversion back to the original side, healing or rebirth never grants a new double step. Preserve this right explicitly or derive it from an equally unambiguous movement history; checking the current rank alone is insufficient.
+
 **Castling:** preserve historical king/rook rights and the usual empty-path and king-through-check constraints, using Remorse attack maps. Both king and rook must still belong to that side. A devastated rook cannot move, and a bloodlust rook cannot make a quiet castle; a guilty rook may castle. Conversion or promotion never grants castling rights. Losing/converting the original eligible rook removes its right even if another rook later occupies its square.
 
 **En passant:** use ordinary pawn geometry and the recorded vulnerable pawn identity. The right lasts for the immediately following opposing player turn, including its bonus if applicable, unless that pawn is moved, captured or changes owner. Guilt/devastation prevents the capture. An en-passant victim's mental state still affects mercy; the captured square and landing square are different. King safety must reflect removal from the victim's actual square.
@@ -184,13 +186,19 @@ For a promoted knight with an unassigned reaction, only zero captures since rebi
 
 Promotion to bishop resets reaction, current affliction and capture count, cancels devastation/aura progress and clears berserk/bloodlust. It becomes intrinsically pacifist. It retains its stable ID but gains no castling or movement-history rights. Promotion never creates a king.
 
+**Stable-position invariant:** no unpromoted pawn may occupy rank 1 or rank 8 in a committed stable position. A move reaching its promotion rank includes and resolves the promotion in the same command. Conversion cannot create a back-rank pawn from a valid position because it does not change the square. Reject imports and tutorial fixtures that violate this invariant; do not invent a delayed promotion choice inside passive settlement. An intermediate capture/promotion presentation does not authorize an invalid committed pawn state.
+
 ## 9. Ending and draws
 
 At a completed turn boundary, if the next player has no legal completed-turn action and its king is attacked, it is checkmate. If it has no legal completed-turn action and is not attacked, it is stalemate and a draw. Do not wait for future timers and do not invent a pass to escape stalemate.
 
 Allow resignation and agreed draw in local two-player play. Bare kings is an automatic draw. Do not import an orthodox insufficient-material detector: bishop influence and berserk behavior change what material can accomplish.
 
-Allow a threefold claim on the **complete semantic position**, not FEN alone: ownership, types, reactions, current states, relevant capture counts, turn/bonus phase, rights, en passant, and remaining aura/removal time. Exclude log length, revision, absolute serial origin and the secret RNG cursor from the equivalence key; normalize timers to remaining time. Stable identities must remain distinguishable where rights or contacts refer to them.
+Allow a threefold claim on the **complete semantic position**, not FEN alone: ownership, types, reactions, current states, relevant capture counts, turn/bonus phase, castling and pawn double-step rights, en passant, and remaining aura/removal time. Exclude log length, revision, absolute serial origin and the secret RNG cursor from the equivalence key; normalize timers to remaining time. Stable identities must remain distinguishable where rights or contacts refer to them.
+
+Maintain the **repetition context** separately from that position key: occurrence counts or an equivalent validated history of completed-turn positions. The context does not become part of its own equivalence key. Count a new initial/prepared root exactly once. After each committed player turn settles and the next side to act is established, record the resulting key exactly once. An individual action, including a bonus action, has no separate repetition entry beyond the completed-turn boundary it may cause. A die reveal, animation, save, reload, replay presentation, draw claim or tutorial-to-practice handoff adds no occurrence. A complete imported game restores its saved context; a prepared position without prior history starts with one occurrence of its current stable root.
+
+The authoritative state/checkpoint and public AI payload must carry this context: identical boards can have different rights to claim a draw. Search extends a branch-local copy at simulated completed-turn boundaries and never increments the live counts. Exact transposition values must not be reused across incompatible repetition contexts; include the relevant context in the search-cache key or avoid that reuse. Undo restores the checkpoint's counts, and redo/replay reconstructs the selected branch once rather than appending a second copy of its occurrences.
 
 Expose a validated `ClaimRepetitionDraw` command and a conditional «Заявить ничью» control when the current completed-turn position has occurred at least three times. It is a decision available before the primary action, not during a bonus, and ends the game without ticking the clock. The AI can choose this draw action too. Recheck eligibility in the authoritative core.
 
@@ -198,13 +206,17 @@ The ordinary 50/75-move rules are disabled in v1 because the source does not def
 
 ## 10. Persistence, undo and randomness
 
-Versioned JSON is the authoritative format. Store all piece metadata, action phase, rights, deadlines, aura progress, resolved events, game revision and sufficient live RNG state or committed outcomes for replay. Standard FEN/PGN alone cannot represent this game. If notation is shown, call it Remorse move/event notation.
+Versioned JSON is the authoritative format. Store all piece metadata, action phase, rights, deadlines, aura progress, repetition context, resolved events, the capture root ledger/current history branch, game revision and sufficient live RNG state or committed outcomes for replay. Standard FEN/PGN alone cannot represent this game. If notation is shown, call it Remorse move/event notation. The static captured-piece rows and conventional `+N` balance are specified in `CAPTURED_PIECES_AND_MATERIAL.md`; they do not affect legality or the engine's strategic evaluation.
 
 A committed d6 outcome is uniformly selected from 1–6 by the session's game RNG. Search and animation have no access to the future game RNG. Seed real games from the platform's cryptographic randomness, use an explicit deterministic generator for reproducible state/replay if desired, and record outcomes. Avoid biased integer sampling.
 
-Undo restores a whole logical decision boundary and the checkpointed game PRNG state. Against AI, return to the previous human decision rather than stopping in a dangling AI bonus. A new game is seeded once; undo and branching do not reseed it. Preserve an existing redo branch and its rolls. Replaying the same semantic move from the same checkpoint has the same result, even after trying and undoing another branch or allocating a new command UUID. Do not expose an accidental “undo to reroll the same capture” loop. The normal game's undo lower bound after tutorial continuation is the handoff checkpoint; previous lesson resets remain read-only provenance.
+The following undo rules apply to **practice versus AI and local two-player sessions**. Rated games reject undo and difficulty changes at the session API, not merely in the UI; follow `RATING_AND_DIFFICULTY.md` for eligibility and result settlement. Reviewing a completed rated game cannot alter its result; an analysis continuation is a separate practice session.
 
-The tutorial has its own explicitly labeled roll provider. Leaving it destroys future scripted outcomes and keeps all already committed piece reactions. Imported sessions validate schema, ownership, king invariants, timers and phase consistency; invalid input must not crash or mutate the current game.
+Undo restores a whole logical decision boundary, the checkpointed game PRNG state, repetition context and active capture-history branch. Against AI in practice, return to the previous human decision rather than stopping in a dangling AI bonus. A new game is seeded once; undo and branching do not reseed it. Preserve an existing redo branch and its rolls. Replaying the same semantic move from the same checkpoint has the same result, even after trying and undoing another branch or allocating a new command UUID. Do not expose an accidental “undo to reroll the same capture” loop. The practice game's undo lower bound after tutorial continuation is the handoff checkpoint; previous lesson resets remain read-only provenance.
+
+The tutorial has its own explicitly labeled roll provider. Leaving it destroys future scripted outcomes and keeps all already committed piece reactions. Each new lesson position resets its capture ledger and repetition context; earlier lessons cannot contribute to the current position. Continuing the final position creates a practice root with only that position's actual capture ledger and repetition context, without counting the handoff as another occurrence. Previous normal/rated sessions remain separate. Tutorial continuations and file imports are always unrated under `RATING_AND_DIFFICULTY.md`, including after reload.
+
+Imported sessions validate schema, ownership, king and pawn invariants, movement rights, timers, repetition/history coherence and phase consistency; invalid input must not crash or mutate the current game. An externally supplied rating flag cannot grant rated eligibility.
 
 ## 11. Required rule fixtures
 
@@ -215,10 +227,11 @@ Use isolated legal positions and forced **test** outcome providers, plus a few i
 3. Guilt movement/no capture/no check; devastated immobility/no check/blocking; bishop pacifism and continuing aura while afflicted.
 4. Activation-turn exclusion, `+2` cure/shame, `+6` removal, bonus not ticking, interruption reset, no bishop stacking, no precharged cure.
 5. Friendly protection, immediate allied king cure, berserk immunity, self-heal exclusion, simultaneous rescue versus expiry.
-6. Shame sequence, conversion reset, pawn direction change, castling-right revocation and iteration-order independence of passive batches.
-7. Immediate bonus after first roll 6, optional End Turn, no third action, threshold on the third total capture and friendly target constraints.
+6. Shame sequence, conversion reset, pawn direction change, permanent double-step/castling-right revocation and iteration-order independence of passive batches.
+7. Immediate bonus after first roll 6, optional End Turn, no third action, bloodlust on the third total capture or a later first 6, and friendly target constraints.
 8. Per-action king safety, all-outcomes safety, passive discovered checks, compulsory safe bonus and mate only after a completed turn.
-9. Castling with guilty/devastated/bloodlust rooks, en-passant discovered check, mercy en passant, promotion inheritance and bishop reset.
-10. Full snapshot/replay roundtrip including bonus and timers; true semantic repetition versus equal board-only layout; no borrowed orthodox insufficient-material draw.
+9. Castling with guilty/devastated/bloodlust rooks, en-passant discovered check, mercy en passant, original versus converted pawn double steps, promotion inheritance, bishop reset and rejection of an unpromoted back-rank pawn fixture/import.
+10. Full snapshot/replay roundtrip including bonus, timers, capture ledger and repetition context; true semantic repetition versus equal board-only layout; identical positions with different claim rights; branch-local search counts; no borrowed orthodox insufficient-material draw.
+11. Practice undo/redo restores RNG, repetitions and the capture ledger; rated undo is rejected; reload and tutorial handoff add no spurious repetition; each tutorial fixture resets its context and only the final position's context crosses the practice handoff.
 
 Fixtures should explicitly encode their source clause or digital decision. Do not claim all cases passed until executable tests actually exist and run.

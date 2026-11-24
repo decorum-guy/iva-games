@@ -130,5 +130,25 @@ Replace its blue/orange material/vertex-color presentation with the agreed ivory
 | [React Three Fiber introduction](https://r3f.docs.pmnd.rs/getting-started/introduction) | React/R3F major compatibility and declarative Three rendering. Use current stable compatible versions. |
 | [Vite features](https://vite.dev/guide/features.html), [workers](https://vite.dev/guide/features.html#web-workers) | Worker bundling and separate TypeScript checking. |
 | [Three.js documentation](https://threejs.org/docs/) | Actual loader, material, lighting, geometry, raycasting and lifecycle APIs; use versions matching installed packages. |
+| [Chess.com captured-pieces help](https://support.chess.com/en/articles/8708638-how-can-i-see-the-captured-pieces-and-material-count) | The requested captured icons sit under usernames; only the side with more remaining material shows a positive number. Remorse-specific event handling is our explicit product decision. |
+| [Chess.com piece values](https://www.chess.com/terms/chess-piece-value) | Conventional P=1, N=3, B=3, R=5, Q=9 for the HUD material count; not a calibrated evaluation of Remorse states. |
+| [The US Chess Rating System — Mark Glickman and Thomas Doan](https://www.glicko.net/ratings/rating.system.pdf), 2026-04-06, printed pp. 10–11 | Primary support for logistic expected score and the Elo update principle. K=32, starting value 1000, floor 100, eligibility rules and provisional bot anchors are this project's choices; the full US Chess system is not implemented. |
 
 Track only **actually used** dependencies/assets in `THIRD_PARTY_NOTICES.md`. Do not label every internet asset “free” without its license or claim an unused engine is integrated. Documentation and libraries can change; verify package compatibility during implementation and preserve the lockfile that was actually tested.
+
+## 6. Supplementary frontend-design guidance
+
+The owner asked whether a design skill would help. Our recommendation is to apply the official [Anthropic frontend-design skill](https://github.com/anthropics/skills/tree/main/skills/frontend-design) as a focused supplement to the established Remorse brief. This is a judgment about fit, not measured evidence that a skill guarantees visual quality.
+
+The full text and neighboring Apache-2.0 license were retrieved and inspected. A byte-preserving reference copy is stored as `docs/reference/frontend-design/GUIDE.md`, with the original `LICENSE.txt` beside it. Only the filename changes from upstream `SKILL.md`; its contents are unmodified. Source revision, the latest commit affecting that directory at retrieval:
+
+```text
+41bbe19d1a1a7eaab5e7bb9050a417e5c6cffc8f
+```
+
+- [Pinned source text](https://github.com/anthropics/skills/blob/41bbe19d1a1a7eaab5e7bb9050a417e5c6cffc8f/skills/frontend-design/SKILL.md).
+- [Pinned license](https://github.com/anthropics/skills/blob/41bbe19d1a1a7eaab5e7bb9050a417e5c6cffc8f/skills/frontend-design/LICENSE.txt).
+
+The inspected skill directory contains the guidance and license, with no executable installer. The build prompt explicitly directs Codex to read the reference. This preparation does **not** install a personal/global skill, plugin or MCP on the owner's Mac, and no such installation is needed to read its instructions for this run. Preserve the source/license attribution when distributing the copied reference.
+
+[OpenAI's current skill documentation](https://learn.chatgpt.com/docs/build-skills) describes skills as instructions with optional resources, explicit or implicit activation, and project discovery in `.agents/skills`. A formal reusable installation can use that supported project scope later; it is unnecessary for the already explicit reference workflow. The guide's generic client narrative is not evidence about this owner. Project requirements control any conflicting style recommendation or request for client input.
