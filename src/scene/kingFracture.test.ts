@@ -52,17 +52,19 @@ it.each(['white', 'black'])('cuts closed complementary chips from the shipped %s
   const source = shippedKing(side), { body, chips } = kingFracture(source)
   const original = meshStats(source), remnant = meshStats(body)
   const parts = chips.map(chip => meshStats(chip.geometry))
-  expect(parts).toHaveLength(10)
+  expect(parts).toHaveLength(11)
   expect(parts.every(part => part.volume > .0001)).toBe(true)
-  expect(remnant.volume).toBeLessThan(original.volume * .98)
+  expect(remnant.volume).toBeLessThan(original.volume * .6)
   expect(remnant.volume + parts.reduce((sum, p) => sum + p.volume, 0)).toBeCloseTo(original.volume, 5)
   expect(remnant.open).toBe(original.open)
   expect(parts.every(part => part.open === 0)).toBe(true)
 })
 
-it.each(['white', 'black'])('preserves the %s king’s two support contacts in four fall directions', side => {
+it.each(['white', 'black'])('preserves the %s king’s two support contacts and loses at least 40% in every fall direction', side => {
   const source = shippedKing(side)
-  for (const bearing of [0, Math.PI / 4, Math.PI, 7 * Math.PI / 4]) {
+  const original = meshStats(source)
+  for (let direction = 0; direction < 32; direction++) {
+    const bearing = direction * Math.PI / 16
     const fall = { dx: Math.cos(bearing), dz: Math.sin(bearing), angle: 1.694 }
     const { body, chips } = kingFracture(source, fall)
     const contacts = (geometry: BufferGeometry) => {
@@ -78,7 +80,11 @@ it.each(['white', 'black'])('preserves the %s king’s two support contacts in f
     const old = contacts(source), chipped = contacts(body)
     expect(chipped[0]).toBeCloseTo(old[0], 5)
     expect(chipped[1]).toBeCloseTo(old[1], 5)
-    expect(meshStats(body).open).toBe(0)
-    expect(chips.every(({ geometry }) => meshStats(geometry).open === 0)).toBe(true)
+    const remnant = meshStats(body)
+    expect(remnant.volume).toBeLessThanOrEqual(original.volume * .6)
+    expect(remnant.open).toBe(0)
+    const parts = chips.map(({ geometry }) => meshStats(geometry))
+    expect(parts.every(part => part.open === 0)).toBe(true)
+    expect(remnant.volume + parts.reduce((sum, part) => sum + part.volume, 0)).toBeCloseTo(original.volume, 5)
   }
 })

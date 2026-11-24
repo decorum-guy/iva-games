@@ -4,7 +4,7 @@ import {
 
 type Vertex = { p: Vector3; n: Vector3; uv: Vector2; uv1: Vector2 }
 type Face = { vertices: Vertex[]; interior: boolean }
-type Cut = { axis: Vector3; offset: number; bottom: number; top: number; notch?: { height: number; slope: number; above?: number } }
+type Cut = { axis: Vector3; offset: number; bottom: number; top: number; planar?: boolean; notch?: { height: number; slope: number; above?: number } }
 
 function cut(x: number, y: number, z: number, offset: number, bottom = -1, top = 2): Cut {
   const axis = new Vector3(x, y, z)
@@ -15,12 +15,13 @@ function cut(x: number, y: number, z: number, offset: number, bottom = -1, top =
 // plane intersects only the ornament it breaks, even when the foot is wider.
 const cuts = [
   cut(1.05, 1, .34, 1.552, 1.40),
-  cut(-.78, .23, .63, .412, 1.122, 1.400),
-  cut(.89, .11, -.46, .265, 1.122, 1.400),
+  { ...cut(-.78, 0, .63, .083, 1.122, 1.400), notch: { height: 1.319, slope: .56 } },
+  { ...cut(.89, 0, -.46, .082, 1.122, 1.400), notch: { height: 1.310, slope: .50 } },
   cut(.47, .025, .88, .161, .84, 1.143),
   cut(-.78, .05, -.63, .184, .84, 1.143),
-  cut(.74, -.09, .67, .244, -1, .53),
-  cut(-.46, .08, -.89, .260, -1, .53),
+  cut(.74, -.32, .67, .035, -1, .53),
+  cut(-.74, -.29, -.67, .046, -1, .53),
+  { ...cut(-.82, -.27, .57, .135, -1, .53), planar: true },
   { ...cut(.75, 0, .66, .026), notch: { height: .724, slope: .76 } },
   { ...cut(-.48, 0, -.88, .032), notch: { height: .596, slope: .92 } },
   { ...cut(-.90, 0, .43, .033), notch: { height: .888, slope: 1.04, above: 3.4 } },
@@ -119,9 +120,9 @@ function closeCut(segments: Vector3[][], axis: Vector3, stone: Face[], chip: Fac
   }
 }
 
-function cutDistance({ axis, offset, notch }: Cut, p: Vector3) {
+function cutDistance({ axis, offset, notch, planar }: Cut, p: Vector3) {
   const lateral = p.x * axis.z - p.z * axis.x
-  const splinter = .010 * Math.sin(47 * p.y + 28 * lateral) + .006 * Math.sin(74 * lateral - 33 * p.y)
+  const splinter = planar ? 0 : .010 * Math.sin(47 * p.y + 28 * lateral) + .006 * Math.sin(74 * lateral - 33 * p.y)
   return axis.dot(p) - offset + splinter - (notch ? (p.y > notch.height ? notch.above ?? notch.slope : notch.slope) * Math.abs(p.y - notch.height) : 0)
 }
 

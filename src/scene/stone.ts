@@ -36,6 +36,7 @@ uniform float uSeed;
 uniform vec3 uTincture;
 uniform vec3 uSweepTint;
 uniform vec4 uRoyal;
+uniform float uBroken;
 uniform vec4 uBirth;
 
 float grain(vec3 p) {
@@ -91,11 +92,12 @@ export function stoneMaterial(source: MeshStandardMaterial, side: Side, seed: nu
     uTincture: { value: new Color(stateColors.neutral) },
     uSweepTint: { value: new Color('#b4dbca') },
     // Resting threat, live strength, travel up the model, and the discharge.
+    uBroken: { value: 0 },
     uRoyal: { value: { x: 0, y: 0, z: 0, w: 0 } },
     uBirth: { value: { x: 0, y: 0, z: 0, w: 0 } },
   }
 
-  material.customProgramCacheKey = () => 'remorse-marble-6'
+  material.customProgramCacheKey = () => 'remorse-marble-7'
   material.onBeforeCompile = shader => {
     Object.assign(shader.uniforms, values)
     shader.vertexShader = shader.vertexShader
@@ -123,6 +125,22 @@ export function stoneMaterial(source: MeshStandardMaterial, side: Side, seed: nu
         float wearMap = 0.0;
         float fault = 0.0;
         vec3 royalGlow = vec3(0.0);
+        float chippedSeam = 0.0;
+        if (uBroken > .5) {
+          // Branches meet the open fractures and remain as dry mineral edges after discharge.
+          float azimuth = atan(pStone.z, pStone.x);
+          float radius = max(.075, length(pStone.xz));
+          float drift = 2.2 * pStone.y + .27 * sin(18.0 * pStone.y) + .10 * sin(47.0 * pStone.y);
+          float trunk = abs(sin(2.0 * azimuth + drift)) * radius * .5;
+          float branchPhase = 3.0 * azimuth - 7.4 * pStone.y + .32 * sin(24.0 * pStone.y);
+          float branch = abs(sin(branchPhase)) * radius / 3.0;
+          float split = min(trunk, branch + .025 * smoothstep(.35, .94, cos(9.1 * pStone.y + azimuth)));
+          float aa = clamp(fwidth(split) * .70, .001, .008);
+          chippedSeam = 1.0 - smoothstep(.0025, .0055 + aa, split);
+          float chippedLip = (1.0 - smoothstep(.006, .011 + aa, split)) - chippedSeam;
+          diffuseColor.rgb = mix(diffuseColor.rgb, vec3(.32, .26, .21), chippedLip * .76);
+          diffuseColor.rgb = mix(diffuseColor.rgb, vec3(.015, .011, .010), chippedSeam * .90);
+        }
         if (uWear > 0.001) {
           // Broad dark fissures frame a narrower colored inlay. The old hairline
           // treatment vanished when an entire figure occupied only a few pixels.
@@ -160,7 +178,7 @@ export function stoneMaterial(source: MeshStandardMaterial, side: Side, seed: nu
           diffuseColor.rgb = mix(diffuseColor.rgb, vec3(.21, .018, .031), recess * min(.39, power * .30));
           vec3 mineral = mix(vec3(.83, .049, .023), vec3(1.49, .61, .132),
             clamp(.12 + .50 * crown + .32 * pulse + .33 * uRoyal.w, 0.0, 1.0));
-          royalGlow = mineral * thread * power * facets;
+          royalGlow = mineral * thread * power * facets * (1.0 - .84 * chippedSeam);
         }
       `)
       .replace('#include <roughnessmap_fragment>', /* glsl */ `

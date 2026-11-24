@@ -492,6 +492,7 @@ export function VisualPiece({ piece, assets, events, flipped, low, reduced, focu
         const fraction = royal?.kind === 'mate' ? sampleMateFall(royal, elapsed) : 1
         const age = royal?.kind === 'mate' ? (elapsed - royalTiming(royal).impact) / 1000 : Infinity
         if (fracture && fractureMaterials) {
+          values.uBroken.value = Number(age >= 0)
           mesh.current.geometry = age >= 0 ? fracture.body : asset.geometry
           mesh.current.material = age >= 0 ? fractureMaterials : material
           for (const [i, shard] of fracture.chips.entries()) {
@@ -519,6 +520,7 @@ export function VisualPiece({ piece, assets, events, flipped, low, reduced, focu
         shadow.current.scale.set(1 + 1.26 * fraction, 1 - .17 * fraction, 1)
         wasFallen.current = true
       } else if (wasFallen.current) {
+        values.uBroken.value = 0
         mesh.current.geometry = asset.geometry
         mesh.current.material = material
         mesh.current.quaternion.identity()
