@@ -108,7 +108,7 @@ Durations below are **design targets**. Tune for clarity and responsiveness, not
 | Self-removal | Quiet dissolution and an empty square; distinguish it from an enemy capture in the event log. |
 | Promotion | Smooth transformation/reveal after a legible chooser; the chosen kind is shown before a capture roll is revealed. |
 | Castling | King and rook animate coherently from one game command. |
-| Check / game over | Clear king highlight and compact result presentation; no large effect obscuring the cause. |
+| Check / checkmate | A short surface impulse for check and a complete scene for mate, with a readable king, directed fragments, sound, and return to the board. [Staging brief](../prompts/IMPLEMENT_CHECK_AND_MATE.md) |
 
 All animation is an event-driven presentation of committed rules results. Rapid repeated taps, resize, board flip, tab suspension, new game and undo must not duplicate a move or resolve a die again. New game/undo cancels or snaps obsolete visuals safely. A tutorial can wait for a presentation event to finish explaining, but the core never waits for frame timing to determine a rule result.
 
