@@ -30,8 +30,8 @@ export const showcaseSources = {
 export const QUEEN_SOUND_LEVEL = .90
 
 const royalContactWindows = {
-  royalCheck: [.70, .57], royalBreak: [1.32, 1.32], royalGround: [.92, .92],
-} as const satisfies Readonly<Record<RoyalContactSound, readonly [number, number]>>
+  royalCheck: [.70, .57], royalGround: [.92, .92],
+} as const
 
 export function reactionSoundLevel(kind: CueKind, figure?: PieceType) {
   if (kind === 'devastated' || kind === 'guilt' && figure === 'rook') return .80
@@ -103,7 +103,13 @@ export function replaceShowcaseCues(cues: readonly SceneCue[], buffers: Readonly
         fadeIn: .009, fadeOut: Math.min(.12, duration * .40) })
       continue
     }
-    if ((sound === 'royalCheck' || sound === 'royalBreak' || sound === 'royalGround') && buffer) {
+    if (sound === 'royalBreak' && buffer) {
+      // The recording already contains the room decay.
+      clips.push({ buffer, at: cue.at, offset: 0, duration: buffer.duration,
+        gain: reduced ? .73 : 1, fadeIn: .003, fadeOut: 0 })
+      continue
+    }
+    if ((sound === 'royalCheck' || sound === 'royalGround') && buffer) {
       const [ordinary, compact] = royalContactWindows[sound]
       const length = reduced ? compact : ordinary
       clips.push({ buffer, at: cue.at, offset: 0, duration: Math.min(buffer.duration, length),

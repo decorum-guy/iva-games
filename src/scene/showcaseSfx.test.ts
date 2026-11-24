@@ -64,7 +64,10 @@ describe('selected showcase playback', () => {
     expect(sampleRoyal(mate, contact + 25).discharge).toBeGreaterThan(0)
     expect(clips).toMatchObject([
       { buffer: buffers.get('royalGround'), at: contact / 1000, offset: 0, duration: .92 },
-      { buffer: buffers.get('royalBreak'), at: contact / 1000 + .018, offset: 0, duration: 1.32 },
+      {
+        buffer: buffers.get('royalBreak'), at: contact / 1000 + .018, offset: 0,
+        duration: buffers.get('royalBreak')!.duration, fadeOut: 0, gain: reduced ? .73 : 1,
+      },
     ])
     expect(clips[0].at + clips[0].duration).toBeLessThan(clips[1].at + clips[1].duration)
   })

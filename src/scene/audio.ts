@@ -491,10 +491,13 @@ function playRecorded(g: AudioGraph, clip: RecordedClip, when: number) {
   const release = Math.min(clip.fadeOut, duration * .8)
   const attack = Math.min(clip.fadeIn, duration - release)
   const gain = connectVoice(g, source, 0).gain
+  const level = release > 0 ? clip.gain * Math.min(1, duration / clip.fadeOut) : clip.gain
   gain.setValueAtTime(0, start)
-  gain.linearRampToValueAtTime(clip.gain * Math.min(1, duration / clip.fadeOut), start + attack)
-  gain.setValueAtTime(clip.gain * Math.min(1, duration / clip.fadeOut), start + duration - release)
-  gain.linearRampToValueAtTime(0, start + duration)
+  gain.linearRampToValueAtTime(level, start + attack)
+  if (release > 0) {
+    gain.setValueAtTime(level, start + duration - release)
+    gain.linearRampToValueAtTime(0, start + duration)
+  }
   source.start(start, clip.offset + elapsed, duration)
 }
 
