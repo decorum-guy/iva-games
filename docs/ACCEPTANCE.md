@@ -1,6 +1,6 @@
 # Acceptance — a finished playable game
 
-Use these requirements to review each game revision. The [current report](VALIDATION_PLAYABILITY.md) records the playability revision and [the first delivery](VALIDATION.md) records the earlier run.
+Use these requirements to review each game revision. The [Mac tutorial report](VALIDATION_TUTORIAL.md) records the current revision. See [the prior playability review](VALIDATION_PLAYABILITY.md) and [the first delivery](VALIDATION.md) for earlier runs.
 
 ## Completion gates
 
