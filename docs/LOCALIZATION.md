@@ -14,7 +14,7 @@ Every player-facing string must have a finished Russian and English version:
 | Game HUD | Player/side labels, turn and bonus-action status, selection, legal/illegal-action explanations, promotion choices, draw/resignation controls and dialogs. |
 | Captured pieces and material | Row/group labels, accessible piece names, `+N` explanation, empty/custom-root descriptions and friendly-loss explanations. |
 | Rating and results | Current/best rating, W/D/L labels, rating changes, provisional-scale explanation, eligibility restrictions, technical aborts and local-storage limitations. |
-| Tutorial | All nine lesson titles, every step and substep, coachmarks, action feedback, progress, fixed-die labels, restart/exit/resume and both final choices. |
+| Tutorial | All nine lesson titles, every step and substep, coachmarks, action feedback, progress, die results, restart/exit/resume and both final choices. Do not add preset-dice notices. |
 | Rules and glossary | All source mechanics and the explicit digital decisions exposed in player help, full-cycle timing, precedence, piece exceptions and ordinary-chess help. |
 | Event history and die | Captures, reactions, cures, shame, conversion, removal, promotion, bonus/end-turn events and all die outcomes, including previously recorded events. |
 | System and accessibility | Loading/empty states, asset/worker/WebGL/storage/import errors, recovery actions, tooltips, aria labels, keyboard help, focus/status announcements and fallback explanations. |
@@ -33,7 +33,7 @@ Use one glossary in HUD badges, rules, tutorial, history and accessibility strin
 | Devastation / devastated | Опустошение | Devastated |
 | Berserk | Ярость | Berserk |
 | Bloodlust | Жажда крови | Bloodlust |
-| Absolution | Отпущение вины | Absolution |
+| Absolution / healing | Исцеление | Healing |
 | Shame | Стыд | Shame |
 | Conversion | Обращение | Conversion |
 | Rally the Troops | Сбор войск | Rally the Troops |
@@ -41,8 +41,13 @@ Use one glossary in HUD badges, rules, tutorial, history and accessibility strin
 | Self-removal | Исчезновение | Self-removal |
 | Promotion | Превращение | Promotion |
 | Unaffected capture reaction | Без изменений | Unaffected |
+| Remembered capture reaction | Запомненная реакция | Remembered reaction |
+| Bonus action | Дополнительное действие | Bonus action |
+| Whole player turn | Ход игрока | Player turn |
 
-Explain «Обращение / Conversion» as a change of army and «Превращение / Promotion» as a change of pawn type; never use these interchangeably. Explain «Отпущение вины / Absolution» in plain words as the bishop clearing guilt or devastation. An unaffected **remembered reaction** is distinct from a figure's current neutral state. Preserve that distinction in both languages.
+Explain «Обращение / Conversion» as a change of army and «Превращение / Promotion» as a change of pawn type; never use these interchangeably. Use «Исцеление / Healing» for clearing either guilt or devastation; the source term “Absolution” may remain in original documents and stable event IDs. An unaffected **remembered reaction** is distinct from a figure's current neutral state. Preserve that distinction in both languages. Two actions in berserk are one player turn; do not label the bonus as a second turn in timing explanations.
+
+Selected-piece deadlines report the exact remaining completed player turns, including a singular remainder of one. A rounded three/two/one cycle badge is only a compact visual countdown; do not repeat that rounded value as an exact number of full cycles in the inspector. Read every instructional screen as a whole: title, explanation, rule and button must agree about what has happened and what happens next.
 
 Use a separate message for complete sentences when Russian grammatical gender/case makes assembly awkward. For example, a history presenter can use a neutral construction such as «Взятие: …» rather than concatenating fragments with the wrong agreement. Do not build English sentences by replacing isolated Russian words.
 

@@ -105,18 +105,22 @@ Use an injected **`TutorialRollProvider`**, separate from the ordinary provider.
 - Selecting a counter in an `inspect` step does not immediately launch the next scripted turn. Show the count, allow a camera close-up, and advance only after «Понятно» / “Got it”. The controller IDs and old checkpoints remain compatible.
 - Use authored focus targets for the current event/inspection; never zoom to an empty/removed figure or scan old events after an exercise. Start focus at the die's settled reveal, together with the material state and required result text. Keep the surface emphasis strong through camera arrival, then show the counter and return to the board before the next action. Input and scripts wait for that return, including transitions to a new prepared position.
 - Fit the board and essential instructions in one dynamic viewport on laptops and phones. Only deliberately opened secondary details may scroll internally.
+- Name a change to a prepared position in the existing instruction so that a reset cannot be mistaken for a consequence of the previous move. Keep coordinates in the action cue instead of repeating them in every sentence. Buttons describe their actual transition, not a move that the player will still have to make afterwards.
+- Teach the general condition of berserk (a capture as the first action earns one more action), freedom to choose another piece at the start of a bloodlust turn, and the king's immunity and continuous protection. Preserve the distinction between the current affliction, remembered reaction and count of actual captures. Review RU and EN for natural phrasing and precise meaning together.
 
 ### Required result checkpoints
 
 `Step.after` supplies authored bilingual `TeachingBeat` observations attached to completed actions. `pendingTeaching` is saved independently of the underlying next step. While a beat is pending, no next instruction, script or board exercise is available. Acknowledgement changes learning progress only; it cannot roll, settle a turn or modify the authoritative game. Correct requested illegal attempts also use a held, constructive rule explanation without replaying the previous action.
 
-Preserve old step IDs, order and fixtures. Version-1 saves without the optional field resume their existing index without retroactively injecting old observations. Validate new pending references against the completed source step and committed action. The last beat may directly advance an otherwise empty position boundary in one Cabinet persistence operation. A failed save retains the old position and explanation. See [the current review](TUTORIAL_CLARITY_REVIEW.md) and [Mac completion brief](../prompts/FINISH_TUTORIAL.md).
+Preserve old step IDs, order and fixtures. Version-1 saves without the optional field resume their existing index without retroactively injecting old observations. Validate new pending references against the completed source step and committed action. A last beat or final read acknowledgement advances an otherwise empty position boundary in one Cabinet persistence operation; do not add a second generic success page. Preserve existing saved position-complete checkpoints. A failed save retains the old position and explanation. See [the current editorial audit](TUTORIAL_EDITORIAL_AUDIT.md) and [Mac activation brief](../prompts/ACTIVATE_EDITORIAL_BUILD.md).
 
 No hidden production setting such as `forceNextRoll` may survive lesson completion. Save tutorial state as tutorial state; an imported normal save must not accidentally reactivate a script. Reject or explicitly route tutorial-save imports to the tutorial controller.
 
 Use objective/event predicates rather than arbitrary delays: e.g. a cure event for a particular piece, a completed-turn serial, a selected promotion, or a validated illegal-attempt explanation. Presentation completion may coordinate the next explanation but cannot create a rule outcome. Reduced motion must still emit the completion signal. Restart/exit cancels all obsolete scheduled commands and presentation waits.
 
 ## Finish and continue
+
+The final independent exercise explicitly asks for a move without a capture. This is a stated exercise constraint, not a claim that ordinary play forbids captures. After the scripted reply, describe the consequence of the chosen move from the actual stable knight identity and current timers: whether healing has started, when it will finish if contact continues, or when the unassisted knight will disappear. Do not use the same success message for every choice or mark a deliberate sacrifice as a rules error. This explanation uses the existing final read step and adds no new checkpoint.
 
 The final tutorial checkpoint must be legal, nonterminal, at a completed-turn boundary, with at least one legal action and no pending roll, promotion or bonus.
 
@@ -151,5 +155,6 @@ Required checks:
 12. Entering/exiting learning preserves a suspended rated session and its locked controls. Practice continuation cannot award Elo or re-enable undo/difficulty changes in that separate rated session.
 13. Complete every lesson and both finish paths in ru and en through the real UI. Every coachmark, rule explanation, control, error and accessible label has authored text in both catalogs; no missing keys or mixed-language fallbacks appear.
 14. Switch ru → en → ru during a directed move, a revealed die, a pending promotion/bonus where the lesson permits it, and the finish screen. Targets, game state and progress remain unchanged; no duplicate event, roll, repetition or completion occurs. Refresh resumes the selected language and current step, and English/Russian coachmarks fit both phone widths.
+15. Verify the final exercise both with timely bishop assistance and with another allowed move. The explanation agrees with the resulting position and deadlines in each case. In ordinary continuation, selecting the knight immediately exposes its state and exact active deadlines without opening the history panel.
 
 Keep test shortcuts/fixture loading in a development-only route or harness; normal sessions cannot silently enable predetermined dice.

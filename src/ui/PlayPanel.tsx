@@ -1,6 +1,6 @@
 import { Component, useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
-import { CYCLE, cyclesRemaining } from '../core';
+import { cyclesRemaining } from '../core';
 import type { Command, GameEvent, GameState, Piece } from '../core';
 import { countText, numberText } from '../i18n/catalog';
 import type { Locale, Translate } from '../i18n/catalog';
@@ -16,6 +16,8 @@ import { eloChange } from './Dialogs';
 import { Icon } from './icons';
 import { PieceIcon, StateMark } from './pieces';
 import { describeEvent } from './projections';
+import { effectTiming } from './effectTiming';
+import { tutorialChoiceFeedback } from './tutorialFeedback';
 
 type DieRenderer = typeof import('../scene/DieThrow').default;
 let preparedDie: DieRenderer | undefined;
@@ -37,24 +39,24 @@ export function PanelNotice({ children, onClose, label }: { children: ReactNode;
   </div>;
 }
 
-export function Inspector({ t, locale, piece, state }: { t: Translate; locale: Locale; piece: Piece | undefined; state: GameState }) {
+export function Inspector({ t, locale, piece, state, compact = false }: {
+  t: Translate; locale: Locale; piece: Piece | undefined; state: GameState; compact?: boolean;
+}) {
   if (!piece) return <div className="inspector idle-inspector">{t('game.inspect')}</div>;
-  const duration = cyclesRemaining(piece, state);
-  const cure = piece.cureArmedAt === null ? null : Math.max(0, Math.ceil((piece.cureArmedAt + CYCLE - state.turnSerial) / CYCLE));
-  const shame = piece.shameArmedAt === null ? null : Math.max(0, Math.ceil((piece.shameArmedAt + CYCLE - state.turnSerial) / CYCLE));
-  return <div className="inspector" data-testid="inspector" data-selected={piece.square} data-state={piece.affliction}>
+  const { removal, cure, shame } = effectTiming(piece, state);
+  return <div className={`inspector ${compact ? 'compact-inspector' : ''}`} data-testid="inspector"
+    data-selected={piece.square} data-state={piece.affliction} data-compact={compact}>
     <div className="inspector-heading">
       <PieceIcon type={piece.type} side={piece.side} />
       <div><h3>{t('game.pieceSquare', { piece: t(`piece.${piece.type}`), square: piece.square })}</h3>
         <span className={`affliction-label ${piece.affliction}`}><StateMark state={piece.affliction} />{t(`state.${piece.affliction}`)}</span></div>
     </div>
     <div className="inspector-timers">
-      {duration !== null && <span>{t('game.removalDue', { count: countText(locale, 'cycle', duration) })}
-        {piece.devastationDue !== null && <> ({countText(locale, 'turn', piece.devastationDue - state.turnSerial)})</>}</span>}
-      {cure !== null && <span>{t('game.cureDue', { count: countText(locale, 'cycle', cure) })}</span>}
-      {shame !== null && <span>{t('game.shameDue', { count: countText(locale, 'cycle', shame) })}</span>}
+      {removal !== null && <span>{t('game.removalDue', { count: countText(locale, 'turn', removal) })}</span>}
+      {cure !== null && <span>{t('game.cureDue', { count: countText(locale, 'turn', cure) })}</span>}
+      {shame !== null && <span>{t('game.shameDue', { count: countText(locale, 'turn', shame) })}</span>}
     </div>
-    <details className="piece-details">
+    {!compact && <details className="piece-details">
       <summary>{t('game.selected')}</summary>
       <p>{t(`state.${piece.affliction}Detail`)}</p>
       {piece.type === 'bishop' && <p>{t('state.bishopDetail')}</p>}
@@ -63,7 +65,7 @@ export function Inspector({ t, locale, piece, state }: { t: Translate; locale: L
         <div><dt>{t('game.reaction')}</dt><dd>{t(`state.${piece.captureReaction}`)}</dd></div>
         <div><dt>{t('game.captures')}</dt><dd>{numberText(locale, piece.capturesSinceRebirth)}</dd></div>
       </dl>
-    </details>
+    </details>}
   </div>;
 }
 
@@ -132,9 +134,13 @@ export function LessonPanel({ t, locale, learning, guide, blocked, rolling = fal
   const moves = guide.filter(cmd => cmd.type === 'move');
   const forced = moves[0] && moves.every(move => move.from === moves[0].from && move.to === moves[0].to);
   const read = step?.kind === 'read';
+  const feedback = tutorialChoiceFeedback(learning, locale);
   const inspectedPiece = step?.kind === 'inspect' ? learning.session.state.pieces.find(piece => piece.square === step.square) : undefined;
   const remaining = inspectedPiece ? cyclesRemaining(inspectedPiece, learning.session.state) : null;
   const nextPosition = learning.position + 1 < lesson.positions.length;
+  const finalRead = read && learning.index === lesson.positions[learning.position].steps.length - 1;
+  const readAction = finalRead ? nextPosition ? 'tutorial.newPosition'
+    : learning.lesson === LESSONS.length - 1 ? 'tutorial.finishAction' : 'tutorial.nextLesson' : 'tutorial.readAction';
   const actionTitle = !step ? 'tutorial.positionDone' : step.kind === 'read' ? 'tutorial.readCue' :
     step.kind === 'inspect' ? 'tutorial.selectCue' : step.kind === 'script' ? 'game.script' :
       step.kind === 'illegal' ? 'tutorial.illegalCue' : 'tutorial.moveCue';
@@ -149,11 +155,13 @@ export function LessonPanel({ t, locale, learning, guide, blocked, rolling = fal
     </div>
     <h2>{complete ? t('tutorial.finish') : resultVisible ? beat!.title[locale] : lesson.title[locale]}</h2>
     {!complete && !resultVisible && <div className="lesson-action-label" role="status"><Icon name={read || inspected || !step ? 'check' : step.kind === 'inspect' ? 'info' : 'arrow'} />{t(rolling ? 'die.watch' : inspected ? 'tutorial.readCue' : actionTitle)}</div>}
-    <p className="lesson-instruction" data-testid={resultVisible ? 'teaching-cause' : inspected ? 'counter-read' : undefined} role={resultVisible ? 'status' : undefined}>{rolling ? t('die.rolling')
+    <p className="lesson-instruction" data-testid={resultVisible ? 'teaching-cause' : inspected ? 'counter-read' : feedback ? 'choice-feedback' : undefined}
+      data-feedback={feedback?.kind} role={resultVisible ? 'status' : undefined}>{rolling ? t('die.rolling')
       : resultVisible ? beat!.text[locale]
       : inspected && remaining !== null ? t('tutorial.counterRead', { count: countText(locale, 'cycle', remaining) })
-        : complete ? t('tutorial.finishDetail') : step?.text[locale] ?? t('tutorial.positionDoneDetail')}</p>
+        : complete ? t('tutorial.finishDetail') : feedback?.text ?? step?.text[locale] ?? t('tutorial.positionDoneDetail')}</p>
     {resultVisible && beat?.rule && <p className="lesson-rule" data-testid="teaching-rule">{beat.rule[locale]}</p>}
+    {feedback?.rule && <p className="lesson-rule" data-testid="choice-rule">{feedback.rule}</p>}
     {resultVisible && beat?.diceLegend && <div className="lesson-dice-legend" data-testid="dice-legend" role="group" aria-label={t('tutorial.diceLegend')}>
       {([
         { faces: '1', state: 'devastated', active: face === 1 },
@@ -177,7 +185,7 @@ export function LessonPanel({ t, locale, learning, guide, blocked, rolling = fal
     </div> : <>
       {(beat || !step || step.kind === 'read' || inspected) && <button type="button" className={`button primary ${rolling ? 'awaiting-roll' : ''}`} onClick={onAdvance}
         disabled={blocked} data-testid="lesson-next">{beat ? beat.action?.[locale] ?? t('tutorial.readAction')
-          : t(!step ? nextPosition ? 'tutorial.newPosition' : 'tutorial.nextLesson' : 'tutorial.readAction')}<Icon name="arrow" /></button>}
+          : t(!step ? nextPosition ? 'tutorial.newPosition' : 'tutorial.nextLesson' : readAction)}<Icon name="arrow" /></button>}
       <div className="lesson-tools">
         {step && <button type="button" className="text-button" onClick={onRepeat}>{t(step.detail ? 'tutorial.why' : 'tutorial.repeat')}</button>}
         <button type="button" className="text-button" onClick={onRestart} data-testid="lesson-restart">{t('tutorial.restart')}</button>

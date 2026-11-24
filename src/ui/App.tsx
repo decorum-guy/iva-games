@@ -409,8 +409,10 @@ export function App() {
             onHandoff={() => void cabinet.handoff()} onNew={() => openSetup()}
             onRepeat={() => setModal({ kind: 'repeat' })} onRestart={() => setModal({ kind: 'restart' })}
             onRestartAll={() => setModal({ kind: 'restart-all' })} />}
+          {!lesson && !rollPending && (selected || mobileDetails) && <Inspector t={t} locale={settings.locale}
+            piece={selected} state={position} compact={!mobileDetails} />}
           <div className={`secondary-panel ${mobileDetails && !rollPending ? '' : 'collapsed'}`}>
-            <Inspector t={t} locale={settings.locale} piece={selected} state={position} />
+            {lesson && <Inspector t={t} locale={settings.locale} piece={selected} state={position} />}
             <History t={t} session={session} latest={latest} review={reviewing}
               onReview={cursor => setReview(cursor === null ? null : { key: snap.motionKey, cursor })} />
           </div>

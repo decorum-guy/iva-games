@@ -6,7 +6,7 @@ import { translator } from '../../src/i18n/catalog'
 import type { MatchRecord } from '../../src/session/match'
 import { nextDie } from '../../src/session/random'
 import { restoreMatch } from '../../src/session/save'
-import { learnerAction, restoreLearning, saveLearning, scriptAction, startLesson } from '../../src/tutorial/controller'
+import { advanceLesson, learnerAction, restoreLearning, saveLearning, scriptAction, startLesson } from '../../src/tutorial/controller'
 import type { Learning } from '../../src/tutorial/controller'
 import { move } from '../../src/tutorial/lessonTypes'
 import type { Step } from '../../src/tutorial/lessonTypes'
@@ -272,6 +272,11 @@ for (const locale of ['ru', 'en'] as const) {
       const before = await boardIdentity(page)
 
       for (const phase of ['read', 'position-complete']) {
+        // New acknowledgements skip the empty completion page. Existing v1
+        // saves can still resume on that page and must advance exactly once.
+        if (phase === 'position-complete') {
+          await restoreTutorialCheckpoint(page, advanceLesson(restoreLearning(saved)))
+        }
         await expect(tutorial(page)).toHaveAttribute('data-kind', phase)
         // A core-legal king move must not be advertised as actionable while the
         // lesson asks for Continue. Clicking it cannot produce tutorialChoice.
@@ -283,6 +288,7 @@ for (const locale of ['ru', 'en'] as const) {
         await expect(page.getByTestId('lesson-next')).toBeInViewport()
         await expect(page.getByTestId('lesson-next')).toBeEnabled()
         await activate(page.getByTestId('lesson-next'), mobile)
+        await expect(tutorial(page)).toHaveAttribute('data-step', 'start-two-cures')
       }
 
       await expect(tutorial(page)).toHaveAttribute('data-step', 'start-two-cures')
@@ -348,7 +354,13 @@ for (const locale of ['ru', 'en'] as const) {
               continue
             }
             await expect(tutorial(page)).toHaveAttribute('data-step', step.id)
-            await expect(tutorial(page).getByText(step.text[locale], { exact: true })).toBeVisible()
+            if (step.id === 'practice-ready') {
+              await expect(page.getByTestId('choice-feedback')).toHaveAttribute('data-feedback', 'unassisted')
+              await expect(page.getByTestId('choice-feedback')).toContainText(locale === 'ru'
+                ? 'после хода белых и ответа чёрных' : 'after White’s turn and Black’s reply')
+            } else {
+              await expect(tutorial(page).getByText(step.text[locale], { exact: true })).toBeVisible()
+            }
             await interactable(page)
             const offersEndTurn = step.kind === 'move' && step.moves !== 'open'
               && step.moves.some(command => command.type === 'endTurn')
@@ -358,7 +370,11 @@ for (const locale of ['ru', 'en'] as const) {
               await expect(page.locator('.flat-board .mark-move, .flat-board .mark-capture, .flat-board .mark-friendly')).toHaveCount(0)
             }
             if (step.kind === 'read') {
-              await expect(page.getByTestId('lesson-next')).toHaveAccessibleName(translator(locale)('tutorial.readAction'))
+              const finalReading = stepIndex === position.steps.length - 1
+              const action = !finalReading ? 'tutorial.readAction'
+                : positionIndex + 1 < lesson.positions.length ? 'tutorial.newPosition'
+                  : lessonIndex + 1 < LESSONS.length ? 'tutorial.nextLesson' : 'tutorial.finishAction'
+              await expect(page.getByTestId('lesson-next')).toHaveAccessibleName(translator(locale)(action))
             }
             if (step.id === 'guilt-forbids-capture') {
               const before = await boardIdentity(page)
@@ -496,8 +512,9 @@ for (const locale of ['ru', 'en'] as const) {
             }
           }
           const final = lessonIndex === LESSONS.length - 1 && positionIndex === lesson.positions.length - 1
-          const advancedWithResult = Boolean(position.steps.at(-1)?.after?.length)
-          if (!final && !advancedWithResult) {
+          const lastStep = position.steps.at(-1)
+          const advancedWithAcknowledgement = Boolean(lastStep?.after?.length) || lastStep?.kind === 'read'
+          if (!final && !advancedWithAcknowledgement) {
             await expect(tutorial(page)).toHaveAttribute('data-step', 'position-complete')
             await interactable(page)
             await activate(page.getByTestId('lesson-next'), mobile)

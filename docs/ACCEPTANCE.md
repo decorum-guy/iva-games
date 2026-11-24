@@ -1,6 +1,6 @@
 # Acceptance — a finished playable game
 
-Use these requirements to review each game revision. The [Mac tutorial report](VALIDATION_TUTORIAL.md) records the current revision. See [the prior playability review](VALIDATION_PLAYABILITY.md) and [the first delivery](VALIDATION.md) for earlier runs.
+Use these requirements to review each game revision. The [current build status](BUILD_STATUS.md) distinguishes source checks from the deployed Mac build. The [personal editorial audit](TUTORIAL_EDITORIAL_AUDIT.md) records all nine lessons on the previous live build and the resulting corrections. The [Mac tutorial report](VALIDATION_TUTORIAL.md), [prior playability review](VALIDATION_PLAYABILITY.md), and [first delivery](VALIDATION.md) are historical results, not acceptance of later revisions. Complete the [current activation brief](../prompts/ACTIVATE_EDITORIAL_BUILD.md) before the owner's requested repeat pass and full game against the AI.
 
 ## Completion gates
 
@@ -58,7 +58,8 @@ Drive both Chromium and available WebKit. A Playwright mobile viewport is an emu
 - Capture/reaction/bonus and cure/shame/conversion/removal events appear in an understandable order.
 - At a new tutorial reaction, the actual die face, its meaning, the affected figure and the practical rule are visible in the required flow. The opponent waits for acknowledgement. Evaluate this first from the screen without consulting the scripted route; completing a known move list does not prove comprehension.
 - Tutorial close-up and material emphasis accompany the current reveal and remain readable after camera arrival. Finishing an exercise does not trigger a historical effect close-up. Moves/scripts remain blocked during return, including a change of fixture; restore and locale changes do not replay the action or consume another result.
-- Countdown text matches the digital full-cycle rule and never decreases on each berserk movement.
+- Countdown text matches the digital full-cycle rule and never decreases on each berserk movement. The selected-piece card reports exact remaining player turns (6, 5, 4, 3, 2, 1 for removal; 2, 1 for an armed healing/shame cycle), not rounded full cycles. Selecting a piece in ordinary play exposes its state and active deadlines without first opening history.
+- Tutorial text explains the conditions of a rule, its visible consequence, and the next requested action. Read the complete RU/EN screens and button labels; translated keys and successful forced moves alone do not establish understanding. The final quiet-move restriction is stated beforehand, and the last explanation matches the chosen move's actual effect on the knight.
 - Tutorial callouts never cover the requested piece, square, promotion option or finish action on laptop or phone.
 - Mobile browser chrome, safe areas and changing viewport height do not hide the board controls. During play/tutorial the document does not scroll; required controls remain inside the viewport. Optional help/history scroll internally. Preserve browser zoom.
 - In the counter lesson, select the figure, inspect the close-up and its highlighted counter, then explicitly acknowledge. The camera returns smoothly; manual board flips are eased. Reduced motion retains visible static focus.

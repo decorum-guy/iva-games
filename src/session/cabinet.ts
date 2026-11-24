@@ -368,10 +368,11 @@ export class Cabinet {
     const current = this.data.learning;
     if (!current || this.data.view !== 'learn' || this.data.animating || this.data.teachingReturning) return;
     let next = advanceLesson(current);
-    // A result's contextual CTA already announces the next example. Do not
-    // interpose a second empty completion screen after that acknowledgement.
-    // Legacy checkpoints with no pending result retain their normal boundary.
-    if (current.pendingTeaching && !next.pendingTeaching && !instruction(next) && !next.complete) next = advanceLesson(next);
+    // A result or final reading already concludes its example. Commit the next
+    // position together with that acknowledgement, without an empty extra page.
+    // A saved legacy position-complete checkpoint still follows the usual path.
+    const acknowledged = current.pendingTeaching || instruction(current)?.kind === 'read';
+    if (acknowledged && !next.pendingTeaching && !instruction(next) && !next.complete) next = advanceLesson(next);
     await this.updateLearning(next, () => {
       if (next.session.record.id !== current.session.record.id) this.invalidate();
       // The scene camera survives fixture changes. A new generation must own

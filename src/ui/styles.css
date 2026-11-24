@@ -501,6 +501,9 @@ html.in-match, .in-match body { height: 100%; overflow: hidden; overscroll-behav
 .lesson-tools .text-button { min-height: 36px; }
 .side-actions { margin-top: auto; }
 .secondary-panel.collapsed { display: none; }
+.compact-inspector { padding-block: 9px; }
+.compact-inspector .inspector-heading { gap: 8px; }
+.compact-inspector .inspector-timers:empty { display: none; }
 .toggle-sheet { display: inline-flex; margin-left: auto; }
 .sound-toggle[aria-pressed="true"] { color: var(--bronze-bright); }
 .sound-toggle[aria-pressed="false"] { color: #d2a496; }

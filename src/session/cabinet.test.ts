@@ -6,7 +6,7 @@ import type { SearchRequest, SearchResponse } from '../engine/protocol'
 import { getDieMotionTiming } from '../scene/diceMotion'
 import { CAMERA_TRAVEL_MS } from '../scene/cameraFocus'
 import * as database from '../storage/database'
-import { acknowledgeTeaching, learnerAction, saveLearning, scriptAction, startLesson, teachingBeat } from '../tutorial/controller'
+import { acknowledgeTeaching, advanceLesson, confirmInspection, guideCommands, instruction, learnerAction, saveLearning, scriptAction, startLesson, teachingBeat } from '../tutorial/controller'
 import type { Learning } from '../tutorial/controller'
 import { Cabinet } from './cabinet'
 import { createMatch, SessionError } from './match'
@@ -354,6 +354,87 @@ describe('Cabinet acknowledged tutorial results', () => {
       }
     }
   }
+
+  function finalReading(lesson: number, position = 0) {
+    let progress = startLesson(lesson, position)
+    for (let stepCount = 0; stepCount < 30; stepCount++) {
+      progress = acknowledgeAll(progress)
+      const step = instruction(progress)
+      if (step?.kind === 'read') return progress
+      if (step?.kind === 'move') progress = learnerAction(progress, guideCommands(progress)[0]).progress
+      else if (step?.kind === 'script') progress = scriptAction(progress)
+      else if (step?.kind === 'illegal') progress = learnerAction(progress, step.move).progress
+      else if (step?.kind === 'inspect') progress = confirmInspection(progress, step.square)
+      else throw new Error('Expected a final reading in this fixture')
+    }
+    throw new Error('The fixture never reached its final reading')
+  }
+
+  it.each([
+    { lesson: 0, position: 0, nextLesson: 1, nextPosition: 0 },
+    { lesson: 2, position: 2, nextLesson: 3, nextPosition: 0 },
+    { lesson: 7, position: 0, nextLesson: 7, nextPosition: 1 },
+    { lesson: 7, position: 1, nextLesson: 8, nextPosition: 0 },
+  ])('commits the final reading and next fixture together ($lesson/$position)', async ({ lesson, position, nextLesson, nextPosition }) => {
+    const reading = finalReading(lesson, position)
+    const current = await tutorialReady(reading)
+    const before = current.getSnapshot().learning!
+    const persisted: Learning[] = []
+    current.subscribe(() => { if (!current.getSnapshot().busy) persisted.push(current.getSnapshot().learning!) })
+    const putLearning = store.putLearning.bind(store)
+    let release!: () => void
+    const gate = new Promise<void>(resolve => { release = resolve })
+    const writes = vi.spyOn(store, 'putLearning').mockImplementationOnce(async saved => { await gate; return putLearning(saved) })
+    const action = current.advance()
+    expect(current.getSnapshot().learning).toMatchObject({ lesson, position, index: reading.index })
+    expect(await current.advance()).toBe(false)
+    expect(await store.getLearning()).toEqual(saveLearning(before))
+    release()
+    expect(await action).toBe(true)
+    expect(writes).toHaveBeenCalledTimes(1)
+    const next = current.getSnapshot().learning!
+    expect(next).toMatchObject({ lesson: nextLesson, position: nextPosition, index: 0, complete: false })
+    expect(next.session.record.id).not.toBe(reading.session.record.id)
+    expect(await store.getLearning()).toEqual(saveLearning(next))
+    expect(persisted.every(progress => progress.lesson !== lesson || progress.position !== position || progress.index === reading.index)).toBe(true)
+  })
+
+  it('preserves a final reading when its combined transition cannot be saved', async () => {
+    const current = await tutorialReady(finalReading(2, 2))
+    const before = current.getSnapshot()
+    const saved = await store.getLearning()
+    vi.spyOn(store, 'putLearning').mockRejectedValueOnce(new SessionError('storage'))
+    expect(await current.advance()).toBe(false)
+    expect(current.getSnapshot().learning).toBe(before.learning)
+    expect(current.getSnapshot().motionKey).toBe(before.motionKey)
+    expect(current.getSnapshot().error).toBe('storage')
+    expect(await store.getLearning()).toEqual(saved)
+  })
+
+  it('still resumes a legacy position-complete save and advances it once', async () => {
+    const legacy = advanceLesson(finalReading(2, 2))
+    expect(instruction(legacy)).toBeUndefined()
+    const current = await tutorialReady(legacy)
+    expect(current.getSnapshot().learning?.session.current).toEqual(legacy.session.current)
+    expect(instruction(current.getSnapshot().learning!)).toBeUndefined()
+    await current.advance()
+    expect(current.getSnapshot().learning).toMatchObject({ lesson: 3, position: 0, index: 0 })
+    expect(await store.getLearning()).toEqual(saveLearning(current.getSnapshot().learning!))
+  })
+
+  it('finishes after the final choice feedback without altering the position for continuation', async () => {
+    const current = await tutorialReady(finalReading(8))
+    const before = current.getSnapshot().learning!
+    expect(instruction(before)?.id).toBe('practice-ready')
+    const writes = vi.spyOn(store, 'putLearning')
+    await current.advance()
+    const complete = current.getSnapshot().learning!
+    expect(complete.complete).toBe(true)
+    expect(complete.session).toBe(before.session)
+    expect(complete.index).toBe(before.index + 1)
+    expect(writes).toHaveBeenCalledTimes(1)
+    expect(await store.getLearning()).toEqual(saveLearning(complete))
+  })
 
   it.each([
     { reduced: false, camera: true }, { reduced: true, camera: true }, { reduced: false, camera: false },

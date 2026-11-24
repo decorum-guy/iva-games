@@ -151,6 +151,24 @@ for (const viewport of [
     await page.getByTestId('end-turn').click()
     await ready(page)
     await expect(playfield(page)).toHaveAttribute('data-active-side', 'black')
+    const timed = createMatch(hotseat, { root: createPosition({ pieces: [
+      { side: 'white', type: 'king', square: 'h1' },
+      { side: 'black', type: 'king', square: 'a8' },
+      { side: 'white', type: 'knight', square: 'c3', affliction: 'devastated' },
+      { side: 'white', type: 'bishop', square: 'd3' },
+    ] }) })
+    await restoreGame(page, timed.record)
+    await cell(page, 'c3').click()
+    const selected = page.getByTestId('inspector')
+    await expect(page.locator('button.toggle-sheet')).toHaveAttribute('aria-expanded', 'false')
+    await expect(selected).toHaveAttribute('data-compact', 'true')
+    await expect(selected).toHaveAttribute('data-state', 'devastated')
+    await expect(selected.locator('.inspector-timers > span')).toHaveCount(2)
+    await expect(selected).toBeInViewport({ ratio: 1 })
+    await expect(selected.locator('details')).toHaveCount(0)
+    await expect(page.getByTestId('game-aside')).toHaveJSProperty('scrollTop', 0)
+    expect(await page.getByTestId('game-aside').evaluate(element => element.scrollHeight <= element.clientHeight + 1)).toBe(true)
+    await noDocumentScroll(page)
 
     const checkpoint = scriptAction(learnerAction(startLesson(2, 2), move('g2', 'g3')).progress)
     await restoreLesson(page, checkpoint, true)
@@ -160,7 +178,7 @@ for (const viewport of [
     await expect(lesson).toHaveAttribute('data-step', 'removal-material-only')
     await expect(playfield(page)).toHaveAttribute('data-tutorial-mode', 'read')
     await expect(lesson.locator('.lesson-action-label')).toHaveText(t('tutorial.readCue'))
-    await expect(next).toHaveAccessibleName(t('tutorial.readAction'))
+    await expect(next).toHaveAccessibleName(t('tutorial.nextLesson'))
     await visibleAction(next)
     await noDocumentScroll(page)
     expect(await lesson.evaluate(element => getComputedStyle(element).boxShadow)).not.toBe('none')
@@ -175,9 +193,6 @@ for (const viewport of [
     await expect(playfield(page)).toHaveAttribute('data-revision', revision!)
     await expect(page.locator('.flat-board .mark-move, .flat-board .mark-capture, .flat-board .mark-friendly')).toHaveCount(0)
     await expect(page.getByTestId('game-aside')).not.toContainText(t('error.tutorialChoice'))
-    await visibleAction(next)
-    await next.click()
-    await expect(playfield(page)).toHaveAttribute('data-tutorial-mode', 'position-complete')
     await visibleAction(next)
     await next.click()
 
