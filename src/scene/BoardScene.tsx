@@ -9,12 +9,13 @@ import { EquirectangularReflectionMapping, PerspectiveCamera, Plane, Raycaster, 
 import type { DirectionalLight, HemisphereLight } from 'three'
 import { HDRLoader } from 'three/addons/loaders/HDRLoader.js'
 import type { GameEvent } from '../core/types'
+import { planKingFall } from './kingFall'
 import { BoardSurface } from './BoardSurface'
 import { DepartingPiece, VisualPiece } from './Piece'
 import { clearChessAssetLoad, studioHDR, useChessAssets } from './assets'
 import { CAMERA_OVERSCAN, CAMERA_TRAVEL_MS, frameCamera, frameCameraOrbit, framePromotionCamera, frameRoyalCamera, overscanFov, sameCameraRig, sampleCameraTravel } from './cameraFocus'
 import type { CameraFrame, CameraRig } from './cameraFocus'
-import { easeRange, promotionRoyalLead, sampleRoyal } from './royalMotion'
+import { easeRange, mateGroundContact, promotionRoyalLead, royalTiming, sampleRoyal } from './royalMotion'
 import type { RoyalCue } from './royalMotion'
 import { RoyalEffects } from './RoyalEffects'
 import { PromotionEffects } from './PromotionEffects'
@@ -129,9 +130,12 @@ function Viewpoint({ flipped, preset, reduced, focus, royal, promotion, onOrbit 
       } else if (!document.hidden) invalidate()
     }
     if (royal && !royal.reduced && !reduced) {
-      const shot = sampleRoyal(royal, now - royal.startedAt)
+      const elapsed = now - royal.startedAt
+      const shot = sampleRoyal(royal, elapsed)
+      const landingView = royal.kind === 'mate'
+        ? easeRange(royalTiming(royal).impact - 105, mateGroundContact(royal) + 40, elapsed) : 0
       const frame = frameRoyalCamera(rig.current, aspect, mobile, squarePoint(royal.square),
-        royal.kind === 'mate', shot.camera, shot.recoil, overview)
+        royal.kind === 'mate', shot.camera, shot.recoil, overview, landingView)
       apply(rig.current, frame)
       lastRoyal.current = shot.camera > .001 ? frame : null
       if (!document.hidden) invalidate()
@@ -241,6 +245,9 @@ function MarbleSet({ pieces, marks, events, flipped, low, reduced, focus, royal,
   onReady: () => void
 }) {
   const assets = useChessAssets()
+  const defeated = royal?.kind === 'mate' ? pieces.find(piece => piece.id === royal.pieceId)
+    : pieces.find(piece => piece.defeated && piece.kind === 'king')
+  const fall = useMemo(() => defeated ? planKingFall(defeated, pieces, assets) : undefined, [defeated, pieces, assets])
   const initialEvent = useRef(events.at(-1)?.id)
   const currentEvents = events.at(-1)?.id === initialEvent.current ? emptyEvents : events
   const eventsById = useMemo(() => {
@@ -265,6 +272,7 @@ function MarbleSet({ pieces, marks, events, flipped, low, reduced, focus, royal,
             key={piece.id} piece={piece} assets={assets} events={eventsById.get(piece.id) ?? emptyEvents}
             low={low} flipped={flipped} reduced={reduced}
             focus={piece.square === focus?.square ? focus : undefined}
+            fall={piece === defeated ? fall : undefined}
             threatened={piece.kind === 'king' && marks.some(mark => mark.kind === 'check' && mark.square === piece.square)}
             royal={piece.id === royal?.pieceId ? royal : undefined}
             promotion={piece.id === promotion?.pieceId ? promotion : undefined}

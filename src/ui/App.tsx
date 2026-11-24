@@ -171,6 +171,9 @@ export function App() {
   const lastMove = [...latest].reverse().find(event => event.type === 'move');
   const kingThreat = isInCheck(position);
   const showThreat = kingThreat && !awaitingReaction && !promotionStage && !snap.royalPending;
+  const readyForResult = !lesson && !awaitingReaction && !promotionStage && !snap.royalPending;
+  const defeatedKing = readyForResult && reviewing === null && position.outcome?.reason === 'checkmate'
+    ? position.pieces.find(piece => piece.type === 'king' && piece.side === position.side)?.id : undefined;
   const captures = useMemo(() => session
     ? reviewing === null ? captureLedger(session) : [
       ...session.record.rootLedger, ...session.eventsAt(reviewing).filter(event => event.type === 'capture'),
@@ -399,6 +402,7 @@ export function App() {
           canMove={canInput}
           focus={tutorialFocus}
           royal={royal ?? undefined}
+          defeatedKing={defeatedKing}
           promotion={formation}
           promotionContact={promotionStage === 'contact' && live && plannedPromotion
             ? { events: plannedPromotion.contactEvents, startedAt: live.startedAt } : undefined}
@@ -460,7 +464,7 @@ export function App() {
           {notice}
           {storageNotice}
           <div className="decision-row" hidden={Boolean(lesson && beat)}>
-          {session.state.outcome && !lesson && !awaitingReaction && !promotionStage && !snap.royalPending && (royal?.kind !== 'mate' || snap.royalResolved) ? <Result t={t} locale={settings.locale} session={session}
+          {session.state.outcome && readyForResult && (royal?.kind !== 'mate' || snap.royalResolved) ? <Result t={t} locale={settings.locale} session={session}
             entry={snap.ledger.find(entry => entry.matchId === session.record.id)} onNew={() => openSetup(mode === 'hotseat')} />
             : royal?.kind === 'mate' ? <div className="finale-controls">
               <button type="button" className="text-button" onClick={skipRoyal} data-testid="skip-royal">{t('game.skipFinale')}</button>

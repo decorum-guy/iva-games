@@ -1,10 +1,13 @@
-import { useEffect, useLayoutEffect, useMemo, useRef } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import {
   CanvasTexture, Group, Mesh, MeshBasicMaterial, Sprite, SpriteMaterial, SRGBColorSpace, Vector3,
 } from 'three'
 import type { GameEvent, Piece } from '../core/types'
 import type { ChessAssets } from './assets'
+import { BerserkFire } from './BerserkFire'
+import { fireDuration, fireEvent } from './fireMotion'
+import type { FireBurst } from './fireMotion'
 import { getSoftShadow } from './BoardSurface'
 import {
   COUNTER_FOCUS_DELAY_MS, COUNTER_FOCUS_MS, COUNTER_OFFSET, FOCUS_EMPHASIS_MS,
@@ -13,7 +16,9 @@ import {
 import { conditionCode, setArmySurface, stoneMaterial } from './stone'
 import { squarePoint, stateColors } from './types'
 import type { SceneFocus, ScenePiece } from './types'
-import { easeRange, sampleRoyal } from './royalMotion'
+import { kingFallPose } from './kingFall'
+import type { KingFall } from './kingFall'
+import { easeRange, sampleMateFall, sampleRoyal } from './royalMotion'
 import type { RoyalCue } from './royalMotion'
 import { samplePromotion } from './promotionMotion'
 import type { PromotionCue } from './promotionMotion'
@@ -227,7 +232,7 @@ function PieceBadge({ piece, flipped, low, reduced, focus }: {
   )
 }
 
-export function VisualPiece({ piece, assets, events, flipped, low, reduced, focus, threatened, royal, promotion }: {
+export function VisualPiece({ piece, assets, events, flipped, low, reduced, focus, threatened, royal, promotion, fall }: {
   piece: ScenePiece
   assets: ChessAssets
   events: readonly GameEvent[]
@@ -236,6 +241,7 @@ export function VisualPiece({ piece, assets, events, flipped, low, reduced, focu
   reduced: boolean
   focus?: SceneFocus
   threatened: boolean
+  fall?: KingFall
   royal?: RoyalCue
   promotion?: PromotionCue
 }) {
@@ -246,8 +252,12 @@ export function VisualPiece({ piece, assets, events, flipped, low, reduced, focu
   const move = useRef<Travel | null>(null)
   const change = useRef<Change | null>(null)
   const focusStart = useRef<number | null>(null)
+  const tiltAxis = useMemo(() => new Vector3(), [])
+  const wasFallen = useRef(false)
   const threat = useRef({ rest: Number(threatened), from: Number(threatened), to: Number(threatened), start: 0 })
   const previous = useRef<{ piece: ScenePiece; eventId?: string; promotionId?: string }>(null)
+  const lastFire = useRef<string | undefined>(undefined)
+  const [fire, setFire] = useState<FireBurst | null>(null)
   const invalidate = useThree(state => state.invalidate)
   const asset = assets.pieces[piece.side][piece.kind]
   const { material, values } = useMemo(
@@ -255,6 +265,12 @@ export function VisualPiece({ piece, assets, events, flipped, low, reduced, focu
     [assets, piece.id],
   )
   useEffect(() => () => material.dispose(), [material])
+  useEffect(() => {
+    if (!fire) return
+    const expire = window.setTimeout(() => setFire(current => current?.id === fire.id ? null : current),
+      Math.max(0, fire.startedAt + fire.duration - performance.now()))
+    return () => window.clearTimeout(expire)
+  }, [fire])
   useLayoutEffect(() => {
     focusStart.current = focus ? performance.now() : null
     values.uFocus.value = focus && reduced ? sampleFigureEmphasis(0, true) : 0
@@ -289,6 +305,14 @@ export function VisualPiece({ piece, assets, events, flipped, low, reduced, focu
     const [x, z] = squarePoint(piece.square)
     const now = performance.now()
     const changedSquare = !!last && last.piece.square !== piece.square
+    const cue = last && eventId !== last.eventId ? events : []
+    const burst = last && fireEvent(cue, last.piece.affliction, piece.affliction)
+    if (burst && burst.id !== lastFire.current) {
+      lastFire.current = burst.id
+      const distance = Math.hypot(x - body.current.position.x, z - body.current.position.z)
+      const approach = burst.kind === 'capture' && changedSquare && !reduced ? pieceTravelMs(distance) * .92 : 0
+      setFire({ ...burst, startedAt: now + approach, duration: fireDuration(burst.kind, reduced) })
+    }
     if (!last || reduced || promotion) {
       move.current = null
       change.current = null
@@ -322,7 +346,6 @@ export function VisualPiece({ piece, assets, events, flipped, low, reduced, focu
       move.current = { from, to, start: now, duration: pieceTravelMs(length), lift: knight ? .61 : .12 + .024 * length }
     }
 
-    const cue = eventId !== last.eventId ? events : []
     const reaction = cue.find(event => event.type === 'reaction')
     const cueReaction = reaction?.type === 'reaction' ? reaction.affliction : null
     const cure = cue.some(event => event.type === 'cure')
@@ -431,6 +454,26 @@ export function VisualPiece({ piece, assets, events, flipped, low, reduced, focu
       if (!reduced && elapsed < FOCUS_EMPHASIS_MS) active = true
     }
     if (piece.kind === 'king') {
+      if (fall) {
+        const elapsed = royal ? now - royal.startedAt : Infinity
+        const fraction = royal?.kind === 'mate' ? sampleMateFall(royal, elapsed) : 1
+        const pose = kingFallPose(fall, fraction)
+        tiltAxis.set(fall.dz, 0, -fall.dx)
+        mesh.current.quaternion.setFromAxisAngle(tiltAxis, pose.angle)
+        mesh.current.position.set(fall.dx * pose.offset, pose.lift, fall.dz * pose.offset)
+        const center = pose.offset + fall.height * .47 * Math.sin(pose.angle)
+        shadow.current.position.set(body.current.position.x + center * fall.dx, .011, body.current.position.z + center * fall.dz)
+        shadow.current.rotation.z = -Math.atan2(fall.dz, fall.dx)
+        shadow.current.scale.set(1 + 1.26 * fraction, 1 - .17 * fraction, 1)
+        wasFallen.current = true
+      } else if (wasFallen.current) {
+        mesh.current.quaternion.identity()
+        mesh.current.position.set(0, 0, 0)
+        shadow.current.position.set(body.current.position.x, .011, body.current.position.z)
+        shadow.current.scale.set(1, 1, 1)
+        shadow.current.rotation.z = 0
+        wasFallen.current = false
+      }
       const mark = threat.current
       const blend = easeRange(0, reduced ? 160 : 240, now - mark.start)
       mark.rest = mark.from + (mark.to - mark.from) * blend
@@ -455,6 +498,7 @@ export function VisualPiece({ piece, assets, events, flipped, low, reduced, focu
       </mesh>
       <group ref={body}>
         <mesh ref={mesh} material={material} userData={{ square: piece.square }} castShadow={!low} receiveShadow={!low} dispose={null} />
+        {fire && <BerserkFire model={asset.geometry} seed={seed(piece.id)} low={low} reduced={reduced} burst={fire} />}
       </group>
       {!reduced && ghostDelay.slice(0, low ? 2 : 3).map((_, i) => (
         <mesh

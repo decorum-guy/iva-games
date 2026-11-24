@@ -28,7 +28,7 @@ The recordings were cut at individual transients, filtered, faded, and combined 
 
 ## Optional audio audition candidates
 
-The files in [public/assets/audio/auditions](public/assets/audio/auditions/README.md) are comparison candidates, not the selected runtime sound bank. The catalog records each source, source hash, output hash, license, editing recipe and timing. The four original comparison MP3 files are also included.
+The [audio audition catalog](public/assets/audio/auditions/README.md) records each candidate's source, source hash, output hash, license, editing recipe and timing. The four original comparison MP3 files are also included. The production selections are listed below.
 
 CC0 recordings are by qubodup (Energy Drain; 3 dark magic spells), lentikula (Basic Spell Impacts), Julie Damsgaard / Spring Spring / Spring Enterprises (Various Sound Effects), rubberduck (75 breaking / falling / hit SFX), pyranostudios (Air whoosh), and JaggedStone (Magic Spell SFX). The [candidate notices](public/assets/audio/auditions/README.md#источники-и-лицензии) contain their primary source links and the [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) reference.
 
@@ -42,7 +42,9 @@ Local comparison playback adds clip windows, gain and fades, including a 1.54-se
 
 The installed R2 devastation and chant, the P2 formation and queen, and the P1/P2 rook mix include recordings from **Fantasy SFX Pack Vol 1 by JC Sounds**, [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). [Original pack](https://opengameart.org/content/jc-sounds-fantasy-sfx-pack-vol-1). Runtime edits include shortening selected reaction recordings, gain, fade envelopes, and synchronization to scene clocks. The rook adds contact-aligned P1/P2 mixing, a short stereo echo and room reverb, and MP3 re-encoding. The [audio manifest](public/assets/audio/manifest.json) records individual original filenames, hashes and CC0 contributors. [Installed choices and timing](docs/SHOWCASE_SFX.md)
 
-Optional dice demos contain trimmed, level-matched transient excerpts of the public CC0 previews by [aunrea](https://freesound.org/people/aunrea/sounds/485950/), [schoman3](https://freesound.org/people/schoman3/sounds/506914/), and [WallyDM](https://freesound.org/people/WallyDM/sounds/815672/). [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/).
+The dice demos use trimmed, level-matched transient excerpts of the public CC0 previews by [aunrea](https://freesound.org/people/aunrea/sounds/485950/), [schoman3](https://freesound.org/people/schoman3/sounds/506914/), and [WallyDM](https://freesound.org/people/WallyDM/sounds/815672/). The runtime uses schoman3's D2 at the selected level of 40%. [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/).
+
+The authored check and mate contact recordings derive from the shipped CC0 stone bank. They pitch and filter stone, capture and fracture excerpts by mh2o, Wuzzy and SamsterBirdies, then add damped modal resonances, short stereo reflections and fades. [Sources and output hashes](public/assets/audio/manifest.json)
 
 ## Software
 

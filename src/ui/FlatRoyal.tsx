@@ -1,7 +1,7 @@
 import { useId, useLayoutEffect, useMemo, useRef } from 'react'
 import type { RefObject } from 'react'
 import { fileOf, rankOf } from '../core'
-import { easeRange, royalTiming, sampleRoyal } from '../scene/royalMotion'
+import { easeRange, royalTiming, sampleMateFall, sampleRoyal } from '../scene/royalMotion'
 import type { RoyalCue } from '../scene/royalMotion'
 
 const flakes = Array.from({ length: 34 }, (_, i) => ({
@@ -43,6 +43,7 @@ export function FlatRoyal({ cue, flipped, board }: {
       host.style.setProperty('--crown-sweep', sample.sweep.toFixed(4))
       host.style.setProperty('--crown-dusk', (sample.dusk * .34).toFixed(4))
       host.style.setProperty('--crown-stress', (mate ? sample.camera * .25 + sample.recoil * .07 : sample.camera * .10).toFixed(4))
+      if (mate) host.style.setProperty('--crown-fall', sampleMateFall(cue, elapsed).toFixed(4))
       host.style.setProperty('--crown-release', sample.discharge.toFixed(4))
       const radius = .22 + sample.wave * (mate ? 4.65 : 2.55)
       contact.current?.setAttribute('opacity', String(sample.contact * (mate ? .71 : .53)))
@@ -76,7 +77,7 @@ export function FlatRoyal({ cue, flipped, board }: {
     draw()
     return () => {
       cancelAnimationFrame(frame)
-      for (const name of ['--crown-pressure', '--crown-sweep', '--crown-dusk', '--crown-stress', '--crown-release']) host.style.removeProperty(name)
+      for (const name of ['--crown-pressure', '--crown-sweep', '--crown-dusk', '--crown-stress', '--crown-release', '--crown-fall']) host.style.removeProperty(name)
     }
   }, [board, cue, count, flipped, mate, tiles, x, y])
 

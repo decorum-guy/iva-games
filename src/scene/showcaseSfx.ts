@@ -11,7 +11,7 @@ const reactions = {
 
 type ReactionSound = keyof typeof reactions
 type PromotionSound = ReturnType<typeof promotionFamily>
-export type ShowcaseSound = ReactionSound | PromotionSound | 'dice'
+export type ShowcaseSound = ReactionSound | PromotionSound | 'dice' | 'royalCheck' | 'royalGround'
 
 export const showcaseDice = { id: 'D2', level: .40 } as const
 
@@ -21,6 +21,7 @@ export const showcaseSources = {
   formation: 'auditions/promotion-p2-formation.mp3', rook: 'showcase/promotion-rook-p1-p2-room.mp3',
   queen: 'auditions/promotion-p2-queen.mp3',
   dice: `dice-auditions/${showcaseDice.id.toLowerCase()}.mp3`,
+  royalCheck: 'showcase/royal-check.mp3', royalGround: 'showcase/royal-mate-ground.mp3',
 } as const satisfies Readonly<Record<ShowcaseSound, string>>
 
 export const QUEEN_SOUND_LEVEL = .90
@@ -41,6 +42,8 @@ function isReactionSound(kind: CueKind): kind is ReactionSound {
 
 export function showcaseSoundForCue(kind: CueKind, plan: ActionPlan | undefined): ShowcaseSound | undefined {
   if (kind === 'dice') return 'dice'
+  if (kind === 'check' || kind === 'royalCheck') return 'royalCheck'
+  if (kind === 'royalGround') return 'royalGround'
   if (isReactionSound(kind)) return kind
   if (plan?.promotion && promotionSounds.has(kind)) return promotionFamily(plan.promotion.event.promotion)
 }
@@ -53,7 +56,7 @@ export function dieRecordingCues(buffer: AudioBuffer, reduced: boolean, at: numb
 }
 
 export function replaceShowcaseCues(cues: readonly SceneCue[], buffers: ReadonlyMap<ShowcaseSound, AudioBuffer>,
-  plan: ActionPlan | undefined, playback: PromotionPlayback | undefined, royal: boolean,
+  plan: ActionPlan | undefined, playback: PromotionPlayback | undefined, royal: boolean, reduced = Boolean(plan?.reduced),
 ) {
   const stock: SceneCue[] = []
   const clips: RecordedClip[] = []
@@ -74,12 +77,17 @@ export function replaceShowcaseCues(cues: readonly SceneCue[], buffers: Readonly
   const replacedPromotion = clips.length > 0
   for (const [index, cue] of cues.entries()) {
     if (replacedPromotion && promotionSounds.has(cue.kind)) continue
-    const die = cue.kind === 'dice' ? buffers.get('dice') : undefined
-    if (die) {
-      clips.push(...dieRecordingCues(die, Boolean(plan?.reduced), cue.at, showcaseDice.level))
+    const sound = showcaseSoundForCue(cue.kind, plan)
+    const buffer = sound ? buffers.get(sound) : undefined
+    if (sound === 'dice' && buffer) {
+      clips.push(...dieRecordingCues(buffer, reduced, cue.at, showcaseDice.level))
       continue
     }
-    const buffer = isReactionSound(cue.kind) ? buffers.get(cue.kind) : undefined
+    if ((sound === 'royalCheck' || sound === 'royalGround') && buffer) {
+      clips.push({ buffer, at: cue.at, offset: 0, duration: Math.min(buffer.duration, sound === 'royalCheck' ? .42 : .92),
+        gain: reduced ? .73 : 1, fadeIn: .003, fadeOut: .045 })
+      continue
+    }
     const edit = isReactionSound(cue.kind) ? reactionMontage(reactions[cue.kind], cue.at) : undefined
     if (!buffer || !edit) { stock.push(cue); continue }
     const nextState = cues.slice(index + 1).find(later => isReactionSound(later.kind))

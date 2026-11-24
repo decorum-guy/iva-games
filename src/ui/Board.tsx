@@ -41,6 +41,7 @@ export interface BoardProps {
   readonly overlay?: ReactNode;
   readonly focus?: SceneFocus;
   readonly royal?: RoyalCue;
+  readonly defeatedKing?: string;
   readonly promotion?: PromotionCue;
   readonly promotionContact?: { readonly events: readonly GameEvent[]; readonly startedAt: number };
 }
@@ -66,7 +67,8 @@ export function Board(props: BoardProps) {
     id: piece.id, square: piece.square, side: piece.side, kind: piece.type, affliction: piece.affliction,
     countdown: cyclesRemaining(piece, state) ?? undefined,
     exposed: piece.shameArmedAt !== null, curePending: piece.cureArmedAt !== null,
-  })), [state]);
+    defeated: piece.id === props.defeatedKing,
+  })), [state, props.defeatedKing]);
   const activeMarks: readonly SceneMark[] = props.royal || props.promotion ? marks.filter(mark => mark.kind === 'check')
     : showFocus ? [...marks, { square: focus, kind: 'focus' }] : marks;
   const counterPiece = props.flat && props.focus?.subject === 'countdown' ? pieces.get(props.focus.square) : undefined;
@@ -121,6 +123,7 @@ export function Board(props: BoardProps) {
         const rank = flipped ? row : 7 - row;
         const square = squareAt(file, rank)!;
         const piece = pieces.get(square);
+        const defeated = Boolean(piece && piece.id === props.defeatedKing);
         const kinds = activeMarks.filter(mark => mark.square === square).map(mark => mark.kind);
         const threatened = kinds.includes('check');
         const target = kinds.includes('friendly') ? 'game.allowedFriendly'
@@ -131,9 +134,11 @@ export function Board(props: BoardProps) {
           className={`cell ${(file + rank) % 2 === 0 ? 'dark' : 'light'} ${kinds.map(kind => `mark-${kind}`).join(' ')}`}
           data-teaching-focus={props.focus?.square === square ? props.focus.subject : undefined}
           data-royal-king={props.royal?.square === square ? true : undefined}
+          data-mated={defeated || undefined}
           data-promotion-piece={props.promotion?.square === square ? true : undefined}
           data-pawn-arriving={!props.reducedMotion && incoming?.type === 'move' && incoming.to === square ? true : undefined}
-          style={incoming?.type === 'move' && incoming.to === square ? tween : undefined}
+          style={defeated ? { '--mate-lean': column < 4 ? '86deg' : '-86deg' } as CSSProperties
+            : incoming?.type === 'move' && incoming.to === square ? tween : undefined}
           draggable={props.canMove && piece?.side === state.side} onDragStart={event => event.dataTransfer.setData('text/plain', square)}
           onDragOver={event => event.preventDefault()} onDrop={event => {
             event.preventDefault();

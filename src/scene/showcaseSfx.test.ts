@@ -33,6 +33,18 @@ describe('selected showcase playback', () => {
     })
   })
 
+  it.each([false, true])('gives the royal strike and landing separate recordings (reduced=%s)', reduced => {
+    const { stock, clips } = replaceShowcaseCues([
+      { kind: 'royalCheck', at: .243 }, { kind: 'royalGround', at: 1.62 },
+    ], buffers, undefined, undefined, false, reduced)
+    expect(stock).toEqual([])
+    const gain = reduced ? .73 : 1
+    expect(clips).toMatchObject([
+      { buffer: buffers.get('royalCheck'), at: .243, duration: .42, gain },
+      { buffer: buffers.get('royalGround'), at: 1.62, duration: .92, gain },
+    ])
+  })
+
   it('uses the short chant and the requested per-state levels', () => {
     expect(mix('reaction.guilt').clips.find(clip => clip.buffer === buffers.get('guilt'))?.gain).toBeCloseTo(10 ** (-8 / 20) * .80)
     expect(mix('reaction.devastated').clips.find(clip => clip.buffer === buffers.get('devastated'))?.gain).toBeCloseTo(10 ** (-2 / 20) * .80)

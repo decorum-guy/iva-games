@@ -106,7 +106,7 @@ export function frameCamera(rig: CameraRig, aspect: number, compact: boolean): C
 
 export function frameRoyalCamera(
   rig: CameraRig, aspect: number, compact: boolean, [x, z]: GroundPoint,
-  mate: boolean, amount: number, recoil: number, overview = frameCamera(rig, aspect, compact),
+  mate: boolean, amount: number, recoil: number, overview = frameCamera(rig, aspect, compact), groundView = 0,
 ): CameraFrame {
   if (amount === 0) return overview
   // Move inward on either side of the table. The corner of the board can leave
@@ -116,6 +116,11 @@ export function frameRoyalCamera(
   const cinematic = {
     ...rig, yaw: rig.yaw + viewSide * angle * radians * amount,
     elevation: rig.elevation - (mate ? 11 : 2.5) * radians * amount,
+  }
+  if (mate && groundView > 0) {
+    // Once the crown starts falling, clear any standing piece one rank in front.
+    const landingAngle = Math.max(cinematic.elevation, 72 * radians)
+    cinematic.elevation += (landingAngle - cinematic.elevation) * groundView * amount
   }
   const view = viewDirection(cinematic)
   const extent = mate ? 1.27 : .89
@@ -131,7 +136,7 @@ export function frameRoyalCamera(
     target.x *= 1 - amount * .12
     target.z *= 1 - amount * .12
   }
-  target.y -= .034 * recoil
+  target.y -= .034 * recoil + (mate ? .32 * groundView * amount : 0)
   return { target, distance, position: target.clone().addScaledVector(view, distance) }
 }
 

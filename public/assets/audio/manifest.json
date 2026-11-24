@@ -84,6 +84,26 @@
       "contactMarkerSeconds": 0.009,
       "fallback": "Original bank contacts at the same 40% level"
     },
+    "royal": {
+      "sourceBank": "board.wav",
+      "recipe": "scripts/build-royal-showcase-mix.py",
+      "sourceNames": ["capture", "stone", "fracture"],
+      "changes": "CC0 contacts pitched and filtered, damped modal body and short stereo room reflections. One recording per point of contact.",
+      "check": {
+        "file": "showcase/royal-check.mp3",
+        "bytes": 11564,
+        "sha256": "bd05ec2d87b487a8d44b5598f49ed0121954c3db1fe2a1772753c70f30da92a4",
+        "playSeconds": 0.42,
+        "decodedPeakDbfs": -5.3
+      },
+      "mateGround": {
+        "file": "showcase/royal-mate-ground.mp3",
+        "bytes": 23660,
+        "sha256": "5ac5daea0a4420c23e23cc62ec345b61aa95d436f815eb4c70f7b8997dd00c59",
+        "playSeconds": 0.92,
+        "decodedPeakDbfs": -3.5
+      }
+    },
     "sounds": {
       "guilt": {
         "file": "auditions/reaction-r1-guilt.mp3",

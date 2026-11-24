@@ -9,6 +9,7 @@ export interface ScenePiece {
   kind: PieceType
   affliction: Affliction
   countdown?: number
+  defeated?: boolean
   exposed?: boolean
   curePending?: boolean
 }

@@ -78,3 +78,22 @@ export function sampleRoyal(cue: RoyalAction, elapsed: number) {
     flight: reduced ? -1 : afterImpact * .001,
   }
 }
+
+/** The body meets the board after the crown discharge, on its own audio marker. */
+export function mateGroundContact(cue: RoyalAction) {
+  return royalTiming(cue).impact + (cue.reduced ? 410 : 670)
+}
+
+/** Fraction of the support angle. Impact carries angular velocity into a small rebound. */
+export function sampleMateFall(cue: RoyalAction, elapsed: number) {
+  if (cue.kind !== 'mate') return 0
+  const { impact } = royalTiming(cue)
+  const contact = mateGroundContact(cue)
+  if (cue.reduced) return easeRange(impact + 160, contact, elapsed)
+  if (elapsed < impact) return .028 * easeRange(impact - 180, impact, elapsed)
+  const t = clampUnit((elapsed - impact) / (contact - impact))
+  if (elapsed <= contact) return .028 + .972 * (.055 * t + .945 * t * t)
+  const age = elapsed - contact
+  if (age >= 310) return 1
+  return 1 - .072 * Math.abs(Math.sin(age * Math.PI / 155)) * Math.exp(-age / 110)
+}

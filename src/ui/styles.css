@@ -747,6 +747,10 @@ html.in-match, .in-match body { height: 100%; overflow: hidden; overscroll-behav
 }
 .flat-board [data-royal-king] { z-index: 2; }
 .flat-board [data-royal-king] .piece-icon { transform: scale(calc(1 + var(--crown-stress, 0))); }
+.flat-board [data-mated] .piece-icon {
+  transform: translateY(calc(var(--crown-fall, 1) * 5%)) rotate(calc(var(--crown-fall, 1) * var(--mate-lean)))
+    scale(calc(1 + var(--crown-stress, 0) - var(--crown-fall, 1) * .18));
+}
 .flat-royal { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 3; pointer-events: none; }
 .flat-board .cell:not([data-royal-king]) { --crown-pressure: 0; --crown-sweep: 1; }
 .crown-inlay { opacity: var(--crown-pressure, 0); pointer-events: none; transition: opacity .2s ease; }
