@@ -12,11 +12,14 @@ import type { GameEvent } from '../core/types'
 import { BoardSurface } from './BoardSurface'
 import { DepartingPiece, VisualPiece } from './Piece'
 import { clearChessAssetLoad, studioHDR, useChessAssets } from './assets'
-import { CAMERA_OVERSCAN, CAMERA_TRAVEL_MS, frameCamera, frameCameraOrbit, frameRoyalCamera, overscanFov, sameCameraRig, sampleCameraTravel } from './cameraFocus'
+import { CAMERA_OVERSCAN, CAMERA_TRAVEL_MS, frameCamera, frameCameraOrbit, framePromotionCamera, frameRoyalCamera, overscanFov, sameCameraRig, sampleCameraTravel } from './cameraFocus'
 import type { CameraFrame, CameraRig } from './cameraFocus'
-import { easeRange, sampleRoyal } from './royalMotion'
+import { easeRange, promotionRoyalLead, sampleRoyal } from './royalMotion'
 import type { RoyalCue } from './royalMotion'
 import { RoyalEffects } from './RoyalEffects'
+import { PromotionEffects } from './PromotionEffects'
+import { samplePromotion } from './promotionMotion'
+import type { PromotionCue } from './promotionMotion'
 import { squarePoint, worldSquare } from './types'
 import type { BoardSceneProps, SceneFocus, SceneMark } from './types'
 import './scene.css'
@@ -43,12 +46,13 @@ const emptyEvents: readonly GameEvent[] = []
 const emptyMarks: readonly SceneMark[] = []
 const toRadians = Math.PI / 180
 
-function Viewpoint({ flipped, preset, reduced, focus, royal, onOrbit }: {
+function Viewpoint({ flipped, preset, reduced, focus, royal, promotion, onOrbit }: {
   flipped: boolean
   preset: NonNullable<BoardSceneProps['camera']>
   reduced: boolean
   focus?: SceneFocus
   royal?: RoyalCue
+  promotion?: PromotionCue
   onOrbit: (active: boolean) => void
 }) {
   const camera = useThree(state => state.camera) as PerspectiveCamera
@@ -101,12 +105,12 @@ function Viewpoint({ flipped, preset, reduced, focus, royal, onOrbit }: {
   }, [aspect, camera, height, yaw, invalidate, mobile, onOrbit, preset, reduced, focus?.square, focus?.key])
 
   useLayoutEffect(() => {
-    if (!royal && lastRoyal.current && !change.current && !reduced) {
+    if (!royal && !promotion && lastRoyal.current && !change.current && !reduced) {
       returnRoyal.current = { from: lastRoyal.current, start: performance.now() }
     } else returnRoyal.current = null
     lastRoyal.current = null
     invalidate()
-  }, [royal?.id, reduced, invalidate])
+  }, [royal?.id, promotion?.id, reduced, invalidate])
 
   useFrame(() => {
     if (!rig.current) return
@@ -130,6 +134,19 @@ function Viewpoint({ flipped, preset, reduced, focus, royal, onOrbit }: {
         royal.kind === 'mate', shot.camera, shot.recoil, overview)
       apply(rig.current, frame)
       lastRoyal.current = shot.camera > .001 ? frame : null
+      if (!document.hidden) invalidate()
+    } else if (promotion && !reduced && !promotion.reduced) {
+      const shot = samplePromotion(promotion, now - promotion.startedAt)
+      const frame = framePromotionCamera(rig.current, aspect, mobile, squarePoint(promotion.square), shot, promotion.intoRoyal, overview)
+      const next = promotion.royalFollowup
+      if (next && shot.handoff > 0) {
+        const entry = frameRoyalCamera(rig.current, aspect, mobile, squarePoint(next.square), next.kind === 'mate',
+          promotionRoyalLead(next.kind), 0, overview)
+        frame.position.lerp(entry.position, shot.handoff)
+        frame.target.lerp(entry.target, shot.handoff)
+      }
+      apply(rig.current, frame)
+      lastRoyal.current = shot.approach > .001 || shot.height > .001 || (next && shot.handoff > 0) ? frame : null
       if (!document.hidden) invalidate()
     } else if (overview) {
       apply(rig.current, overview)
@@ -211,7 +228,7 @@ function eventPieceId(event: GameEvent) {
   return null
 }
 
-function MarbleSet({ pieces, marks, events, flipped, low, reduced, focus, royal, onReady }: {
+function MarbleSet({ pieces, marks, events, flipped, low, reduced, focus, royal, promotion, onReady }: {
   pieces: BoardSceneProps['pieces']
   marks: readonly SceneMark[]
   events: readonly GameEvent[]
@@ -220,6 +237,7 @@ function MarbleSet({ pieces, marks, events, flipped, low, reduced, focus, royal,
   reduced: boolean
   focus?: SceneFocus
   royal?: RoyalCue
+  promotion?: PromotionCue
   onReady: () => void
 }) {
   const assets = useChessAssets()
@@ -240,7 +258,7 @@ function MarbleSet({ pieces, marks, events, flipped, low, reduced, focus, royal,
   useEffect(onReady, [onReady])
   return (
     <>
-      <BoardSurface assets={assets} marks={marks} flipped={flipped} royal={royal} />
+      <BoardSurface assets={assets} marks={marks} flipped={flipped} royal={royal} promotion={promotion} reduced={reduced} pieces={pieces} />
       <group name="remorse-pieces">
         {pieces.map(piece => (
           <VisualPiece
@@ -249,6 +267,7 @@ function MarbleSet({ pieces, marks, events, flipped, low, reduced, focus, royal,
             focus={piece.square === focus?.square ? focus : undefined}
             threatened={piece.kind === 'king' && marks.some(mark => mark.kind === 'check' && mark.square === piece.square)}
             royal={piece.id === royal?.pieceId ? royal : undefined}
+            promotion={piece.id === promotion?.pieceId ? promotion : undefined}
           />
         ))}
       </group>
@@ -283,7 +302,7 @@ interface PointerOrigin {
 export default function BoardScene({
   pieces, marks = emptyMarks, events = emptyEvents, flipped = false,
   camera = 'studio', quality, reducedMotion = false, motionKey,
-  focus, royal, onSquare, onDragSquare, onFailure, loadingLabel,
+  focus, royal, promotion, onSquare, onDragSquare, onFailure, loadingLabel,
 }: BoardSceneProps) {
   const reduced = useReducedMotion(reducedMotion)
   const pointer = useRef<PointerOrigin>(null)
@@ -380,6 +399,7 @@ export default function BoardScene({
   return (
     <div
       ref={board} className="remorse-scene" data-renderer="3d" data-scene-ready={ready ? 'true' : 'false'}
+      data-promotion-scene={promotion?.kind}
       data-camera-focus={activeFocus?.square ?? 'none'} data-focus-subject={activeFocus?.subject ?? 'none'}
       onPointerDown={startPointer} onPointerUp={finishPointer} onPointerMove={movePointer}
       onPointerCancel={() => { pointer.current = null; setDragTarget(null) }}
@@ -394,14 +414,15 @@ export default function BoardScene({
           shadows={low ? false : 'percentage'}
           onCreated={state => { scene.current = state; state.gl.toneMappingExposure = .97 }}
         >
-          <Viewpoint flipped={flipped} preset={camera} reduced={reduced} focus={activeFocus} royal={royal} onOrbit={onOrbit} />
+          <Viewpoint flipped={flipped} preset={camera} reduced={reduced} focus={activeFocus} royal={royal} promotion={promotion} onOrbit={onOrbit} />
           <ContextLifecycle onFailure={onFailure} />
           <Lighting low={low} royal={royal} />
           <RoyalEffects cue={royal} low={low} />
+          {promotion && <PromotionEffects cue={promotion} low={low} reduced={reduced} />}
           <Suspense fallback={null}>
             <MarbleSet
               key={motionKey ?? 'marble-set'} pieces={pieces} marks={focusedMarks} events={events}
-              flipped={flipped} low={low} reduced={reduced} focus={activeFocus} royal={royal} onReady={onReady}
+              flipped={flipped} low={low} reduced={reduced} focus={activeFocus} royal={royal} promotion={promotion} onReady={onReady}
             />
           </Suspense>
         </Canvas>

@@ -72,6 +72,7 @@ export const messages = {
   'game.undo': ['Отменить ход', 'Undo move'],
   'game.redo': ['Вернуть ход', 'Redo move'],
   'game.promotion': ['Превращение пешки', 'Pawn promotion'],
+  'game.forming': ['Превращение · {piece}', 'Promotion · {piece}'],
   'game.choosePiece': ['Выберите, кем станет пешка. Если нужен бросок, он произойдёт после выбора.', 'Choose what your pawn becomes. Any die roll happens after your choice.'],
   'game.inspect': ['Выберите фигуру на доске', 'Select a piece on the board'],
   'game.details': ['Детали', 'Details'],

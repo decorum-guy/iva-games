@@ -489,6 +489,7 @@ html.in-match, .in-match body { height: 100%; overflow: hidden; overscroll-behav
 .view-game .decision-row .recovery-actions, .view-game .decision-row .finale-controls { grid-column: 1 / -1; }
 .view-game .decision-row .roll-dock { grid-column: 2; grid-row: 2; }
 .view-game .decision-row .bonus-action { grid-column: 1; grid-row: 2; }
+.view-game .decision-row:has(.roll-dock[data-empty="true"]) .bonus-action { grid-column: 1 / -1; }
 .view-game .decision-row .turn-panel > .button { grid-column: 1; grid-row: 2; }
 .view-learn .decision-row .turn-panel:not(:has(.bonus-action)):not(:has(.recovery-actions)) { padding-block: 8px; }
 .view-learn:not([data-tutorial-mode="script"]) .turn-panel:not(:has(.bonus-action)) { display: none; }
@@ -666,6 +667,23 @@ html.in-match, .in-match body { height: 100%; overflow: hidden; overscroll-behav
   /* Space for the turn, roll and inspector keeps the board still between taps. */
   .in-match .view-game { grid-template-rows: minmax(0, 1fr) min(320px, 46dvh); }
   .in-match .view-learn { grid-template-rows: minmax(0, 1fr) min(360px, 46dvh); }
+  /* Alongside the explanation, the whole die fits below the board and
+     leaves the acknowledgement and lesson controls in the visible sheet. */
+  .lesson-heading { display: contents; }
+  .lesson-heading .roll-dock {
+    float: right; width: 112px; height: 118px; margin: 2px 0 5px 8px;
+    --die-width: 96px; --die-height: 84px;
+  }
+  .lesson-heading .dice-reveal {
+    grid-template-columns: 1fr; grid-template-rows: 12px 84px minmax(0, 1fr); gap: 0; justify-items: center;
+  }
+  .lesson-heading .dice-actor, .lesson-heading .dice-caption {
+    grid-column: 1; align-self: center; text-align: center; font-size: .66rem;
+  }
+  .lesson-heading .dice-stage { grid-column: 1; grid-row: 2; }
+  .lesson-heading .dice-caption { grid-row: 3; padding-top: 0; }
+  .lesson-panel > .button.primary, .lesson-tools, .lesson-target, .lesson-dice-legend, .lesson-actions { clear: both; }
+
 }
 
 @media (max-height: 535px) and (orientation: landscape) {
@@ -771,4 +789,36 @@ html.in-match, .in-match body { height: 100%; overflow: hidden; overscroll-behav
     min-height: 28px;
     justify-self: start;
   }
+}
+
+.flat-promotion { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 2; pointer-events: none; }
+.flat-board[data-flat-promotion] .cell { isolation: auto; overflow: visible; background: none; }
+.flat-board[data-flat-promotion] .cell::before { z-index: 0; background: #60686e; }
+.flat-board[data-flat-promotion] .cell.light::before { background: #a9b5bc; }
+.flat-board[data-flat-promotion] .cell > .piece-icon { position: relative; z-index: 3; }
+.flat-board .cell[data-promotion-piece] > .piece-icon {
+  transform: translateY(calc(var(--forge-lift, 0) * 110%))
+    scale(calc(1 + var(--forge-air, 0) * .14 + var(--forge-recoil, 0) * .032), calc(1 + var(--forge-air, 0) * .14 - var(--forge-recoil, 0) * .065));
+  clip-path: inset(calc((1 - var(--forge-grow, 1)) * 100%) -18% -12%);
+  filter: drop-shadow(0 0 calc(var(--forge-light, 0) * .46rem) #efb076)
+    drop-shadow(0 .03rem calc(var(--forge-air, 0) * .28rem) #c3dcf3);
+}
+.cell[data-pawn-arriving] { overflow: visible; isolation: auto; z-index: 3; }
+.cell[data-pawn-arriving] > .piece-icon {
+  position: relative; z-index: 3;
+  animation: flat-pawn-arrival 300ms cubic-bezier(.25, .64, .35, 1) both;
+  animation-delay: var(--pawn-delay, 0ms);
+}
+.flat-promotion-capture {
+  position: absolute; width: 12.5%; height: 12.5%; z-index: 2; display: grid; place-items: center;
+  pointer-events: none; animation: flat-pawn-contact 390ms ease-out both;
+}
+.flat-promotion-capture .piece-icon { width: 83%; height: 83%; }
+@keyframes flat-pawn-arrival {
+  from { transform: translate(var(--pawn-x), var(--pawn-y)) scale(.97); }
+  to { transform: translate(0, 0) scale(1); }
+}
+@keyframes flat-pawn-contact {
+  0%, 46% { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(.72); }
 }

@@ -36,6 +36,7 @@ uniform float uSeed;
 uniform vec3 uTincture;
 uniform vec3 uSweepTint;
 uniform vec4 uRoyal;
+uniform vec4 uBirth;
 
 float grain(vec3 p) {
   p = fract(p * 0.319 + vec3(0.1, 0.2, 0.3));
@@ -91,9 +92,10 @@ export function stoneMaterial(source: MeshStandardMaterial, side: Side, seed: nu
     uSweepTint: { value: new Color('#b4dbca') },
     // Resting threat, live strength, travel up the model, and the discharge.
     uRoyal: { value: { x: 0, y: 0, z: 0, w: 0 } },
+    uBirth: { value: { x: 0, y: 0, z: 0, w: 0 } },
   }
 
-  material.customProgramCacheKey = () => 'remorse-marble-4'
+  material.customProgramCacheKey = () => 'remorse-marble-6'
   material.onBeforeCompile = shader => {
     Object.assign(shader.uniforms, values)
     shader.vertexShader = shader.vertexShader
@@ -110,6 +112,13 @@ export function stoneMaterial(source: MeshStandardMaterial, side: Side, seed: nu
           float threshold = crystal * 0.66 + (pStone.y + .08) * .20;
           if (threshold < uFade) discard;
           edgeFade = 1.0 - smoothstep(.005, .105, threshold - uFade);
+        }
+        float forgeLight = 0.0;
+        if (uBirth.z > 0.5) {
+          float cut = uBirth.x * 1.88 - pStone.y;
+          float chip = (grain(floor(pStone * 26.0) + uSeed) - .5) * .13;
+          if (cut + chip < -.045) discard;
+          forgeLight = (1.0 - smoothstep(.015, .21, abs(cut + chip))) * uBirth.y;
         }
         float wearMap = 0.0;
         float fault = 0.0;
@@ -175,6 +184,15 @@ export function stoneMaterial(source: MeshStandardMaterial, side: Side, seed: nu
           totalEmissiveRadiance += uSweepTint * sweep * .68;
         }
         totalEmissiveRadiance += uTincture * edgeFade * .44;
+        totalEmissiveRadiance += vec3(1.09, .63, .31) * forgeLight;
+        if (uBirth.y > .001) {
+          float edge = pow(1.0 - abs(dot(normal, normalize(vViewPosition))), 3.0);
+          totalEmissiveRadiance += vec3(.71, .45, .28) * edge * uBirth.y * .34;
+        }
+        if (uBirth.w > .001) {
+          float silver = pow(1.0 - abs(dot(normal, normalize(vViewPosition))), 2.2);
+          totalEmissiveRadiance += vec3(.47, .61, .79) * (.066 + silver * .55) * uBirth.w;
+        }
         if (uRoyal.x + uRoyal.y > .002) {
           float rim = pow(1.0 - abs(dot(normal, normalize(vViewPosition))), 3.7);
           float crown = smoothstep(.99, 1.57, pStone.y);

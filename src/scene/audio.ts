@@ -2,6 +2,9 @@ import type { Affliction, GameEvent, Side } from '../core/types'
 import { sampleWindow, sceneAudioPath } from './audioSamples'
 import type { SampleName } from './audioSamples'
 import { getDieMotionTiming } from './diceMotion'
+import { actionPlan, isCaptureReaction } from './actionPresentation'
+import type { ActionPlan } from './actionPresentation'
+import { promotionFamily, promotionTiming } from './promotionMotion'
 import { royalTiming } from './royalMotion'
 import type { RoyalCue } from './royalMotion'
 
@@ -11,11 +14,15 @@ export interface SceneAudioOptions {
   /** performance.now() at the live presentation commit, shared with its animation. */
   readonly startedAt?: number
   readonly royal?: boolean
+  readonly plan?: ActionPlan
+  readonly batchId?: string
 }
 
 type CueKind = 'move' | 'capture' | 'mercy' | 'friendlyCapture' | 'dice' | 'unaffected'
   | 'guilt' | 'devastated' | 'berserk' | 'bloodlust' | 'heal' | 'convert' | 'remove'
-  | 'promotion' | 'bonus' | 'check' | 'turn' | 'win' | 'loss' | 'draw' | 'finish' | RoyalSound
+  | 'promotionFormation' | 'promotionRookApproach' | 'promotionRookImpact'
+  | 'promotionQueenApproach' | 'promotionQueenImpact' | 'promotionQueenFracture' | 'promotionQueenArc'
+  | 'bonus' | 'check' | 'turn' | 'win' | 'loss' | 'draw' | 'finish' | RoyalSound
 type RoyalSound = 'royalCheck' | 'royalCharge' | 'royalBreak' | 'royalWin' | 'royalLoss' | 'royalEnd'
 
 interface SceneCue {
@@ -31,7 +38,6 @@ function importantEffect(events: readonly GameEvent[], rolled: boolean): CueKind
     if (event.type === 'reaction' || event.type === 'affliction') states.add(event.affliction)
   }
   if (events.some(event => event.type === 'convert')) return 'convert'
-  if (events.some(event => event.type === 'promotion')) return 'promotion'
   if (events.some(event => event.type === 'cure')) return 'heal'
   for (const state of ['bloodlust', 'berserk', 'devastated', 'guilt'] as const) {
     if (states.has(state)) return state
@@ -41,34 +47,67 @@ function importantEffect(events: readonly GameEvent[], rolled: boolean): CueKind
   if (events.some(event => event.type === 'bonus')) return 'bonus'
 }
 
-/** Give each action one physical contact and at most one expressive cue. */
+function outcomeCue(events: readonly GameEvent[], options: SceneAudioOptions): CueKind | undefined {
+  if (options.royal) return undefined
+  const outcome = events.find(event => event.type === 'outcome')
+  if (outcome?.type === 'outcome') {
+    const winner = outcome.outcome.winner
+    return winner === null ? 'draw' : !options.humanSide ? 'finish' : winner === options.humanSide ? 'win' : 'loss'
+  }
+  if (events.some(event => event.type === 'turn' && event.check)) return 'check'
+}
+
+/** Schedule the whole committed action at its live start, including its later semantic stages. */
 export function planSceneCues(events: readonly GameEvent[], options: SceneAudioOptions = {}): readonly SceneCue[] {
   const cues: SceneCue[] = []
-  const reduced = Boolean(options.reducedMotion)
-  const capture = events.find(event => event.type === 'capture')
   const rolled = events.some(event => event.type === 'reaction' && event.face !== undefined)
-  const outcome = events.find(event => event.type === 'outcome')
-  const checked = events.some(event => event.type === 'turn' && event.check)
-
+  const plan = options.plan ?? actionPlan(events, rolled, Boolean(options.reducedMotion), Boolean(options.royal))
+  const { reduced, roll, promotion } = plan
+  const capture = events.find(event => event.type === 'capture')
   if (capture) cues.push({
     kind: capture.friendly ? 'friendlyCapture' : capture.mercy ? 'mercy' : 'capture',
-    at: reduced ? .018 : .13,
+    at: reduced ? .018 : promotion ? .205 : .13,
   })
   else if (events.some(event => event.type === 'move')) cues.push({ kind: 'move', at: reduced ? .022 : .16 })
-  if (rolled) cues.push({ kind: 'dice', at: 0 })
+  if (roll) cues.push({ kind: 'dice', at: roll.start / 1000 })
 
-  let accent: CueKind | undefined
-  if (outcome && !options.royal) {
-    const winner = outcome.outcome.winner
-    accent = winner === null ? 'draw' : !options.humanSide ? 'finish' : winner === options.humanSide ? 'win' : 'loss'
-  } else if (checked && !options.royal) accent = 'check'
-  else accent = importantEffect(events, rolled)
+  const ending = outcomeCue(events, options)
+  if (promotion) {
+    const { event, reactionEvents, reactionAt, surgeAt, formationAt, aftermathAt, aftermathEvents } = promotion
+    const state = importantEffect(reactionEvents, rolled)
+    if (state && reactionAt !== null) cues.push({ kind: state, at: reactionAt / 1000 + (reduced ? .036 : .074) })
+    if (surgeAt !== null) cues.push({ kind: 'bloodlust', at: surgeAt / 1000 + (reduced ? .035 : .064) })
+    const family = promotionFamily(event.promotion)
+    const impact = (formationAt + promotionTiming(event.promotion, reduced).impact) / 1000
+    if (family === 'formation') {
+      cues.push({ kind: 'promotionFormation', at: formationAt / 1000 + (reduced ? .055 : .15) })
+    } else if (family === 'rook') {
+      if (!reduced) cues.push({ kind: 'promotionRookApproach', at: impact - .31 })
+      cues.push({ kind: 'promotionRookImpact', at: impact })
+    } else {
+      if (!reduced) cues.push({ kind: 'promotionQueenApproach', at: impact - .42 })
+      cues.push({ kind: 'promotionQueenImpact', at: impact }, { kind: 'promotionQueenFracture', at: impact + .075 })
+      if (!reduced) cues.push({ kind: 'promotionQueenArc', at: impact + .14 })
+    }
+    const consequence = importantEffect(aftermathEvents.filter(event => event.type !== 'bonus'), false)
+    if (consequence) cues.push({ kind: consequence, at: aftermathAt / 1000 + (reduced ? .035 : .09) })
+    if (ending) cues.push({ kind: ending, at: plan.end / 1000 + .015 })
+    return cues
+  }
 
-  if (accent) {
-    const at = rolled ? getDieMotionTiming(reduced).motionMs / 1000 + DIE_SETTLE_SOUND_GAP
-      : cues.length ? (reduced ? .084 : .258) : .018
-    cues.push({ kind: accent, at })
-  } else if (!options.royal && !cues.length && events.some(event => event.type === 'turn')) cues.push({ kind: 'turn', at: .018 })
+  const at = roll ? roll.settle / 1000 + DIE_SETTLE_SOUND_GAP : cues.length ? (reduced ? .084 : .258) : .018
+  const reactions = ending ? [] : events.filter(isCaptureReaction)
+  const accent = ending ?? importantEffect(reactions.length ? reactions.slice(0, 1) : events, rolled)
+  if (accent) cues.push({ kind: accent, at })
+  if (plan.escalationAt !== null && !ending) {
+    cues.push({ kind: 'bloodlust', at: plan.escalationAt / 1000 + (reduced ? .035 : .064) })
+  }
+  if (reactions.length) {
+    const consequence = importantEffect(events.filter(event => !isCaptureReaction(event) && event.type !== 'bonus'), false)
+    if (consequence) cues.push({ kind: consequence, at: (cues.at(-1)?.at ?? at) + (reduced ? .09 : .18) })
+  } else if (!options.royal && !cues.length && events.some(event => event.type === 'turn')) {
+    cues.push({ kind: 'turn', at: .018 })
+  }
   return cues
 }
 
@@ -112,7 +151,15 @@ const regular: Record<Exclude<CueKind, 'dice' | RoyalSound>, SampleVoice> = {
   heal: { sample: 'resonance', rate: 1.14, gain: .53 },
   convert: { sample: 'resonance', rate: .84, gain: .59 },
   remove: { sample: 'fracture', rate: .56, gain: .37 },
-  promotion: { sample: 'resonance', rate: 1.46, gain: .62 },
+  // Local audition replacements attach to these named stages. The shipped
+  // bank supplies their temporary mix until the owner selects new recordings.
+  promotionFormation: { sample: 'resonance', rate: 1.19, gain: .46 },
+  promotionRookApproach: { sample: 'resonance', rate: .75, gain: .22 },
+  promotionRookImpact: { sample: 'capture', rate: .83, gain: .69 },
+  promotionQueenApproach: { sample: 'resonance', rate: .57, gain: .26 },
+  promotionQueenImpact: { sample: 'capture', rate: .66, gain: .75 },
+  promotionQueenFracture: { sample: 'fracture', rate: .80, gain: .43 },
+  promotionQueenArc: { sample: 'diceEdge', rate: 1.36, gain: .25 },
   bonus: { sample: 'resonance', rate: 1.65, gain: .31 },
   check: { sample: 'diceEdge', rate: 1.02, gain: .64 },
   turn: { sample: 'stone', rate: 1.28, gain: .25 },
@@ -406,7 +453,7 @@ function playBatch(batchId: string | undefined, cues: readonly SceneCue[], optio
 
 /** Accept only newly committed live events. Never call this with restored/review/search history. */
 export function playSceneCue(events: readonly GameEvent[], options: SceneAudioOptions = {}): boolean {
-  return playBatch(events.at(-1)?.id, planSceneCues(events, options), options)
+  return playBatch(options.batchId ?? events.at(-1)?.id, planSceneCues(events, options), options)
 }
 
 export function playRoyalCue(cue: RoyalCue) {
@@ -414,7 +461,7 @@ export function playRoyalCue(cue: RoyalCue) {
   const cues: SceneCue[] = cue.kind === 'check'
     ? [{ kind: 'royalCheck', at: impact / 1000 }]
     : [
-      { kind: 'royalCharge', at: (impact - 760) / 1000 },
+      ...(cue.fromPromotion && !cue.reduced ? [] : [{ kind: 'royalCharge' as const, at: (impact - 760) / 1000 }]),
       { kind: 'royalBreak', at: impact / 1000 },
       { kind: cue.tone === 'win' ? 'royalWin' : cue.tone === 'loss' ? 'royalLoss' : 'royalEnd', at: resolution / 1000 },
     ]

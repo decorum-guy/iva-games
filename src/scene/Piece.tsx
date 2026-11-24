@@ -15,6 +15,8 @@ import { squarePoint, stateColors } from './types'
 import type { SceneFocus, ScenePiece } from './types'
 import { easeRange, sampleRoyal } from './royalMotion'
 import type { RoyalCue } from './royalMotion'
+import { samplePromotion } from './promotionMotion'
+import type { PromotionCue } from './promotionMotion'
 
 const restHeight = .005
 const flatRotation: [number, number, number] = [-Math.PI / 2, 0, 0]
@@ -228,7 +230,7 @@ function PieceBadge({ piece, flipped, low, reduced, focus }: {
   )
 }
 
-export function VisualPiece({ piece, assets, events, flipped, low, reduced, focus, threatened, royal }: {
+export function VisualPiece({ piece, assets, events, flipped, low, reduced, focus, threatened, royal, promotion }: {
   piece: ScenePiece
   assets: ChessAssets
   events: readonly GameEvent[]
@@ -238,6 +240,7 @@ export function VisualPiece({ piece, assets, events, flipped, low, reduced, focu
   focus?: SceneFocus
   threatened: boolean
   royal?: RoyalCue
+  promotion?: PromotionCue
 }) {
   const mesh = useRef<Mesh>(null)
   const body = useRef<Group>(null)
@@ -247,7 +250,7 @@ export function VisualPiece({ piece, assets, events, flipped, low, reduced, focu
   const change = useRef<Change | null>(null)
   const focusStart = useRef<number | null>(null)
   const threat = useRef({ rest: Number(threatened), from: Number(threatened), to: Number(threatened), start: 0 })
-  const previous = useRef<{ piece: ScenePiece; eventId?: string }>(null)
+  const previous = useRef<{ piece: ScenePiece; eventId?: string; promotionId?: string }>(null)
   const invalidate = useThree(state => state.invalidate)
   const asset = assets.pieces[piece.side][piece.kind]
   const { material, values } = useMemo(
@@ -285,23 +288,33 @@ export function VisualPiece({ piece, assets, events, flipped, low, reduced, focu
     if (!mesh.current || !body.current || !shadow.current) return
     const last = previous.current
     const eventId = events.at(-1)?.id
-    previous.current = { piece, eventId }
+    previous.current = { piece, eventId, promotionId: promotion?.id }
     const [x, z] = squarePoint(piece.square)
     const now = performance.now()
     const changedSquare = !!last && last.piece.square !== piece.square
-    if (!last || reduced) {
+    if (!last || reduced || promotion) {
       move.current = null
       change.current = null
       body.current.position.set(x, restHeight, z)
       body.current.rotation.y = 0
+      body.current.scale.setScalar(1)
       shadow.current.position.set(x, .01, z)
       for (const ghost of trail.current) if (ghost) ghost.visible = false
       values.uEmber.value = values.uFade.value = 0
       values.uMend.value = -1
       applyModel(piece)
       stoneState(piece.affliction, 1)
+      values.uBirth.value.y = values.uBirth.value.z = values.uBirth.value.w = 0
       invalidate()
       return
+    }
+
+    if (last.promotionId) {
+      body.current.position.set(x, restHeight, z)
+      body.current.scale.setScalar(1)
+      shadow.current.position.set(x, .01, z)
+      ;(shadow.current.material as MeshBasicMaterial).opacity = low ? .61 : .38
+      values.uBirth.value.y = values.uBirth.value.z = values.uBirth.value.w = 0
     }
 
     if (changedSquare) {
@@ -337,6 +350,20 @@ export function VisualPiece({ piece, assets, events, flipped, low, reduced, focu
     if (!body.current || !shadow.current || !mesh.current) return
     let active = false
     const now = performance.now()
+    if (promotion) {
+      const sample = samplePromotion(promotion, now - promotion.startedAt, reduced || promotion.reduced)
+      body.current.position.y = restHeight + sample.height
+      const compression = sample.family === 'formation' ? .026 : .064
+      body.current.scale.set(1 + .024 * sample.recoil, 1 - compression * sample.recoil, 1 + .024 * sample.recoil)
+      const surface = values.uBirth.value
+      surface.x = sample.reveal
+      surface.y = sample.family === 'formation' ? .81 * sample.charge * (1 - sample.reveal * .60) + .75 * sample.contact
+        : .56 * sample.contact + .45 * sample.arc
+      surface.z = sample.reveal < .995 ? 1 : 0
+      surface.w = sample.airLight * (piece.side === 'black' ? .88 : .32)
+      ;(shadow.current.material as MeshBasicMaterial).opacity = (low ? .61 : .38) / (1 + sample.height * 1.17)
+      active = true
+    }
     const travel = move.current
     if (travel) {
       const elapsed = now - travel.start

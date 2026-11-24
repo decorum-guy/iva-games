@@ -135,6 +135,40 @@ export function frameRoyalCamera(
   return { target, distance, position: target.clone().addScaledVector(view, distance) }
 }
 
+/** Preserve the board, rising silhouette and the start of the lightning stroke. */
+export function framePromotionCamera(
+  rig: CameraRig, aspect: number, compact: boolean, [x, z]: GroundPoint,
+  motion: { approach: number; recoil: number; height: number; reveal: number; arc: number; depthView: number },
+  intoRoyal: boolean, overview = frameCamera(rig, aspect, compact),
+): CameraFrame {
+  const { approach, recoil, height, reveal, arc, depthView } = motion
+  if (approach === 0 && height === 0 && depthView === 0) return overview
+  const direction = overview.position.clone().sub(overview.target)
+  const elevation = Math.atan2(direction.y, Math.hypot(direction.x, direction.z))
+  const yaw = Math.atan2(direction.x, direction.z)
+  const view = viewDirection({ ...rig, yaw, elevation: elevation - (compact ? 8 : 9.5) * radians * depthView })
+  const top = Math.max(1.70, height + Math.min(1.70, .22 + 1.98 * reveal), 1.70 + Math.sqrt(arc) * 1.06)
+  const bounds = [...BOARD_FRAMING_POINTS, ...[-.46, .46].flatMap(dx => [-.46, .46].map(dz =>
+    [x + dx, top, z + dz] as const))]
+  const emphasis = Math.max(approach, recoil, clamp((top - 1.70) / .72))
+  const room = compact ? .986 - emphasis * .021 : .968 - emphasis * .016
+  const fit = fitFrame(bounds, overviewOrigin, view, rig.fov, aspect, room)
+  const zoom = approach * (compact ? .025 : intoRoyal ? .040 : .055)
+  const desired = overview.target.clone().add(new Vector3(x * zoom * .73, -.025 * recoil, z * zoom * .73))
+  const target = desired.lerp(fit.target, .62 * emphasis)
+  const across = up.clone().cross(view).normalize()
+  const vertical = view.clone().cross(across)
+  const aperture = Math.tan(rig.fov * radians / 2) * room
+  let distance = overview.distance * (1 - zoom)
+  for (const point of bounds) {
+    const delta = new Vector3(...point).sub(target)
+    const extent = Math.max(Math.abs(delta.dot(across)) / (aperture * Math.max(.05, aspect)), Math.abs(delta.dot(vertical)) / aperture)
+    distance = Math.max(distance, delta.dot(view) + extent)
+  }
+  distance += .12 * recoil
+  return { target, distance, position: target.clone().addScaledVector(view, distance) }
+}
+
 export function sameCameraRig(a: CameraRig, b: CameraRig): boolean {
   return a.elevation === b.elevation && a.yaw === b.yaw && a.fov === b.fov && a.focusAmount === b.focusAmount
     && a.focusPoint[0] === b.focusPoint[0] && a.focusPoint[1] === b.focusPoint[1]

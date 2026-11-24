@@ -662,3 +662,32 @@ test('a real worker capture shows and sounds its own committed die', async ({ pa
   expect(peak).toBeLessThan(.9)
   await testInfo.attach('native-audio-signal', { body: JSON.stringify({ peak, frames: probe.signal, starts: probe.starts }), contentType: 'application/json' })
 })
+
+test('pawn reaction and queen contact use one live audio batch and undo cancels the late cues', async ({ page }) => {
+  await instrumentNativeAudio(page)
+  await open(page, 'en', false)
+  const root = createPosition({ pieces: [
+    { side: 'white', type: 'king', square: 'h2' }, { side: 'black', type: 'king', square: 'h6' },
+    { side: 'white', type: 'pawn', square: 'b7' }, { side: 'black', type: 'rook', square: 'a8' },
+  ] })
+  const seed = Array.from({ length: 100 }, (_, n) => n).find(n => nextDie(n).face === 2)!
+  await restoreGame(page, createMatch(hotseat, { root, seed }).record)
+  await cell(page, 'b7').click()
+  await expect.poll(async () => (await nativeAudio(page)).context).toBe('running')
+  await cell(page, 'a8').click()
+  await page.getByTestId('promotion-queen').click()
+  await expect(playfield(page)).toHaveAttribute('data-dice', 'throwing')
+  await expect.poll(async () => (await nativeAudio(page)).starts.length).toBe(11)
+  const sounds = (await nativeAudio(page)).starts
+  expect(sounds.map(({ offset, duration }) => ({ offset, duration }))).toEqual(
+    (['capture', 'diceBody', 'diceBounce', 'diceEdge', 'diceBounce', 'diceSettle', 'fracture',
+      'resonance', 'capture', 'fracture', 'diceEdge'] as const).map(sampleWindow),
+  )
+  expect(sounds[6].when).toBeGreaterThan(sounds[5].when)
+  expect(sounds[8].when).toBeGreaterThan(sounds[6].when)
+  await page.getByTestId('undo').click()
+  await expect(playfield(page)).toHaveAttribute('data-promotion-stage', 'none')
+  await expect(cell(page, 'b7')).toHaveAccessibleName(/Pawn/)
+  const { stops } = await nativeAudio(page)
+  expect(sounds.slice(6).every(sound => stops.some(stop => stop.scheduled === sound.when && stop.at < sound.when))).toBe(true)
+})

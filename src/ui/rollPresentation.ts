@@ -31,3 +31,13 @@ export function maskRollResult(current: GameState, previous: GameState): GameSta
 export function rollSceneEvents(events: readonly GameEvent[], phase: 'throwing' | 'revealed'): readonly GameEvent[] {
   return events.filter(event => (event.type === 'move' || event.type === 'capture') === (phase === 'throwing'))
 }
+
+/** A rolled six can briefly show rage before the third capture escalates it. */
+export function maskBloodlust(current: GameState, events: readonly GameEvent[]): GameState {
+  const reaction = events.find(event => event.type === 'reaction' && event.affliction === 'berserk')
+  if (reaction?.type !== 'reaction') return current
+  return {
+    ...current,
+    pieces: current.pieces.map(piece => piece.id === reaction.piece.id ? { ...piece, affliction: 'berserk' } : piece),
+  }
+}

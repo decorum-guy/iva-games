@@ -2,9 +2,10 @@ import type { Command, GameEvent, Side } from '../core';
 import { ENGINE_VERSION, getPreset, PRESET_VERSION } from '../engine/presets';
 import type { SearchRequest, SearchResponse } from '../engine/protocol';
 import { initialProfile } from '../rating/elo';
-import { getDieMotionTiming, getDieThrowDuration } from '../scene/diceMotion';
+import { actionPlan } from '../scene/actionPresentation';
+import type { ActionPlan, PromotionStage } from '../scene/actionPresentation';
 import { CAMERA_TRAVEL_MS } from '../scene/cameraFocus';
-import { royalAction, royalLeadIn, royalTiming } from '../scene/royalMotion';
+import { royalAction, royalTiming } from '../scene/royalMotion';
 import type { RoyalCue } from '../scene/royalMotion';
 import type { Profile, RatingEntry } from '../rating/elo';
 import { openGameStore } from '../storage/database';
@@ -42,7 +43,12 @@ interface CabinetState {
   readonly rollPhase: 'idle' | 'throwing' | 'settled';
   readonly rollReduced: boolean;
   readonly rollStartedAt: number | null;
-  readonly audioCue: { readonly id: string; readonly events: readonly GameEvent[]; readonly human: Side | null; readonly startedAt: number; readonly royal: boolean } | null;
+  readonly audioCue: {
+    readonly id: string; readonly events: readonly GameEvent[]; readonly human: Side | null;
+    readonly startedAt: number; readonly royal: ReturnType<typeof royalAction>; readonly plan: ActionPlan;
+  } | null;
+  readonly promotionStage: PromotionStage | null;
+  readonly waitingForBloodlust: boolean;
   readonly royalPending: boolean;
   readonly royalCue: RoyalCue | null;
   readonly royalResolved: boolean;
@@ -75,7 +81,7 @@ export class Cabinet {
     ready: false, durable: false, storageProblem: null, busy: false, animating: false, teachingReturning: false, thinking: false, searchFailed: false,
     profile: initialProfile, ledger: [], matches: [], view: 'home', game: null, learning: null,
     error: null, motionKey: 'home', rollId: null, rollPhase: 'idle', rollReduced: false, rollStartedAt: null, audioCue: null,
-    royalPending: false, royalCue: null, royalResolved: false,
+    promotionStage: null, waitingForBloodlust: false, royalPending: false, royalCue: null, royalResolved: false,
   };
   private readonly listeners = new Set<() => void>();
   private store: GameStore | null = null;
@@ -83,8 +89,8 @@ export class Cabinet {
   private worker: Worker | null = null;
   private workerDeadline: ReturnType<typeof setTimeout> | undefined;
   private scheduled: ReturnType<typeof setTimeout> | undefined;
-  private reveal: ReturnType<typeof setTimeout> | undefined;
-  private settle: ReturnType<typeof setTimeout> | undefined;
+  private presentationTimers: ReturnType<typeof setTimeout>[] = [];
+  private fastForwardPresentation: (() => void) | undefined;
   private royalEnd: ReturnType<typeof setTimeout> | undefined;
   private teachingReturn: ReturnType<typeof setTimeout> | undefined;
   private attempts = 0;
@@ -249,13 +255,12 @@ export class Cabinet {
     this.generation += 1;
     this.stopWorker();
     clearTimeout(this.scheduled);
-    clearTimeout(this.reveal);
-    clearTimeout(this.settle);
+    this.clearPresentation();
     clearTimeout(this.royalEnd);
     clearTimeout(this.teachingReturn);
     this.attempts = 0;
     this.patch({ thinking: false, animating: false, teachingReturning: false, searchFailed: false, motionKey: newId(), rollId: null,
-      rollPhase: 'idle', rollStartedAt: null, audioCue: null, royalPending: false, royalCue: null, royalResolved: false });
+      rollPhase: 'idle', rollStartedAt: null, audioCue: null, promotionStage: null, waitingForBloodlust: false, royalPending: false, royalCue: null, royalResolved: false });
   }
 
   private async run(action: () => void | Promise<void>): Promise<boolean> {
@@ -385,40 +390,71 @@ export class Cabinet {
     this.changedStore();
   });
 
+  private clearPresentation() {
+    this.presentationTimers.forEach(timer => clearTimeout(timer));
+    this.presentationTimers = [];
+    this.fastForwardPresentation = undefined;
+  }
+
+  finishHiddenPresentation = () => {
+    this.fastForwardPresentation?.();
+    this.finishRoyal();
+  };
+
   private present(game: GameSession) {
     const action = game.record.actions[game.record.cursor - 1];
     if (!action) return;
-    // This is a live, committed action. Restores/reviews never call present and
-    // therefore cannot replay old sounds. Results need a cue even without motion.
+    // Only a live, committed action creates a clock or an audio batch.
     const startedAt = performance.now();
     const { events } = game.current;
     const { human, mode } = game.record.config;
     const royal = mode === 'tutorial' ? null : royalAction(game.state, events, human, this.shortMotion);
-    const audioCue = { id: `${game.record.id}/${action.id}`, events, human, startedAt, royal: Boolean(royal) };
+    const plan = actionPlan(events, Boolean(action.roll), this.shortMotion, Boolean(royal));
+    const audioCue = { id: `${game.record.id}/${action.id}`, events, human, startedAt, royal, plan };
     const showsMotion = action.command.type === 'move' || action.command.type === 'endTurn';
     if (!showsMotion) { this.patch({ audioCue }); return; }
-    clearTimeout(this.reveal);
-    clearTimeout(this.settle);
-    const rollId = action.roll ? action.id : null;
-    const motion = rollId ? getDieMotionTiming(this.shortMotion).motionMs : null;
-    const baseDuration = rollId ? getDieThrowDuration(this.shortMotion) : this.shortMotion ? 75 : 330;
-    const duration = royal ? royalLeadIn(events, baseDuration, motion, this.shortMotion) : baseDuration;
-    this.patch({ audioCue, animating: true, rollId, rollPhase: rollId ? 'throwing' : 'idle', rollReduced: this.shortMotion,
-      rollStartedAt: rollId ? startedAt : null, royalPending: Boolean(royal) });
-    if (motion !== null) this.settle = setTimeout(() => {
-      this.patch({ rollPhase: 'settled' });
-    }, motion);
-    this.reveal = setTimeout(() => {
+
+    this.clearPresentation();
+    const { roll, promotion } = plan;
+    const startsThrowing = roll?.start === 0;
+    this.patch({ audioCue, animating: true, rollId: startsThrowing ? action.id : null,
+      rollPhase: startsThrowing ? 'throwing' : 'idle', rollReduced: plan.reduced,
+      rollStartedAt: startsThrowing ? startedAt : null, royalPending: Boolean(royal),
+      promotionStage: promotion ? 'contact' : null, waitingForBloodlust: plan.escalationAt !== null });
+    const at = (offset: number, run: () => void) => {
+      this.presentationTimers.push(setTimeout(() => {
+        if (this.data.audioCue?.id === audioCue.id && this.data.animating) run();
+      }, offset));
+    };
+    if (roll) {
+      if (roll.start > 0) at(roll.start, () => this.patch({
+        rollId: action.id, rollPhase: 'throwing', rollStartedAt: startedAt + roll.start, promotionStage: 'roll',
+      }));
+      at(roll.settle, () => this.patch({ rollPhase: 'settled', ...(promotion ? { promotionStage: 'reaction' as const } : {}) }));
+    }
+    if (plan.escalationAt !== null) at(plan.escalationAt, () => this.patch({ waitingForBloodlust: false }));
+    if (promotion) {
+      if (!roll && promotion.reactionAt !== null) at(promotion.reactionAt, () => this.patch({ promotionStage: 'reaction' }));
+      if (promotion.surgeAt !== null) at(promotion.surgeAt, () => this.patch({ promotionStage: 'surge' }));
+      at(promotion.formationAt, () => this.patch({ promotionStage: 'formation', rollPhase: 'idle' }));
+      if (promotion.aftermathAt < plan.end) at(promotion.aftermathAt, () => this.patch({ promotionStage: 'aftermath' }));
+    }
+    const finish = () => {
+      this.clearPresentation();
       const cue = royal && (typeof document === 'undefined' || !document.hidden)
-        ? { ...royal, reduced: this.shortMotion, startedAt: performance.now() } : null;
-      this.patch({ animating: false, rollPhase: 'idle', royalPending: false, royalCue: cue, royalResolved: false });
+        ? { ...royal, fromPromotion: Boolean(promotion), continuingCamera: promotion?.aftermathAt === plan.end,
+          reduced: this.shortMotion, startedAt: performance.now() } : null;
+      this.patch({ animating: false, rollPhase: 'idle', promotionStage: null, waitingForBloodlust: false, royalPending: false, royalCue: cue, royalResolved: false,
+        ...(roll ? { rollId: action.id } : {}) });
       if (!cue) { this.pump(); return; }
       const { duration, resolution } = royalTiming(cue);
       this.royalEnd = cue.kind === 'check' ? setTimeout(this.finishRoyal, duration) : setTimeout(() => {
         this.patch({ royalResolved: true });
         this.royalEnd = setTimeout(this.finishRoyal, duration - resolution);
       }, resolution);
-    }, duration);
+    };
+    this.fastForwardPresentation = finish;
+    at(plan.end, finish);
   }
 
   finishRoyal = () => {

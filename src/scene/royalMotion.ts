@@ -8,6 +8,8 @@ export interface RoyalAction {
   readonly side: Side
   readonly tone: 'win' | 'loss' | 'neutral'
   readonly reduced: boolean
+  readonly fromPromotion?: boolean
+  readonly continuingCamera?: boolean
 }
 
 export interface RoyalCue extends RoyalAction {
@@ -32,17 +34,19 @@ export function royalLeadIn(events: readonly GameEvent[], baseMs: number, rollMo
   if (reduced) return baseMs
   if (rollMotionMs !== null) return Math.max(baseMs, rollMotionMs + 615)
   if (events.every(event => event.type === 'turn' || event.type === 'outcome')) return 145
-  return events.some(event => event.type === 'promotion') ? 855 : 625
+  return 625
 }
 
-export function royalTiming({ kind, reduced }: RoyalAction) {
+export function royalTiming({ kind, reduced, fromPromotion }: RoyalAction) {
   if (kind === 'check') return reduced ? { duration: 880, impact: 280, resolution: 680 }
     : { duration: 990, impact: 243, resolution: 760 }
+  if (fromPromotion && !reduced) return { duration: 2820, impact: 715, resolution: 1930 }
   return reduced ? { duration: 2680, impact: 1020, resolution: 2080 }
     : { duration: 3330, impact: 1030, resolution: 2370 }
 }
 
 export const clampUnit = (value: number) => Math.max(0, Math.min(1, value))
+export const promotionRoyalLead = (kind: RoyalAction['kind']) => kind === 'mate' ? .22 : .12
 export function easeRange(from: number, to: number, value: number) {
   const t = clampUnit((value - from) / (to - from))
   return t * t * (3 - 2 * t)
@@ -61,13 +65,14 @@ export function sampleRoyal(cue: RoyalAction, elapsed: number) {
   const surface = (charge * (mate ? .68 : .73) * decay + discharge * (mate ? 1.13 : .77)) *
     (reduced ? .78 : 1)
   const wave = clampUnit(afterImpact / (mate ? 1170 : 485))
-  const camera = reduced ? 0 : easeRange(0, mate ? 1020 : 292, elapsed) *
-    (1 - easeRange(mate ? 2090 : 425, duration - 20, elapsed))
+  const cameraLead = cue.continuingCamera ? promotionRoyalLead(cue.kind) : 0
+  const camera = reduced ? 0 : (cameraLead + (1 - cameraLead) * easeRange(0, mate ? impact - 10 : 292, elapsed)) *
+    (1 - easeRange(mate ? resolution - 280 : 425, duration - 20, elapsed))
   const recoil = reduced || !mate ? 0 :
     easeRange(0, 66, afterImpact) * (1 - easeRange(69, 265, afterImpact))
   return {
     surface, sweep: charge, discharge, camera, recoil,
-    dusk: mate ? easeRange(0, 860, elapsed) * (1 - easeRange(resolution - 350, duration - 60, elapsed)) : 0,
+    dusk: mate ? easeRange(0, impact * .84, elapsed) * (1 - easeRange(resolution - 350, duration - 60, elapsed)) : 0,
     contact: (.35 * charge * decay + .90 * discharge) * (reduced ? .65 : 1),
     wave, waveStrength: reduced ? 0 : easeRange(0, 46, afterImpact) * (1 - easeRange(.24, 1, wave)),
     flight: reduced ? -1 : afterImpact * .001,

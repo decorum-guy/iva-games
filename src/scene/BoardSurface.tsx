@@ -3,10 +3,13 @@ import { useFrame, useThree } from '@react-three/fiber'
 import { CanvasTexture, MeshBasicMaterial, SRGBColorSpace, Vector2, Vector3, Vector4 } from 'three'
 import type { Group } from 'three'
 import type { ChessAssets } from './assets'
+import { MarbleFracture } from './MarbleFracture'
 import { squarePoint } from './types'
-import type { SceneMark } from './types'
+import type { SceneMark, ScenePiece } from './types'
 import { easeRange, sampleRoyal } from './royalMotion'
 import type { RoyalCue } from './royalMotion'
+import { samplePromotion } from './promotionMotion'
+import type { PromotionCue } from './promotionMotion'
 
 const flatRotation: [number, number, number] = [-Math.PI / 2, 0, 0]
 
@@ -248,11 +251,14 @@ function CheckInlay({ square, dramatic }: { square?: string; dramatic: boolean }
   </group>
 }
 
-export function BoardSurface({ assets, flipped, marks, royal }: {
+export function BoardSurface({ assets, flipped, marks, royal, promotion, reduced, pieces }: {
   assets: ChessAssets
   flipped: boolean
   marks: readonly SceneMark[]
   royal?: RoyalCue
+  promotion?: PromotionCue
+  reduced: boolean
+  pieces: readonly ScenePiece[]
 }) {
   const letters = useMemo(() => engraving(flipped), [flipped])
   useEffect(() => () => letters.dispose(), [letters])
@@ -265,7 +271,7 @@ export function BoardSurface({ assets, flipped, marks, royal }: {
     material.envMapIntensity = .38
     const origin = { value: new Vector2() }
     const reflection = { value: new Vector4() }
-    material.customProgramCacheKey = () => 'remorse-royal-marble'
+    material.customProgramCacheKey = () => 'remorse-marble-reflection'
     material.onBeforeCompile = shader => {
       shader.uniforms.uKingTile = origin
       shader.uniforms.uKingLight = reflection
@@ -295,7 +301,17 @@ export function BoardSurface({ assets, flipped, marks, royal }: {
   }, [assets])
   useEffect(() => () => boardMaterial.dispose(), [boardMaterial])
   useFrame(() => {
-    if (!royal) { reflection.value.set(0, 0, 0, 0); return }
+    if (!royal) {
+      if (promotion) {
+        const flash = samplePromotion(promotion, performance.now() - promotion.startedAt, promotion.reduced || reduced)
+        const scale = flash.family === 'queen' ? 1.0 : flash.family === 'rook' ? .76 : .29
+        const [x, z] = squarePoint(promotion.square)
+        origin.value.set(x, z)
+        reflection.value.set(flash.contact * scale, .25 + flash.wave * (1.1 + 3.9 * scale),
+          flash.waveLight * scale * (flash.family === 'queen' ? .64 : .85), flash.arc * .88 + flash.contact * .48)
+      } else reflection.value.set(0, 0, 0, 0)
+      return
+    }
     const pulse = sampleRoyal(royal, performance.now() - royal.startedAt)
     const mate = royal.kind === 'mate'
     const [x, z] = squarePoint(royal.square)
@@ -313,7 +329,9 @@ export function BoardSurface({ assets, flipped, marks, royal }: {
       </mesh>
       <Plate size={9.54} height={.08} y={-.325} color="#222328" metalness={.3} />
       <Plate size={9.57} height={.017} y={-.299} color="#8c6945" metalness={.63} />
-      <mesh geometry={assets.board.geometry} material={boardMaterial} receiveShadow dispose={null} />
+      {promotion?.kind === 'queen'
+        ? <MarbleFracture model={assets.board.geometry} material={boardMaterial} cue={promotion} reduced={reduced} pieces={pieces} />
+        : <mesh geometry={assets.board.geometry} material={boardMaterial} receiveShadow dispose={null} />}
       <mesh position-y={.004} rotation={flatRotation}>
         <planeGeometry args={[9.58, 9.58]} />
         <meshBasicMaterial map={letters} transparent opacity={.96} depthWrite={false} toneMapped={false} />

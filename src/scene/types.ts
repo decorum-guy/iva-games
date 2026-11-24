@@ -1,5 +1,6 @@
 import type { Affliction, GameEvent, PieceType, Side, Square } from '../core/types'
 import type { RoyalCue } from './royalMotion'
+import type { PromotionCue } from './promotionMotion'
 
 export interface ScenePiece {
   id: string
@@ -37,6 +38,7 @@ export interface BoardSceneProps {
   /** Explicit teaching focus only. Removing it restores the whole-board camera. */
   focus?: SceneFocus
   royal?: RoyalCue
+  promotion?: PromotionCue
   onSquare: (square: Square) => void
   onDragSquare?: (from: Square, to: Square) => void
   onFailure: () => void

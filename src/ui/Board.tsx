@@ -1,10 +1,12 @@
 import { Component, lazy, Suspense, useMemo, useRef, useState } from 'react';
-import type { FocusEvent, KeyboardEvent, ReactNode } from 'react';
+import type { CSSProperties, FocusEvent, KeyboardEvent, ReactNode } from 'react';
 import { cyclesRemaining, fileOf, rankOf, squareAt } from '../core';
 import type { GameEvent, GameState, Piece, Square } from '../core';
 import type { Translate } from '../i18n/catalog';
 import type { SceneFocus, SceneMark } from '../scene/types';
 import type { RoyalCue } from '../scene/royalMotion';
+import type { PromotionCue } from '../scene/promotionMotion';
+import { FlatPromotion } from './FlatPromotion';
 import { FlatRoyal } from './FlatRoyal';
 import { PieceIcon, StateMark } from './pieces';
 
@@ -36,6 +38,8 @@ export interface BoardProps {
   readonly overlay?: ReactNode;
   readonly focus?: SceneFocus;
   readonly royal?: RoyalCue;
+  readonly promotion?: PromotionCue;
+  readonly promotionContact?: { readonly events: readonly GameEvent[]; readonly startedAt: number };
 }
 
 function ariaSquare(t: Translate, square: Square, piece?: Piece) {
@@ -60,10 +64,19 @@ export function Board(props: BoardProps) {
     countdown: cyclesRemaining(piece, state) ?? undefined,
     exposed: piece.shameArmedAt !== null, curePending: piece.cureArmedAt !== null,
   })), [state]);
-  const activeMarks: readonly SceneMark[] = props.royal ? marks.filter(mark => mark.kind === 'check')
+  const activeMarks: readonly SceneMark[] = props.royal || props.promotion ? marks.filter(mark => mark.kind === 'check')
     : showFocus ? [...marks, { square: focus, kind: 'focus' }] : marks;
   const counterPiece = props.flat && props.focus?.subject === 'countdown' ? pieces.get(props.focus.square) : undefined;
   const counter = counterPiece ? cyclesRemaining(counterPiece, state) : null;
+  const incoming = props.promotionContact?.events.find(event => event.type === 'move');
+  const departing = props.promotionContact?.events.find(event => event.type === 'capture');
+  const orientation = flipped ? -1 : 1;
+  const phaseDelay = props.promotionContact ? Math.max(0, performance.now() - props.promotionContact.startedAt) : 0;
+  const tween = incoming?.type === 'move' ? {
+    '--pawn-x': `${(fileOf(incoming.from) - fileOf(incoming.to)) * 119 * orientation}%`,
+    '--pawn-y': `${(rankOf(incoming.to) - rankOf(incoming.from)) * 119 * orientation}%`,
+    '--pawn-delay': `-${phaseDelay}ms`,
+  } as CSSProperties : undefined;
 
   function handleKey(event: KeyboardEvent<HTMLElement>) {
     const movement = keyboardMoves[event.key];
@@ -97,7 +110,7 @@ export function Board(props: BoardProps) {
     }} onBlur={event => { pointerFocus.current = false; hideFocus(event); }}>
     <span id="board-keys" className="sr-only">{t('game.keyboard')}</span>
     {showFocus && <output className="sr-only" aria-live="polite">{ariaSquare(t, focus, pieces.get(focus))}</output>}
-    {props.flat ? <div className="flat-board" ref={flatBoard} data-renderer="2d">
+    {props.flat ? <div className="flat-board" ref={flatBoard} data-renderer="2d" data-flat-promotion={props.promotion?.kind}>
       {Array.from({ length: 64 }, (_, index) => {
         const column = index % 8;
         const row = index >> 3;
@@ -115,6 +128,9 @@ export function Board(props: BoardProps) {
           className={`cell ${(file + rank) % 2 === 0 ? 'dark' : 'light'} ${kinds.map(kind => `mark-${kind}`).join(' ')}`}
           data-teaching-focus={props.focus?.square === square ? props.focus.subject : undefined}
           data-royal-king={props.royal?.square === square ? true : undefined}
+          data-promotion-piece={props.promotion?.square === square ? true : undefined}
+          data-pawn-arriving={!props.reducedMotion && incoming?.type === 'move' && incoming.to === square ? true : undefined}
+          style={incoming?.type === 'move' && incoming.to === square ? tween : undefined}
           draggable={props.canMove && piece?.side === state.side} onDragStart={event => event.dataTransfer.setData('text/plain', square)}
           onDragOver={event => event.preventDefault()} onDrop={event => {
             event.preventDefault();
@@ -130,12 +146,19 @@ export function Board(props: BoardProps) {
           </>}
         </button>;
       })}
+      {!props.reducedMotion && departing?.type === 'capture' && <div className="flat-promotion-capture" aria-hidden="true"
+        style={{ left: (flipped ? 7 - fileOf(departing.victim.square) : fileOf(departing.victim.square)) * 12.5 + '%',
+          top: (flipped ? rankOf(departing.victim.square) : 7 - rankOf(departing.victim.square)) * 12.5 + '%',
+          animationDelay: `-${phaseDelay}ms` }}>
+        <PieceIcon type={departing.victim.type} side={departing.victim.side} />
+      </div>}
+      {props.promotion && <FlatPromotion cue={props.promotion} flipped={flipped} reduced={props.reducedMotion} board={flatBoard} />}
       {props.royal && <FlatRoyal cue={props.royal} flipped={flipped} board={flatBoard} />}
     </div> : <SceneLoaderBoundary onFailure={props.onFailure}><Suspense fallback={<div className="scene-loading" role="status">{t('settings.loadingScene')}</div>}>
       <BoardScene pieces={scenePieces} marks={activeMarks} events={props.events} flipped={flipped}
         camera={props.camera} quality={props.low ? 'low' : 'high'} reducedMotion={props.reducedMotion}
         motionKey={props.motionKey} loadingLabel={t('settings.loadingScene')} onFailure={props.onFailure}
-        focus={props.focus} royal={props.royal}
+        focus={props.focus} royal={props.royal} promotion={props.promotion}
         onSquare={square => { setFocus(square); onSquare(square); }} onDragSquare={props.canMove ? props.onDragSquare : undefined} />
     </Suspense></SceneLoaderBoundary>}
     {counter !== null && <div className="flat-counter" data-testid="flat-counter" aria-hidden="true">

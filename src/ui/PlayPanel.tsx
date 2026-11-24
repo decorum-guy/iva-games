@@ -120,9 +120,10 @@ export function RollDock({ t, session, rollId, reduced, low, pending, active, st
   </div>;
 }
 
-export function LessonPanel({ t, locale, learning, guide, blocked, rolling = false, inspected = false, dice, onAdvance, onHandoff, onNew, onRepeat, onRestart, onRestartAll }: {
+export function LessonPanel({ t, locale, learning, guide, blocked, rolling = false, forming, inspected = false, dice, onAdvance, onHandoff, onNew, onRepeat, onRestart, onRestartAll }: {
   t: Translate; locale: Locale; learning: Learning; guide: readonly Command[]; blocked: boolean;
   rolling?: boolean;
+  forming?: 'queen' | 'rook' | 'bishop' | 'knight';
   inspected?: boolean;
   dice: ReactNode;
   onAdvance: () => void; onHandoff: () => void; onNew: () => void; onRepeat: () => void; onRestart: () => void;
@@ -133,7 +134,8 @@ export function LessonPanel({ t, locale, learning, guide, blocked, rolling = fal
   const beat = teachingBeat(learning);
   const step = beat ? undefined : instruction(learning);
   const phase = beat ? 'result' : complete ? 'complete' : step?.kind ?? 'position-complete';
-  const resultVisible = Boolean(beat && !rolling);
+  const waiting = rolling || Boolean(forming);
+  const resultVisible = Boolean(beat && !waiting);
   const face = learning.session.record.actions[learning.session.record.cursor - 1]?.roll?.face;
   const moves = guide.filter(cmd => cmd.type === 'move');
   const forced = moves[0] && moves.every(move => move.from === moves[0].from && move.to === moves[0].to);
@@ -162,9 +164,10 @@ export function LessonPanel({ t, locale, learning, guide, blocked, rolling = fal
       <h2>{complete ? t('tutorial.finish') : resultVisible ? beat!.title[locale] : feedback ? t('tutorial.choiceResult') : lesson.title[locale]}</h2>
       {dice}
     </div>
-    {!complete && !resultVisible && !feedback && <div className="lesson-action-label" role="status"><Icon name={read || inspected || !step ? 'check' : step.kind === 'inspect' ? 'info' : 'arrow'} />{t(rolling ? 'die.watch' : inspected ? 'tutorial.readCue' : actionTitle)}</div>}
+    {!complete && !resultVisible && !feedback && <div className="lesson-action-label" role="status"><Icon name={read || inspected || !step ? 'check' : step.kind === 'inspect' ? 'info' : 'arrow'} />{t(rolling ? 'die.watch' : forming ? 'game.promotion' : inspected ? 'tutorial.readCue' : actionTitle)}</div>}
     <p className="lesson-instruction" data-testid={resultVisible ? 'teaching-cause' : inspected ? 'counter-read' : feedback ? 'choice-feedback' : undefined}
       data-feedback={feedback?.kind} role={resultVisible ? 'status' : undefined}>{rolling ? t('die.rolling')
+      : forming ? t('game.forming', { piece: t(`piece.${forming}`) })
       : resultVisible ? beat!.text[locale]
       : inspected && remaining !== null ? t('tutorial.counterRead', { count: countText(locale, 'turn', remaining) })
         : complete ? t('tutorial.finishDetail') : feedback?.text ?? step?.text[locale] ?? t('tutorial.positionDoneDetail')}</p>
@@ -180,8 +183,8 @@ export function LessonPanel({ t, locale, learning, guide, blocked, rolling = fal
         <strong>{entry.faces}</strong><span>{t(`state.${entry.state}`)}</span>
       </div>)}
     </div>}
-    {!rolling && !inspected && step?.kind === 'inspect' && <div className="lesson-target">{t('tutorial.inspect', { square: step.square })}</div>}
-    {!rolling && forced && !complete && <div className="lesson-target">{t('tutorial.try', { from: moves[0].from, to: moves[0].to })}</div>}
+    {!waiting && !inspected && step?.kind === 'inspect' && <div className="lesson-target">{t('tutorial.inspect', { square: step.square })}</div>}
+    {!waiting && forced && !complete && <div className="lesson-target">{t('tutorial.try', { from: moves[0].from, to: moves[0].to })}</div>}
     {complete ? <div className="lesson-actions">
       <button type="button" className="button primary" onClick={onHandoff} disabled={blocked} data-testid="lesson-continue">
         <span>{t('tutorial.continue')}<small>{t('tutorial.continueDetail')}</small></span><Icon name="arrow" />
@@ -189,7 +192,7 @@ export function LessonPanel({ t, locale, learning, guide, blocked, rolling = fal
       <button type="button" className="button" onClick={onNew} data-testid="lesson-new" disabled={blocked}>{t('home.new')}</button>
       <button type="button" className="text-button" onClick={onRestartAll} disabled={blocked}>{t('tutorial.restartAll')}</button>
     </div> : <>
-      {(beat || !step || step.kind === 'read' || inspected) && <button type="button" className={`button primary ${rolling ? 'awaiting-roll' : ''}`} onClick={onAdvance}
+      {(beat || !step || step.kind === 'read' || inspected) && <button type="button" className={`button primary ${waiting ? 'awaiting-roll' : ''}`} onClick={onAdvance}
         disabled={blocked} data-testid="lesson-next">{beat ? beat.action?.[locale] ?? t('tutorial.readAction')
           : t(!step ? nextPosition ? 'tutorial.newPosition' : 'tutorial.nextLesson' : readAction)}<Icon name="arrow" /></button>}
       <div className="lesson-tools">

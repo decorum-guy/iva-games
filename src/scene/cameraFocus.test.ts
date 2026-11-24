@@ -4,10 +4,11 @@ import { MeshStandardMaterial, PerspectiveCamera, Vector3 } from 'three'
 import type { PieceType, Side } from '../core/types'
 import {
   BOARD_FRAMING_POINTS, CAMERA_OVERSCAN, CAMERA_TRAVEL_MS, COUNTER_FOCUS_DELAY_MS, COUNTER_FOCUS_MS, COUNTER_OFFSET,
-  FOCUS_EMPHASIS_MS, MAX_FOCUS_ZOOM, frameCamera, frameCameraOrbit, frameRoyalCamera, overscanFov, sampleCameraTravel,
+  FOCUS_EMPHASIS_MS, MAX_FOCUS_ZOOM, frameCamera, frameCameraOrbit, framePromotionCamera, frameRoyalCamera, overscanFov, sampleCameraTravel,
   sampleCounterEmphasis, sampleFigureEmphasis,
 } from './cameraFocus'
 import type { CameraFrame, CameraRig, GroundPoint, Point3 } from './cameraFocus'
+import { samplePromotion } from './promotionMotion'
 import { stoneMaterial } from './stone'
 
 interface Gltf {
@@ -80,6 +81,32 @@ describe('royal camera framing', () => {
           expect(screenExtent(modelBounds(side, 'king', point), camera)).toBeLessThan(.99)
         }
       }
+    }
+  })
+})
+
+describe('promotion camera framing', () => {
+  it.each(layouts)('fits the revealed crown, the royal arc and the playing surface: $name', layout => {
+    for (const flipped of [false, true]) for (const point of corners) {
+      const { aspect, compact, fov, elevation, yaw } = layout
+      const rig: CameraRig = {
+        elevation: elevation * radians, yaw: yaw * radians + (flipped ? Math.PI : 0), fov,
+        focusAmount: 0, focusPoint: point,
+      }
+      for (const kind of ['queen', 'rook'] as const) for (const time of [100, 200, 380, 520, 680, 760, 980]) {
+        const cue = { kind, id: 'fit', pieceId: 'pawn', side: 'black' as const, square: 'a8',
+          startedAt: 0, reduced: false, intoRoyal: true }
+        const sample = samplePromotion(cue, time)
+        const frame = framePromotionCamera(rig, aspect, compact, point, sample, cue.intoRoyal)
+        const camera = cameraFor(rig, aspect, frame)
+        const rock = modelBounds(cue.side, kind, point).map(([x, y, z]) =>
+          [x, sample.height + Math.min(y, sample.reveal * 1.88 + .12), z] as const)
+        const lights = sample.arc > .8 ? [[point[0], 2.62, point[1]] as const] : []
+        expect(screenExtent([...BOARD_FRAMING_POINTS, ...rock, ...lights], camera)).toBeLessThan(.99)
+      }
+      const end = samplePromotion({ kind: 'queen', id: 'fit', pieceId: 'pawn', side: 'white', square: 'a8',
+        startedAt: 0, reduced: false, intoRoyal: false }, 2260)
+      expect(framePromotionCamera(rig, aspect, compact, point, end, false)).toEqual(frameCamera(rig, aspect, compact))
     }
   })
 })
