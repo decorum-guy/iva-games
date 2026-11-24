@@ -268,18 +268,25 @@ export class Cabinet {
       success = false;
       const code = errorCode(error);
       if (storageProblem(code) && !this.data.storageProblem) this.storageUnavailable(code);
-      if (code === 'stale' || code === 'ratedOccupied') {
-        await this.refreshOverview().catch(() => undefined);
-        const latest = this.data.matches.find(match => match.id === this.data.game?.record.id);
-        if (latest && latest.revision !== this.data.game?.record.revision) {
+      if (code === 'stale') {
+        const game = this.data.game;
+        const store = this.store;
+        // A concurrent tab can supersede the optional overview refresh. An
+        // explicit conflict needs the canonical record for this specific game.
+        const latest = game && store ? await store.getMatch(game.record.id).catch(() => undefined) : undefined;
+        if (latest && this.store === store && this.data.game === game && latest.revision !== game?.record.revision) {
           this.invalidate();
           if (latest.status === 'open' || latest.status === 'finished') {
-            try { this.patch({ game: restoreMatch(latest) }); } catch { this.patch({ view: 'home', game: null }); }
+            try {
+              const restored = restoreMatch(latest);
+              this.patch({ game: restored, rollId: lastRoll(restored) });
+            } catch { this.patch({ view: 'home', game: null }); }
           } else {
             this.patch({ view: 'home', game: null });
           }
         }
       }
+      if (code === 'stale' || code === 'ratedOccupied') void this.refreshOverview().catch(() => undefined);
       this.patch({ error: code });
     } finally {
       this.patch({ busy: false });

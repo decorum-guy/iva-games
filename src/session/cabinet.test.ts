@@ -120,6 +120,31 @@ function enableRealRecovery() {
 }
 
 describe('Cabinet live audio delivery', () => {
+  it('restores the canonical match after another tab settles it while the overview is stale', async () => {
+    const other = await realOpenGameStore(databaseName)
+    extraStores.push(other)
+    let prior = await store.reserveRated('black', 4)
+    for (const command of [move('f2', 'f3'), move('e7', 'e5'), move('g2', 'g4')]) {
+      const next = prior.submit(prior.envelope(command), prior.state.side === 'black' ? 'human' : 'bot')
+      await store.commit(prior, next)
+      prior = next
+    }
+    await cabinet.resumeGame(prior.record.id)
+    const datedList = await store.overview()
+    const mate = move('d8', 'h4')
+    const final = prior.submit(prior.envelope(mate), 'human')
+    await other.commit(prior, final)
+    vi.spyOn(store, 'overview').mockResolvedValueOnce(datedList)
+
+    expect(await cabinet.command(mate)).toBe(false)
+    expect(cabinet.getSnapshot().game?.record).toMatchObject({
+      id: final.record.id, revision: final.record.revision, status: 'finished', actions: final.record.actions,
+    })
+    expect(cabinet.getSnapshot().game?.state.outcome).toEqual(final.state.outcome)
+    expect(cabinet.getSnapshot()).toMatchObject({ animating: false, royalCue: null, rollId: null, audioCue: null })
+    expect((await other.overview()).ledger).toHaveLength(1)
+  })
+
   it('emits one move cue only after persistence commits, including during concurrent input', async () => {
     await cabinet.startGame(hotseat)
     const ids = observeCues()
