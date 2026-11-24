@@ -676,7 +676,9 @@ test('pawn reaction and queen contact use one live audio batch and undo cancels 
   await expect.poll(async () => (await nativeAudio(page)).context).toBe('running')
   await cell(page, 'a8').click()
   await page.getByTestId('promotion-queen').click()
-  await expect(playfield(page)).toHaveAttribute('data-dice', 'throwing')
+  // Undo the live batch before its delayed accents. Waiting for the WebGL die
+  // to render can consume that window on a slow browser.
+  await expect(playfield(page)).toHaveAttribute('data-revision', '1')
   await expect.poll(async () => (await nativeAudio(page)).starts.length).toBe(11)
   const sounds = (await nativeAudio(page)).starts
   expect(sounds.map(({ offset, duration }) => ({ offset, duration }))).toEqual(
@@ -688,8 +690,10 @@ test('pawn reaction and queen contact use one live audio batch and undo cancels 
   await page.getByTestId('undo').click()
   await expect(playfield(page)).toHaveAttribute('data-promotion-stage', 'none')
   await expect(cell(page, 'b7')).toHaveAccessibleName(/Pawn/)
-  const { stops } = await nativeAudio(page)
-  expect(sounds.slice(6).every(sound => stops.some(stop => stop.scheduled === sound.when && stop.at < sound.when))).toBe(true)
+  await expect.poll(async () => {
+    const { stops } = await nativeAudio(page)
+    return sounds.slice(6).every(sound => stops.some(stop => stop.scheduled === sound.when && stop.at < sound.when))
+  }).toBe(true)
 })
 
 test('the promotion lesson schedules formation only after acknowledgment, including after a reload', async ({ page }) => {
