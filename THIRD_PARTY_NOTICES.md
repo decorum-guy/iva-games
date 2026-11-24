@@ -26,6 +26,16 @@ The shipped chess files, upstream paths and hashes are recorded in the [asset ma
 
 The recordings were cut at individual transients, filtered, faded, and combined into a local mono PCM bank. [Source files, hashes and clip frames](public/assets/audio/manifest.json).
 
+## Optional audio audition candidates
+
+The files in [public/assets/audio/auditions](public/assets/audio/auditions/README.md) are comparison candidates, not the selected runtime sound bank. The catalog records each source, source hash, output hash, license, editing recipe and timing. The four original comparison MP3 files are also included.
+
+CC0 recordings are by qubodup (Energy Drain; 3 dark magic spells), lentikula (Basic Spell Impacts), Julie Damsgaard / Spring Spring / Spring Enterprises (Various Sound Effects), rubberduck (75 breaking / falling / hit SFX), pyranostudios (Air whoosh), and JaggedStone (Magic Spell SFX). The [candidate notices](public/assets/audio/auditions/README.md#источники-и-лицензии) contain their primary source links and the [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) reference.
+
+R2 and parts of P2 include **Fantasy SFX Pack Vol 1 by JC Sounds**, licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). [Original source](https://opengameart.org/content/jc-sounds-fantasy-sfx-pack-vol-1). The original R2 audition changes are resampling to 48 kHz stereo, constant per-clip gain, comparison pauses and MP3 encoding, with the source clips uncut. Individual R2 candidates omit the comparison pauses and are encoded from the corresponding lossless windows. P2 changes include trimming, resampling, pitch/time changes on selected layers, filtering, fades, gain and layering with additional CC0 audio; individual P2 candidates add MP3 encoding from the existing scene WAVs. No selected production remix is implied by these audition edits.
+
+The separate P1 fracture audition isolates the already existing CC0 stone layers with their original processing and shared scene gain, and removes only verified trailing digital silence. It must not be added again over the complete P1 queen mix.
+
 ## Software
 
 React, React DOM, Three.js, React Three Fiber and Drei are MIT-licensed. `idb` is ISC-licensed. Exact installed versions are pinned in [the lockfile](package-lock.json). The production build generates `dist/THIRD_PARTY_LICENSES.md` from the bundler’s dependency metadata. [The React Three Fiber license](public/assets/licenses/react-three-fiber.txt) is also included because the npm archive lists MIT without a standalone license text.

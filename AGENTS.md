@@ -4,7 +4,13 @@
 
 Build a finished, beautiful, playable web game on the owner's Mac: Remorse Chess versus a real variant-aware AI with ten difficulty levels, local Elo progression, local two-player play, and a mandatory interactive tutorial. Laptop and phone interfaces and complete Russian/English localization are required. The owner has delegated routine implementation decisions and does not want questions during the build.
 
-The preparation package and implementation are both present. Read `docs/BUILD_STATUS.md` for the current verification state; do not describe planned or unverified work as accepted. The full personal playthrough is `docs/VALIDATION_ROOT_PLAYTHROUGH.md`; the latest focused live review is `docs/VALIDATION_DICE_AND_FOCUS.md`. The current Mac activation task is `prompts/ACTIVATE_DICE_DOCK_BUILD.md`, followed by the separately scoped online-room stage. A separately authorized cinematic promotion/reaction task is `prompts/IMPLEMENT_CINEMATIC_PROMOTIONS.md`; its audio selection is pending and does not block visual or network work.
+The preparation package and implementation are both present. Read `docs/BUILD_STATUS.md` for the current verification state; do not describe planned or unverified work as accepted. The latest focused source and live review is `docs/VALIDATION_FINAL_SHOWCASE.md`; the earlier full personal playthrough is `docs/VALIDATION_ROOT_PLAYTHROUGH.md`.
+
+## Current scope: sound selection, then presentation
+
+The owner froze further feature and visual work on 24 November 2026. The remaining iteration is `prompts/FINAL_SFX_SELECTION_AND_SHOWCASE.md`: first build a complete local sound-comparison page using the existing real game scenes, then install only the owner's explicit audio choices and prepare the presentation in `docs/SHOWCASE_SEQUENCE.md`. The gameplay baseline is `7fca60eb256dd95c91509d345359f874d52a02f1` (`index-BEqzMELx.js`). The candidate MP3 files and their provenance are now in `public/assets/audio/auditions/`; they are not the selected runtime sound bank.
+
+Do not start the older activation, multiplayer, redesign, animation-rewrite or engine-expansion tasks as part of this final iteration. The online-room brief remains available for a later separate stage. Preserve the running game on 4173 while preparing the comparison page on another local port. The next required user input is the audio choice, after the working comparison page is ready; no preliminary design questions are needed. Keep QA silent and do not bring test windows in front of the owner's applications. Actual audio demonstration starts only from the owner's Play action.
 
 ## Read before implementation
 

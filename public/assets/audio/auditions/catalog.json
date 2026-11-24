@@ -1,0 +1,1802 @@
+{
+  "schema_version": 1,
+  "purpose": "Local audition candidates for the existing REMORSE animations. No bank has been selected or installed.",
+  "auditory_review": "No sound was played or subjectively assessed during this packaging step. Checks are source hashes, exact PCM extraction/reconstruction, decoding, duration and sample peaks only.",
+  "gameplay_reference_commit": "7fca60eb256dd95c91509d345359f874d52a02f1",
+  "animation_policy": "Animation durations, geometry, rules and player profile remain unchanged. Audio tails do not extend the visual timeline.",
+  "encoding": "libmp3lame 192 kbps, 48 kHz, stereo, with gapless duration metadata; no new normalization, fades, pitch changes or creative edits in this packaging step, except isolation of an already existing stone stem and exclusion of its verified trailing digital silence.",
+  "event_candidates": {
+    "reaction.guilt": {
+      "R1": "r1-guilt",
+      "R2": "r2-guilt"
+    },
+    "reaction.devastated": {
+      "R1": "r1-devastated",
+      "R2": "r2-devastated"
+    },
+    "reaction.berserk": {
+      "R1": "r1-berserk",
+      "R2": "r2-berserk"
+    },
+    "reaction.bloodlust": {
+      "R1": "r1-bloodlust",
+      "R2": "r2-bloodlust"
+    },
+    "promotion.formation": {
+      "P1": "p1-formation",
+      "P2": "p2-formation"
+    },
+    "promotion.rook": {
+      "P1": "p1-rook",
+      "P2": "p2-rook"
+    },
+    "promotion.queen": {
+      "P1": "p1-queen",
+      "P2": "p2-queen"
+    },
+    "promotion.queen.fracture": {
+      "P1-STONE-SOLO": "p1-queen-fracture-only"
+    }
+  },
+  "candidates": [
+    {
+      "id": "r1-guilt",
+      "family": "reaction",
+      "candidate": "R1",
+      "event": "reaction.guilt",
+      "label_ru": "Вина",
+      "license": "CC0-1.0",
+      "source_ids": [
+        "reaction-r1-guilt"
+      ],
+      "file": "reaction-r1-guilt.mp3",
+      "url": "/assets/audio/auditions/reaction-r1-guilt.mp3",
+      "sha256": "85d6e7477c5259c9f8cfa90142f84fdef73a5ad02e0ace93b1b5dcb73af08360",
+      "bytes": 73196,
+      "codec": "mp3",
+      "bitrate_kbps": 192,
+      "sample_rate_hz": 48000,
+      "channels": 2,
+      "decoded_frames": 144000,
+      "decoded_duration_seconds": 3.0,
+      "container_duration_seconds": 3.024,
+      "input_pcm_sample_peak_dbfs": -6.0000004906757844,
+      "decoded_mp3_sample_peak_dbfs": -6.240240300930484,
+      "decoded_clipped_samples": 0,
+      "all_decoded_samples_finite": true,
+      "sync": {
+        "physical_contact_seconds": null,
+        "semantic_anchor": "reaction reveal / material change",
+        "candidate_start_offset_from_reaction_cue_seconds": 0,
+        "auditory_transient_verified": false
+      },
+      "existing_processing": {
+        "source_content": "whole original retained",
+        "sample_rate_conversion_hz": 48000,
+        "channels": 2,
+        "constant_gain_db": -5.990000191316226,
+        "target_sample_peak_dbfs": -6
+      },
+      "packaging": {
+        "method": "Exact sample window from the existing lossless comparison WAV, then MP3 encoding. Comparison gaps excluded; original sound content uncut. No added gain or processing.",
+        "comparison_window_frames": [
+          19200,
+          163200
+        ],
+        "comparison_window_seconds": [
+          0.4,
+          3.4
+        ],
+        "input_pcm_f32le_sha256": "b2595fa6a1f307be319e74c8f1c6fb8bd8883f27a66afe82a1fa5142a871f422"
+      }
+    },
+    {
+      "id": "r1-devastated",
+      "family": "reaction",
+      "candidate": "R1",
+      "event": "reaction.devastated",
+      "label_ru": "Опустошение",
+      "license": "CC0-1.0",
+      "source_ids": [
+        "reaction-r1-devastated"
+      ],
+      "file": "reaction-r1-devastated.mp3",
+      "url": "/assets/audio/auditions/reaction-r1-devastated.mp3",
+      "sha256": "8c5f00e9194cac45302b8a7fe1b3fa12b53f434c7285d53da36361409346fb49",
+      "bytes": 59948,
+      "codec": "mp3",
+      "bitrate_kbps": 192,
+      "sample_rate_hz": 48000,
+      "channels": 2,
+      "decoded_frames": 116516,
+      "decoded_duration_seconds": 2.427416666666667,
+      "container_duration_seconds": 2.472,
+      "input_pcm_sample_peak_dbfs": -6.0000004906757844,
+      "decoded_mp3_sample_peak_dbfs": -5.598098365326145,
+      "decoded_clipped_samples": 0,
+      "all_decoded_samples_finite": true,
+      "sync": {
+        "physical_contact_seconds": null,
+        "semantic_anchor": "reaction reveal / material change",
+        "candidate_start_offset_from_reaction_cue_seconds": 0,
+        "auditory_transient_verified": false
+      },
+      "existing_processing": {
+        "source_content": "whole original retained",
+        "sample_rate_conversion_hz": 48000,
+        "channels": 2,
+        "constant_gain_db": -5.482142746499482,
+        "target_sample_peak_dbfs": -6
+      },
+      "packaging": {
+        "method": "Exact sample window from the existing lossless comparison WAV, then MP3 encoding. Comparison gaps excluded; original sound content uncut. No added gain or processing.",
+        "comparison_window_frames": [
+          201600,
+          318116
+        ],
+        "comparison_window_seconds": [
+          4.2,
+          6.627416666666667
+        ],
+        "input_pcm_f32le_sha256": "e6333ff7a10557537e57a414b3397890d84a9bcd7ad8daebb15729316aa196ab"
+      }
+    },
+    {
+      "id": "r1-berserk",
+      "family": "reaction",
+      "candidate": "R1",
+      "event": "reaction.berserk",
+      "label_ru": "Ярость",
+      "license": "CC0-1.0",
+      "source_ids": [
+        "reaction-r1-berserk"
+      ],
+      "file": "reaction-r1-berserk.mp3",
+      "url": "/assets/audio/auditions/reaction-r1-berserk.mp3",
+      "sha256": "0fb13ae8e8da4508d7518f5f12070f0eb62327494e541a88346966102f1c2a4e",
+      "bytes": 73196,
+      "codec": "mp3",
+      "bitrate_kbps": 192,
+      "sample_rate_hz": 48000,
+      "channels": 2,
+      "decoded_frames": 143872,
+      "decoded_duration_seconds": 2.997333333333333,
+      "container_duration_seconds": 3.024,
+      "input_pcm_sample_peak_dbfs": -6.0000004906757844,
+      "decoded_mp3_sample_peak_dbfs": -6.050130550043516,
+      "decoded_clipped_samples": 0,
+      "all_decoded_samples_finite": true,
+      "sync": {
+        "physical_contact_seconds": null,
+        "semantic_anchor": "reaction reveal / material change",
+        "candidate_start_offset_from_reaction_cue_seconds": 0,
+        "auditory_transient_verified": false
+      },
+      "existing_processing": {
+        "source_content": "whole original retained",
+        "sample_rate_conversion_hz": 48000,
+        "channels": 2,
+        "constant_gain_db": -5.577843076899133,
+        "target_sample_peak_dbfs": -6
+      },
+      "packaging": {
+        "method": "Exact sample window from the existing lossless comparison WAV, then MP3 encoding. Comparison gaps excluded; original sound content uncut. No added gain or processing.",
+        "comparison_window_frames": [
+          356516,
+          500388
+        ],
+        "comparison_window_seconds": [
+          7.427416666666667,
+          10.42475
+        ],
+        "input_pcm_f32le_sha256": "77e43441d121709aa3d7f8d79db5e496619749e3964a3e59f76173cefbce04a4"
+      }
+    },
+    {
+      "id": "r1-bloodlust",
+      "family": "reaction",
+      "candidate": "R1",
+      "event": "reaction.bloodlust",
+      "label_ru": "Жажда крови",
+      "license": "CC0-1.0",
+      "source_ids": [
+        "reaction-r1-bloodlust"
+      ],
+      "file": "reaction-r1-bloodlust.mp3",
+      "url": "/assets/audio/auditions/reaction-r1-bloodlust.mp3",
+      "sha256": "761a7567a05a37d710334b0afb2f87e2032c207d3b20eed01864b8474901dc60",
+      "bytes": 95660,
+      "codec": "mp3",
+      "bitrate_kbps": 192,
+      "sample_rate_hz": 48000,
+      "channels": 2,
+      "decoded_frames": 188200,
+      "decoded_duration_seconds": 3.9208333333333334,
+      "container_duration_seconds": 3.96,
+      "input_pcm_sample_peak_dbfs": -6.0000004906757844,
+      "decoded_mp3_sample_peak_dbfs": -6.081046924218939,
+      "decoded_clipped_samples": 0,
+      "all_decoded_samples_finite": true,
+      "sync": {
+        "physical_contact_seconds": null,
+        "semantic_anchor": "reaction reveal / material change",
+        "candidate_start_offset_from_reaction_cue_seconds": 0,
+        "auditory_transient_verified": false
+      },
+      "existing_processing": {
+        "source_content": "whole original retained",
+        "sample_rate_conversion_hz": 48000,
+        "channels": 2,
+        "constant_gain_db": -5.877361360915342,
+        "target_sample_peak_dbfs": -6
+      },
+      "packaging": {
+        "method": "Exact sample window from the existing lossless comparison WAV, then MP3 encoding. Comparison gaps excluded; original sound content uncut. No added gain or processing.",
+        "comparison_window_frames": [
+          538788,
+          726988
+        ],
+        "comparison_window_seconds": [
+          11.22475,
+          15.145583333333333
+        ],
+        "input_pcm_f32le_sha256": "a6ce5136a36dbdb53df4d63daba35042dadf2aa0a01b9015a3c4142446afda99"
+      }
+    },
+    {
+      "id": "r2-guilt",
+      "family": "reaction",
+      "candidate": "R2",
+      "event": "reaction.guilt",
+      "label_ru": "Вина",
+      "license": "CC-BY-4.0",
+      "source_ids": [
+        "reaction-r2-guilt"
+      ],
+      "file": "reaction-r2-guilt.mp3",
+      "url": "/assets/audio/auditions/reaction-r2-guilt.mp3",
+      "sha256": "46362259661493a9d1ad36e6f1109edc478b16464fe03b7d82a2e862c135fe1d",
+      "bytes": 35756,
+      "codec": "mp3",
+      "bitrate_kbps": 192,
+      "sample_rate_hz": 48000,
+      "channels": 2,
+      "decoded_frames": 68800,
+      "decoded_duration_seconds": 1.4333333333333333,
+      "container_duration_seconds": 1.464,
+      "input_pcm_sample_peak_dbfs": -6.0000004906757844,
+      "decoded_mp3_sample_peak_dbfs": -6.327925860487628,
+      "decoded_clipped_samples": 0,
+      "all_decoded_samples_finite": true,
+      "sync": {
+        "physical_contact_seconds": null,
+        "semantic_anchor": "reaction reveal / material change",
+        "candidate_start_offset_from_reaction_cue_seconds": 0,
+        "auditory_transient_verified": false
+      },
+      "existing_processing": {
+        "source_content": "whole original retained",
+        "sample_rate_conversion_hz": 48000,
+        "channels": 2,
+        "constant_gain_db": 2.2977520797690687,
+        "target_sample_peak_dbfs": -6
+      },
+      "packaging": {
+        "method": "Exact sample window from the existing lossless comparison WAV, then MP3 encoding. Comparison gaps excluded; original sound content uncut. No added gain or processing.",
+        "comparison_window_frames": [
+          19200,
+          88000
+        ],
+        "comparison_window_seconds": [
+          0.4,
+          1.8333333333333333
+        ],
+        "input_pcm_f32le_sha256": "13105048a7157c62278ad8a4b4485ce76f27b6d2579d1e5692097f9ece6cc069"
+      }
+    },
+    {
+      "id": "r2-devastated",
+      "family": "reaction",
+      "candidate": "R2",
+      "event": "reaction.devastated",
+      "label_ru": "Опустошение",
+      "license": "CC-BY-4.0",
+      "source_ids": [
+        "reaction-r2-devastated"
+      ],
+      "file": "reaction-r2-devastated.mp3",
+      "url": "/assets/audio/auditions/reaction-r2-devastated.mp3",
+      "sha256": "efcacfb9b7d88a9457cf2fe145a7b95a12ebc7e771100192667a6970e7ab13b8",
+      "bytes": 29996,
+      "codec": "mp3",
+      "bitrate_kbps": 192,
+      "sample_rate_hz": 48000,
+      "channels": 2,
+      "decoded_frames": 57600,
+      "decoded_duration_seconds": 1.2,
+      "container_duration_seconds": 1.224,
+      "input_pcm_sample_peak_dbfs": -5.999998424704031,
+      "decoded_mp3_sample_peak_dbfs": -6.265246559151736,
+      "decoded_clipped_samples": 0,
+      "all_decoded_samples_finite": true,
+      "sync": {
+        "physical_contact_seconds": null,
+        "semantic_anchor": "reaction reveal / material change",
+        "candidate_start_offset_from_reaction_cue_seconds": 0,
+        "auditory_transient_verified": false
+      },
+      "existing_processing": {
+        "source_content": "whole original retained",
+        "sample_rate_conversion_hz": 48000,
+        "channels": 2,
+        "constant_gain_db": 1.9443444122164768,
+        "target_sample_peak_dbfs": -6
+      },
+      "packaging": {
+        "method": "Exact sample window from the existing lossless comparison WAV, then MP3 encoding. Comparison gaps excluded; original sound content uncut. No added gain or processing.",
+        "comparison_window_frames": [
+          126400,
+          184000
+        ],
+        "comparison_window_seconds": [
+          2.6333333333333333,
+          3.8333333333333335
+        ],
+        "input_pcm_f32le_sha256": "3d3cb11910365fb1013ac951cc71e91cead81e4a75b699735ecddda848575e12"
+      }
+    },
+    {
+      "id": "r2-berserk",
+      "family": "reaction",
+      "candidate": "R2",
+      "event": "reaction.berserk",
+      "label_ru": "Ярость",
+      "license": "CC-BY-4.0",
+      "source_ids": [
+        "reaction-r2-berserk"
+      ],
+      "file": "reaction-r2-berserk.mp3",
+      "url": "/assets/audio/auditions/reaction-r2-berserk.mp3",
+      "sha256": "0fb24ee1aad421602d488b206691536beabdd1fbeaf4a1010a1eaa3f891d72a9",
+      "bytes": 29996,
+      "codec": "mp3",
+      "bitrate_kbps": 192,
+      "sample_rate_hz": 48000,
+      "channels": 2,
+      "decoded_frames": 57600,
+      "decoded_duration_seconds": 1.2,
+      "container_duration_seconds": 1.224,
+      "input_pcm_sample_peak_dbfs": -6.0000004906757844,
+      "decoded_mp3_sample_peak_dbfs": -6.249072296968806,
+      "decoded_clipped_samples": 0,
+      "all_decoded_samples_finite": true,
+      "sync": {
+        "physical_contact_seconds": null,
+        "semantic_anchor": "reaction reveal / material change",
+        "candidate_start_offset_from_reaction_cue_seconds": 0,
+        "auditory_transient_verified": false
+      },
+      "existing_processing": {
+        "source_content": "whole original retained",
+        "sample_rate_conversion_hz": 48000,
+        "channels": 2,
+        "constant_gain_db": -0.4856575853815046,
+        "target_sample_peak_dbfs": -6
+      },
+      "packaging": {
+        "method": "Exact sample window from the existing lossless comparison WAV, then MP3 encoding. Comparison gaps excluded; original sound content uncut. No added gain or processing.",
+        "comparison_window_frames": [
+          222400,
+          280000
+        ],
+        "comparison_window_seconds": [
+          4.633333333333334,
+          5.833333333333333
+        ],
+        "input_pcm_f32le_sha256": "278d7e0a05db73ca3054e5b0f36d4214b5c3454f3e87daee4e83049db460240c"
+      }
+    },
+    {
+      "id": "r2-bloodlust",
+      "family": "reaction",
+      "candidate": "R2",
+      "event": "reaction.bloodlust",
+      "label_ru": "Жажда крови",
+      "license": "CC-BY-4.0",
+      "source_ids": [
+        "reaction-r2-bloodlust"
+      ],
+      "file": "reaction-r2-bloodlust.mp3",
+      "url": "/assets/audio/auditions/reaction-r2-bloodlust.mp3",
+      "sha256": "19d0d3a95da261be2f42836683b223b5c3e5206823bd63f541694731f8c14ca3",
+      "bytes": 145196,
+      "codec": "mp3",
+      "bitrate_kbps": 192,
+      "sample_rate_hz": 48000,
+      "channels": 2,
+      "decoded_frames": 288000,
+      "decoded_duration_seconds": 6.0,
+      "container_duration_seconds": 6.024,
+      "input_pcm_sample_peak_dbfs": -6.0000004906757844,
+      "decoded_mp3_sample_peak_dbfs": -6.250494755781649,
+      "decoded_clipped_samples": 0,
+      "all_decoded_samples_finite": true,
+      "sync": {
+        "physical_contact_seconds": null,
+        "semantic_anchor": "reaction reveal / material change",
+        "candidate_start_offset_from_reaction_cue_seconds": 0,
+        "auditory_transient_verified": false
+      },
+      "existing_processing": {
+        "source_content": "whole original retained",
+        "sample_rate_conversion_hz": 48000,
+        "channels": 2,
+        "constant_gain_db": -0.8754683904844187,
+        "target_sample_peak_dbfs": -6
+      },
+      "packaging": {
+        "method": "Exact sample window from the existing lossless comparison WAV, then MP3 encoding. Comparison gaps excluded; original sound content uncut. No added gain or processing.",
+        "comparison_window_frames": [
+          318400,
+          606400
+        ],
+        "comparison_window_seconds": [
+          6.633333333333334,
+          12.633333333333333
+        ],
+        "input_pcm_f32le_sha256": "b518894c8873c95d7cf242d67bf36d7d7da584417b1c01caf8f6909887b8b376"
+      },
+      "integration_note": "The full six-second necromancy chant is included only to choose a timbre. It is a loop with a vocal/chant label; if selected, choose a short non-looping excerpt by listening and specify the edit. Do not install the whole loop automatically."
+    },
+    {
+      "id": "p1-formation",
+      "family": "promotion",
+      "candidate": "P1",
+      "event": "promotion.formation",
+      "applies_to": [
+        "bishop",
+        "knight"
+      ],
+      "license": "CC0-1.0",
+      "source_ids": [
+        "promotion-magic",
+        "promotion-whoosh"
+      ],
+      "file": "promotion-p1-formation.mp3",
+      "url": "/assets/audio/auditions/promotion-p1-formation.mp3",
+      "sha256": "2b289ea737a84818d7aa7df8f9cdf3cb2930d1f86b7998fcc41b0b86f9a907f1",
+      "bytes": 73196,
+      "codec": "mp3",
+      "bitrate_kbps": 192,
+      "sample_rate_hz": 48000,
+      "channels": 2,
+      "decoded_frames": 144000,
+      "decoded_duration_seconds": 3.0,
+      "container_duration_seconds": 3.024,
+      "input_pcm_sample_peak_dbfs": -8.000117030469568,
+      "decoded_mp3_sample_peak_dbfs": -8.24420172149034,
+      "decoded_clipped_samples": 0,
+      "all_decoded_samples_finite": true,
+      "sync": {
+        "physical_contact_seconds": null,
+        "semantic_anchor": "formation onset",
+        "main_formation_layer_onset_seconds": 0.16,
+        "auditory_transient_verified": false
+      },
+      "existing_scene_recipe": {
+        "name": "bishop_or_knight",
+        "duration_s": 3.0,
+        "target_peak_dbfs": -8,
+        "scene_gain_db": -3.0000000000000018,
+        "layers": [
+          {
+            "source": "magic",
+            "at_s": 0.16,
+            "relative_peak_dbfs": -5,
+            "source_start_s": 0,
+            "source_end_s": null,
+            "playback_speed": 1,
+            "lowpass_hz": null,
+            "highpass_hz": null,
+            "fade_in_s": 0.005,
+            "fade_out_s": 0.28,
+            "pan": 0
+          },
+          {
+            "source": "whoosh",
+            "at_s": 0.02,
+            "relative_peak_dbfs": -19,
+            "source_start_s": 1.9,
+            "source_end_s": 2.26,
+            "playback_speed": 1,
+            "lowpass_hz": null,
+            "highpass_hz": null,
+            "fade_in_s": 0.06,
+            "fade_out_s": 0.09,
+            "pan": 0
+          }
+        ],
+        "sequence_start_s": 0,
+        "sequence_end_s": 3.0
+      },
+      "packaging": {
+        "method": "Existing standalone lossless scene WAV encoded to MP3. No extra trim, gain, normalization or creative edit.",
+        "input_wav_sha256": "6a4a52b336ccdda2bd6747058ff763efaf068271dcff3d48aa88ac94967be113",
+        "input_wav_filename": "P1_STONE_LIGHTNING_CC0_1_bishop_or_knight.wav"
+      }
+    },
+    {
+      "id": "p1-rook",
+      "family": "promotion",
+      "candidate": "P1",
+      "event": "promotion.rook",
+      "applies_to": [
+        "rook"
+      ],
+      "license": "CC0-1.0",
+      "source_ids": [
+        "promotion-whoosh",
+        "promotion-landing",
+        "promotion-rock_fall",
+        "promotion-dull_explosion"
+      ],
+      "file": "promotion-p1-rook.mp3",
+      "url": "/assets/audio/auditions/promotion-p1-rook.mp3",
+      "sha256": "dabec9e87d36d324b4a751b41e7b942c8d9c6204b03f8e86acf8fd8eb2eb295b",
+      "bytes": 85292,
+      "codec": "mp3",
+      "bitrate_kbps": 192,
+      "sample_rate_hz": 48000,
+      "channels": 2,
+      "decoded_frames": 168000,
+      "decoded_duration_seconds": 3.5,
+      "container_duration_seconds": 3.528,
+      "input_pcm_sample_peak_dbfs": -5.000377362660108,
+      "decoded_mp3_sample_peak_dbfs": -5.2549277805116565,
+      "decoded_clipped_samples": 0,
+      "all_decoded_samples_finite": true,
+      "sync": {
+        "physical_contact_seconds": 0.42,
+        "semantic_anchor": "piece lands on the board",
+        "main_formation_layer_onset_seconds": null,
+        "auditory_transient_verified": false
+      },
+      "existing_scene_recipe": {
+        "name": "rook",
+        "duration_s": 3.5,
+        "target_peak_dbfs": -5,
+        "scene_gain_db": -0.9334554807840568,
+        "layers": [
+          {
+            "source": "whoosh",
+            "at_s": 0.0,
+            "relative_peak_dbfs": -15,
+            "source_start_s": 2.0,
+            "source_end_s": 2.42,
+            "playback_speed": 1,
+            "lowpass_hz": null,
+            "highpass_hz": null,
+            "fade_in_s": 0.1,
+            "fade_out_s": 0.06,
+            "pan": 0
+          },
+          {
+            "source": "landing",
+            "at_s": 0.42,
+            "relative_peak_dbfs": -5,
+            "source_start_s": 0,
+            "source_end_s": null,
+            "playback_speed": 0.88,
+            "lowpass_hz": null,
+            "highpass_hz": null,
+            "fade_in_s": 0.005,
+            "fade_out_s": 0.2,
+            "pan": 0
+          },
+          {
+            "source": "rock_fall",
+            "at_s": 0.23,
+            "relative_peak_dbfs": -8,
+            "source_start_s": 0,
+            "source_end_s": null,
+            "playback_speed": 1,
+            "lowpass_hz": null,
+            "highpass_hz": null,
+            "fade_in_s": 0.005,
+            "fade_out_s": 0.15,
+            "pan": 0
+          },
+          {
+            "source": "dull_explosion",
+            "at_s": 0.43,
+            "relative_peak_dbfs": -11,
+            "source_start_s": 0,
+            "source_end_s": 2.3,
+            "playback_speed": 0.8,
+            "lowpass_hz": 360,
+            "highpass_hz": null,
+            "fade_in_s": 0.005,
+            "fade_out_s": 0.5,
+            "pan": 0
+          }
+        ],
+        "sequence_start_s": 4.0,
+        "sequence_end_s": 7.5
+      },
+      "packaging": {
+        "method": "Existing standalone lossless scene WAV encoded to MP3. No extra trim, gain, normalization or creative edit.",
+        "input_wav_sha256": "4a477cab297e6712a2789a809618d0000bbe797b5ca81f2b1b42e81993c30036",
+        "input_wav_filename": "P1_STONE_LIGHTNING_CC0_2_rook.wav"
+      }
+    },
+    {
+      "id": "p1-queen",
+      "family": "promotion",
+      "candidate": "P1",
+      "event": "promotion.queen",
+      "applies_to": [
+        "queen"
+      ],
+      "license": "CC0-1.0",
+      "source_ids": [
+        "promotion-whoosh",
+        "promotion-landing",
+        "promotion-dull_explosion",
+        "promotion-break_stone",
+        "promotion-rock_break1",
+        "promotion-rock_break2",
+        "promotion-lightning"
+      ],
+      "file": "promotion-p1-queen.mp3",
+      "url": "/assets/audio/auditions/promotion-p1-queen.mp3",
+      "sha256": "59428a87580766dd26f816f4d3c26c078644bac331235750f42f06c99bec970e",
+      "bytes": 121580,
+      "codec": "mp3",
+      "bitrate_kbps": 192,
+      "sample_rate_hz": 48000,
+      "channels": 2,
+      "decoded_frames": 240000,
+      "decoded_duration_seconds": 5.0,
+      "container_duration_seconds": 5.04,
+      "input_pcm_sample_peak_dbfs": -3.0003622493859567,
+      "decoded_mp3_sample_peak_dbfs": -3.297459457707089,
+      "decoded_clipped_samples": 0,
+      "all_decoded_samples_finite": true,
+      "sync": {
+        "physical_contact_seconds": 0.42,
+        "semantic_anchor": "piece lands on the board",
+        "main_formation_layer_onset_seconds": null,
+        "auditory_transient_verified": false
+      },
+      "existing_scene_recipe": {
+        "name": "queen",
+        "duration_s": 5.0,
+        "target_peak_dbfs": -3,
+        "scene_gain_db": -0.9143270437807192,
+        "layers": [
+          {
+            "source": "whoosh",
+            "at_s": 0,
+            "relative_peak_dbfs": -14,
+            "source_start_s": 1.9,
+            "source_end_s": 2.4,
+            "playback_speed": 1,
+            "lowpass_hz": null,
+            "highpass_hz": null,
+            "fade_in_s": 0.12,
+            "fade_out_s": 0.06,
+            "pan": 0
+          },
+          {
+            "source": "landing",
+            "at_s": 0.42,
+            "relative_peak_dbfs": -4,
+            "source_start_s": 0,
+            "source_end_s": null,
+            "playback_speed": 0.72,
+            "lowpass_hz": null,
+            "highpass_hz": null,
+            "fade_in_s": 0.005,
+            "fade_out_s": 0.3,
+            "pan": 0
+          },
+          {
+            "source": "dull_explosion",
+            "at_s": 0.43,
+            "relative_peak_dbfs": -9,
+            "source_start_s": 0,
+            "source_end_s": null,
+            "playback_speed": 0.85,
+            "lowpass_hz": 600,
+            "highpass_hz": null,
+            "fade_in_s": 0.005,
+            "fade_out_s": 0.55,
+            "pan": 0
+          },
+          {
+            "source": "break_stone",
+            "at_s": 0.49,
+            "relative_peak_dbfs": -6,
+            "source_start_s": 0,
+            "source_end_s": null,
+            "playback_speed": 0.78,
+            "lowpass_hz": null,
+            "highpass_hz": null,
+            "fade_in_s": 0.005,
+            "fade_out_s": 0.35,
+            "pan": 0
+          },
+          {
+            "source": "rock_break1",
+            "at_s": 0.62,
+            "relative_peak_dbfs": -12,
+            "source_start_s": 0,
+            "source_end_s": null,
+            "playback_speed": 0.88,
+            "lowpass_hz": null,
+            "highpass_hz": null,
+            "fade_in_s": 0.005,
+            "fade_out_s": 0.12,
+            "pan": -0.3
+          },
+          {
+            "source": "rock_break2",
+            "at_s": 0.86,
+            "relative_peak_dbfs": -15,
+            "source_start_s": 0,
+            "source_end_s": null,
+            "playback_speed": 0.82,
+            "lowpass_hz": null,
+            "highpass_hz": null,
+            "fade_in_s": 0.005,
+            "fade_out_s": 0.12,
+            "pan": 0.3
+          },
+          {
+            "source": "lightning",
+            "at_s": 0.46,
+            "relative_peak_dbfs": -8,
+            "source_start_s": 0,
+            "source_end_s": null,
+            "playback_speed": 1,
+            "lowpass_hz": null,
+            "highpass_hz": 180,
+            "fade_in_s": 0.005,
+            "fade_out_s": 0.45,
+            "pan": 0
+          }
+        ],
+        "sequence_start_s": 8.5,
+        "sequence_end_s": 13.5
+      },
+      "packaging": {
+        "method": "Existing standalone lossless scene WAV encoded to MP3. No extra trim, gain, normalization or creative edit.",
+        "input_wav_sha256": "d6c413a82b427bdf34731b3d08e3dddb16070d99ab00e07a84152d186d2a7e0c",
+        "input_wav_filename": "P1_STONE_LIGHTNING_CC0_3_queen.wav"
+      }
+    },
+    {
+      "id": "p2-formation",
+      "family": "promotion",
+      "candidate": "P2",
+      "event": "promotion.formation",
+      "applies_to": [
+        "bishop",
+        "knight"
+      ],
+      "license": "CC-BY-4.0 + CC0-1.0",
+      "source_ids": [
+        "promotion-teleport",
+        "promotion-whoosh"
+      ],
+      "file": "promotion-p2-formation.mp3",
+      "url": "/assets/audio/auditions/promotion-p2-formation.mp3",
+      "sha256": "e67bcbd77896e94d015cc0d07520e5864f0f84d8f5697f15bc0d9bb3366cb76e",
+      "bytes": 73196,
+      "codec": "mp3",
+      "bitrate_kbps": 192,
+      "sample_rate_hz": 48000,
+      "channels": 2,
+      "decoded_frames": 144000,
+      "decoded_duration_seconds": 3.0,
+      "container_duration_seconds": 3.024,
+      "input_pcm_sample_peak_dbfs": -8.000117030469568,
+      "decoded_mp3_sample_peak_dbfs": -8.366608508022452,
+      "decoded_clipped_samples": 0,
+      "all_decoded_samples_finite": true,
+      "sync": {
+        "physical_contact_seconds": null,
+        "semantic_anchor": "formation onset",
+        "main_formation_layer_onset_seconds": 0.12,
+        "auditory_transient_verified": false
+      },
+      "existing_scene_recipe": {
+        "name": "bishop_or_knight",
+        "duration_s": 3.0,
+        "target_peak_dbfs": -8,
+        "scene_gain_db": -3.116445654844254,
+        "layers": [
+          {
+            "source": "teleport",
+            "at_s": 0.12,
+            "relative_peak_dbfs": -5,
+            "source_start_s": 0,
+            "source_end_s": null,
+            "playback_speed": 1,
+            "lowpass_hz": null,
+            "highpass_hz": null,
+            "fade_in_s": 0.005,
+            "fade_out_s": 0.25,
+            "pan": 0
+          },
+          {
+            "source": "whoosh",
+            "at_s": 0.03,
+            "relative_peak_dbfs": -22,
+            "source_start_s": 2.0,
+            "source_end_s": 2.36,
+            "playback_speed": 1,
+            "lowpass_hz": null,
+            "highpass_hz": null,
+            "fade_in_s": 0.07,
+            "fade_out_s": 0.1,
+            "pan": 0
+          }
+        ],
+        "sequence_start_s": 0,
+        "sequence_end_s": 3.0
+      },
+      "packaging": {
+        "method": "Existing standalone lossless scene WAV encoded to MP3. No extra trim, gain, normalization or creative edit.",
+        "input_wav_sha256": "4445da9b260c27572fd8b42a57ec0f78acbd53a05ba7e5b37b1c15e9998db493",
+        "input_wav_filename": "P2_ARC_STONE_CC_BY_4_1_bishop_or_knight.wav"
+      }
+    },
+    {
+      "id": "p2-rook",
+      "family": "promotion",
+      "candidate": "P2",
+      "event": "promotion.rook",
+      "applies_to": [
+        "rook"
+      ],
+      "license": "CC-BY-4.0 + CC0-1.0",
+      "source_ids": [
+        "promotion-swing",
+        "promotion-landing",
+        "promotion-rock_fall",
+        "promotion-fire",
+        "promotion-dull_explosion"
+      ],
+      "file": "promotion-p2-rook.mp3",
+      "url": "/assets/audio/auditions/promotion-p2-rook.mp3",
+      "sha256": "c9d8acd4f9550176781e65515dd3a0e1058d1874d9853cfb1936a19139c63226",
+      "bytes": 85292,
+      "codec": "mp3",
+      "bitrate_kbps": 192,
+      "sample_rate_hz": 48000,
+      "channels": 2,
+      "decoded_frames": 168000,
+      "decoded_duration_seconds": 3.5,
+      "container_duration_seconds": 3.528,
+      "input_pcm_sample_peak_dbfs": -5.000377362660108,
+      "decoded_mp3_sample_peak_dbfs": -5.274772699026159,
+      "decoded_clipped_samples": 0,
+      "all_decoded_samples_finite": true,
+      "sync": {
+        "physical_contact_seconds": 0.42,
+        "semantic_anchor": "piece lands on the board",
+        "main_formation_layer_onset_seconds": null,
+        "auditory_transient_verified": false
+      },
+      "existing_scene_recipe": {
+        "name": "rook",
+        "duration_s": 3.5,
+        "target_peak_dbfs": -5,
+        "scene_gain_db": 0.8680561455380273,
+        "layers": [
+          {
+            "source": "swing",
+            "at_s": 0.03,
+            "relative_peak_dbfs": -15,
+            "source_start_s": 0,
+            "source_end_s": 0.45,
+            "playback_speed": 1,
+            "lowpass_hz": null,
+            "highpass_hz": null,
+            "fade_in_s": 0.005,
+            "fade_out_s": 0.07,
+            "pan": 0
+          },
+          {
+            "source": "landing",
+            "at_s": 0.42,
+            "relative_peak_dbfs": -7,
+            "source_start_s": 0,
+            "source_end_s": null,
+            "playback_speed": 0.78,
+            "lowpass_hz": null,
+            "highpass_hz": null,
+            "fade_in_s": 0.005,
+            "fade_out_s": 0.25,
+            "pan": 0
+          },
+          {
+            "source": "rock_fall",
+            "at_s": 0.25,
+            "relative_peak_dbfs": -8,
+            "source_start_s": 0,
+            "source_end_s": null,
+            "playback_speed": 0.9,
+            "lowpass_hz": null,
+            "highpass_hz": null,
+            "fade_in_s": 0.005,
+            "fade_out_s": 0.16,
+            "pan": 0
+          },
+          {
+            "source": "fire",
+            "at_s": 0.42,
+            "relative_peak_dbfs": -8,
+            "source_start_s": 0,
+            "source_end_s": null,
+            "playback_speed": 1,
+            "lowpass_hz": 900,
+            "highpass_hz": null,
+            "fade_in_s": 0.005,
+            "fade_out_s": 0.4,
+            "pan": 0
+          },
+          {
+            "source": "dull_explosion",
+            "at_s": 0.44,
+            "relative_peak_dbfs": -13,
+            "source_start_s": 0,
+            "source_end_s": 2.1,
+            "playback_speed": 0.84,
+            "lowpass_hz": 300,
+            "highpass_hz": null,
+            "fade_in_s": 0.005,
+            "fade_out_s": 0.45,
+            "pan": 0
+          }
+        ],
+        "sequence_start_s": 4.0,
+        "sequence_end_s": 7.5
+      },
+      "packaging": {
+        "method": "Existing standalone lossless scene WAV encoded to MP3. No extra trim, gain, normalization or creative edit.",
+        "input_wav_sha256": "2cd4b3b7de5c9f789cbe643f88b8d5f4bd4a81bf136062323d156f83e9645f91",
+        "input_wav_filename": "P2_ARC_STONE_CC_BY_4_2_rook.wav"
+      }
+    },
+    {
+      "id": "p2-queen",
+      "family": "promotion",
+      "candidate": "P2",
+      "event": "promotion.queen",
+      "applies_to": [
+        "queen"
+      ],
+      "license": "CC-BY-4.0 + CC0-1.0",
+      "source_ids": [
+        "promotion-swing",
+        "promotion-landing",
+        "promotion-fire",
+        "promotion-dull_explosion",
+        "promotion-break_stone",
+        "promotion-rock_break1",
+        "promotion-rock_break2",
+        "promotion-electric"
+      ],
+      "file": "promotion-p2-queen.mp3",
+      "url": "/assets/audio/auditions/promotion-p2-queen.mp3",
+      "sha256": "3711bb92db1ec6844e47e0e65febf68ceb1d651c624f31903a8f2d17ec367665",
+      "bytes": 121580,
+      "codec": "mp3",
+      "bitrate_kbps": 192,
+      "sample_rate_hz": 48000,
+      "channels": 2,
+      "decoded_frames": 240000,
+      "decoded_duration_seconds": 5.0,
+      "container_duration_seconds": 5.04,
+      "input_pcm_sample_peak_dbfs": -3.0003622493859567,
+      "decoded_mp3_sample_peak_dbfs": -3.175257722078852,
+      "decoded_clipped_samples": 0,
+      "all_decoded_samples_finite": true,
+      "sync": {
+        "physical_contact_seconds": 0.42,
+        "semantic_anchor": "piece lands on the board",
+        "main_formation_layer_onset_seconds": null,
+        "auditory_transient_verified": false
+      },
+      "existing_scene_recipe": {
+        "name": "queen",
+        "duration_s": 5.0,
+        "target_peak_dbfs": -3,
+        "scene_gain_db": 0.3217680788443521,
+        "layers": [
+          {
+            "source": "swing",
+            "at_s": 0.01,
+            "relative_peak_dbfs": -16,
+            "source_start_s": 0,
+            "source_end_s": 0.5,
+            "playback_speed": 0.93,
+            "lowpass_hz": null,
+            "highpass_hz": null,
+            "fade_in_s": 0.005,
+            "fade_out_s": 0.08,
+            "pan": 0
+          },
+          {
+            "source": "landing",
+            "at_s": 0.42,
+            "relative_peak_dbfs": -5,
+            "source_start_s": 0,
+            "source_end_s": null,
+            "playback_speed": 0.7,
+            "lowpass_hz": null,
+            "highpass_hz": null,
+            "fade_in_s": 0.005,
+            "fade_out_s": 0.28,
+            "pan": 0
+          },
+          {
+            "source": "fire",
+            "at_s": 0.43,
+            "relative_peak_dbfs": -10,
+            "source_start_s": 0,
+            "source_end_s": null,
+            "playback_speed": 0.83,
+            "lowpass_hz": 750,
+            "highpass_hz": null,
+            "fade_in_s": 0.005,
+            "fade_out_s": 0.5,
+            "pan": 0
+          },
+          {
+            "source": "dull_explosion",
+            "at_s": 0.44,
+            "relative_peak_dbfs": -13,
+            "source_start_s": 0,
+            "source_end_s": null,
+            "playback_speed": 0.9,
+            "lowpass_hz": 420,
+            "highpass_hz": null,
+            "fade_in_s": 0.005,
+            "fade_out_s": 0.5,
+            "pan": 0
+          },
+          {
+            "source": "break_stone",
+            "at_s": 0.48,
+            "relative_peak_dbfs": -6,
+            "source_start_s": 0,
+            "source_end_s": null,
+            "playback_speed": 0.84,
+            "lowpass_hz": null,
+            "highpass_hz": null,
+            "fade_in_s": 0.005,
+            "fade_out_s": 0.4,
+            "pan": 0
+          },
+          {
+            "source": "rock_break1",
+            "at_s": 0.67,
+            "relative_peak_dbfs": -11,
+            "source_start_s": 0,
+            "source_end_s": null,
+            "playback_speed": 0.82,
+            "lowpass_hz": null,
+            "highpass_hz": null,
+            "fade_in_s": 0.005,
+            "fade_out_s": 0.12,
+            "pan": 0.3
+          },
+          {
+            "source": "rock_break2",
+            "at_s": 0.97,
+            "relative_peak_dbfs": -15,
+            "source_start_s": 0,
+            "source_end_s": null,
+            "playback_speed": 0.8,
+            "lowpass_hz": null,
+            "highpass_hz": null,
+            "fade_in_s": 0.005,
+            "fade_out_s": 0.12,
+            "pan": -0.3
+          },
+          {
+            "source": "electric",
+            "at_s": 0.47,
+            "relative_peak_dbfs": -7,
+            "source_start_s": 0,
+            "source_end_s": null,
+            "playback_speed": 1,
+            "lowpass_hz": null,
+            "highpass_hz": 220,
+            "fade_in_s": 0.005,
+            "fade_out_s": 0.35,
+            "pan": 0
+          }
+        ],
+        "sequence_start_s": 8.5,
+        "sequence_end_s": 13.5
+      },
+      "packaging": {
+        "method": "Existing standalone lossless scene WAV encoded to MP3. No extra trim, gain, normalization or creative edit.",
+        "input_wav_sha256": "8638a42523cc4a9e95896fb6798cf78ba9a84e009d42732296d26f3037a21145",
+        "input_wav_filename": "P2_ARC_STONE_CC_BY_4_3_queen.wav"
+      }
+    },
+    {
+      "id": "p1-queen-fracture-only",
+      "family": "promotion-stem",
+      "candidate": "P1-STONE-SOLO",
+      "event": "promotion.queen.fracture",
+      "license": "CC0-1.0",
+      "source_ids": [
+        "promotion-break_stone",
+        "promotion-rock_break1",
+        "promotion-rock_break2"
+      ],
+      "file": "promotion-p1-queen-fracture-only.mp3",
+      "url": "/assets/audio/auditions/promotion-p1-queen-fracture-only.mp3",
+      "sha256": "b635b9a9ab5df3119ce1e45e4078bcd7095bd4fd8d5747b08d734ded2210df71",
+      "bytes": 87596,
+      "codec": "mp3",
+      "bitrate_kbps": 192,
+      "sample_rate_hz": 48000,
+      "channels": 2,
+      "decoded_frames": 172800,
+      "decoded_duration_seconds": 3.6,
+      "container_duration_seconds": 3.624,
+      "input_pcm_sample_peak_dbfs": -6.9143347403440005,
+      "decoded_mp3_sample_peak_dbfs": -7.186802919283455,
+      "decoded_clipped_samples": 0,
+      "all_decoded_samples_finite": true,
+      "sync": {
+        "physical_contact_reference_seconds": 0.42,
+        "first_stone_layer_onset_seconds": 0.49,
+        "first_stone_layer_offset_after_contact_seconds": 0.07,
+        "semantic_anchor": "same contact clock as P1 queen; no landing sound in this solo file",
+        "auditory_transient_verified": false
+      },
+      "existing_scene_recipe": {
+        "parent_scene": "P1_STONE_LIGHTNING_CC0 queen",
+        "scene_gain_db": -0.9143270437807192,
+        "layers": [
+          {
+            "source": "break_stone",
+            "at_s": 0.49,
+            "relative_peak_dbfs": -6,
+            "source_start_s": 0,
+            "source_end_s": null,
+            "playback_speed": 0.78,
+            "lowpass_hz": null,
+            "highpass_hz": null,
+            "fade_in_s": 0.005,
+            "fade_out_s": 0.35,
+            "pan": 0
+          },
+          {
+            "source": "rock_break1",
+            "at_s": 0.62,
+            "relative_peak_dbfs": -12,
+            "source_start_s": 0,
+            "source_end_s": null,
+            "playback_speed": 0.88,
+            "lowpass_hz": null,
+            "highpass_hz": null,
+            "fade_in_s": 0.005,
+            "fade_out_s": 0.12,
+            "pan": -0.3
+          },
+          {
+            "source": "rock_break2",
+            "at_s": 0.86,
+            "relative_peak_dbfs": -15,
+            "source_start_s": 0,
+            "source_end_s": null,
+            "playback_speed": 0.82,
+            "lowpass_hz": null,
+            "highpass_hz": null,
+            "fade_in_s": 0.005,
+            "fade_out_s": 0.12,
+            "pan": 0.3
+          }
+        ]
+      },
+      "packaging": {
+        "method": "Isolate only the three existing stone layers with original offsets, processing and parent-scene gain; no subset normalization. Preserve the 0.490 second leading timeline. Remove only 1.4 seconds of verified trailing PCM digital silence, then MP3 encode.",
+        "full_queen_reconstruction_matches_existing_pcm16_exactly": true,
+        "full_queen_reconstruction_max_pcm_error": 0,
+        "preserved_parent_window_seconds": [
+          0,
+          3.6
+        ],
+        "removed_verified_silence_seconds": [
+          3.6,
+          5.0
+        ],
+        "removed_layers": [
+          "whoosh",
+          "landing",
+          "dull_explosion",
+          "lightning"
+        ],
+        "additional_artistic_processing": "none"
+      }
+    }
+  ],
+  "sources": {
+    "reaction-r1-guilt": {
+      "title": "Energy Drain",
+      "creator": "qubodup",
+      "page_url": "https://opengameart.org/content/energy-drain",
+      "download_url": "https://opengameart.org/sites/default/files/qubodup-PowerDrain.7z",
+      "license": "CC0-1.0",
+      "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "license_note": "Author page explicitly changes the terms to CC0 on 2024-06-23 and says restrictions in the archive may be ignored. Archived page is retained.",
+      "original_filename": "qubodup-PowerDrain.flac",
+      "original_sha256": "de0cb2775d484f4b7dc4aaa341d9750fda76d0d599d2b683720d6feaf616280d",
+      "original_metadata": {
+        "programs": [],
+        "stream_groups": [],
+        "streams": [
+          {
+            "codec_name": "flac",
+            "sample_rate": "48000",
+            "channels": 2,
+            "bits_per_sample": 0
+          }
+        ],
+        "format": {
+          "duration": "3.000000",
+          "size": "311228"
+        }
+      }
+    },
+    "reaction-r1-devastated": {
+      "title": "Basic Spell Impacts",
+      "creator": "lentikula",
+      "page_url": "https://lentikula.itch.io/freecc0-basic-spell-impacts-sfx",
+      "download_url": "https://lentikula.itch.io/freecc0-basic-spell-impacts-sfx/purchase",
+      "license": "CC0-1.0",
+      "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "license_note": "Author explicitly releases the pack under CC0. Original archive reused from prior research download; originals are copied byte-for-byte.",
+      "original_filename": "Ice Spell Impact 1.wav",
+      "original_sha256": "793bd970c9e4edf55acd4551335ae3a6e07415527022057369bbdb68ead355a4",
+      "original_metadata": {
+        "programs": [],
+        "stream_groups": [],
+        "streams": [
+          {
+            "codec_name": "pcm_s24le",
+            "sample_rate": "48000",
+            "channels": 2,
+            "bits_per_sample": 24
+          }
+        ],
+        "format": {
+          "duration": "2.427417",
+          "size": "699176"
+        }
+      }
+    },
+    "reaction-r1-berserk": {
+      "title": "Basic Spell Impacts",
+      "creator": "lentikula",
+      "page_url": "https://lentikula.itch.io/freecc0-basic-spell-impacts-sfx",
+      "download_url": "https://lentikula.itch.io/freecc0-basic-spell-impacts-sfx/purchase",
+      "license": "CC0-1.0",
+      "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "license_note": "Author explicitly releases the pack under CC0. Original archive reused from prior research download; originals are copied byte-for-byte.",
+      "original_filename": "Fire Spell Impact 1.wav",
+      "original_sha256": "0ed8aa723a1189da00f115d7402508a291906bd249a80036e71a59f1020e67eb",
+      "original_metadata": {
+        "programs": [],
+        "stream_groups": [],
+        "streams": [
+          {
+            "codec_name": "pcm_s24le",
+            "sample_rate": "48000",
+            "channels": 2,
+            "bits_per_sample": 24
+          }
+        ],
+        "format": {
+          "duration": "2.997333",
+          "size": "863312"
+        }
+      }
+    },
+    "reaction-r1-bloodlust": {
+      "title": "3 dark magic spells",
+      "creator": "qubodup",
+      "page_url": "https://opengameart.org/content/3-dark-magic-spells",
+      "download_url": "https://opengameart.org/sites/default/files/dark_magic.7z",
+      "license": "CC0-1.0",
+      "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "original_filename": "fout-03.flac",
+      "original_sha256": "ec55b77eb3096dcc083d219254d0a37a0ecf071477d7c47bc363092c2ca02d0d",
+      "original_metadata": {
+        "programs": [],
+        "stream_groups": [],
+        "streams": [
+          {
+            "codec_name": "flac",
+            "sample_rate": "44100",
+            "channels": 2,
+            "bits_per_sample": 0
+          }
+        ],
+        "format": {
+          "duration": "3.920816",
+          "size": "381356"
+        }
+      }
+    },
+    "reaction-r2-guilt": {
+      "title": "JC Sounds - Fantasy SFX Pack Vol 1",
+      "creator": "JC Sounds",
+      "page_url": "https://opengameart.org/content/jc-sounds-fantasy-sfx-pack-vol-1",
+      "download_url": "https://opengameart.org/sites/default/files/fantasy_sfx_pack_vol_1.7z",
+      "license": "CC-BY-4.0",
+      "license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "attribution": "JC Sounds - Fantasy SFX Pack Vol 1 by JC Sounds; https://opengameart.org/content/jc-sounds-fantasy-sfx-pack-vol-1 ; CC BY 4.0 https://creativecommons.org/licenses/by/4.0/ . Audition edits: stereo/48 kHz conversion, per-clip constant gain to -6 dBFS sample peak, silence between clips, MP3 encoding. No trimming, layering, pitch change, or compression.",
+      "original_filename": "Seq_Fantasy SFX Pack Vol 1_Mana Drain_Start.wav",
+      "original_sha256": "7020a586bef1f42fd08d00c83d861b54e647c7c90fc93a54edcec89e08184977",
+      "original_metadata": {
+        "programs": [],
+        "stream_groups": [],
+        "streams": [
+          {
+            "codec_name": "pcm_s16le",
+            "sample_rate": "44100",
+            "channels": 1,
+            "bits_per_sample": 16
+          }
+        ],
+        "format": {
+          "duration": "1.433333",
+          "size": "127110"
+        }
+      }
+    },
+    "reaction-r2-devastated": {
+      "title": "JC Sounds - Fantasy SFX Pack Vol 1",
+      "creator": "JC Sounds",
+      "page_url": "https://opengameart.org/content/jc-sounds-fantasy-sfx-pack-vol-1",
+      "download_url": "https://opengameart.org/sites/default/files/fantasy_sfx_pack_vol_1.7z",
+      "license": "CC-BY-4.0",
+      "license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "attribution": "JC Sounds - Fantasy SFX Pack Vol 1 by JC Sounds; https://opengameart.org/content/jc-sounds-fantasy-sfx-pack-vol-1 ; CC BY 4.0 https://creativecommons.org/licenses/by/4.0/ . Audition edits: stereo/48 kHz conversion, per-clip constant gain to -6 dBFS sample peak, silence between clips, MP3 encoding. No trimming, layering, pitch change, or compression.",
+      "original_filename": "Single_Fantasy SFX Pack Vol 1_Ice Spell_Buildup.wav",
+      "original_sha256": "020ef632467120f17131c12e13a242b4285ca1bec10eaddd6757843901644ba9",
+      "original_metadata": {
+        "programs": [],
+        "stream_groups": [],
+        "streams": [
+          {
+            "codec_name": "pcm_s16le",
+            "sample_rate": "44100",
+            "channels": 1,
+            "bits_per_sample": 16
+          }
+        ],
+        "format": {
+          "duration": "1.200000",
+          "size": "106530"
+        }
+      }
+    },
+    "reaction-r2-berserk": {
+      "title": "JC Sounds - Fantasy SFX Pack Vol 1",
+      "creator": "JC Sounds",
+      "page_url": "https://opengameart.org/content/jc-sounds-fantasy-sfx-pack-vol-1",
+      "download_url": "https://opengameart.org/sites/default/files/fantasy_sfx_pack_vol_1.7z",
+      "license": "CC-BY-4.0",
+      "license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "attribution": "JC Sounds - Fantasy SFX Pack Vol 1 by JC Sounds; https://opengameart.org/content/jc-sounds-fantasy-sfx-pack-vol-1 ; CC BY 4.0 https://creativecommons.org/licenses/by/4.0/ . Audition edits: stereo/48 kHz conversion, per-clip constant gain to -6 dBFS sample peak, silence between clips, MP3 encoding. No trimming, layering, pitch change, or compression.",
+      "original_filename": "Single_Fantasy SFX Pack Vol 1_Fireball_Buildup.wav",
+      "original_sha256": "15f43d950d226436354678a241d85685fa627d6e91a2d39715bd235597376b36",
+      "original_metadata": {
+        "programs": [],
+        "stream_groups": [],
+        "streams": [
+          {
+            "codec_name": "pcm_s16le",
+            "sample_rate": "44100",
+            "channels": 1,
+            "bits_per_sample": 16
+          }
+        ],
+        "format": {
+          "duration": "1.200000",
+          "size": "106530"
+        }
+      }
+    },
+    "reaction-r2-bloodlust": {
+      "title": "JC Sounds - Fantasy SFX Pack Vol 1",
+      "creator": "JC Sounds",
+      "page_url": "https://opengameart.org/content/jc-sounds-fantasy-sfx-pack-vol-1",
+      "download_url": "https://opengameart.org/sites/default/files/fantasy_sfx_pack_vol_1.7z",
+      "license": "CC-BY-4.0",
+      "license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "attribution": "JC Sounds - Fantasy SFX Pack Vol 1 by JC Sounds; https://opengameart.org/content/jc-sounds-fantasy-sfx-pack-vol-1 ; CC BY 4.0 https://creativecommons.org/licenses/by/4.0/ . Audition edits: stereo/48 kHz conversion, per-clip constant gain to -6 dBFS sample peak, silence between clips, MP3 encoding. No trimming, layering, pitch change, or compression.",
+      "original_filename": "Loop_Fantasy Pack Vol 1_Dark Necromancy Chant_01.wav",
+      "original_sha256": "57297aa868c441f87129be20a970c86d58c978bbb841924d483e7773b77a1039",
+      "original_metadata": {
+        "programs": [],
+        "stream_groups": [],
+        "streams": [
+          {
+            "codec_name": "pcm_s16le",
+            "sample_rate": "44100",
+            "channels": 2,
+            "bits_per_sample": 16
+          }
+        ],
+        "format": {
+          "duration": "6.000000",
+          "size": "1059090"
+        }
+      }
+    },
+    "promotion-break_stone": {
+      "path": "selected_originals/break_stone/break_stone.wav",
+      "original_filename": "break_stone.wav",
+      "author": "Julie Damsgaard / Spring Spring / Spring Enterprises",
+      "pack_title": "Various Sound Effects",
+      "source_url": "https://opengameart.org/content/various-sound-effects-0",
+      "download_url": "https://opengameart.org/sites/default/files/break_stone.wav",
+      "license": "CC0",
+      "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "duration_s": 2.425094,
+      "audio_info": [
+        {
+          "sample_rate": "96000",
+          "channels": 2
+        }
+      ],
+      "sha256": "8e3ed312e12791be6d6bbcf02a1889fb3913e420b85c796e4236319e23414df2",
+      "bytes": 931398
+    },
+    "promotion-dull_explosion": {
+      "path": "selected_originals/dull_explosion/dull_explosion.wav",
+      "original_filename": "dull_explosion.wav",
+      "author": "Julie Damsgaard / Spring Spring / Spring Enterprises",
+      "pack_title": "Various Sound Effects",
+      "source_url": "https://opengameart.org/content/various-sound-effects-0",
+      "download_url": "https://opengameart.org/sites/default/files/dull_explosion.wav",
+      "license": "CC0",
+      "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "duration_s": 3.52,
+      "audio_info": [
+        {
+          "sample_rate": "96000",
+          "channels": 2
+        }
+      ],
+      "sha256": "f79f07a733eb27822fb4567318e38b150a482d340bdabad7a30c099815109588",
+      "bytes": 1351866
+    },
+    "promotion-landing": {
+      "path": "selected_originals/landing/snd_enemyland.wav",
+      "original_filename": "snd_enemyland.wav",
+      "author": "Julie Damsgaard / Spring Spring / Spring Enterprises",
+      "pack_title": "Various Sound Effects",
+      "source_url": "https://opengameart.org/content/various-sound-effects-0",
+      "download_url": "https://opengameart.org/sites/default/files/snd_enemyland.wav",
+      "license": "CC0",
+      "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "duration_s": 1.471917,
+      "audio_info": [
+        {
+          "sample_rate": "96000",
+          "channels": 2
+        }
+      ],
+      "sha256": "0532cbb00ed7d9987d49f1450f974f43180ffa8c4a863caf5a220aa1ddf911b4",
+      "bytes": 565378
+    },
+    "promotion-rock_fall": {
+      "path": "selected_originals/rock_fall/bfh1_rock_falling_01.ogg",
+      "original_filename": "bfh1_rock_falling_01.ogg",
+      "author": "rubberduck",
+      "pack_title": "75 CC0 breaking / falling / hit sfx",
+      "source_url": "https://opengameart.org/content/75-cc0-breaking-falling-hit-sfx",
+      "download_url": "https://opengameart.org/sites/default/files/sfx_breaking_and_falling.zip",
+      "license": "CC0",
+      "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "duration_s": 0.916479,
+      "audio_info": [
+        {
+          "sample_rate": "48000",
+          "channels": 2
+        }
+      ],
+      "sha256": "9e58d2d3302c1bad27267cef6a2b3b47bb636f49f77d8e4b986ac81a26e80d7b",
+      "bytes": 36250
+    },
+    "promotion-rock_break1": {
+      "path": "selected_originals/rock_break1/bfh1_rock_breaking_01.ogg",
+      "original_filename": "bfh1_rock_breaking_01.ogg",
+      "author": "rubberduck",
+      "pack_title": "75 CC0 breaking / falling / hit sfx",
+      "source_url": "https://opengameart.org/content/75-cc0-breaking-falling-hit-sfx",
+      "download_url": "https://opengameart.org/sites/default/files/sfx_breaking_and_falling.zip",
+      "license": "CC0",
+      "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "duration_s": 1.146542,
+      "audio_info": [
+        {
+          "sample_rate": "48000",
+          "channels": 2
+        }
+      ],
+      "sha256": "970cac3139e1530009ca87f8ee0dd800dc4da61917a5e62bdc83d475a9bf4da7",
+      "bytes": 30092
+    },
+    "promotion-rock_break2": {
+      "path": "selected_originals/rock_break2/bfh1_rock_breaking_02.ogg",
+      "original_filename": "bfh1_rock_breaking_02.ogg",
+      "author": "rubberduck",
+      "pack_title": "75 CC0 breaking / falling / hit sfx",
+      "source_url": "https://opengameart.org/content/75-cc0-breaking-falling-hit-sfx",
+      "download_url": "https://opengameart.org/sites/default/files/sfx_breaking_and_falling.zip",
+      "license": "CC0",
+      "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "duration_s": 0.864625,
+      "audio_info": [
+        {
+          "sample_rate": "48000",
+          "channels": 2
+        }
+      ],
+      "sha256": "3e06b794511f693b6aaca5eee1d47491bab74d814746a68de6c8bf4eec744ccc",
+      "bytes": 45809
+    },
+    "promotion-whoosh": {
+      "path": "selected_originals/whoosh/whoosh2.wav",
+      "original_filename": "whoosh2.wav",
+      "author": "pyranostudios",
+      "pack_title": "Air whoosh",
+      "source_url": "https://opengameart.org/content/air-whoosh",
+      "download_url": "https://opengameart.org/sites/default/files/whoosh2_0.wav",
+      "license": "CC0",
+      "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "duration_s": 5.246599,
+      "audio_info": [
+        {
+          "sample_rate": "44100",
+          "channels": 2
+        }
+      ],
+      "sha256": "d3fbff5bb78b289af16b2dfa29083f07ef83b0cbaff4514c48dfda16d082b468",
+      "bytes": 925662
+    },
+    "promotion-magic": {
+      "path": "selected_originals/magic/magical_4.ogg",
+      "original_filename": "magical_4.ogg",
+      "author": "JaggedStone",
+      "pack_title": "Magic Spell SFX",
+      "source_url": "https://opengameart.org/content/magic-spell-sfx",
+      "download_url": "https://opengameart.org/sites/default/files/magical_4.ogg",
+      "license": "CC0",
+      "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "duration_s": 2.414875,
+      "audio_info": [
+        {
+          "sample_rate": "44100",
+          "channels": 2
+        }
+      ],
+      "sha256": "b7862d109b4013dfb2a389a10f8917203beb0efc458444bc5a1b8ada605cc118",
+      "bytes": 79091
+    },
+    "promotion-lightning": {
+      "path": "selected_originals/lightning/Lightning Spell Impact 1.wav",
+      "original_filename": "Lightning Spell Impact 1.wav",
+      "author": "lentikula",
+      "pack_title": "Basic Spell Impacts [Free/CC0]",
+      "source_url": "https://lentikula.itch.io/freecc0-basic-spell-impacts-sfx",
+      "download_url": "https://lentikula.itch.io/freecc0-basic-spell-impacts-sfx/purchase",
+      "license": "CC0",
+      "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "duration_s": 3.68,
+      "audio_info": [
+        {
+          "sample_rate": "48000",
+          "channels": 2,
+          "bits_per_raw_sample": "24"
+        }
+      ],
+      "sha256": "15d3a0491e6e51e14cea718dbdb3d597163b0bc00e0fc0fadf1d1d68b0f8b853",
+      "bytes": 1059920
+    },
+    "promotion-teleport": {
+      "path": "selected_originals/teleport/Single_Fantasy SFX Pack Vol 1_Teleport_In.wav",
+      "original_filename": "Single_Fantasy SFX Pack Vol 1_Teleport_In.wav",
+      "author": "JC Sounds",
+      "pack_title": "Fantasy SFX Pack Vol 1",
+      "source_url": "https://opengameart.org/content/jc-sounds-fantasy-sfx-pack-vol-1",
+      "download_url": "https://opengameart.org/sites/default/files/fantasy_sfx_pack_vol_1.7z",
+      "license": "CC BY 4.0",
+      "license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "duration_s": 1.633333,
+      "audio_info": [
+        {
+          "sample_rate": "44100",
+          "channels": 1
+        }
+      ],
+      "sha256": "c720f0f4b1c11ac9ce81245d5bb3f1cbb060d3933e469a9d606d1681e25f243f",
+      "bytes": 144750
+    },
+    "promotion-swing": {
+      "path": "selected_originals/swing/Single_Fantasy SFX Pack Vol 1_Heavy Sword_Swing_01.wav",
+      "original_filename": "Single_Fantasy SFX Pack Vol 1_Heavy Sword_Swing_01.wav",
+      "author": "JC Sounds",
+      "pack_title": "Fantasy SFX Pack Vol 1",
+      "source_url": "https://opengameart.org/content/jc-sounds-fantasy-sfx-pack-vol-1",
+      "download_url": "https://opengameart.org/sites/default/files/fantasy_sfx_pack_vol_1.7z",
+      "license": "CC BY 4.0",
+      "license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "duration_s": 0.633333,
+      "audio_info": [
+        {
+          "sample_rate": "44100",
+          "channels": 1
+        }
+      ],
+      "sha256": "3eb8abd55dbe99c6390da79fcc3fa629e7c3c79cd29ddec122217e825933b063",
+      "bytes": 56550
+    },
+    "promotion-fire": {
+      "path": "selected_originals/fire/Single_Fantasy SFX Pack Vol 1_Fireball Impact_01.wav",
+      "original_filename": "Single_Fantasy SFX Pack Vol 1_Fireball Impact_01.wav",
+      "author": "JC Sounds",
+      "pack_title": "Fantasy SFX Pack Vol 1",
+      "source_url": "https://opengameart.org/content/jc-sounds-fantasy-sfx-pack-vol-1",
+      "download_url": "https://opengameart.org/sites/default/files/fantasy_sfx_pack_vol_1.7z",
+      "license": "CC BY 4.0",
+      "license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "duration_s": 1.233333,
+      "audio_info": [
+        {
+          "sample_rate": "44100",
+          "channels": 1
+        }
+      ],
+      "sha256": "117df27398321a5454dc1f502a481db5efbf525cbf7a08c9632641ccbc9877c5",
+      "bytes": 109470
+    },
+    "promotion-electric": {
+      "path": "selected_originals/electric/Single_Fantasy SFX Pack Vol 1_Electric Spell_Hit_02.wav",
+      "original_filename": "Single_Fantasy SFX Pack Vol 1_Electric Spell_Hit_02.wav",
+      "author": "JC Sounds",
+      "pack_title": "Fantasy SFX Pack Vol 1",
+      "source_url": "https://opengameart.org/content/jc-sounds-fantasy-sfx-pack-vol-1",
+      "download_url": "https://opengameart.org/sites/default/files/fantasy_sfx_pack_vol_1.7z",
+      "license": "CC BY 4.0",
+      "license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "duration_s": 0.866667,
+      "audio_info": [
+        {
+          "sample_rate": "44100",
+          "channels": 1
+        }
+      ],
+      "sha256": "b089297875138c3b99005b3405067c48a2d151aa0c1e7ba6c95912b210230f09",
+      "bytes": 77130
+    }
+  },
+  "research_provenance": {
+    "R1_Reactions_CC0": {
+      "manifest_sha256": "8b1f55456c6a656bc82372303bec03abb5f2a7b85523b02c8faf3c19be7fe672",
+      "wav_sha256": "97e082258e4b58fac0488172c3af122c1b564272b467d137a04a98cf4f212ba1",
+      "wav_frames": 746188,
+      "wav_duration_seconds": 15.545583333333333,
+      "comparison_mp3_filename": "R1_Reactions_CC0.mp3"
+    },
+    "R2_Reactions_JCSounds_CC_BY_4": {
+      "manifest_sha256": "b09d5f70ca88e2da3aeb680d9b66c5ed9d86d48d62515f60b8601092051f8668",
+      "wav_sha256": "dda2e29dea83d2fbfd242758676884d31304b85262456f4f03fb9e8af23237f3",
+      "wav_frames": 625600,
+      "wav_duration_seconds": 13.033333333333333,
+      "comparison_mp3_filename": "R2_Reactions_JCSounds_CC_BY_4.mp3"
+    },
+    "promotion_manifest": {
+      "file": "manifest.json",
+      "sha256": "643ff427e955c1603af477837d72e60be15a701d01ad949252fa9c5471ca1ed1",
+      "build_script_sha256": "22869df5a87088a3af6d4b731215c6112b4b0cdd01b4c003143eb9f750080899"
+    }
+  },
+  "limitations": [
+    "No loudness-match or subjective listening claim. Existing comparison levels are preserved.",
+    "Reaction candidates retain full source recordings, so lengths vary. R2 bloodlust is a six-second chant provided for timbre choice, not an automatically approved full-game cue.",
+    "Promotion candidates retain the existing 3 / 3.5 / 5 second audio scenes. They are not new animation lengths.",
+    "Rook and queen contact is 0.420 seconds into their candidate audio. Schedule against the real visual impact, not animation start. Reduced motion needs a documented audio-only pre-roll offset; do not extend its animation.",
+    "Do not layer an audition over the existing equivalent reaction/promotion sound. The fracture-only file is a solo comparison of a stem already in P1 queen, not an extra layer to add on top."
+  ],
+  "verification": {
+    "candidate_count": 15,
+    "total_mp3_bytes": 1190676,
+    "all_decoded_durations_match_input_frame_counts": true,
+    "all_candidates_have_zero_decoded_clipped_samples": true,
+    "all_original_source_hashes_match_research_manifests": true,
+    "sound_played": false
+  },
+  "comparison_demos": [
+    {
+      "id": "R1",
+      "file": "R1_Reactions_CC0.mp3",
+      "url": "/assets/audio/auditions/R1_Reactions_CC0.mp3",
+      "sha256": "448ee99aa1cc1bb3de040eb7a6915838a23df8e995bde7e3553e2cde58c99d2f",
+      "bytes": 374444,
+      "decoded_duration_seconds": 15.545583333333333,
+      "decoded_clipped_samples": 0,
+      "purpose": "Comparison montage only; not a single gameplay cue",
+      "sequence": [
+        "guilt",
+        "devastated",
+        "berserk",
+        "bloodlust"
+      ],
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "R2",
+      "file": "R2_Reactions_JCSounds_CC_BY_4.mp3",
+      "url": "/assets/audio/auditions/R2_Reactions_JCSounds_CC_BY_4.mp3",
+      "sha256": "2db982855bb839193df6b5537cdb739be58f0434c8044d15ebdccebbef4a2064",
+      "bytes": 314540,
+      "decoded_duration_seconds": 13.033333333333333,
+      "decoded_clipped_samples": 0,
+      "purpose": "Comparison montage only; not a single gameplay cue",
+      "sequence": [
+        "guilt",
+        "devastated",
+        "berserk",
+        "bloodlust"
+      ],
+      "license": "CC-BY-4.0"
+    },
+    {
+      "id": "P1",
+      "file": "P1_STONE_LIGHTNING_CC0.mp3",
+      "url": "/assets/audio/auditions/P1_STONE_LIGHTNING_CC0.mp3",
+      "sha256": "9913d8f2542b8655ee2b1b8f7f32a958c50023e22c2226e65662e5fcbae8c59f",
+      "bytes": 325484,
+      "decoded_duration_seconds": 13.5,
+      "decoded_clipped_samples": 0,
+      "purpose": "Comparison montage only; not a single gameplay cue",
+      "sequence": [
+        "formation",
+        "rook",
+        "queen"
+      ],
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "P2",
+      "file": "P2_ARC_STONE_CC_BY_4.mp3",
+      "url": "/assets/audio/auditions/P2_ARC_STONE_CC_BY_4.mp3",
+      "sha256": "8c8f86e582056834004156715235ea85e8cd92b8b3383fb8a053c97d258e1b0c",
+      "bytes": 325484,
+      "decoded_duration_seconds": 13.5,
+      "decoded_clipped_samples": 0,
+      "purpose": "Comparison montage only; not a single gameplay cue",
+      "sequence": [
+        "formation",
+        "rook",
+        "queen"
+      ],
+      "license": "CC0-1.0 + CC-BY-4.0"
+    }
+  ]
+}
