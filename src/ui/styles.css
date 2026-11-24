@@ -159,6 +159,7 @@ h1, h2, h3, p { margin: 0; }
   border: 1px solid #4b4840; border-radius: 10px;
   box-shadow: inset 0 0 0 3px #121417, 0 16px 42px #080a0b66;
 }
+.board-stage:focus-visible { outline-offset: -2px; }
 .board-stage[data-keyboard="false"]:focus { outline: none; }
 .board-stage::after {
   content: ''; position: absolute; inset: 5px; pointer-events: none; border: 1px solid #82715624; border-radius: 7px;
@@ -678,8 +679,9 @@ html.in-match, .in-match body { height: 100%; overflow: hidden; overscroll-behav
   }
   .in-match .table-column { grid-template-rows: 35px minmax(0, 1fr) 35px; gap: 0; }
   .in-match .player-row { min-height: 0; padding-block: 0; }
+  .in-match .player-heading { line-height: 1.25; }
   .in-match .player-heading strong { font-size: .73rem; }
-  .in-match .capture-line { min-height: 17px; }
+  .in-match :is(.capture-line, .trophies, .material) { min-height: 17px; }
   .in-match .game-aside { max-height: 100%; gap: 5px; }
   .in-match .lesson-panel { padding: 7px 10px; }
   .in-match .lesson-panel h2 { font-size: 1.45rem; }

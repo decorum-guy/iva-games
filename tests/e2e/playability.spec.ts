@@ -145,6 +145,16 @@ for (const viewport of [
     const fixture = captureFixture('white', 6)
     await restoreGame(page, fixture.after.record)
     await expect(playfield(page)).toHaveAttribute('data-phase', 'bonus')
+    await page.locator('.board-stage').press('ArrowRight')
+    const clearance = await page.getByTestId('board').evaluate(table => {
+      const stage = table.querySelector<HTMLElement>('.board-stage')!
+      const [far, near] = table.querySelectorAll('.player-detail')
+      const board = stage.getBoundingClientRect()
+      const outline = getComputedStyle(stage)
+      const outside = Math.max(0, parseFloat(outline.outlineOffset) + parseFloat(outline.outlineWidth))
+      return Math.min(board.top - far.getBoundingClientRect().bottom, near.getBoundingClientRect().top - board.bottom) - outside
+    })
+    expect(clearance).toBeGreaterThanOrEqual(0)
     await noDocumentScroll(page)
     await visibleAction(page.getByTestId('end-turn'))
     await visibleAction(page.getByTestId('sound-toggle'))
