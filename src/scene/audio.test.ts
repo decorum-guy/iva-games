@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { GameEvent, Piece } from '../core/types'
 import { getDieMotionTiming } from './diceMotion'
+import { sampleWindow } from './audioSamples'
 
 const piece: Piece = {
   id: 'white-rook', side: 'white', type: 'rook', square: 'd4', affliction: 'neutral',
@@ -33,6 +34,7 @@ class FakeNode {
 }
 class FakeSource extends FakeNode {
   frequency = new FakeParam()
+  playbackRate = new FakeParam()
   type = 'sine'
   buffer: unknown
   onended: (() => void) | null = null
@@ -59,14 +61,6 @@ class FakeAudioContext {
       threshold: new FakeParam(), knee: new FakeParam(), ratio: new FakeParam(),
       attack: new FakeParam(), release: new FakeParam(),
     })
-  }
-  createConvolver() { return Object.assign(new FakeNode(), { buffer: undefined as unknown }) }
-  createBuffer(channels: number, length: number) {
-    const data = Array.from({ length: channels }, () => new Float32Array(length))
-    return { getChannelData: (channel: number) => data[channel] }
-  }
-  createBiquadFilter() {
-    return Object.assign(new FakeNode(), { frequency: new FakeParam(), Q: new FakeParam(), type: 'bandpass' })
   }
   createOscillator() { const source = new FakeSource(); this.sources.push(source); return source }
   createBufferSource() { return this.createOscillator() }
@@ -118,20 +112,21 @@ describe('semantic scene sounds', () => {
     expect(audio.planSceneCues([{ ...ending, outcome: { reason: 'agreement', winner: null } }]).map(cue => cue.kind)).toEqual(['draw'])
   })
 
-  it('retains check and non-moving game endings, and shortens reduced-motion timing', () => {
+  it('reserves the post-die cue for check and keeps reduced timing aligned', () => {
     expect(audio.planSceneCues([check]).map(cue => cue.kind)).toEqual(['check'])
     const normal = audio.planSceneCues([capture, reaction, check])
     const reduced = audio.planSceneCues([capture, reaction, check], { reducedMotion: true })
+    expect(normal.map(cue => cue.kind)).toEqual(['capture', 'dice', 'check'])
     expect(reduced.map(cue => cue.kind)).toEqual(normal.map(cue => cue.kind))
     reduced.forEach((cue, index) => expect(cue.at).toBeLessThanOrEqual(normal[index].at))
-    expect(reduced.find(cue => cue.kind === 'guilt')?.at).toBeLessThan(normal.find(cue => cue.kind === 'guilt')!.at)
+    expect(reduced.find(cue => cue.kind === 'check')?.at).toBeLessThan(normal.find(cue => cue.kind === 'check')!.at)
   })
 
   it.each([false, true])('uses the visible die impacts and waits for settling before its state cue (reduced=%s)', async reducedMotion => {
     const timing = getDieMotionTiming(reducedMotion)
     const context = await unlock()
     const planned = audio.planSceneCues([reaction], { reducedMotion })
-    expect(planned.find(cue => cue.kind === 'guilt')?.at).toBeCloseTo(timing.motionMs / 1000 + .025)
+    expect(planned.find(cue => cue.kind === 'guilt')?.at).toBeCloseTo(timing.motionMs / 1000 + audio.DIE_SETTLE_SOUND_GAP)
     expect(audio.playSceneCue([reaction], { reducedMotion })).toBe(true)
     const starts = context.sources.flatMap(source => source.start.mock.calls.map(call => call[0] as number))
     for (const impactMs of timing.impactsMs) {
@@ -213,7 +208,7 @@ describe('audio user activation and cancellation', () => {
     expect(await ready).toBe(true)
     const starts = context.sources.flatMap(source => source.start.mock.calls.map(call => call[0] as number))
     expect(Math.min(...starts)).toBeCloseTo(.008 + 1.080 - .900)
-    expect(starts.some(at => Math.abs(at - (.008 + 1.525 - .900)) < .00001)).toBe(true)
+    expect(starts.some(at => Math.abs(at - (.008 + 1.500 + audio.DIE_SETTLE_SOUND_GAP - .900)) < .00001)).toBe(true)
   })
 
   it('uses commit time for a 900ms delayed effect even when the context is already running', async () => {
@@ -222,8 +217,41 @@ describe('audio user activation and cancellation', () => {
     expect(audio.playSceneCue([capture, reaction], { startedAt: 100 })).toBe(true)
     const starts = context.sources.flatMap(source => source.start.mock.calls.map(call => call[0] as number))
     expect(Math.min(...starts)).toBeCloseTo(.008 + 1.080 - .900)
-    expect(starts.some(at => Math.abs(at - (.008 + 1.525 - .900)) < .00001)).toBe(true)
+    expect(starts.some(at => Math.abs(at - (.008 + 1.500 + audio.DIE_SETTLE_SOUND_GAP - .900)) < .00001)).toBe(true)
   })
+
+  it('plays the recorded impact slices at the five shared contacts once the bank decodes', async () => {
+    const buffer = { duration: 1 };
+    const bank = new Uint8Array([1, 2, 3]);
+    const fetch = vi.fn(async () => new Response(bank));
+    vi.stubGlobal('fetch', fetch);
+    const decode = vi.fn(async () => buffer);
+    vi.stubGlobal('AudioContext', class extends FakeAudioContext { decodeAudioData = decode });
+    await audio.prepareSceneAudio();
+    const context = await unlock();
+    await vi.waitFor(() => expect(decode).toHaveBeenCalledTimes(1));
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(audio.playSceneCue([reaction])).toBe(true);
+    const impacts = ['diceBody', 'diceBounce', 'diceEdge', 'diceBounce', 'diceSettle'] as const;
+    for (const [index, impact] of impacts.entries()) {
+      expect(context.sources[index].buffer).toBe(buffer);
+      const { offset, duration } = sampleWindow(impact);
+      expect(context.sources[index].start).toHaveBeenCalledExactlyOnceWith(
+        .008 + getDieMotionTiming(false).impactsMs[index] / 1000, offset, duration,
+      );
+    }
+    expect(context.sources).toHaveLength(6); // five impacts plus one state accent
+  });
+
+  it('fades and cancels an older action as soon as a new action owns the sound bus', async () => {
+    const context = await unlock();
+    expect(audio.playSceneCue([capture, reaction])).toBe(true);
+    const oldVoices = [...context.sources];
+    context.currentTime = .30;
+    expect(audio.playSceneCue([move('next/player/move')])).toBe(true);
+    for (const source of oldVoices) expect(source.stop).toHaveBeenLastCalledWith(.318);
+    expect(context.sources.slice(oldVoices.length)).toHaveLength(1);
+  });
 
   it('retains commit time across both a delayed effect and a pending device resume', async () => {
     let time = 600

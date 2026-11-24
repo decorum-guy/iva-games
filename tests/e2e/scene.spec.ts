@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test'
 import type { Locator, Page } from '@playwright/test'
 import { createPosition } from '../../src/core'
+import { CAMERA_OVERSCAN } from '../../src/scene/cameraFocus'
 import { createMatch } from '../../src/session/match'
 import { exportMatch } from '../../src/session/save'
 
@@ -27,8 +28,10 @@ async function topCamera(page: Page) {
 // touch events go through the actual rendered board and the normal picking path.
 async function cellCenter(canvas: Locator, square: string, flipped = false) {
   await canvas.scrollIntoViewIfNeeded()
-  const box = await canvas.boundingBox()
-  if (!box) throw new Error('Canvas does not have a visible bounding box')
+  const box = await canvas.evaluate(element => {
+    const rect = element.closest('[data-renderer="3d"]')!.getBoundingClientRect()
+    return { x: rect.x, y: rect.y, width: rect.width, height: rect.height }
+  })
   const cell = Math.min(box.width, box.height) / 10
   const orientation = flipped ? -1 : 1
   return {
@@ -200,4 +203,34 @@ test('both armies render their distinct surface states at the ordinary camera in
   await page.getByTestId('flip').click()
   await canvas.screenshot({ path: testInfo.outputPath('material-states-flipped.png') })
   expect(errors).toEqual([])
+})
+
+test('a manual 3D flip uses the larger canvas throughout one continuous orbit', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'no-preference' })
+  await page.goto('/')
+  await readyCanvas(page)
+  await startHotseat(page)
+  const stage = page.locator('.board-stage')
+  const scene = surface(page)
+  await expect(stage).toHaveCSS('overflow', 'hidden')
+  const canvas = scene.locator('canvas')
+  // After entering hotseat, the renderer resizes from the home layout.
+  const dimensions = await stage.evaluate(element => ({
+    width: element.clientWidth, height: element.clientHeight,
+  }))
+  await expect.poll(async () => {
+    const bounds = await canvas.boundingBox()
+    return bounds ? Math.abs(bounds.height - dimensions.height * CAMERA_OVERSCAN) : Infinity
+  }).toBeLessThan(2)
+  const canvasBefore = await canvas.boundingBox()
+  expect(canvasBefore!.width).toBeGreaterThan(dimensions.width * 1.4)
+  await page.getByTestId('flip').click()
+  await expect(scene).toHaveAttribute('data-camera-orbit', '')
+  await expect(stage).toHaveCSS('overflow', 'visible')
+  const canvasDuring = await scene.locator('canvas').boundingBox()
+  expect(canvasDuring).toEqual(canvasBefore)
+  await expect(scene).not.toHaveAttribute('data-camera-orbit')
+  await expect(stage).toHaveCSS('overflow', 'hidden')
+  expect(await scene.locator('canvas').boundingBox()).toEqual(canvasBefore)
+  await expect(page.locator('.table-column .player-row').last()).toHaveAttribute('data-side', 'black')
 })

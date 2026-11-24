@@ -56,7 +56,6 @@ Some paired copy to establish tone:
 | Рейтинговая | Rated |
 | Тренировка | Practice |
 | Завершить ход | End turn |
-| Учебный бросок: результат задан для примера | Tutorial roll: a fixed result for this example |
 | Продолжить эту партию | Continue this game |
 | С текущей учебной позиции, без подсказок · тренировка | From this tutorial position, without guidance · practice |
 | Начать новую партию | Start a new game |

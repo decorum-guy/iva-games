@@ -3,7 +3,7 @@ type Pair = readonly [ru: string, en: string];
 
 export const messages = {
   'home.title': ['Шахматы с характером', 'Chess with consequences'],
-  'home.prompt': ['После взятия фигура может потерять волю, раскаяться или потребовать ещё один ход.', 'A capture can break a piece, burden it with guilt or earn it a second move.'],
+  'home.prompt': ['Цель — мат. После первого подходящего взятия кубик определяет, как отреагирует фигура. Она запоминает результат. Вина лишает взятий, ярость даёт второй ход, а слоны могут лечить союзников и обращать соперников.', 'The goal is checkmate. After a piece’s first qualifying capture, a die decides its reaction and the piece remembers it. Guilt prevents captures, berserk earns a second move, and bishops can heal allies or convert enemies.'],
   'home.playAI': ['Играть с ИИ', 'Play against AI'],
   'home.hotseat': ['Играть вдвоём', 'Two players'],
   'home.learn': ['Пройти обучение', 'Start tutorial'],

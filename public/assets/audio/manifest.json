@@ -1,0 +1,79 @@
+{
+  "file": "board.wav",
+  "bytes": 58812,
+  "sha256": "5ea14a2d097d8f1a54f56e43ba6385e59a822bf18cdf718eef7624b0e80f9858",
+  "sampleRate": 32000,
+  "channels": 1,
+  "clipFrames": {
+    "stone": [
+      0,
+      2208
+    ],
+    "capture": [
+      2464,
+      3565
+    ],
+    "diceBody": [
+      6285,
+      2592
+    ],
+    "diceBounce": [
+      9133,
+      2560
+    ],
+    "diceEdge": [
+      11949,
+      2560
+    ],
+    "diceSettle": [
+      14765,
+      2592
+    ],
+    "fracture": [
+      17613,
+      5562
+    ],
+    "resonance": [
+      23431,
+      5697
+    ]
+  },
+  "sources": [
+    {
+      "author": "Wuzzy",
+      "title": "Wooden dice on wodden table roll, take 4",
+      "page": "https://opengameart.org/content/wooden-dice-on-wodden-table-roll",
+      "file": "https://opengameart.org/sites/default/files/Holzw%C3%BCrfel_auf_Holztisch_4.flac",
+      "sha256": "7d2d2332bc5f3ae57c151e07526956993c6647dc9795bd35ec3b99f8229fabda",
+      "license": "CC0-1.0",
+      "use": "Three single impacts and lower body for capture"
+    },
+    {
+      "author": "mh2o",
+      "title": "chess_move_on_alabaster.wav",
+      "page": "https://freesound.org/people/mh2o/sounds/351518/",
+      "file": "https://cdn.freesound.org/previews/351/351518_4502687-hq.mp3",
+      "sha256": "c13803890bd531fee08b167e780b0a7bab2c4e21b1b232366b8df3860792b25b",
+      "license": "CC0-1.0",
+      "use": "Cleaned placement and pitched capture"
+    },
+    {
+      "author": "andresix",
+      "title": "Dice_Rolls_15cm.wav",
+      "page": "https://freesound.org/people/andresix/sounds/347807/",
+      "file": "https://cdn.freesound.org/previews/347/347807_2999169-hq.mp3",
+      "sha256": "e401338204f43144e3f820dc8d5935a7d78cb4b483025128a42b8c05c7a5f26a",
+      "license": "CC0-1.0",
+      "use": "Single edge impact"
+    },
+    {
+      "author": "SamsterBirdies",
+      "title": "Ceramic clack / glass hit",
+      "page": "https://freesound.org/people/SamsterBirdies/sounds/745291/",
+      "file": "https://cdn.freesound.org/previews/745/745291_5487341-hq.mp3",
+      "sha256": "326fb0f3b1cb9db48d3db9c6b6a0b5adbd93f6a0143c262b90f83f223b3a0b65",
+      "license": "CC0-1.0",
+      "use": "Filtered fracture and short resonance"
+    }
+  ]
+}

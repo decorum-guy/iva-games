@@ -3,8 +3,8 @@ import { describe, expect, it } from 'vitest'
 import { MeshStandardMaterial, PerspectiveCamera, Vector3 } from 'three'
 import type { PieceType, Side } from '../core/types'
 import {
-  BOARD_FRAMING_POINTS, CAMERA_TRAVEL_MS, COUNTER_FOCUS_DELAY_MS, COUNTER_FOCUS_MS,
-  FOCUS_EMPHASIS_MS, MAX_FOCUS_ZOOM, frameCamera, sampleCameraTravel,
+  BOARD_FRAMING_POINTS, CAMERA_OVERSCAN, CAMERA_TRAVEL_MS, COUNTER_FOCUS_DELAY_MS, COUNTER_FOCUS_MS, COUNTER_OFFSET,
+  FOCUS_EMPHASIS_MS, MAX_FOCUS_ZOOM, frameCamera, frameCameraOrbit, overscanFov, sampleCameraTravel,
   sampleCounterEmphasis, sampleFigureEmphasis,
 } from './cameraFocus'
 import type { CameraFrame, CameraRig, GroundPoint, Point3 } from './cameraFocus'
@@ -82,9 +82,8 @@ describe('teaching camera framing', () => {
       }
       // A sprite stays camera-facing; check its actual expanded corners, not
       // a plane left flat on the board. This covers both near-side directions.
-      const sign = flipped ? -1 : 1
-      const anchor = new Vector3(point[0] - .30 * sign, .209, point[1] + .32 * sign)
       const right = new Vector3(1, 0, 0).applyQuaternion(camera.quaternion)
+      const anchor = new Vector3(point[0], .209, point[1]).addScaledVector(right, -COUNTER_OFFSET)
       const up = new Vector3(0, 1, 0).applyQuaternion(camera.quaternion)
       const half = (layout.compact ? .42 : .35) * 1.60 * 1.2 / 2
       const badge = [-1, 1].flatMap(dx => [-1, 1].map(dy => {
@@ -116,22 +115,35 @@ describe('teaching camera framing', () => {
     }
   })
 
-  it('takes 850ms for a smooth orbit and keeps the whole board framed during a manual flip', () => {
-    const from: CameraRig = { elevation: 58 * radians, yaw: 3.5 * radians, fov: 35, focusAmount: 0, focusPoint: [0, 0] }
+  it.each(layouts)('takes one uninterrupted 850ms orbit at a fixed radius: $name', layout => {
+    const from: CameraRig = { elevation: layout.elevation * radians, yaw: layout.yaw * radians,
+      fov: layout.fov, focusAmount: 0, focusPoint: [0, 0] }
     const to = { ...from, yaw: from.yaw + Math.PI }
+    const start = frameCamera(from, layout.aspect, layout.compact)
+    const finish = frameCamera(to, layout.aspect, layout.compact)
     expect(CAMERA_TRAVEL_MS).toBe(850)
     expect(sampleCameraTravel(from, to, 0)).toEqual(from)
     expect(sampleCameraTravel(from, to, 850)).toEqual(to)
     const firstStep = sampleCameraTravel(from, to, 10).yaw - from.yaw
     const middleStep = sampleCameraTravel(from, to, 425).yaw - sampleCameraTravel(from, to, 415).yaw
-    expect(firstStep).toBeLessThan(middleStep / 10)
-    for (const elapsed of [0, 100, 225, 425, 625, 750, 850]) {
+    expect(Math.abs(firstStep)).toBeLessThan(Math.abs(middleStep) / 10)
+    let previous = from.yaw
+    let largest = 0
+    for (let elapsed = 0; elapsed <= CAMERA_TRAVEL_MS; elapsed += 10) {
       const rig = sampleCameraTravel(from, to, elapsed)
-      for (const layout of layouts) {
-        const frame = frameCamera(rig, layout.aspect, layout.compact)
-        expect(screenExtent(BOARD_FRAMING_POINTS, cameraFor(rig, layout.aspect, frame))).toBeLessThan(1)
-      }
+      expect(Math.abs(Math.atan2(Math.sin(rig.yaw - previous), Math.cos(rig.yaw - previous)))).toBeLessThan(.061)
+      previous = rig.yaw
+      const frame = frameCameraOrbit(rig, start, finish, elapsed)
+      expect(frame.distance).toBeCloseTo(start.distance, 10)
+      largest = Math.max(largest, screenExtent(BOARD_FRAMING_POINTS,
+        cameraFor(rig, layout.aspect, frame)))
+      expect(screenExtent(BOARD_FRAMING_POINTS, cameraFor({ ...rig, fov: overscanFov(rig.fov) },
+        layout.aspect, frame))).toBeLessThan(1)
     }
+    expect(CAMERA_OVERSCAN).toBeGreaterThan(1)
+    expect(largest).toBeGreaterThan(1)
+    const landed = frameCameraOrbit(to, start, finish, CAMERA_TRAVEL_MS)
+    expect(landed.position.distanceTo(finish.position)).toBeLessThan(1e-12)
   })
 
   it('uses the short orbit across angle zero instead of an unnecessary full turn', () => {

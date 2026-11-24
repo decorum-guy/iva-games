@@ -6,6 +6,7 @@ import { translator } from '../../src/i18n/catalog'
 import { createMatch } from '../../src/session/match'
 import type { MatchRecord } from '../../src/session/match'
 import { nextDie } from '../../src/session/random'
+import { sampleWindow } from '../../src/scene/audioSamples'
 import { learnerAction, saveLearning, scriptAction, startLesson } from '../../src/tutorial/controller'
 import type { Learning } from '../../src/tutorial/controller'
 import { move } from '../../src/tutorial/lessonTypes'
@@ -55,7 +56,7 @@ async function persist(page: Page, store: 'matches' | 'learning', value: MatchRe
     }
   }, { store, value, view })
   await page.reload()
-  await expect(playfield(page)).toHaveAttribute('data-view', store === 'learning' ? 'learn' : 'game')
+  await expect(playfield(page)).toHaveAttribute('data-view', view === 'home' ? view : store === 'learning' ? 'learn' : 'game')
   await ready(page)
 }
 
@@ -126,10 +127,13 @@ async function visibleAction(button: Locator) {
 }
 
 for (const viewport of [
+  { width: 1440, height: 900, locale: 'en' },
+  { width: 1512, height: 715, locale: 'ru' },
   { width: 1280, height: 800, locale: 'ru' },
   { width: 390, height: 844, locale: 'en' },
   { width: 360, height: 800, locale: 'ru' },
   { width: 844, height: 390, locale: 'en' },
+  { width: 568, height: 320, locale: 'ru' },
 ] as const) {
   test(`${viewport.width}×${viewport.height}: the game and tutorial keep the current action on screen`, async ({ page }) => {
     await page.setViewportSize({ width: viewport.width, height: viewport.height })
@@ -295,4 +299,168 @@ test('real captures by either side show the committed 3D die in 2D, without repl
   await page.clock.runFor(2000)
   await expect(page.getByTestId('die-throw')).toHaveCount(0)
   await expect(page.getByTestId('tutorial')).toHaveAttribute('data-step', 'faces-and-material')
+})
+
+test('the short introduction explains reactions, the die and bishops in both languages', async ({ page }) => {
+  await open(page, 'ru')
+  const intro = page.getByTestId('home-introduction')
+  await expect(intro).toContainText('кубик')
+  await expect(intro).toContainText('слоны')
+  await page.getByTestId('lang-en').click()
+  await expect(intro).toContainText('a die decides its reaction')
+  await expect(intro).toContainText('bishops can heal')
+  await expect(page.getByTestId('mode-ai')).toBeVisible()
+})
+
+interface AudioProbe {
+  context: string
+  starts: { when: number; offset: number; duration: number; state: string }[]
+  stops: { at: number; scheduled?: number }[]
+  signal: { time: number; peak: number }[]
+}
+
+async function instrumentNativeAudio(page: Page) {
+  await page.addInitScript(() => {
+    // Duplicate the master into an analyser. The normal native destination still plays.
+    const probe: AudioProbe = { context: 'none', starts: [], stops: [], signal: [] }
+    Object.assign(window, { remorseAudioProbe: probe })
+    const connect = AudioNode.prototype.connect
+    AudioNode.prototype.connect = function (this: AudioNode, ...args: unknown[]) {
+      const result = Reflect.apply(connect, this, args)
+      if (args[0] === this.context.destination && this.context instanceof AudioContext) {
+        const analyser = this.context.createAnalyser()
+        analyser.fftSize = 2048
+        Reflect.apply(connect, this, [analyser])
+        const data = new Float32Array(analyser.fftSize)
+        const context = this.context
+        setInterval(() => {
+          probe.context = context.state
+          analyser.getFloatTimeDomainData(data)
+          let peak = 0
+          for (const value of data) peak = Math.max(peak, Math.abs(value))
+          probe.signal.push({ time: performance.now(), peak })
+        }, 10)
+      }
+      return result
+    } as typeof connect
+    const start = AudioBufferSourceNode.prototype.start
+    const scheduled = new WeakMap<AudioBufferSourceNode, number>()
+    AudioBufferSourceNode.prototype.start = function (when = 0, offset = 0, duration?: number) {
+      if (duration !== undefined) {
+        scheduled.set(this, when)
+        probe.starts.push({ when, offset, duration, state: this.context.state })
+      }
+      if (duration === undefined) start.call(this, when, offset)
+      else start.call(this, when, offset, duration)
+    }
+    const stop = AudioBufferSourceNode.prototype.stop
+    AudioBufferSourceNode.prototype.stop = function (when = 0) {
+      probe.stops.push({ at: when, scheduled: scheduled.get(this) })
+      stop.call(this, when)
+    }
+  })
+}
+
+function nativeAudio(page: Page): Promise<AudioProbe> {
+  return page.evaluate(() => (window as Window & { remorseAudioProbe?: AudioProbe }).remorseAudioProbe!)
+}
+
+test('real audio plays the opening worker move and the confirmed resignation', async ({ page }) => {
+  await instrumentNativeAudio(page)
+  await open(page, 'en', false)
+  expect((await nativeAudio(page)).context).toBe('none')
+  await page.getByTestId('mode-ai').click()
+  await page.getByTestId('setup-practice').click()
+  await page.getByTestId('setup-black').click()
+  await page.getByTestId('setup-start').click()
+  await expect(playfield(page)).toHaveAttribute('data-turn', '1')
+  await ready(page)
+  await expect.poll(async () => (await nativeAudio(page)).starts.length).toBe(1)
+  expect((await nativeAudio(page)).starts[0]).toMatchObject({ state: 'running', ...sampleWindow('stone') })
+  await expect.poll(async () => Math.max(...(await nativeAudio(page)).signal.map(frame => frame.peak))).toBeGreaterThan(.012)
+
+  await page.getByTestId('resign').click()
+  await page.getByTestId('confirm-action').click()
+  await expect(page.getByTestId('game-result')).toHaveAttribute('data-reason', 'resignation')
+  await expect.poll(async () => (await nativeAudio(page)).starts.length).toBe(2)
+  expect((await nativeAudio(page)).starts[1]).toMatchObject({ state: 'running', ...sampleWindow('fracture') })
+})
+
+test('real recorded impacts follow the animation, and undo stops the pending audio', async ({ page }) => {
+  await instrumentNativeAudio(page)
+  await open(page, 'en', false)
+  const capture = captureFixture('white', 2)
+  await restoreGame(page, capture.before.record)
+  await cell(page, capture.from).click()
+  await expect.poll(async () => (await nativeAudio(page)).context).toBe('running')
+  await cell(page, capture.to).click()
+  await expect(playfield(page)).toHaveAttribute('data-dice', 'throwing')
+  // Observe the first audible contact in the page, then click before the final
+  // contacts. A remote polling interval can consume most of the throw window.
+  await page.waitForFunction(() => {
+    const probe = (window as Window & { remorseAudioProbe?: AudioProbe }).remorseAudioProbe
+    return probe?.signal.some(frame => frame.peak > .012)
+  }, undefined, { polling: 16 })
+  await page.getByTestId('undo').click()
+  await expect(playfield(page)).toHaveAttribute('data-dice', 'none')
+  await expect(playfield(page)).toHaveAttribute('data-turn', '0')
+  await expect(page.getByTestId('dice-reveal')).toHaveCount(0)
+  const { starts, stops } = await nativeAudio(page)
+  expect(starts.map(({ offset, duration }) => ({ offset, duration }))).toEqual(
+    (['capture', 'diceBody', 'diceBounce', 'diceEdge', 'diceBounce', 'diceSettle', 'fracture'] as const)
+      .map(sampleWindow),
+  )
+  expect(starts[1].when - starts[0].when).toBeCloseTo(.23, 3)
+  expect(starts[5].when - starts[1].when).toBeCloseTo(1.14, 3)
+  expect(starts[6].when - starts[5].when).toBeCloseTo(.09, 3)
+  for (const { when } of starts.slice(-2)) {
+    expect(stops.some(stop => stop.scheduled === when && stop.at < when)).toBe(true)
+  }
+  const afterUndo = await page.evaluate(() => performance.now())
+  await expect.poll(async () => (await nativeAudio(page)).signal.at(-1)?.time).toBeGreaterThan(afterUndo + 1600)
+  const quiet = (await nativeAudio(page)).signal.filter(frame => frame.time > afterUndo + 90)
+  expect(Math.max(...quiet.map(frame => frame.peak))).toBeLessThan(.004)
+})
+
+test('a real worker capture shows and sounds its own committed die', async ({ page }, testInfo) => {
+  await instrumentNativeAudio(page)
+  await open(page, 'en', false)
+  const seed = Array.from({ length: 100 }, (_, n) => n).find(n => nextDie(n).face === 4)!
+  const root = createPosition({ side: 'black', pieces: [
+    { side: 'white', type: 'king', square: 'h1' },
+    { side: 'black', type: 'king', square: 'a8' },
+    { side: 'black', type: 'rook', square: 'c3' },
+    { side: 'white', type: 'queen', square: 'c4' },
+  ] })
+  const game = createMatch({ mode: 'practice', level: 10, human: 'white', provenance: 'standard' }, { root, seed })
+  await persist(page, 'matches', game.record, 'home')
+  // The settled overlay has a short hold. Sample it at the DOM mutation rather
+  // than relying on the polling interval hitting its 350ms window under load.
+  await page.evaluate(() => {
+    const record = new MutationObserver(() => {
+      const result = document.querySelector('[data-testid="dice-reveal"][data-phase="settled"] .dice-caption')
+      if (result) {
+        document.documentElement.dataset.qaDieResult = result.textContent ?? ''
+        record.disconnect()
+      }
+    })
+    record.observe(document.body, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ['data-phase'] })
+  })
+  await page.getByTestId('home-resume').click()
+  const reveal = page.getByTestId('dice-reveal')
+  await expect(reveal).toHaveAttribute('data-actor', 'black')
+  await expect(reveal).toHaveAttribute('data-phase', 'throwing')
+  await expect(page.getByTestId('die-throw').locator('canvas')).toBeVisible()
+  await expect(page.locator('html')).toHaveAttribute('data-qa-die-result', '4 · Unaffected')
+  const saved = await recorded<MatchRecord>(page, 'matches', game.record.id)
+  expect(saved.actions).toHaveLength(1)
+  expect(saved.actions[0]).toMatchObject({ actor: 'black', command: move('c3', 'c4'), roll: { face: 4, fixed: false } })
+  await ready(page)
+  const probe = await nativeAudio(page)
+  expect(probe.starts).toHaveLength(7)
+  expect(probe.starts[1]).toMatchObject(sampleWindow('diceBody'))
+  const peak = Math.max(...probe.signal.map(frame => frame.peak))
+  expect(peak).toBeGreaterThan(.012)
+  expect(peak).toBeLessThan(.9)
+  await testInfo.attach('native-audio-signal', { body: JSON.stringify({ peak, frames: probe.signal, starts: probe.starts }), contentType: 'application/json' })
 })

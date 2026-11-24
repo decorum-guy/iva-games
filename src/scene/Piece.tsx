@@ -7,7 +7,7 @@ import type { GameEvent, Piece } from '../core/types'
 import type { ChessAssets } from './assets'
 import { getSoftShadow } from './BoardSurface'
 import {
-  COUNTER_FOCUS_DELAY_MS, COUNTER_FOCUS_MS, FOCUS_EMPHASIS_MS,
+  COUNTER_FOCUS_DELAY_MS, COUNTER_FOCUS_MS, COUNTER_OFFSET, FOCUS_EMPHASIS_MS,
   sampleCounterEmphasis, sampleFigureEmphasis,
 } from './cameraFocus'
 import { conditionCode, setArmySurface, stoneMaterial } from './stone'
@@ -169,6 +169,8 @@ function PieceBadge({ piece, flipped, low, reduced, focus }: {
   const invalidate = useThree(state => state.invalidate)
   const emphasized = focus?.subject === 'countdown'
   const size = low ? .42 : .35
+  const sign = flipped ? -1 : 1
+  const right = useMemo(() => new Vector3(), [])
   useLayoutEffect(() => {
     started.current = performance.now()
     invalidate()
@@ -177,11 +179,14 @@ function PieceBadge({ piece, flipped, low, reduced, focus }: {
     const wake = window.setTimeout(invalidate, COUNTER_FOCUS_DELAY_MS)
     return () => window.clearTimeout(wake)
   }, [focus?.key, emphasized, reduced, invalidate])
-  useFrame(() => {
+  useFrame(({ camera }) => {
     if (!badge.current || !frame.current) return
     const elapsed = performance.now() - started.current
     const amount = emphasized ? sampleCounterEmphasis(elapsed, reduced) : 0
     badge.current.scale.set(size * (1 + .60 * amount), size * (1 + .60 * amount), 1)
+    right.setFromMatrixColumn(camera.matrixWorld, 0)
+    badge.current.position.set(-.30 * sign * (1 - amount), .18, .32 * sign * (1 - amount))
+      .addScaledVector(right, -COUNTER_OFFSET * amount)
     frame.current.visible = amount > 0
     ;(frame.current.material as SpriteMaterial).opacity = amount
     if (emphasized && !reduced && elapsed >= COUNTER_FOCUS_DELAY_MS
@@ -192,7 +197,6 @@ function PieceBadge({ piece, flipped, low, reduced, focus }: {
     : affliction !== 'neutral' ? affliction : exposed ? 'shame' : curePending ? 'cure' : null
   if (!key) return null
   const [x, z] = squarePoint(piece.square)
-  const sign = flipped ? -1 : 1
   return (
     <group position={[x, .029, z]}>
       {affliction === 'devastated' && <>

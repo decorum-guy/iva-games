@@ -13,7 +13,18 @@ Remorse Chess is a chess variant by **Bardelo Bardalini** (`@bardelo_bardalini`)
 | Cormorant Garamond | [Christian Thalmann / Cormorant project](https://github.com/CatharsisFonts/Cormorant) | [SIL OFL 1.1](public/assets/licenses/cormorant-garamond.txt) |
 | Manrope | [Mikhail Sharanda / Manrope project](https://github.com/sharanda/manrope) | [SIL OFL 1.1](public/assets/licenses/manrope.txt) |
 
-The shipped chess files, upstream paths and hashes are recorded in the [asset manifest](public/assets/chess/manifest.json). The application uses original 2D silhouettes, wordmark, die graphics and synthesized audio.
+The shipped chess files, upstream paths and hashes are recorded in the [asset manifest](public/assets/chess/manifest.json). The application uses original 2D silhouettes, wordmark and die graphics.
+
+## Recorded sound
+
+| Source | Use in REMORSE | License |
+|---|---|---|
+| [Wooden dice on wodden table roll, take 4 — Wuzzy](https://opengameart.org/content/wooden-dice-on-wodden-table-roll) | First impact, rebounds, and settling contact | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
+| [Dice_Rolls_15cm.wav — andresix](https://freesound.org/people/andresix/sounds/347807/) | The brighter edge contact | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
+| [chess_move_on_alabaster.wav — mh2o](https://freesound.org/people/mh2o/sounds/351518/) | Placement and the capture layer | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
+| [Ceramic clack / glass hit — SamsterBirdies](https://freesound.org/people/SamsterBirdies/sounds/745291/) | Surface fracture and short resonance | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
+
+The recordings were cut at individual transients, filtered, faded, and combined into a local mono PCM bank. [Source files, hashes and clip frames](public/assets/audio/manifest.json).
 
 ## Software
 

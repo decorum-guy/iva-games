@@ -62,7 +62,7 @@ Drive both Chromium and available WebKit. A Playwright mobile viewport is an emu
 - In the counter lesson, select the figure, inspect the close-up and its highlighted counter, then explicitly acknowledge. The camera returns smoothly; manual board flips are eased. Reduced motion retains visible static focus.
 - In a congested 360×800 view show both nicknames/capture rows, material advantage, a selected afflicted figure, tutorial guidance and a bonus-action control simultaneously. Keep source/target accessible. Test both Russian and English text lengths, Cyrillic font coverage and no layout shift on first capture.
 - Bot `≈Elo`, human Elo and material `+N` are clearly distinct. The ten-level choice is compact in setup; it does not become ten permanent buttons around the board.
-- Reduced motion removes excessive movement while retaining state feedback. Muted default stays muted after a clean start.
+- Reduced motion removes excessive movement while retaining state feedback. Fresh profiles enable sound after a genuine gesture. A previously saved mute and volume survive reload.
 - Keyboard users can perform moves and dismiss/open dialogs, and focus is restored after promotion/tutorial modals.
 
 Record a few useful local screenshots and, if needed, one short local motion clip. Inspect them. Do not dump a large video corpus or snapshots into the repo or Actions artifact storage.

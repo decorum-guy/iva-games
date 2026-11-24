@@ -11,8 +11,8 @@ import type { GameEvent } from '../core/types'
 import { BoardSurface } from './BoardSurface'
 import { DepartingPiece, VisualPiece } from './Piece'
 import { clearChessAssetLoad, studioHDR, useChessAssets } from './assets'
-import { CAMERA_TRAVEL_MS, frameCamera, sameCameraRig, sampleCameraTravel } from './cameraFocus'
-import type { CameraRig } from './cameraFocus'
+import { CAMERA_OVERSCAN, CAMERA_TRAVEL_MS, frameCamera, frameCameraOrbit, overscanFov, sameCameraRig, sampleCameraTravel } from './cameraFocus'
+import type { CameraFrame, CameraRig } from './cameraFocus'
 import { squarePoint, worldSquare } from './types'
 import type { BoardSceneProps, SceneFocus, SceneMark } from './types'
 import './scene.css'
@@ -39,27 +39,30 @@ const emptyEvents: readonly GameEvent[] = []
 const emptyMarks: readonly SceneMark[] = []
 const toRadians = Math.PI / 180
 
-function Viewpoint({ flipped, preset, reduced, focus }: {
+function Viewpoint({ flipped, preset, reduced, focus, onOrbit }: {
   flipped: boolean
   preset: NonNullable<BoardSceneProps['camera']>
   reduced: boolean
   focus?: SceneFocus
+  onOrbit: (active: boolean) => void
 }) {
   const camera = useThree(state => state.camera) as PerspectiveCamera
   const size = useThree(state => state.size)
   const invalidate = useThree(state => state.invalidate)
-  const mobile = size.width < 515
+  const mobile = size.width / CAMERA_OVERSCAN < 515
   const height = (preset === 'top' ? 89.98 : preset === 'tactical' ? 75 : mobile ? 67 : 58) * toRadians
   const yaw = (preset === 'studio' ? (mobile ? .6 : 3.5) : 0) * toRadians + (flipped ? Math.PI : 0)
   const rig = useRef<CameraRig | null>(null)
-  const change = useRef<{ from: CameraRig; to: CameraRig; start: number } | null>(null)
+  const aspect = size.width / Math.max(1, size.height)
+  const applied = useRef<CameraFrame | null>(null)
+  const change = useRef<{ from: CameraRig; to: CameraRig; start: number; orbitFrom?: CameraFrame } | null>(null)
   const configured = useRef<CameraRig | null>(null)
 
-  function apply(value: CameraRig) {
-    camera.fov = value.fov
-    camera.aspect = size.width / Math.max(1, size.height)
+  function apply(value: CameraRig, frame = frameCamera(value, aspect, mobile)) {
+    camera.fov = overscanFov(value.fov)
+    camera.aspect = aspect
     camera.updateProjectionMatrix()
-    const frame = frameCamera(value, camera.aspect, mobile)
+    applied.current = frame
     camera.position.copy(frame.position)
     camera.lookAt(frame.target)
     camera.updateMatrixWorld()
@@ -78,21 +81,30 @@ function Viewpoint({ flipped, preset, reduced, focus }: {
     } else if (!configured.current || !sameCameraRig(configured.current, target)) {
       // At overview scale the unused anchor can move without moving the camera.
       if (rig.current.focusAmount === 0) rig.current = { ...rig.current, focusPoint: target.focusPoint }
-      change.current = sameCameraRig(rig.current, target) ? null : { from: rig.current, to: target, start: performance.now() }
+      const yawDelta = target.yaw - rig.current.yaw
+      const turning = Math.abs(Math.atan2(Math.sin(yawDelta), Math.cos(yawDelta))) > .04 ||
+        Boolean(change.current?.orbitFrom)
+      const orbitFrom = turning ? applied.current ?? frameCamera(rig.current, aspect, mobile) : undefined
+      change.current = sameCameraRig(rig.current, target) ? null : { from: rig.current, to: target, start: performance.now(), orbitFrom }
     }
     configured.current = target
-    apply(rig.current)
+    onOrbit(Boolean(change.current?.orbitFrom))
+    apply(rig.current, change.current?.orbitFrom ? applied.current ?? undefined : undefined)
     invalidate()
-  }, [camera, height, yaw, invalidate, mobile, preset, reduced, size.width, size.height, focus?.square, focus?.key])
+  }, [aspect, camera, height, yaw, invalidate, mobile, onOrbit, preset, reduced, focus?.square, focus?.key])
 
   useFrame(() => {
     const travel = change.current
     if (!travel) return
     const elapsed = performance.now() - travel.start
     rig.current = sampleCameraTravel(travel.from, travel.to, elapsed)
-    apply(rig.current)
-    if (elapsed >= CAMERA_TRAVEL_MS) change.current = null
-    else if (!document.hidden) invalidate()
+    apply(rig.current, travel.orbitFrom
+      ? frameCameraOrbit(rig.current, travel.orbitFrom, frameCamera(travel.to, aspect, mobile), elapsed)
+      : undefined)
+    if (elapsed >= CAMERA_TRAVEL_MS) {
+      change.current = null
+      onOrbit(false)
+    } else if (!document.hidden) invalidate()
   })
 
   return null
@@ -237,6 +249,9 @@ export default function BoardScene({
     ray: new Raycaster(),
   }), [])
   const onReady = useCallback(() => setReady(true), [])
+  const onOrbit = useCallback((active: boolean) => {
+    board.current?.toggleAttribute('data-camera-orbit', active)
+  }, [])
   const activeFocus = ready && focus && pieces.some(piece => piece.square === focus.square) ? focus : undefined
   const shownMarks: readonly SceneMark[] = dragTarget && !marks.some(mark => mark.square === dragTarget && mark.kind === 'focus')
     ? [...marks, { square: dragTarget, kind: 'focus' }]
@@ -281,7 +296,7 @@ export default function BoardScene({
   }
 
   function startPointer(event: PointerEvent<HTMLDivElement>) {
-    if (!event.isPrimary || event.button !== 0) return
+    if (!event.isPrimary || event.button !== 0 || board.current?.hasAttribute('data-camera-orbit')) return
     pointer.current = { id: event.pointerId, square: pick(event), x: event.clientX, y: event.clientY }
     if (event.pointerType === 'mouse' && onDragSquare) event.currentTarget.setPointerCapture(event.pointerId)
   }
@@ -319,13 +334,15 @@ export default function BoardScene({
     >
       <GraphicsBoundary onFailure={() => { clearChessAssetLoad(); onFailure() }}>
         <Canvas
+          style={{ position: 'absolute', inset: `${(1 - CAMERA_OVERSCAN) * 50}%`,
+            width: `${CAMERA_OVERSCAN * 100}%`, height: `${CAMERA_OVERSCAN * 100}%`, pointerEvents: 'none' }}
           frameloop="demand" dpr={low ? [1, 1.5] : [1, 1.75]}
           gl={{ antialias: true, alpha: true, powerPreference: 'high-performance' }}
           camera={{ near: .18, far: 60, position: [1, 15, 10], fov: 35 }}
           shadows={low ? false : 'percentage'}
           onCreated={state => { scene.current = state; state.gl.toneMappingExposure = .97 }}
         >
-          <Viewpoint flipped={flipped} preset={camera} reduced={reduced} focus={activeFocus} />
+          <Viewpoint flipped={flipped} preset={camera} reduced={reduced} focus={activeFocus} onOrbit={onOrbit} />
           <ContextLifecycle onFailure={onFailure} />
           <Lighting low={low} />
           <Suspense fallback={null}>

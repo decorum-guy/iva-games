@@ -6,7 +6,7 @@ import { Cabinet } from '../session/cabinet';
 import { captureLedger } from '../session/match';
 import { exportMatch } from '../session/save';
 import { guideCommands, instruction } from '../tutorial/controller';
-import { muteAudio, playSceneCue, setAudioVolume, stopSceneAudio, unlockAudio } from '../scene/audio';
+import { muteAudio, playSceneCue, prepareSceneAudio, setAudioVolume, stopSceneAudio, unlockAudio } from '../scene/audio';
 import type { SceneFocus, SceneMark } from '../scene/types';
 import { Board } from './Board';
 import {
@@ -15,7 +15,7 @@ import {
 import type { Settings } from './Dialogs';
 import { PlayerRow } from './Hud';
 import { Icon, Seal } from './icons';
-import { History, Inspector, LessonPanel, PanelNotice, Result, RollCard, RollReveal } from './PlayPanel';
+import { History, Inspector, LessonPanel, PanelNotice, prepareDieRenderer, Result, RollCard, RollReveal } from './PlayPanel';
 import { materialBalance } from './projections';
 import { maskRollResult, rollSceneEvents } from './rollPresentation';
 
@@ -147,7 +147,7 @@ export function App() {
   }, [settings]);
   useEffect(() => { cabinet.setShortMotion(reduced); }, [reduced]);
   useEffect(() => {
-    if (view !== 'home') void import('../scene/DieThrow').catch(() => undefined);
+    if (view !== 'home') void prepareDieRenderer();
   }, [view]);
   useEffect(() => {
     const playing = view !== 'home';
@@ -157,7 +157,8 @@ export function App() {
   }, [view]);
   useEffect(() => {
     setAudioVolume(settings.volume);
-    if (!settings.sound) muteAudio();
+    if (settings.sound) void prepareSceneAudio();
+    else muteAudio();
     const wake = () => { if (settings.sound) void unlockAudio(); };
     document.addEventListener('pointerdown', wake, { capture: true });
     document.addEventListener('keydown', wake, { capture: true });
@@ -339,7 +340,7 @@ export function App() {
         </div>}
         {view === 'home' ? <section className="home-panel">
           <div className="home-intro">
-            <h1>{t('home.title')}</h1><p>{t('home.prompt')}</p>
+            <h1>{t('home.title')}</h1><p className="home-introduction" data-testid="home-introduction">{t('home.prompt')}</p>
           </div>
           {notice}
           {snap.ready ? <div className="play-options">

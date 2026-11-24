@@ -1,4 +1,4 @@
-import { Component, lazy, Suspense } from 'react';
+import { Component, useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import { CYCLE, cyclesRemaining } from '../core';
 import type { Command, GameEvent, GameState, Piece } from '../core';
@@ -17,7 +17,14 @@ import { Icon } from './icons';
 import { PieceIcon, StateMark } from './pieces';
 import { describeEvent } from './projections';
 
-const DieThrow = lazy(() => import('../scene/DieThrow'));
+type DieRenderer = typeof import('../scene/DieThrow').default;
+let preparedDie: DieRenderer | undefined;
+let dieLoad: Promise<DieRenderer | undefined> | undefined;
+
+export function prepareDieRenderer() {
+  dieLoad ??= import('../scene/DieThrow').then(module => (preparedDie = module.default), () => undefined);
+  return dieLoad;
+}
 class DieLoadBoundary extends Component<{ children: ReactNode; fallback: ReactNode }, { failed: boolean }> {
   state = { failed: false };
   static getDerivedStateFromError() { return { failed: true }; }
@@ -80,6 +87,15 @@ export function RollCard({ t, session, rollId, pending }: {
 export function RollReveal({ t, session, rollId, reduced, low, pending, startedAt }: {
   t: Translate; session: GameSession; rollId: string; reduced: boolean; low: boolean; pending: boolean; startedAt?: number;
 }) {
+  const [Renderer, setRenderer] = useState(() => preparedDie);
+  useEffect(() => {
+    if (Renderer) return;
+    let active = true;
+    void prepareDieRenderer().then(renderer => {
+      if (active && renderer) setRenderer(() => renderer);
+    });
+    return () => { active = false; };
+  }, [Renderer]);
   const action = session.record.actions[session.record.cursor - 1];
   if (!action?.roll || action.id !== rollId) return null;
   const reaction = session.current.events.find((event): event is Extract<GameEvent, { type: 'reaction' }> =>
@@ -91,9 +107,9 @@ export function RollReveal({ t, session, rollId, reduced, low, pending, startedA
   return <div className="dice-reveal" data-testid="dice-reveal" data-actor={action.actor}
     data-phase={pending ? 'throwing' : 'settled'}>
     <span className="dice-actor">{t('die.actor', { side: t(`side.${action.actor}`) })}</span>
-    <DieLoadBoundary fallback={placeholder}><Suspense fallback={placeholder}>
-      <DieThrow face={action.roll.face} rollKey={`${session.record.id}/${rollId}`} reduced={reduced} quality={low ? 'low' : 'high'} startedAt={startedAt} />
-    </Suspense></DieLoadBoundary>
+    {Renderer ? <DieLoadBoundary fallback={placeholder}>
+      <Renderer face={action.roll.face} rollKey={`${session.record.id}/${rollId}`} reduced={reduced} quality={low ? 'low' : 'high'} startedAt={startedAt} />
+    </DieLoadBoundary> : placeholder}
     <strong className="dice-caption" role="status">{pending ? t('die.rolling') : `${action.roll.face} · ${result}`}</strong>
   </div>;
 }

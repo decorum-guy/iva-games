@@ -1,6 +1,7 @@
 import { Vector3 } from 'three'
 
 export const CAMERA_TRAVEL_MS = 850
+export const CAMERA_OVERSCAN = 1.68
 export const FOCUS_EMPHASIS_MS = 1000
 export const COUNTER_FOCUS_DELAY_MS = CAMERA_TRAVEL_MS + 180
 export const COUNTER_FOCUS_MS = 240
@@ -38,7 +39,29 @@ export const BOARD_FRAMING_POINTS: readonly Point3[] = [-4.8, 4.8].flatMap(x => 
 
 /** The whole model, base and enlarged camera-facing counter fit in this envelope. */
 export function pieceFocusBounds([x, z]: GroundPoint): readonly Point3[] {
-  return [-.85, .85].flatMap(dx => [-.30, 1.85].flatMap(y => [-.85, .85].map(dz => [x + dx, y, z + dz] as const)))
+  return [-1, 1].flatMap(dx => [-.30, 1.85].flatMap(y => [-1, 1].map(dz => [x + dx, y, z + dz] as const)))
+}
+
+export const COUNTER_OFFSET = .79;
+
+export function overscanFov(fov: number) {
+  return 2 * Math.atan(Math.tan(fov * radians / 2) * CAMERA_OVERSCAN) / radians;
+}
+
+function viewDirection(rig: CameraRig) {
+  return new Vector3(Math.cos(rig.elevation) * Math.sin(rig.yaw), Math.sin(rig.elevation), Math.cos(rig.elevation) * Math.cos(rig.yaw));
+}
+
+function travelProgress(elapsedMs: number) {
+  return (1 - Math.cos(Math.PI * clamp(elapsedMs / CAMERA_TRAVEL_MS))) / 2;
+}
+
+/** Fit the two endpoints once per viewport, then orbit without fitting to diagonal corners. */
+export function frameCameraOrbit(rig: CameraRig, from: CameraFrame, to: CameraFrame, elapsedMs: number): CameraFrame {
+  const progress = travelProgress(elapsedMs);
+  const target = from.target.clone().lerp(to.target, progress);
+  const distance = from.distance + (to.distance - from.distance) * progress;
+  return { position: target.clone().addScaledVector(viewDirection(rig), distance), target, distance };
 }
 
 function fitFrame(points: readonly Point3[], origin: Vector3, view: Vector3, fov: number, aspect: number, room: number): CameraFrame {
@@ -66,7 +89,7 @@ function fitFrame(points: readonly Point3[], origin: Vector3, view: Vector3, fov
 
 /** Framing follows the existing orientation: teaching focus never adds a turn. */
 export function frameCamera(rig: CameraRig, aspect: number, compact: boolean): CameraFrame {
-  const view = new Vector3(Math.cos(rig.elevation) * Math.sin(rig.yaw), Math.sin(rig.elevation), Math.cos(rig.elevation) * Math.cos(rig.yaw))
+  const view = viewDirection(rig)
   const overview = fitFrame(BOARD_FRAMING_POINTS, overviewOrigin, view, rig.fov, aspect, compact ? .986 : .968)
   const amount = clamp(rig.focusAmount)
   if (amount === 0) return overview
@@ -88,7 +111,7 @@ export function sameCameraRig(a: CameraRig, b: CameraRig): boolean {
 export function sampleCameraTravel(from: CameraRig, to: CameraRig, elapsedMs: number): CameraRig {
   const t = clamp(elapsedMs / CAMERA_TRAVEL_MS)
   if (t === 1) return to
-  const p = (1 - Math.cos(Math.PI * t)) / 2
+  const p = travelProgress(elapsedMs)
   const yaw = Math.atan2(Math.sin(to.yaw - from.yaw), Math.cos(to.yaw - from.yaw))
   return {
     elevation: from.elevation + (to.elevation - from.elevation) * p,

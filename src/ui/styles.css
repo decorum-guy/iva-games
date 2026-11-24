@@ -607,3 +607,23 @@ html.in-match, .in-match body { height: 100%; overflow: hidden; overscroll-behav
   .in-match .lesson-target { margin-top: 5px; }
   .in-match .lesson-tools .text-button { min-height: 30px; }
 }
+
+
+/* Extra canvas area gives the orbit room while the resting board keeps its size. */
+.board-stage:has(.remorse-scene[data-camera-orbit]) { overflow: visible; z-index: 2; }
+.board-stage:has(.remorse-scene[data-camera-orbit])::after { z-index: -1; }
+.home-intro .home-introduction { max-width: 39ch; }
+
+@media (max-height: 375px) and (orientation: landscape) {
+  .in-match .lesson-panel[data-kind="complete"] .lesson-actions {
+    grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+    align-items: stretch;
+  }
+  .lesson-panel[data-kind="complete"] .lesson-actions .button { font-size: .77rem; padding: 6px; }
+  .lesson-panel[data-kind="complete"] .lesson-actions .icon { display: none; }
+  .lesson-panel[data-kind="complete"] .lesson-actions .text-button {
+    grid-column: 1 / -1;
+    min-height: 28px;
+    justify-self: start;
+  }
+}
