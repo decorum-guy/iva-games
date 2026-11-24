@@ -44,13 +44,20 @@ describe('selected showcase playback', () => {
     ])
   })
 
-  it('keeps the existing mate audio while sound auditions are pending', () => {
-    const cues = [
-      { kind: 'royalCharge', at: .27 }, { kind: 'royalBreak', at: 1.03 }, { kind: 'royalEnd', at: 2.37 },
-    ] as const
-    const { stock, clips } = replaceShowcaseCues(cues, buffers, undefined, undefined, false)
-    expect(stock).toEqual(cues)
-    expect(clips).toEqual([])
+  it.each([false, true])('plays separate fragment and E/G/D landing recordings (reduced=%s)', reduced => {
+    const release = reduced ? 1.02 : 1.03
+    const landing = reduced ? 1.43 : 1.70
+    const charge = { kind: 'royalCharge', at: release - .76 } as const
+    const end = { kind: 'royalEnd', at: reduced ? 2.08 : 2.37 } as const
+    const { stock, clips } = replaceShowcaseCues([
+      charge, { kind: 'royalBreak', at: release }, { kind: 'royalGround', at: landing }, end,
+    ], buffers, undefined, undefined, false, reduced)
+    expect(stock).toEqual([charge, end])
+    expect(clips).toMatchObject([
+      { buffer: buffers.get('royalBreak'), at: release, offset: 0, duration: reduced ? .36 : .42 },
+      { buffer: buffers.get('royalGround'), at: landing, offset: 0, duration: .92 },
+    ])
+    expect(clips[0].at + clips[0].duration).toBeLessThan(clips[1].at)
   })
 
   it('uses the short chant and the requested per-state levels', () => {

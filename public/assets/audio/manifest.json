@@ -86,10 +86,11 @@
     },
     "royal": {
       "selected": {
-        "check": "B"
+        "check": "B",
+        "mateLanding": "E+G+D"
       },
       "recipe": "scripts/build-royal-showcase-mix.py",
-      "changes": "The selected steel hit retains its audition attack and adds a stereo room tail. Mate alternatives are local sound comparisons.",
+      "changes": "The selected steel hit retains its attack and adds stereo room decay. E, G and D play as one landing. A separate raw rock recording supplies the fragment release.",
       "check": {
         "file": "showcase/royal-check.mp3",
         "bytes": 18476,
@@ -110,7 +111,176 @@
           "previewSha256": "bdd930f424ef02688fbd4c0f7632da0362f7df6e61bfa845337243c9e70e0bd5",
           "license": "CC0-1.0",
           "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/"
+        },
+        "rockBreak": {
+          "author": "themightyglider",
+          "title": "rock_break.ogg",
+          "page": "https://opengameart.org/content/breaking-rock",
+          "download": "https://opengameart.org/sites/default/files/rock_break.ogg",
+          "sourceSha256": "b645f35d21194e7855dd4a5405b1e8e6bec070731b92df6abcb202676b8e9f2e",
+          "license": "CC0-1.0",
+          "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/"
+        },
+        "stone-new": {
+          "author": "Spring Spring (Julie Damsgaard)",
+          "title": "break_stone.wav",
+          "page": "https://opengameart.org/content/various-sound-effects-0",
+          "download": "https://opengameart.org/sites/default/files/break_stone.wav",
+          "sourceSha256": "8e3ed312e12791be6d6bbcf02a1889fb3913e420b85c796e4236319e23414df2",
+          "license": "CC0-1.0",
+          "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/"
+        },
+        "dull-new": {
+          "author": "Spring Spring (Julie Damsgaard)",
+          "title": "dull_explosion.wav",
+          "page": "https://opengameart.org/content/various-sound-effects-0",
+          "download": "https://opengameart.org/sites/default/files/dull_explosion.wav",
+          "sourceSha256": "f79f07a733eb27822fb4567318e38b150a482d340bdabad7a30c099815109588",
+          "license": "CC0-1.0",
+          "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/"
+        },
+        "bangs-new": {
+          "author": "Spring Spring (Julie Damsgaard)",
+          "title": "bangs.wav",
+          "page": "https://opengameart.org/content/various-sound-effects-0",
+          "download": "https://opengameart.org/sites/default/files/bangs.wav",
+          "sourceSha256": "c52a9e114f00f16af765a759b6d1c16b26c9ef02becba8c3dddd1e90ee2bc045",
+          "license": "CC0-1.0",
+          "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/"
+        },
+        "thud-005": {
+          "author": "DAEDAL",
+          "title": "DAEDAL_Impact_005_Thud.wav",
+          "page": "https://daedal.art/resources/cinematic-impacts/",
+          "download": "https://github.com/luciansofronie/daedal-downloads/releases/download/packs-v1/DAEDAL_Cinematic_Impacts.zip",
+          "sourceSha256": "bb95e47131fa087ee2695335ac776f18917243885724be0be1ef9a0c04c6c3a2",
+          "license": "CC0-1.0",
+          "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/"
+        },
+        "boom-011": {
+          "author": "DAEDAL",
+          "title": "DAEDAL_Impact_011_Boom.wav",
+          "page": "https://daedal.art/resources/cinematic-impacts/",
+          "download": "https://github.com/luciansofronie/daedal-downloads/releases/download/packs-v1/DAEDAL_Cinematic_Impacts.zip",
+          "sourceSha256": "8cf645664df3cf4922064e5e5a704624e670e4056f960cf6cab5b57904890168",
+          "license": "CC0-1.0",
+          "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/"
         }
+      },
+      "mateRecipe": "scripts/build-mate-showcase-mix.py",
+      "mateFragments": {
+        "file": "showcase/royal-mate-fragments.mp3",
+        "bytes": 11564,
+        "sha256": "c254facb2c3dab02a331903519f16f490ccdf1d255179fe01838aaf39d58e8b7",
+        "playSeconds": 0.42,
+        "reducedPlaySeconds": 0.36,
+        "source": "rockBreak",
+        "changes": "Trim 14 ms of lead-in, slow to 94%, filter, fade and limit. Plays at the mate discharge."
+      },
+      "mateGround": {
+        "file": "showcase/royal-mate-ground.mp3",
+        "bytes": 23660,
+        "sha256": "52c7e6f618897fce232b8ebacb2df0ec2f70218d704057d29eb6b6ad2a1fc4be",
+        "playSeconds": 0.92,
+        "layers": [
+          {
+            "id": "E",
+            "gain": 0.82,
+            "frequenciesHz": [
+              52,
+              null
+            ],
+            "auditionMasterSha256": "97c58227924f290aa6a5d3b8fd5fd708bf7c5d9cc2bf2a3e7ccea2fcba0a481c",
+            "sourceCuts": [
+              [
+                "dull-new",
+                0.004,
+                0.86,
+                0.85,
+                2470,
+                35,
+                1
+              ],
+              [
+                "stone-new",
+                0.03,
+                0.63,
+                1.06,
+                5100,
+                390,
+                0.31
+              ]
+            ]
+          },
+          {
+            "id": "G",
+            "gain": 0.67,
+            "frequenciesHz": [
+              31,
+              200
+            ],
+            "auditionMasterSha256": "6f41fce81730b40dbc361b1bd1fa5c70193dc99891146d3d8023b14b4eb64b32",
+            "sourceCuts": [
+              [
+                "boom-011",
+                0.165,
+                0.9,
+                0.95,
+                2440,
+                31,
+                1
+              ],
+              [
+                "bangs-new",
+                2.166,
+                0.32,
+                0.93,
+                2675,
+                153,
+                0.35
+              ]
+            ]
+          },
+          {
+            "id": "D",
+            "gain": 0.49,
+            "frequenciesHz": [
+              490,
+              4500
+            ],
+            "auditionMasterSha256": "3e55833bcc3ae22ce5c3ca7eca661378e4a864fe7c6f6d9694d4af5413ae7178",
+            "sourceCuts": [
+              [
+                "stone-new",
+                0.012,
+                0.68,
+                0.78,
+                4200,
+                83,
+                1
+              ],
+              [
+                "thud-005",
+                0.005,
+                0.47,
+                0.95,
+                450,
+                37,
+                0.42
+              ]
+            ]
+          }
+        ],
+        "sourceCutColumns": [
+          "source",
+          "startSeconds",
+          "lengthSeconds",
+          "speed",
+          "lowpassHz",
+          "highpassHz",
+          "relativeGain"
+        ],
+        "changes": "Align the three shown landing masters to zero. Give E the fall, G the low tail, and D the brittle rim. Render through one peak limiter with a closing fade. The game plays this file once when the king touches marble."
       }
     },
     "berserkIgnition": {

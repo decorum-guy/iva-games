@@ -248,7 +248,7 @@ describe('audio user activation and cancellation', () => {
     await audio.prepareSceneAudio();
     const context = await unlock();
     await vi.waitFor(() => expect(decode).toHaveBeenCalledTimes(1));
-    expect(fetch).toHaveBeenCalledTimes(11);
+    expect(fetch).toHaveBeenCalledTimes(13);
     expect(audio.playSceneCue([reaction])).toBe(true);
     const impacts = ['diceBody', 'diceBounce', 'diceEdge', 'diceBounce', 'diceSettle'] as const;
     for (const [index, impact] of impacts.entries()) {
