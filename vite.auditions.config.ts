@@ -1,11 +1,2 @@
-import { defineConfig, mergeConfig } from 'vite';
-import game from './vite.config.js';
-
-export default mergeConfig(game, defineConfig({
-  appType: 'mpa',
-  build: {
-    outDir: '.qa/sfx-audition/production',
-    emptyOutDir: true,
-    rolldownOptions: { input: ['auditions.html', 'dice.html'] },
-  },
-}));
+// Compatibility entry; the package owns this configuration.
+export { default } from './games/remorse/vite.auditions.config.js'

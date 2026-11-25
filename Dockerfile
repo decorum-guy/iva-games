@@ -2,6 +2,10 @@ FROM node:24-bookworm-slim AS build
 WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends python3 make g++ ca-certificates && rm -rf /var/lib/apt/lists/*
 COPY package.json package-lock.json ./
+COPY games/remorse/package.json ./games/remorse/package.json
+COPY games/overdrive/package.json ./games/overdrive/package.json
+COPY packages/engine-sdk/package.json ./packages/engine-sdk/package.json
+COPY apps/server/package.json ./apps/server/package.json
 RUN npm ci
 COPY . .
 RUN npm run build && npm prune --omit=dev --ignore-scripts
@@ -13,7 +17,7 @@ COPY --from=build /app/package.json /app/package-lock.json ./
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/dist-server ./dist-server
-COPY server/backup.mjs ./server/backup.mjs
+COPY apps/server/scripts/backup.mjs ./apps/server/scripts/backup.mjs
 RUN mkdir -p /data && chown node:node /data
 USER node
 EXPOSE 4173

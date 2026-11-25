@@ -8,3 +8,9 @@ data
 .qa
 playwright-report
 test-results
+
+**/node_modules
+**/dist
+**/.qa
+**/test-results
+**/playwright-report

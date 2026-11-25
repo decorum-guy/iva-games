@@ -1,3 +1,11 @@
+# Chess 2 — active monorepo migration and acceptance
+
+The owner authorized reorganizing the existing implementation into npm workspaces before renaming the GitHub repository. Keep delivery on `feat/overdrive-sdk` / draft PR #3; do not merge `main`, rename GitHub, change DNS, deploy, or replace the owner's active 4173 server as a side effect. The owner will rename the repository separately; update the handoff's actual remote only after that action is confirmed.
+
+Current source paths are `games/remorse/src`, `games/overdrive/src`, `packages/engine-sdk/src` and `apps/server/src`. Each game owns its `public`, tests and asset scripts. Use root npm commands and one lockfile. Preserve rule semantics, runtime asset URLs, storage keys, cookies, protocol/save versions, database paths, engine behavior and each game's distinct visuals/audio. Runtime game dependencies cross package boundaries through explicit exports; the server consumes pure rules/protocols, never UI. Do not add a catalogue implementation or unify game styling.
+
+Read `docs/MONOREPO.md` and `prompts/ACCEPT_OVERDRIVE_MONOREPO.md` for the current structure and local acceptance task. Historical paths/counts/hashes in older validation reports describe their recorded revisions and are not claims about the migrated tree. Keep them intact. Record fresh migration checks separately and distinguish authored code, executed checks, browser observations, listening and activation. The older instructions below retain their behavioral requirements; translate their source paths using the migration document.
+
 # Chess 2 — active SDK and OVERDRIVE iteration
 
 On 25 November 2026 the owner explicitly assigned the next agent to create and test the common engine SDK and complete the whole OVERDRIVE / Форсаж iteration: final rules, measured balance work, new models/audio/effects, an independent interface, implementation, SDK-aware AI, real networking and acceptance. This is the active scope; preserve the existing REMORSE product. Routine decisions and continued execution are authorized.
