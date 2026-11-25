@@ -67,6 +67,11 @@ for (const lang of ['ru', 'en'] as const) for (const finish of ['continue', 'new
       await expect(app(page)).toHaveAttribute('data-turn', '1')
       if (index < TEACHING_FIXTURES.length - 1) {
         await page.getByRole('button', { name: lang === 'ru' ? 'Следующий приём' : 'Next exercise', exact: true }).click()
+        if (index === 0) {
+          await page.reload()
+          await expect(app(page)).toHaveAttribute('data-turn', '0')
+          await expect(page.locator('.od-lesson')).toContainText(lessonText[TEACHING_FIXTURES[1].id][lang][0])
+        }
       }
     }
     await page.getByRole('button', { name: finish === 'continue'
@@ -91,6 +96,13 @@ test('local launch, repeat-click/tap and Escape deselection, keyboard, save and 
   await page.getByRole('button', { name: 'At one board', exact: true }).click()
   await page.getByRole('button', { name: 'Start game', exact: true }).click()
   await expect(app(page)).toHaveAttribute('data-mode', 'local')
+  for (const square of ['a1', 'h1', 'a8', 'h8']) {
+    // The view/flip controls must leave the whole board available to a pointer.
+    expect(await cell(page, square).evaluate(element => {
+      const rect = element.getBoundingClientRect()
+      return element.contains(document.elementFromPoint(rect.x + rect.width / 2, rect.y + rect.height / 2))
+    })).toBe(true)
+  }
   await clickSquare(page, 'e2')
   await expect(cell(page, 'e2')).toHaveAttribute('data-selected', 'true')
   await clickSquare(page, 'e2')
