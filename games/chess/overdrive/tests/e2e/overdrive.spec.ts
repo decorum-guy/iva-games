@@ -67,6 +67,11 @@ for (const lang of ['ru', 'en'] as const) for (const finish of ['continue', 'new
       await expect(app(page)).toHaveAttribute('data-turn', '1')
       if (index < TEACHING_FIXTURES.length - 1) {
         await page.getByRole('button', { name: lang === 'ru' ? 'Следующий приём' : 'Next exercise', exact: true }).click()
+        if (index === 0) {
+          await page.reload()
+          await expect(app(page)).toHaveAttribute('data-turn', '0')
+          await expect(page.locator('.od-lesson')).toContainText(lessonText[TEACHING_FIXTURES[1].id][lang][0])
+        }
       }
     }
     await page.getByRole('button', { name: finish === 'continue'
