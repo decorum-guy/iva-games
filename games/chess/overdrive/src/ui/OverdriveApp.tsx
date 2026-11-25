@@ -205,7 +205,7 @@ export function OverdriveApp() {
       onSnapshot:(next,kind,action)=>{
         const previous=roomRef.current
         setRoom(next);roomRef.current=next
-        if(kind==='welcome'&&previous?.game.id===next.game.id&&previous.game.revision===next.game.revision&&!document.hidden)return
+        if(previous?.game.id===next.game.id&&previous.game.revision===next.game.revision)return
         if(kind==='welcome'||!previous||previous.game.id!==next.game.id||document.hidden){queue.current=[];resetMotion();displayRef.current=next.game.state;displayedGame.current={id:next.game.id,revision:next.game.revision};setOnlineDisplay(next.game.state);setFlipped(next.you==='black');return}
         if(next.game.revision>previous.game.revision){
           if(action&&next.game.revision===previous.game.revision+1){queue.current.push({snapshot:next,action});drainRef.current()}
