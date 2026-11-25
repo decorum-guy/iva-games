@@ -96,8 +96,8 @@ function Figure(props:FigureProps & {fall:KingFall|null;playback:FallPlayback|nu
       return
     }
     const king=piece.id===fall.king
-    // Reduced motion waits for the mating piece to finish before posing the king.
-    const waiting=reduced&&motion&&elapsed<sceneTiming(motion.events,true).result
+    // Lazy load, remount and reduced motion all respect the committed action.
+    const waiting=motion&&elapsed<sceneTiming(motion.events,reduced).result
     const frame=waiting?0:playback&&!playback.settled?playback.elapsed:fall.duration
     if(frame===fall.duration&&lastAngle.current===(king?fall.angle:0))return
     const angles=fallAngles(fall,frame)
@@ -183,7 +183,20 @@ function ActionEffect({motion,reduced}:{motion:BoardMotion|null;reduced:boolean}
 function Arena(props:Board3DProps) {
   const fall=useMemo(()=>planKingFall(props.state),[props.state])
   const {onArenaMounted,playback}=props
-  useLayoutEffect(()=>{onArenaMounted(true);return ()=>onArenaMounted(false)},[onArenaMounted])
+  const gl=useThree(s=>s.gl)
+  useLayoutEffect(()=>{
+    const canvas=gl.domElement
+    const lost=()=>onArenaMounted(false)
+    const restored=()=>onArenaMounted(true)
+    onArenaMounted(!gl.getContext().isContextLost())
+    canvas.addEventListener('webglcontextlost',lost)
+    canvas.addEventListener('webglcontextrestored',restored)
+    return ()=>{
+      onArenaMounted(false)
+      canvas.removeEventListener('webglcontextlost',lost)
+      canvas.removeEventListener('webglcontextrestored',restored)
+    }
+  },[gl,onArenaMounted])
   useFrame(()=>{
     if(fall&&playback&&!playback.settled&&!document.hidden)stepFall(playback,fall,performance.now())
   },-1)
