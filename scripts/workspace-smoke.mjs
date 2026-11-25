@@ -235,7 +235,7 @@ try {
         if (response.status !== 404 || !response.headers.get('content-type')?.startsWith('application/json')) throw new Error(`Missing asset returned HTML: ${pathname}`)
       }
       check(true, `${layout.name}: missing assets return 404`)
-      for (const [path, protocol] of [['/api/health', 'remorse-online-v1'], ['/api/overdrive/health', 'overdrive-online-v1']]) {
+      for (const [path, protocol] of [['/api/health', 'remorse-online-v1'], ['/api/overdrive/health', 'overdrive-online-v2']]) {
         const response = await request(origin + path)
         const health = await response.json()
         if (!response.ok || health.ok !== true || health.protocol !== protocol) throw new Error(`Health failed for ${path}`)

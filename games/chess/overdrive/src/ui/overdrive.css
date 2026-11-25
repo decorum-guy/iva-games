@@ -13,6 +13,8 @@
 
 /* Committed 2D motion shares the event clock and poses with the 3D arena. */
 .od-board-2d{position:relative}
+.od-board-2d{width:80%}
+.od-cell[data-check=true]{background:#cf3f39;box-shadow:inset 0 0 0 3px #ffb3a5}
 .od-board-2d[data-animating=true]>.od-cell>.od-piece-icon,.od-board-accessible[data-animating=true]>.od-cell>.od-piece-icon,.od-board-2d[data-animating=true]>.od-cell>.od-form-counter,.od-board-accessible[data-animating=true]>.od-cell>.od-form-counter{visibility:hidden}
 .od-motion-layer{position:absolute;inset:0;pointer-events:none;overflow:hidden;z-index:4}
 .od-board-2d[data-castling=true],.od-board-2d[data-castling=true]>.od-motion-layer{overflow:visible}

@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { commandKey, createInitialState, createPosition, isInCheck, legalCommands, positionKey, transition } from '../../src/core'
-import type { GameState, PieceInput } from '../../src/core'
+import { commandKey, createInitialState, createPosition as createVersionedPosition, isInCheck, legalCommands, positionKey, transition } from '../../src/core'
+import type { GameState, PieceInput, PositionInput } from '../../src/core'
 import { evaluate } from '../../src/engine/evaluate'
 import { getPreset, PRESETS } from '../../src/engine/presets'
 import { overdriveAdapter, search } from '../../src/engine/search'
+const createPosition = (input: PositionInput) => createVersionedPosition({ rulesVersion: 'overdrive-v1', ...input })
 const piece = (id: string, side: PieceInput['side'], type: PieceInput['type'], square: string): PieceInput => ({ id, side, type, square })
 function tactical(pieces: PieceInput[], energy = 5): GameState {
   return createPosition({ pieces: [

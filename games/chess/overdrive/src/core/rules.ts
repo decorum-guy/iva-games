@@ -1,11 +1,11 @@
-import { ABILITIES, PROMOTIONS, RuleError } from './types'
+import { ABILITIES, PROMOTIONS, LEGACY_RULES_VERSION, energyBankSize, RuleError } from './types'
 import type { Action, Command, EnPassant, EventData, GameOutcome, GameState, Piece, Side, Square, Transition } from './types'
 import { adjacent, DIAGONAL, file, homeRank, KING_STEPS, KNIGHT_STEPS, offset, opposite, ORTHOGONAL, pawnDirection, pawnStartRank, promotionRank, raidMiddles, rank, squareAt, validSquare } from './geometry'
 
 const reject = (code: ConstructorParameters<typeof RuleError>[0]): never => { throw new RuleError(code) }
 const at = (state: Pick<GameState, 'pieces'>, square: Square): Piece | undefined => state.pieces.find(p => p.square === square)
 export const pieceAt = at
-export const hasAbility = (state: GameState, piece: Piece): boolean => state.energy[piece.side] >= 5 || state.forms[piece.side]?.pieceId === piece.id
+export const hasAbility = (state: GameState, piece: Piece): boolean => state.energy[piece.side] >= energyBankSize(state.rulesVersion) || state.forms[piece.side]?.pieceId === piece.id
 
 /** Non-recursive geometric attack map. Pins do not suppress attacks. */
 export function attackMap(state: GameState, side: Side): ReadonlySet<Square> {
@@ -92,8 +92,9 @@ export function resolveCandidate(state: GameState, command: Action): Transition 
   const side = state.side, enemy = opposite(side), events: EventData[] = []
   const energy = { ...state.energy }, forms = { ...state.forms }
   const rewardedCheckLayouts = { ...state.rewardedCheckLayouts }
-  let pieces = state.pieces.slice(), enPassant: EnPassant | null = null, captured = 0, movedPawn = false
-  const spent = command.mode === 'impulse' ? 5 : command.mode === 'activate' ? 10 : 0
+  let pieces = state.pieces.slice(), enPassant: EnPassant | null = null, captured = 0, captureValue = 0, movedPawn = false
+  const bank = energyBankSize(state.rulesVersion), capacity = bank * 2
+  const spent = command.mode === 'impulse' ? bank : command.mode === 'activate' ? capacity : 0
   if (command.type === 'move' && command.mode !== 'normal' && command.mode !== 'activate') return reject('invalidCommand')
   if (command.type === 'ability' && command.mode === 'normal') return reject('invalidCommand')
   if (energy[side] < spent) return reject('energy')
@@ -116,6 +117,7 @@ export function resolveCandidate(state: GameState, command: Action): Transition 
     if (victim.side === side) return reject('illegalMovement')
     pieces = pieces.filter(p => p.id !== victim.id)
     captured++
+    captureValue += state.rulesVersion === LEGACY_RULES_VERSION ? 1 : ({ pawn: 1, knight: 2, bishop: 2, rook: 3, queen: 4, king: 0 } as const)[victim.type]
     events.push({ type: 'capture', victim, pieceId: original.id })
     if (forms[victim.side]?.pieceId === victim.id) {
       forms[victim.side] = null
@@ -225,7 +227,7 @@ export function resolveCandidate(state: GameState, command: Action): Transition 
     forms[side] = remainingTurns ? { ...form, remainingTurns } : null
     events.push({ type: 'form', side, pieceId: form.pieceId, remainingTurns, cause: remainingTurns ? 'tick' : 'expire' })
   }
-  const captureEarned = Math.min(10 - energy[side], captured)
+  const captureEarned = Math.min(capacity - energy[side], captureValue)
   energy[side] += captureEarned
   let candidate: GameState = { ...state, pieces, energy, forms, rewardedCheckLayouts, enPassant }
   let checkEarned = 0
@@ -233,7 +235,7 @@ export function resolveCandidate(state: GameState, command: Action): Transition 
     const key = checkLayoutKey(candidate, side)
     if (!rewardedCheckLayouts[side].includes(key)) {
       rewardedCheckLayouts[side] = [...rewardedCheckLayouts[side], key].sort()
-      checkEarned = Math.min(2, 10 - energy[side])
+      checkEarned = Math.min(2, capacity - energy[side])
       energy[side] += checkEarned
     }
   }
@@ -271,12 +273,12 @@ function* rawActions(state: GameState): Generator<Action> {
     }
     for (const to of moves) {
       yield { type: 'move', mode: 'normal', pieceId: piece.id, to }
-      if (state.energy[piece.side] >= 10) yield { type: 'move', mode: 'activate', pieceId: piece.id, to }
+      if (state.energy[piece.side] >= energyBankSize(state.rulesVersion) * 2) yield { type: 'move', mode: 'activate', pieceId: piece.id, to }
     }
     const modes: Action['mode'][] = []
     if (state.forms[piece.side]?.pieceId === piece.id) modes.push('form')
-    else if (state.energy[piece.side] >= 5) modes.push('impulse')
-    if (state.energy[piece.side] >= 10) modes.push('activate')
+    else if (state.energy[piece.side] >= energyBankSize(state.rulesVersion)) modes.push('impulse')
+    if (state.energy[piece.side] >= energyBankSize(state.rulesVersion) * 2) modes.push('activate')
     if (!modes.length) continue
     const abilities: Omit<Action, 'mode'>[] = []
     const add = (target: Piece, to?: Square) => abilities.push({ type: 'ability', pieceId: piece.id, targetId: target.id, ...(to ? { to } : {}) })

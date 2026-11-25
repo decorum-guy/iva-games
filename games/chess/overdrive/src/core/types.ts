@@ -1,5 +1,8 @@
 /** Complete, public state for the deterministic OVERDRIVE ruleset. */
-export const RULES_VERSION = 'overdrive-v1' as const
+export const RULES_VERSION = 'overdrive-v2' as const
+export const LEGACY_RULES_VERSION = 'overdrive-v1' as const
+export type RulesVersion = typeof RULES_VERSION | typeof LEGACY_RULES_VERSION
+export const energyBankSize = (version: RulesVersion): number => version === LEGACY_RULES_VERSION ? 5 : 3
 export const SIDES = ['white', 'black'] as const
 export const PIECE_TYPES = ['pawn', 'knight', 'bishop', 'rook', 'queen', 'king'] as const
 export const PROMOTIONS = ['queen', 'rook', 'bishop', 'knight'] as const
@@ -25,7 +28,7 @@ export interface GameOutcome {
   readonly reason: 'checkmate' | 'resignation' | 'stalemate' | 'bareKings' | 'repetition' | 'fiftyMoves' | 'seventyFiveMoves' | 'agreement'
 }
 export interface GameState {
-  readonly rulesVersion: typeof RULES_VERSION
+  readonly rulesVersion: RulesVersion
   readonly pieces: readonly Piece[]
   readonly side: Side
   readonly turnSerial: number
@@ -38,6 +41,7 @@ export interface GameState {
   readonly outcome: GameOutcome | null
 }
 export interface PositionInput {
+  readonly rulesVersion?: RulesVersion
   readonly pieces: readonly PieceInput[]
   readonly side?: Side
   readonly turnSerial?: number
