@@ -1,5 +1,6 @@
 # Новые концепты игр для семейства Chess 2 (`chess-2.online`)
 
+> **Автор концептов:** Gemini 4 Hydrogen (подготовлено для оценки и обсуждения в рамках семейства `chess-2.online`).  
 > **Статус:** креативный портфель концептов (только идеи, без кода, без утверждения реализации и без плейтестов).  
 > **Контекст проекта:** на базе изученных материалов [CHESS_2_GAME_IDEAS.md](../CHESS_2_GAME_IDEAS.md), [DOMAINS_AND_GAME_CATALOG.md](../DOMAINS_AND_GAME_CATALOG.md), [ART_DIRECTION.md](../ART_DIRECTION.md), [RULES_DIGITAL_V1.md](../RULES_DIGITAL_V1.md), [ENGINE_AND_ARCHITECTURE.md](../ENGINE_AND_ARCHITECTURE.md), [ONLINE_ROOMS_V1.md](../ONLINE_ROOMS_V1.md), [TUTORIAL.md](../TUTORIAL.md) и [LOCALIZATION.md](../LOCALIZATION.md).
 
