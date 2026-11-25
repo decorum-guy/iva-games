@@ -87,10 +87,10 @@ function Figure(props:FigureProps) {
     {(selected||active)&&<mesh rotation={[-Math.PI/2,0,0]} position={[0,.008,0]}><ringGeometry args={[.34,.37,40]}/><meshBasicMaterial color={selected?'#e96b33':'#ffd5a5'} transparent opacity={.85}/></mesh>}
   </group>
 }
-function CapacitorRail({side,energy}:{side:Side;energy:number}) {
+function CapacitorRail({side,energy,bank}:{side:Side;energy:number;bank:number}) {
   const z=side==='white'?4.43:-4.43
   return <group>
-    {Array.from({length:10},(_,i)=><group key={i} position={[(i-4.5)*.27+(i<5?-.12:.12),-.005,z]}>
+    {Array.from({length:bank*2},(_,i)=><group key={i} position={[(i-(bank*2-1)/2)*.27+(i<bank?-.12:.12),-.005,z]}>
       <mesh><boxGeometry args={[.21,.065,.16]}/><meshStandardMaterial color={i<energy?'#ed7b43':'#668091'} emissive={i<energy?'#ed6e29':'#000000'} emissiveIntensity={i<energy?.5:0} metalness={.4} roughness={.3}/></mesh>
     </group>)}
   </group>
@@ -178,7 +178,7 @@ function Arena(props:Board3DProps) {
     })}
     {[-1,1].flatMap(x=>[-1,1].map(z=><mesh key={`${x}/${z}`} position={[x*4.38,-.025,z*4.38]} rotation={[-Math.PI/2,0,0]}><cylinderGeometry args={[.09,.09,.03,6]}/><meshStandardMaterial color="#294960" metalness={.9} roughness={.21}/></mesh>))}
     {[-1,1].flatMap(x=>Array.from({length:12},(_,i)=><mesh key={`${x}/${i}`} position={[x*4.4,-.042,(i-5.5)*.32]}><boxGeometry args={[.16,.012,.12]}/><meshStandardMaterial color="#365366" roughness={.5}/></mesh>))}
-    <CapacitorRail side="white" energy={props.state.energy.white}/><CapacitorRail side="black" energy={props.state.energy.black}/>
+    <CapacitorRail side="white" energy={props.state.energy.white} bank={props.state.rulesVersion==='overdrive-v1'?5:3}/><CapacitorRail side="black" energy={props.state.energy.black} bank={props.state.rulesVersion==='overdrive-v1'?5:3}/>
     {pieces.map(piece=><Figure key={piece.id} piece={piece} selected={props.selected===piece.id} active={props.state.forms[piece.side]?.pieceId===piece.id} checked={piece.type==='king'&&piece.side===props.state.side&&checked} defeated={piece.type==='king'&&props.state.outcome?.winner!=null&&props.state.outcome.winner!==piece.side} {...{motion:props.motion,reduced:props.reduced,onSquare:props.onSquare}}/>)}
     <ActionEffect motion={props.motion} reduced={props.reduced}/>
   </group>

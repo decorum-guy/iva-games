@@ -115,7 +115,7 @@ export function Board2D({ state, selected, targets, focusSquares, onSquare, flip
       const target = targets.includes(square), focus = focusSquares.includes(square)
       return <button key={square} type="button" role="gridcell" data-square={square} data-selected={chosen}
         data-target={target} data-focus={focus} data-check={square === checkedSquare} className={`od-cell ${(x + y) % 2 ? 'light' : 'dark'}`}
-        aria-label={`${square}${piece ? `, ${sideName(piece.side, language)}, ${pieceName(piece.type, language)}` : ''}${target ? tr(language, ', доступный ход', ', available move') : ''}`}
+        aria-label={`${square}${piece ? `, ${sideName(piece.side, language)}, ${pieceName(piece.type, language)}` : ''}${target ? tr(language, ', доступный ход', ', available move') : ''}${square === checkedSquare ? tr(language, ', шах', ', check') : ''}`}
         aria-selected={chosen} onClick={() => onSquare(square)} onKeyDown={event => {
           const direction = ({ ArrowLeft: -1, ArrowRight: 1, ArrowUp: -8, ArrowDown: 8 } as Record<string, number>)[event.key]
           if (direction !== undefined) {

@@ -49,7 +49,7 @@ describe('Overdrive Worker lifecycle and visible thinking delay', () => {
     controller.start(source)
     expect(workers).toHaveLength(1)
     expect(workers[0].request).toMatchObject({ publicState: source.state, gameId: 'test-game',
-      gameRevision: 0, presetId: 4, rulesVersion: 'overdrive-v1' })
+      gameRevision: 0, presetId: 4, rulesVersion: 'overdrive-v2' })
     expect(callbacks.onThinking).toHaveBeenLastCalledWith(true)
     workers[0].result()
     expect(workers[0].terminated).toBe(true)

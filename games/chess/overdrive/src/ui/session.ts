@@ -1,6 +1,7 @@
 import { commandKey, resign, transition, validateCommand, validateState } from '../core'
 import type { Command, GameState, Side } from '../core'
 import { TEACHING_FIXTURES } from '../core/teaching'
+import { LEGACY_TEACHING_FIXTURES } from '../core/legacyTeaching'
 
 export const LOCAL_SESSION_KEY = 'overdrive-local-v1'
 export const SETTINGS_KEY = 'overdrive-settings-v1'
@@ -56,7 +57,7 @@ function validRecord(value: unknown): value is LocalSessionRecord {
   if (!valid) return false
   const record = value as unknown as LocalSessionRecord
   if (record.mode !== 'tutorial') return true
-  const fixture = TEACHING_FIXTURES[record.lessonIndex]
+  const fixture = (record.root.rulesVersion === 'overdrive-v1' ? LEGACY_TEACHING_FIXTURES : TEACHING_FIXTURES)[record.lessonIndex]
   // Teaching has exactly one accepted command per fixture. An invalid index or
   // mismatched acknowledgement would otherwise leave the learner unable to act.
   return !!fixture && !record.resignedBy && JSON.stringify(record.root) === JSON.stringify(fixture.state) &&

@@ -21,7 +21,7 @@ const CUE_PRIORITY: Record<OverdriveCueName, number> = {
 export const MAX_OVERDRIVE_VOICES = 8
 
 /** One semantic action: physical cue, resource feedback, then check/result. */
-export function planOverdriveCues(events: readonly GameEvent[], reducedMotion = false): readonly OverdriveCue[] {
+export function planOverdriveCues(events: readonly GameEvent[], reducedMotion = false, bank = 5): readonly OverdriveCue[] {
   if (!events.length) return []
   const cues: OverdriveCue[] = []
   const ability = events.find(event => event.type === 'ability')
@@ -45,7 +45,7 @@ export function planOverdriveCues(events: readonly GameEvent[], reducedMotion = 
     event.after > Math.max(0, event.before - event.spent))
   if (earned.length) {
     cues.push({ name: 'energy', at: timing.energy })
-    if (earned.some(event => Math.floor(event.after / 5) > Math.floor(Math.max(0, event.before - event.spent) / 5))) {
+    if (earned.some(event => Math.floor(event.after / bank) > Math.floor(Math.max(0, event.before - event.spent) / bank))) {
       cues.push({ name: 'cellfull', at: timing.cellFull })
     }
   }
@@ -123,7 +123,7 @@ export class OverdriveAudio {
     } catch { /* Autoplay restrictions or unavailable audio must not interrupt a game. */ }
   }
 
-  playEvents(events: readonly GameEvent[]): void {
+  playEvents(events: readonly GameEvent[], bank = 5): void {
     if (this.disposed) return
     const fresh = events.filter(event => {
       if (this.seen.has(event.id)) return false
@@ -132,7 +132,7 @@ export class OverdriveAudio {
       return true
     })
     if (!this.canPlay()) return // Muted/hidden history is consumed, never queued for later.
-    this.schedule(planOverdriveCues(fresh, this.options.reducedMotion))
+    this.schedule(planOverdriveCues(fresh, this.options.reducedMotion, bank))
   }
 
   playCue(name: string): void {

@@ -216,7 +216,7 @@ describe('Overdrive real HTTP and independent WebSocket guests', () => {
     const state = createPosition({ pieces: [
       ...pieces, ...(name === 'cover' ? [] : [{ type: 'king' as const, side: 'white' as const, square: 'h1' }]),
       { type: 'king', side: 'black', square: 'h8' },
-    ], energy: { white: 5 } })
+    ], energy: { white: 3 } })
     await installRoot(created.snapshot.id, state, white, black)
     const command = legalCommands(state).find((item): item is Action => item.type === 'ability' && item.pieceId === 'focus-piece' &&
       item.mode === 'impulse' && item.targetId === 'target-piece' && (!landing || item.to === landing))
@@ -225,14 +225,33 @@ describe('Overdrive real HTTP and independent WebSocket guests', () => {
     await black.wait(message => message.type === 'update' && message.snapshot.game.revision === 1)
     expect(white.snapshot.game).toEqual(black.snapshot.game)
     expect(white.snapshot.game.actions[0].events).toContainEqual(expect.objectContaining({ type: 'ability', ability: name }))
-    expect(white.snapshot.game.actions[0].events).toContainEqual(expect.objectContaining({ type: 'energy', spent: 5 }))
-    expect(white.snapshot.game.state.energy.white).toBeLessThan(5)
+    expect(white.snapshot.game.actions[0].events).toContainEqual(expect.objectContaining({ type: 'energy', spent: 3 }))
+    expect(white.snapshot.game.state.energy.white).toBeLessThanOrEqual(3)
+  })
+
+  it('replays an existing v1 room with its original capture value after reconnecting', async () => {
+    const { white, black, created, whiteCookie } = await room()
+    const state = createPosition({ rulesVersion: 'overdrive-v1', pieces: [
+      { id: 'wk', side: 'white', type: 'king', square: 'h1' },
+      { id: 'bk', side: 'black', type: 'king', square: 'h8' },
+      { id: 'wr', side: 'white', type: 'rook', square: 'a2' },
+      { id: 'bq', side: 'black', type: 'queen', square: 'a7' },
+    ] })
+    await installRoot(created.snapshot.id, state, white, black)
+    expect((await white.command({ type: 'move', mode: 'normal', pieceId: 'wr', to: 'a7' })).result.type).toBe('ack')
+    await black.wait(message => message.type === 'update' && message.snapshot.game.revision === 1)
+    expect(black.snapshot.game.state.energy.white).toBe(1)
+    await white.close()
+    const resumed = new Peer(whiteCookie)
+    await resumed.open(created.snapshot.id)
+    expect(resumed.snapshot.game.state.rulesVersion).toBe('overdrive-v1')
+    expect(resumed.snapshot.game.state.energy.white).toBe(1)
   })
 
   it('keeps form activation and duration authoritative when a client reconnects', async () => {
     const { white, black, created, whiteCookie } = await room()
     const initial = createInitialState()
-    const state = createPosition({ pieces: initial.pieces, energy: { white: 10 } })
+    const state = createPosition({ pieces: initial.pieces, energy: { white: 6 } })
     await installRoot(created.snapshot.id, state, white, black)
     const command = legalCommands(state).find((item): item is Action => item.type === 'move' && item.mode === 'activate' && item.to === 'e4')!
     expect(command).toBeDefined()
