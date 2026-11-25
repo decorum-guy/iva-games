@@ -6,15 +6,17 @@ Build a finished, beautiful, playable web game on the owner's Mac: Remorse Chess
 
 The preparation package and implementation are both present. Read `docs/BUILD_STATUS.md` for the current verification state and distinguish isolated source/test results from activation and live browser acceptance. Earlier reviews, including `docs/VALIDATION_FINAL_SHOWCASE.md` and `docs/VALIDATION_ROOT_PLAYTHROUGH.md`, verify only their recorded revisions.
 
-## Current scope: pacing audit fixes and Mac activation
+## Current scope: rules audit, clearer teaching and complete online rooms
 
-On 25 November 2026 the owner authorized implementing the remaining findings from the pacing/selection audit. The recorded Mac baseline is gameplay revision `9366cea29aad449441dd769d492b24030610a1af` (`index-HC_opOyP.js`), with release report `73428e6652dc925704881abb6992f6fb6dd0b6ce`. Continue from current `main`; these identifiers describe the baseline and are not instructions to reset newer work. Follow `prompts/ACTIVATE_PACING_AUDIT_FIXES.md` for the focused checks and Mac activation.
+On 25 November 2026 the owner assigned further development to this assistant: independently audit the rules, simplify overloaded player-facing explanations, repair the tutorial, and implement complete online play before publication. This supersedes the earlier restriction to pacing/selection fixes. Preserve accepted visuals, chosen audio, local saves and rating. Use `docs/ONLINE_ROOMS_V1.md` for the agreed guest-room scope and validate real independent clients; do not call a transport stub a network game.
 
-The scope is to preserve a full reading interval after an actually displayed reaction even when rendering is late, keep a local AI continuation from passing an unseen result while the tab is hidden, and keep a deselected bonus figure cleared after an empty-square click. Preserve real worker search, cancellation, tutorial holds, saves, rating and the chosen visual/audio treatment. Prepare and verify on an isolated port before activating the tested production build on 4173. Activation of these fixes is authorized; do not ask for the same permission again. Keep QA silent and headless, without taking focus from the owner's applications.
+The owner has purchased `chess-2.online`. REMORSE is to be published at `remorse.chess-2.online`. The root domain will later host a menu of all games, with future variants on separate subdomains. Claude will design that catalogue after a second game exists; do not build the catalogue in this iteration. See `docs/DOMAINS_AND_GAME_CATALOG.md`. These are owner-provided plans, not confirmation of configured DNS or a deployed server.
 
-Sound selection is complete according to `docs/SHOWCASE_SFX.md` and `docs/BUILD_STATUS.md`: R1 guilt/berserk, R2 devastation/short bloodlust, P2 bishop/knight and queen, the selected P1+P2 rook mix, D2 dice, and the documented check/mate and ignition mixes. Preserve those installed choices. `prompts/FINAL_SFX_SELECTION_AND_SHOWCASE.md` and the audition assets remain historical/reference material; they do not require another selection round.
+## Previous stage: pacing audit fixes and Mac activation
 
-The previous report's 18 games / 1,137 actions and exact Elo are executor-reported until the local report and original records are independently examined. Keep that private archive and all QA media on the Mac; publish only a concise validation summary. Network rooms remain a separate next stage under `docs/ONLINE_ROOMS_V1.md` and `prompts/IMPLEMENT_ONLINE_ROOMS.md`. Do not expand this repair into multiplayer, a redesign, new effects or engine-strength calibration.
+The local executor reported accepting and activating gameplay revision `6da671baf1fbcd57c7b4629c7e4ba5734c3de034` (`index-1TCUvz0X.js`) on the Mac; the report is in `d074f6e` and `docs/VALIDATION_PACING_AUDIT_FIXES.md`. Preserve its result-reading gate, real worker search, cancellation, visibility handling and bonus deselection behavior. Do not replay old activation tasks merely because their prompt files remain in the repository.
+
+Sound selection is complete according to `docs/SHOWCASE_SFX.md`: preserve the chosen bank, mixes, volumes and accepted effects. Keep QA silent and headless without taking focus from the owner's applications. The executor's 18-game audit and private exports remain on the Mac; describe independent access and verification accurately.
 
 ## Read before implementation
 
