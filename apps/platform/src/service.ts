@@ -441,7 +441,10 @@ export class PlatformService {
   }
   getRoom(actor: string, roomId: string): Room { this.member(actor, roomId); return this.roomView(roomId); }
   listRooms(actor: string): Room[] {
-    return this.rows('SELECT r.room_id FROM rooms r JOIN room_members m ON m.room_id=r.room_id WHERE m.player_id=? ORDER BY r.created_at DESC LIMIT 50', actor).map(row => this.roomView(String(row.room_id)));
+    // A history cap must never hide a room the player can still return to.
+    const active = this.rows("SELECT r.room_id FROM rooms r JOIN room_members m ON m.room_id=r.room_id WHERE m.player_id=? AND r.state IN ('lobby','starting','playing') ORDER BY r.created_at DESC,r.room_id DESC", actor);
+    const history = this.rows("SELECT r.room_id FROM rooms r JOIN room_members m ON m.room_id=r.room_id WHERE m.player_id=? AND r.state IN ('finished','cancelled') ORDER BY r.created_at DESC,r.room_id DESC LIMIT 50", actor);
+    return [...active, ...history].map(row => this.roomView(String(row.room_id)));
   }
   createRoom(actor: string, input: Record<string, unknown>): Room {
     this.requireVerified(actor);
@@ -574,7 +577,25 @@ export class PlatformService {
     return this.invitationView(id);
   }
   listInvitations(actor: string): Invitation[] {
-    return this.rows('SELECT invitation_id FROM invitations WHERE invitee_id=? OR inviter_id=? ORDER BY created_at DESC LIMIT 100', actor, actor).map(row => this.invitationView(String(row.invitation_id)));
+    // Joined, expired and closed invitations are history. Keep every pending offer or
+    // unexpired reservation visible even when the account has a long invitation history.
+    const now = this.now();
+    return this.rows(`
+      WITH visible AS (
+        SELECT i.invitation_id,i.created_at,
+          CASE WHEN r.state='lobby' AND (
+            (i.state='pending' AND i.expires_at>?) OR
+            (i.state='accepted' AND EXISTS (SELECT 1 FROM seat_reservations s WHERE s.invitation_id=i.invitation_id AND s.expires_at>?))
+          ) THEN 1 ELSE 0 END AS actionable
+        FROM invitations i JOIN rooms r ON r.room_id=i.room_id
+        WHERE i.invitee_id=? OR i.inviter_id=?
+      ), history AS (
+        SELECT * FROM visible WHERE actionable=0 ORDER BY created_at DESC,invitation_id DESC LIMIT 100
+      )
+      SELECT invitation_id FROM (
+        SELECT * FROM visible WHERE actionable=1 UNION ALL SELECT * FROM history
+      ) ORDER BY actionable DESC,created_at DESC,invitation_id DESC
+    `, now, now, actor, actor).map(row => this.invitationView(String(row.invitation_id)));
   }
   acceptInvitation(actor: string, id: string): Invitation {
     this.requireVerified(actor); const row = this.invitationRow(id);

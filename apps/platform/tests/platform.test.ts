@@ -296,6 +296,67 @@ describe('Iva Games platform: independent HTTP clients and persistent authority'
     expect((await host.client.request<{ friends: unknown[] }>('/friends')).body.friends).toHaveLength(1);
   });
 
+  it('keeps active rooms discoverable after terminal history exceeds the list limit', async () => {
+    const f = await fixture(); const host = await signup(f, 'hoster'); const outsider = await signup(f, 'outsider');
+    const lobby = await newRoom(host.client);
+    f.now.value++;
+    let playing = await newRoom(host.client);
+    playing = (await host.client.request<{ room: Room }>(`/rooms/${playing.roomId}/bots`, { difficulty: 'easy', expectedRevision: playing.revision })).body.room;
+    expect((await host.client.request(`/rooms/${playing.roomId}/ready`, { ready: true, expectedRevision: playing.revision })).status).toBe(200);
+    const started = await host.client.request<{ room: Room }>(`/rooms/${playing.roomId}/start`, { expectedRevision: playing.revision });
+    expect(started.body.room.state).toBe('playing');
+    const history: string[] = [];
+    for (let index = 0; index < 51; index++) {
+      f.now.value++;
+      const room = await newRoom(host.client); history.push(room.roomId);
+      expect((await host.client.request(`/rooms/${room.roomId}/cancel`, {})).status).toBe(200);
+    }
+    const listed = await host.client.request<{ rooms: Room[] }>('/rooms');
+    expect(listed.status).toBe(200);
+    expect(listed.body.rooms.slice(0, 2).map(room => room.roomId)).toEqual([playing.roomId, lobby.roomId]);
+    expect(listed.body.rooms.slice(2).map(room => room.roomId)).toEqual(history.slice(1).reverse());
+    expect((await outsider.client.request<{ rooms: Room[] }>('/rooms')).body.rooms).toEqual([]);
+    expect((await host.client.room(lobby.roomId)).state).toBe('lobby');
+  });
+
+  it('keeps actionable invitations ahead of bounded terminal history without changing access', async () => {
+    const f = await fixture(); const host = await signup(f, 'hoster'); const secondHost = await signup(f, 'another'); const guest = await signup(f, 'guest');
+    await befriend(host, guest); await befriend(secondHost, guest);
+    const pendingRoom = await newRoom(host.client); const reservedRoom = await newRoom(host.client);
+    const pending = await invite(host.client, pendingRoom, guest.account.playerId);
+    f.now.value++;
+    const reserved = await invite(host.client, reservedRoom, guest.account.playerId);
+    expect((await guest.client.request(`/invitations/${reserved.invitationId}/accept`, {})).status).toBe(200);
+    const historyRooms = [await newRoom(host.client), await newRoom(secondHost.client)];
+    const history: string[] = [];
+    for (let index = 0; index < 51; index++) {
+      // Two hosts stay within invitation limits; the reservation remains younger than two minutes.
+      if (index === 25) f.now.value += 60_001;
+      for (const [offset, owner] of [host, secondHost].entries()) {
+        f.now.value++;
+        const old = await invite(owner.client, historyRooms[offset], guest.account.playerId); history.push(old.invitationId);
+        expect((await owner.client.request(`/invitations/${old.invitationId}/revoke`, {})).status).toBe(200);
+      }
+    }
+    const listed = await guest.client.request<{ invitations: Invitation[] }>('/invitations');
+    expect(listed.status).toBe(200);
+    expect(listed.body.invitations.slice(0, 2).map(invitation => invitation.invitationId)).toEqual([reserved.invitationId, pending.invitationId]);
+    expect(listed.body.invitations.slice(2).map(invitation => invitation.invitationId)).toEqual(history.slice(2).reverse());
+    expect(listed.body.invitations[0]).toMatchObject({ status: 'accepted', reservationExpiresAt: expect.any(Number) });
+    expect(listed.body.invitations[1].status).toBe('pending');
+    const secondHostList = await secondHost.client.request<{ invitations: Invitation[] }>('/invitations');
+    expect(secondHostList.body.invitations.some(invitation => [reserved.invitationId, pending.invitationId].includes(invitation.invitationId))).toBe(false);
+    expect((await guest.client.request(`/rooms/${reservedRoom.roomId}/join`, {})).status).toBe(200);
+    const afterJoin = (await guest.client.request<{ invitations: Invitation[] }>('/invitations')).body.invitations;
+    expect(afterJoin).toHaveLength(101);
+    expect(afterJoin[0].invitationId).toBe(pending.invitationId);
+    expect(afterJoin.some(invitation => invitation.invitationId === reserved.invitationId)).toBe(false);
+    f.now.value += 30 * 60_000;
+    const afterExpiry = (await guest.client.request<{ invitations: Invitation[] }>('/invitations')).body.invitations;
+    expect(afterExpiry).toHaveLength(100);
+    expect(afterExpiry.some(invitation => invitation.invitationId === pending.invitationId)).toBe(false);
+  });
+
   it('resets readiness when roster changes, rejects stale settings/start and keeps bots separate from accounts', async () => {
     const f = await fixture(); const host = await signup(f, 'hoster');
     let room = await newRoom(host.client, 3);

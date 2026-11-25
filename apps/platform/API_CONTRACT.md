@@ -56,7 +56,7 @@ Members contain `participantId,playerId,handle,displayName,seatIndex,ready,contr
 
 | Method and path | JSON body | Result |
 |---|---|---|
-| GET `/rooms` | — | `{rooms:Room[]}`; own current memberships |
+| GET `/rooms` | — | `{rooms:Room[]}`; own memberships, all active first followed by up to 50 terminal rooms |
 | POST `/rooms` | `{gameId,capacity,title?}` | `{room}` |
 | GET `/rooms/:roomId` | — | `{room}`; membership required |
 | POST `/rooms/:roomId/join` | `{}` | `{room}`; accepted unexpired reservation or existing membership |
@@ -82,7 +82,7 @@ Status: `pending | accepted | declined | revoked | expired`. `displayStatus` may
 
 | Method and path | JSON body | Result |
 |---|---|---|
-| GET `/invitations` | — | `{invitations:Invitation[]}`; incoming and own outgoing |
+| GET `/invitations` | — | `{invitations:Invitation[]}`; incoming and own outgoing, all actionable pending/reserved first followed by up to 100 historical entries |
 | GET `/invitations/:invitationId` | — | `{invitation}`; sender/recipient only |
 | POST `/rooms/:roomId/invitations` | `{playerId}` | `{invitation}`; host invites accepted friend |
 | POST `/invitations/:invitationId/accept` | `{}` | `{invitation}`; recipient reserves a seat |

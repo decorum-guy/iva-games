@@ -6,7 +6,7 @@ The owner now explicitly authorizes implementation of accounts, friends, rooms a
 
 The repository rename to `decorum-guy/iva-games` has been verified by stable GitHub repository ID 1469444922. `games/chess/*` remains the approved collection structure. Check remote refs again before integrating concurrent work.
 
-The published chess migration `d2d9693` is integrated into `feat/iva-platform-foundation`. Preserve its `games/chess/*`, `packages/engine-sdk` and `apps/server` source. This platform feature branch and its review are separate from the chess delivery branch/PR recorded below. Both use one root npm workspace lockfile. The main branch and active Mac/public deployment are not changed by this integration.
+The published chess migration `d2d9693` and Mac acceptance fixes `c18e57c` are integrated into `feat/iva-platform-foundation`. Preserve the accepted `games/chess/*`, `packages/engine-sdk` and `apps/server` source. Platform PR #5 is stacked on `acceptance/overdrive-monorepo` / PR #6, which is based on `feat/overdrive-sdk` / PR #3. Both use one root npm workspace lockfile. The Mac report is `docs/overdrive/VALIDATION_MAC_2026_11_25.md`; it does not accept the new portal. The main branch and active Mac/public deployment are not changed by this integration.
 
 District now targets social negotiation, atomic property/resource deals, city events and personal goals inspired by the owner's Colonist / Monopoly One / Jackbox experience. Bots are mandatory in its first release, including solo with bots and mixed rooms. Read `games/district/DESIGN_V0_2.md` and `BOT_DESIGN.md`; v0.1 rules are historical and must not silently fill v0.2 gaps. Design, technical lab bots and an implemented District game are distinct deliverables.
 

@@ -13,6 +13,7 @@ on:
       - 'tsconfig.base.json'
       - 'eslint.config.js'
       - 'scripts/check-boundaries.mjs'
+      - 'scripts/platform-smoke.mjs'
       - '.github/workflows/iva-platform.yml'
   push:
     branches: [main, feat/iva-platform-foundation]
@@ -27,6 +28,7 @@ on:
       - 'tsconfig.base.json'
       - 'eslint.config.js'
       - 'scripts/check-boundaries.mjs'
+      - 'scripts/platform-smoke.mjs'
       - '.github/workflows/iva-platform.yml'
 
 permissions:
@@ -49,4 +51,5 @@ jobs:
       - run: npm ci --no-audit --no-fund
       - run: npm run check
       - run: npm run build:all
+      - run: npm run platform:smoke
       # QA output stays in the job logs. No upload-artifact or video/trace storage.
