@@ -256,8 +256,8 @@ export function OverdriveApp() {
           <div className="od-arena-stamp" aria-hidden="true">{tr(language,'Форсаж','Overdrive')}</div>
           {settings.view==='3d'?<SceneBoundary fallback={focusableBoard}><Suspense fallback={focusableBoard}><Board3D {...boardProps}/></Suspense></SceneBoundary>:focusableBoard}
           {settings.view==='3d'&&<Board2D {...boardProps} language={language} accessibleOnly/>}
-          <div className="od-board-tools"><button onClick={()=>setFlipped(!flipped)} aria-label={tr(language,'Перевернуть доску','Flip board')}><svg viewBox="0 0 24 24"><path d="M4 9a8 8 0 0 1 14-3l2 3m0-6v6h-6M20 15a8 8 0 0 1-14 3l-2-3m0 6v-6h6"/></svg></button><button onClick={()=>setSettings({...settings,view:settings.view==='3d'?'2d':'3d'})}>{settings.view==='3d'?'2D':'3D'}</button></div>
         </div>
+        <div className="od-board-tools"><button onClick={()=>setFlipped(!flipped)} aria-label={tr(language,'Перевернуть доску','Flip board')}><svg viewBox="0 0 24 24"><path d="M4 9a8 8 0 0 1 14-3l2 3m0-6v6h-6M20 15a8 8 0 0 1-14 3l-2-3m0 6v-6h6"/></svg></button><button onClick={()=>setSettings({...settings,view:settings.view==='3d'?'2d':'3d'})}>{settings.view==='3d'?'2D':'3D'}</button></div>
         <PlayerRail state={state} side={flipped?'black':'white'} language={language} name={owner(flipped?'black':'white')} connected={mode==='online'?room?.players[flipped?'black':'white']?.connected:undefined} thinking={thinking&&state.side===(flipped?'black':'white')}/>
       </div>
       <aside className="od-workbench">

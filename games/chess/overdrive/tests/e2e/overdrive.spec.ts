@@ -96,6 +96,13 @@ test('local launch, repeat-click/tap and Escape deselection, keyboard, save and 
   await page.getByRole('button', { name: 'At one board', exact: true }).click()
   await page.getByRole('button', { name: 'Start game', exact: true }).click()
   await expect(app(page)).toHaveAttribute('data-mode', 'local')
+  for (const square of ['a1', 'h1', 'a8', 'h8']) {
+    // The view/flip controls must leave the whole board available to a pointer.
+    expect(await cell(page, square).evaluate(element => {
+      const rect = element.getBoundingClientRect()
+      return element.contains(document.elementFromPoint(rect.x + rect.width / 2, rect.y + rect.height / 2))
+    })).toBe(true)
+  }
   await clickSquare(page, 'e2')
   await expect(cell(page, 'e2')).toHaveAttribute('data-selected', 'true')
   await clickSquare(page, 'e2')
