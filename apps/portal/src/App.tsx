@@ -1,3 +1,4 @@
+import { friendRequestFeedback } from "./socialFeedback";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import type { LabView } from "@iva-games/session-kit/lab";
@@ -541,11 +542,20 @@ export default function App() {
         className="button small primary"
         disabled={busy || player.playerId === user?.playerId}
         onClick={() =>
-          void mutate(
-            "/friend-requests",
-            { playerId: player.playerId },
-            t("Заявка отправлена.", "Friend request sent."),
-          )
+          void perform(async () => {
+            await request("/friend-requests", { playerId: player.playerId });
+            const latest = await request<Social>("/friends");
+            await refresh();
+            const feedback = friendRequestFeedback(latest, player.playerId);
+            setNotice({
+              text: feedback === "received"
+                ? t("Вам уже пришла заявка. Примите её.", "They already sent you a request. Accept it to become friends.")
+                : feedback === "friends"
+                  ? t("Вы уже друзья.", "You are already friends.")
+                  : t("Заявка отправлена.", "Friend request sent."),
+              error: false,
+            });
+          })
         }
       >
         <Icon name="plus" size={16} />
