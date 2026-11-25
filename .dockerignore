@@ -1,0 +1,10 @@
+.git
+node_modules
+dist
+dist-server
+data
+.env
+*.local
+.qa
+playwright-report
+test-results

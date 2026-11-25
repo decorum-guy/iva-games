@@ -1,3 +1,4 @@
+import type { CaptureReaction, DieFace } from '../core';
 import type { Copy } from '../tutorial/lessonTypes';
 
 export interface RuleSection {
@@ -6,13 +7,66 @@ export interface RuleSection {
   readonly body: readonly Copy[];
 }
 
+/** The always-visible introduction; exact exceptions remain in the sections below. */
+export const quickRules = {
+  title: { ru: 'Главное перед партией', en: 'Before you play' },
+  intro: {
+    ru: 'Цель — поставить мат. Фигуры ходят как в шахматах, но взятия меняют их состояние, а слоны не берут и не дают шах.',
+    en: 'The goal is checkmate. Pieces move as in chess, but captures change their state, and bishops cannot capture or give check.',
+  },
+  die: { ru: 'Первое обычное взятие — бросок кубика', en: 'The first ordinary capture rolls a die' },
+  cycle: {
+    ru: 'Цикл — по одному следующему ходу каждой стороны. Ход, создавший эффект, не считается.',
+    en: 'A cycle is one subsequent turn by each side. The turn that caused the effect does not count.',
+  },
+  bloodlust: {
+    ru: 'Ярость при трёх взятиях становится жаждой крови: только ходы со взятием, можно брать своих, кроме короля.',
+    en: 'At three captures, berserk becomes bloodlust: captures only, including allies other than the king.',
+  },
+  memory: {
+    ru: 'Результат кубика запоминается: обычные взятия повторяют его даже после исцеления. У коня первое взятие без реакции; король всегда невосприимчив.',
+    en: 'The die result is remembered: ordinary captures repeat it even after healing. A knight gets one free capture; a king is always immune.',
+  },
+  support: {
+    ru: 'Свой слон лечит за цикл; чужой каждый цикл вызывает следующий этап: вина → опустошение → смена стороны. Король лечит своих сразу. Соседство включает диагонали.',
+    en: 'A friendly bishop heals after a cycle. An enemy bishop advances one stage each cycle: guilt → devastation → changing sides. A king heals allies immediately. Diagonal neighbors count.',
+  },
+  inspection: {
+    ru: 'Нажмите на фигуру: её карточка покажет состояние и точный срок до лечения, ухудшения или исчезновения.',
+    en: 'Select a piece to see its state and the exact number of turns until healing, shame, or removal.',
+  },
+} satisfies Record<string, Copy>;
+
+export const reactionRules: readonly {
+  readonly faces: readonly DieFace[];
+  readonly reaction: Exclude<CaptureReaction, 'unassigned'>;
+  readonly description: Copy;
+}[] = [
+  { faces: [1], reaction: 'devastated', description: {
+    ru: 'Не ходит. Без помощи исчезнет через 3 цикла.',
+    en: 'Cannot move. Disappears after 3 cycles unless rescued.',
+  } },
+  { faces: [2, 3], reaction: 'guilt', description: {
+    ru: 'Ходит, но не берёт и не даёт шах.',
+    en: 'Can move, but cannot capture or give check.',
+  } },
+  { faces: [4, 5], reaction: 'unaffected', description: {
+    ru: 'Взятия не меняют состояние.',
+    en: 'Captures leave its state unchanged.',
+  } },
+  { faces: [6], reaction: 'berserk', description: {
+    ru: 'Взятие первым действием даёт второе той же фигурой. Максимум два за ход.',
+    en: 'A first-action capture earns a second action with the same piece. Two per turn at most.',
+  } },
+];
+
 export const sourceRules: readonly RuleSection[] = [
   {
     id: 'goal',
     title: { ru: 'Цель партии', en: 'Objective' },
     body: [{
-      ru: 'Первыми ходят белые. Цель — мат: король соперника под шахом, и у него нет способа спастись. Королей не берут. Если шаха нет, но ни одна фигура не может сделать допустимый ход, это пат и ничья.',
-      en: 'White moves first. The goal is checkmate: the opposing king is in check and there is no legal way to save it. Kings are never captured. If a side is not in check but has no legal move, the game ends in a draw by stalemate.',
+      ru: 'Первыми ходят белые. Мат — король под шахом, и спасти его нельзя. Королей не берут. Если шаха нет, но допустимых ходов тоже нет, это пат: ничья.',
+      en: 'White moves first. Checkmate means a king is in check with no legal escape. Kings are never captured. No legal moves without check is stalemate: a draw.',
     }, {
       ru: 'Мат и пат определяются после всего хода игрока — включая дополнительное действие, исцеление и другие эффекты. Возможный второй шаг фигуры в ярости сам по себе не считается шахом.',
       en: 'Checkmate and stalemate are decided after the whole turn, including any bonus action, healing, and other effects. A possible second action by a berserk piece does not itself count as check.',
@@ -22,14 +76,14 @@ export const sourceRules: readonly RuleSection[] = [
     id: 'capture',
     title: { ru: 'Первое взятие и память', en: 'First capture and memory' },
     body: [{
-      ru: 'При первом взятии фигура обычно бросает кубик: 1 — опустошение, 2–3 — вина, 4–5 — без изменений, 6 — ярость. Она запоминает результат. Следующие взятия вызывают ту же реакцию без нового броска, даже после исцеления; исключения перечислены ниже.',
-      en: 'A piece normally rolls a die on its first capture: 1 means devastation, 2–3 guilt, 4–5 unaffected, and 6 berserk. It remembers the result. Later captures repeat that reaction without another roll, even after healing; the exceptions are explained below.',
+      ru: 'Кубик бросают один раз для каждой фигуры, при её первом обычном взятии. Реакция запоминается: исцеление убирает текущее состояние, но следующее обычное взятие возвращает его без броска.',
+      en: 'Each piece rolls once, on its first ordinary capture. Healing clears its current state but leaves the reaction remembered: the next ordinary capture brings it back without another roll.',
     }, {
-      ru: 'Конь пропускает бросок при первом взятии вообще. Милосердное взятие тоже расходует эту льготу. Но взятие слона и в первый раз вызывает опустошение. При следующих взятиях кубик и запомненная реакция работают так же, как у других фигур.',
-      en: 'A knight skips the roll on its first capture of any kind. A mercy capture uses up this exemption too. Taking a bishop still causes devastation, even on the first capture. Later captures use the die and remembered reaction just as other pieces do.',
+      ru: 'Конь получает одно взятие без реакции, затем подчиняется общему правилу. Милосердное взятие расходует эту льготу. Взятие слона вызывает опустошение даже в первый раз.',
+      en: 'A knight gets one capture without a reaction, then follows the normal rules. A mercy capture uses up that exemption. Taking a bishop causes devastation even on its first capture.',
     }, {
-      ru: 'Король всегда берёт без реакции. Слон не берёт и не даёт шах. Взятие слона вызывает опустошение; исключения — король и фигуры в ярости или с жаждой крови. Опустошение за слона не меняет запомненную реакцию на другие взятия.',
-      en: 'Kings capture without a reaction. Bishops cannot capture or give check. Taking a bishop causes devastation unless the capturer is a king, berserk, or in bloodlust. The bishop penalty does not change the capturer’s remembered reaction to other captures.',
+      ru: 'Король берёт без реакции. За взятие слона — опустошение без броска, кроме короля, ярости и жажды крови. Прежняя запомненная реакция при этом сохраняется; если её ещё нет, она не назначается.',
+      en: 'Kings capture without a reaction. Taking a bishop causes devastation without a roll, except for kings, berserk, and bloodlust. The capturer keeps its remembered reaction; if none was assigned, it remains unassigned.',
     }, {
       ru: 'Результат 4–5 означает, что собственные взятия не меняют состояние фигуры. От стыда рядом с вражеским слоном он не защищает.',
       en: 'A roll of 4–5 means that the piece’s own captures leave its state unchanged. It is still vulnerable to shame from an enemy bishop.',
@@ -50,17 +104,28 @@ export const sourceRules: readonly RuleSection[] = [
     }],
   },
   {
+    id: 'timing',
+    title: { ru: 'Полный цикл', en: 'Full cycles' },
+    body: [{
+      ru: 'Цикл — по одному завершённому ходу каждой стороны. Ход, создавший эффект или соседство, в отсчёт не входит. Пример: белые подвели слона; затем ходят чёрные и снова белые — только теперь прошёл цикл. Два действия в ярости составляют один ход.',
+      en: 'A cycle is one completed turn by each side. The turn that creates the effect or contact does not count. Example: White brings a bishop alongside a piece; Black moves, then White moves again. Only now has a cycle passed. Two berserk actions make one turn.',
+    }, {
+      ru: 'Уход из-под влияния слонов сбрасывает незавершённый отсчёт, даже если вернуться вторым действием. Уже полученные вина и опустошение остаются. Несколько слонов не ускоряют эффект; смена слона без разрыва соседства не сбрасывает отсчёт.',
+      en: 'Losing bishop contact resets unfinished progress, even if the piece returns on its bonus action. Guilt and devastation already received remain. Multiple bishops do not speed things up; replacing one bishop with another without a break preserves progress.',
+    }],
+  },
+  {
     id: 'aura',
     title: { ru: 'Исцеление, стыд и обращение', en: 'Healing, shame, and conversion' },
     body: [{
-      ru: 'Слон помогает фигурам на всех восьми клетках вокруг себя, включая диагонали. Свой слон снимает вину и опустошение после полного цикла непрерывного соседства. Он может лечить несколько фигур сразу, пока вы ходите другими.',
-      en: 'A bishop helps pieces on all eight neighboring squares, including diagonals. A friendly bishop heals guilt and devastation after a full cycle of uninterrupted contact. It can heal several pieces at once while you move others.',
+      ru: 'Слон ходит по диагоналям, но не берёт и не даёт шах. Он влияет на все восемь соседних клеток. Свой слон снимает вину и опустошение через цикл непрерывного соседства — у нескольких фигур сразу.',
+      en: 'Bishops move diagonally but cannot capture or give check. Their influence covers all eight neighboring squares. A friendly bishop clears guilt and devastation after one cycle of continuous contact, healing several pieces at once.',
     }, {
-      ru: 'Вражеский слон вызывает стыд. За каждый полный цикл соседства состояние ухудшается на один этап: вина → опустошение → обращение в другую армию. Если фигура уже испытывает вину или опустошение, отсчёт начинается с её текущего состояния.',
-      en: 'An enemy bishop causes shame. Each full cycle of contact advances one stage: guilt → devastation → conversion to the other side. A piece that is already guilty or devastated starts from its current state.',
+      ru: 'Вражеский слон вызывает стыд. За каждый полный цикл соседства состояние ухудшается на один этап: вина → опустошение → обращение в другую армию. Если фигура уже испытывает вину или опустошение, отсчёт начинается с её текущего состояния. Стыд не меняет запомненную реакцию на взятия.',
+      en: 'An enemy bishop causes shame. Each full cycle of contact advances one stage: guilt → devastation → conversion to the other side. A piece that is already guilty or devastated starts from its current state. Shame does not change its remembered capture reaction.',
     }, {
-      ru: 'Свой слон сразу останавливает стыд от вражеского, но на исцеление всё равно нужен полный цикл. Слон не лечит себя. Его влияние на соседей сохраняется и при вине, и при опустошении.',
-      en: 'A friendly bishop stops enemy shame immediately, but healing still takes a full cycle. A bishop cannot heal itself. Its influence on neighbors continues even when it is guilty or devastated.',
+      ru: 'Свой слон сразу блокирует стыд от чужого; само исцеление занимает цикл. Слон не лечит себя. Вина и опустошение не отключают его влияние на соседей.',
+      en: 'A friendly bishop blocks enemy shame immediately; healing still takes a cycle. It cannot heal itself. Guilt and devastation do not switch off its influence on neighbors.',
     }, {
       ru: 'При обращении фигура остаётся на клетке и переходит на сторону слона. Она теряет прежнее состояние, запомненную реакцию и счётчик взятий. Для следующих взятий снова действуют правила первого взятия; конь снова пропускает первый бросок.',
       en: 'Conversion leaves the piece on its square and changes it to the bishop’s side. Its old state, remembered reaction, and capture count are cleared. The first-capture rules apply again, so a knight skips its first roll again.',
@@ -110,15 +175,9 @@ export const sourceRules: readonly RuleSection[] = [
 
 export const digitalRules: readonly RuleSection[] = [
   {
-    id: 'timing',
-    title: { ru: 'Полный цикл', en: 'Full cycles' },
+    id: 'settlement',
+    title: { ru: 'Эффекты в конце хода', en: 'End-of-turn effects' },
     body: [{
-      ru: 'Полный цикл — по одному завершённому ходу каждой стороны. Отсчёт начинается после хода, в котором фигура получила состояние или оказалась рядом со слоном. Два действия в ярости считаются одним ходом игрока, а не двумя.',
-      en: 'A full cycle is one completed turn by each side. Counting starts after the turn when the piece gained its state or came into contact with a bishop. Two berserk actions count as one player turn, not two.',
-    }, {
-      ru: 'Если соседство прервалось, незавершённый отсчёт лечения или стыда начинается заново при следующем сближении. Это верно даже при уходе и возвращении за два действия одного хода. Уже возникшая вина или опустошение при этом остаются. Несколько слонов не ускоряют один эффект.',
-      en: 'If contact breaks, any unfinished healing or shame countdown restarts when contact returns. This applies even if a piece leaves and returns within one turn’s two actions. Guilt or devastation already caused by shame remains. Several bishops do not speed up the same effect.',
-    }, {
       ru: 'Король помогает соседям сразу. В конце хода все фигуры, дождавшиеся исцеления или следующего этапа стыда, меняют состояния одновременно. Исцеление и обращение спасают фигуру, даже если она должна исчезнуть в тот же момент. Новое влияние начинает свой отсчёт и не срабатывает повторно в этом ходе.',
       en: 'A king helps its neighbors immediately. At the end of a turn, all pieces that have reached their healing or shame deadline change state together. Healing or conversion saves a piece even if it was due to disappear at that moment. Any new influence starts its own countdown and cannot trigger another stage that turn.',
     }],
@@ -168,7 +227,10 @@ export const digitalRules: readonly RuleSection[] = [
 ];
 
 export const rulesMeta = {
-  digital: { ru: 'Цифровые правила', en: 'Digital rules' },
+  digital: { ru: 'Точные правила этой версии', en: 'Detailed rules for this edition' },
+  detail: { ru: 'Правила по темам', en: 'Rules by topic' },
+  face: { ru: 'Кубик', en: 'Die' },
+  effect: { ru: 'Реакция', en: 'Reaction' },
   credit: {
     ru: 'Вариант придумал Bardelo Bardalini. REMORSE — независимая цифровая адаптация. Здесь приведены также уточнения, принятые для этой версии.',
     en: 'Variant created by Bardelo Bardalini. REMORSE is an independent digital adaptation. This guide also explains the rulings used in this edition.',

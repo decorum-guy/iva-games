@@ -254,7 +254,7 @@ export class GameSession implements GameTransport {
   }
 }
 
-export function captureLedger(session: GameSession): readonly CaptureEvent[] {
+export function captureLedger(session: { readonly record: { readonly rootLedger: readonly CaptureEvent[] }; readonly events: readonly GameEvent[] }): readonly CaptureEvent[] {
   return [...session.record.rootLedger, ...session.events.filter(event => event.type === 'capture')];
 }
 

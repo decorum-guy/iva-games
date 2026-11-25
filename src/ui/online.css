@@ -1,0 +1,37 @@
+.online-setup { display: grid; gap: 1.1rem; }
+.online-setup p { margin: 0; line-height: 1.55; }
+.online-setup fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
+.online-setup legend { margin-bottom: .6rem; }
+.online-name { display: grid; gap: .55rem; }
+.online-name input, .online-invitation input { width: 100%; min-width: 0; border: 1px solid #665e4b; border-radius: 8px; background: #101316; color: #eee7d7; padding: .8rem; font: inherit; }
+.online-name input:focus-visible, .online-invitation input:focus-visible { outline: 2px solid #d4b476; outline-offset: 2px; }
+.online-panel { border: 1px solid #635b484f; background: #191d21; border-radius: 10px; padding: .75rem .9rem; display: grid; gap: .7rem; }
+.online-connection { display: flex; align-items: center; gap: .5rem; font-size: .8rem; line-height: 1.4; color: #c9c5bd; }
+.online-connection i { flex: 0 0 6px; height: 6px; border-radius: 50%; background: #b19867; }
+.online-connection i[data-connected="true"] { background: #9bbda5; }
+.online-waiting { display: grid; gap: .8rem; }
+.online-waiting h3, .online-offer p, .online-rematch p { margin: 0; }
+.online-seats { display: grid; gap: .6rem; list-style: none; padding: 0; margin: 0; }
+.online-seats li { display: flex; align-items: center; gap: .5rem; min-width: 0; }
+.online-seats li > span:nth-child(2) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+.online-seats small { font-size: .7rem; color: #b2afa7; }
+.online-seats small[data-ready="true"] { color: #b7cdb9; }
+.online-invitation { display: grid; gap: .55rem; }
+.online-invitation p, .online-room-tools p { margin: 0; font-size: .8rem; line-height: 1.45; color: #beb9ae; }
+.online-invitation input { font-size: .75rem; padding: .6rem; }
+.online-invitation small { font-size: .75rem; color: #d5bc8a; }
+.online-buttons { display: flex; gap: .65rem; margin-top: .6rem; }
+.online-room-tools { font-size: .8rem; }
+.online-room-tools summary { cursor: pointer; color: #b8b3a8; }
+.online-room-tools p { margin: .55rem 0; }
+.online-rematch { display: grid; gap: .65rem; }
+.view-online .game-aside { overflow-y: auto; overscroll-behavior: contain; }
+.view-online .decision-row[hidden] { display: none; }
+@media (max-width: 740px) {
+  .online-name input, .online-invitation input { font-size: 16px; }
+  .online-panel { padding: .55rem .7rem; gap: .45rem; }
+  .online-waiting { gap: .55rem; }
+  .online-waiting h3 { font-size: 1rem; }
+  .online-invitation p { display: none; }
+  .online-seats { gap: .35rem; font-size: .85rem; }
+}

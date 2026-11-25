@@ -8,8 +8,8 @@ import type { RatingEntry } from '../rating/elo';
 import { instruction, teachingBeat } from '../tutorial/controller';
 import type { Learning } from '../tutorial/controller';
 import { LESSONS } from '../tutorial/lessons';
-import { tutorialHistory } from '../session/match';
-import type { GameSession } from '../session/match';
+import { GameSession, tutorialHistory } from '../session/match';
+import type { GameView } from '../session/view';
 import { ReactionDie } from '../scene/ReactionDie';
 import { eloChange } from './Dialogs';
 import { Icon } from './icons';
@@ -70,7 +70,7 @@ export function Inspector({ t, locale, piece, state, compact = false }: {
 
 /** One reserved information slot; a live throw never covers or resizes the board. */
 export function RollDock({ t, session, rollId, reduced, low, pending, awaitingReaction, active, startedAt, reserve = true }: {
-  t: Translate; session: GameSession; rollId: string | null; reduced: boolean; low: boolean;
+  t: Translate; session: GameView; rollId: string | null; reduced: boolean; low: boolean;
   pending: boolean; awaitingReaction: boolean; active: boolean; startedAt?: number; reserve?: boolean;
 }) {
   const dock = useRef<HTMLDivElement>(null);
@@ -208,14 +208,14 @@ export function LessonPanel({ t, locale, learning, guide, blocked, rolling = fal
 }
 
 export function History({ t, session, latest, review, concealLatest, onReview }: {
-  t: Translate; session: GameSession; latest: readonly GameEvent[]; review: number | null;
+  t: Translate; session: GameView; latest: readonly GameEvent[]; review: number | null;
   concealLatest: boolean;
   onReview: (cursor: number | null) => void;
 }) {
   const tutorial = session.record.config.mode === 'tutorial';
   const total = session.record.cursor;
   const notable = latest.filter(event => event.type !== 'turn' || event.check);
-  const tutorialEvents = tutorialHistory(session).filter(event => event.type !== 'turn' || event.check);
+  const tutorialEvents = (session instanceof GameSession ? tutorialHistory(session) : []).filter(event => event.type !== 'turn' || event.check);
   const displayed = review !== null ? session.eventsAt(review)
     : concealLatest ? [...session.eventsAt(total - 1), ...latest] : session.events;
   const events = displayed.filter(event => event.type !== 'turn' || event.check);
@@ -242,7 +242,7 @@ export function History({ t, session, latest, review, concealLatest, onReview }:
 }
 
 export function Result({ t, locale, session, entry, onNew }: {
-  t: Translate; locale: Locale; session: GameSession; entry?: RatingEntry; onNew: () => void;
+  t: Translate; locale: Locale; session: GameView; entry?: RatingEntry; onNew?: () => void;
 }) {
   const { outcome } = session.state;
   if (!outcome) return null;
@@ -255,6 +255,6 @@ export function Result({ t, locale, session, entry, onNew }: {
     {entry ? <div className="result-rating"><span>{t('result.ratingChange')}</span><strong>{eloChange(locale, entry)}</strong>
       {displayDelta(entry.before, entry.after) === 0 && entry.exactDelta !== 0 && <small>{t('result.lessThanOne')}</small>}
     </div> : <p className="field-note">{t('result.noRating')}</p>}
-    <button type="button" className="button primary" onClick={onNew}>{t('home.new')}<Icon name="arrow" /></button>
+    {onNew && <button type="button" className="button primary" onClick={onNew}>{t('home.new')}<Icon name="arrow" /></button>}
   </div>;
 }

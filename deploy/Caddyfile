@@ -1,0 +1,4 @@
+remorse.chess-2.online {
+  encode zstd gzip
+  reverse_proxy remorse:4173
+}

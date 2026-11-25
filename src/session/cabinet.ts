@@ -19,8 +19,14 @@ import { createContinuation, createMatch, SessionError } from './match';
 import type { GameSession, MatchRecord, SessionCode, SessionConfig } from './match';
 import { newId } from './random';
 import { importMatch, restoreMatch } from './save';
+import type { GameView } from './view';
+import { OnlineGame } from '../online/game';
+import { OnlineApiError, OnlineRoomClient, createOnlineRoom, ensureOnlineGuest, fetchOnlineRoom,
+  joinOnlineRoom, refreshOnlineInvite } from '../online/client';
+import type { OnlineCommand, OnlineErrorCode, RoomSnapshot } from '../online/protocol';
+import { clearRoomLocation, rememberRoom } from '../online/location';
 
-export type View = 'home' | 'game' | 'learn';
+export type View = 'home' | 'game' | 'learn' | 'online';
 
 interface CabinetState {
   readonly ready: boolean;
@@ -38,6 +44,13 @@ interface CabinetState {
   readonly matches: readonly MatchRecord[];
   readonly view: View;
   readonly game: GameSession | null;
+  readonly remoteGame: OnlineGame | null;
+  readonly onlineRoom: RoomSnapshot | null;
+  readonly onlineTransport: ReturnType<OnlineRoomClient['getState']> | null;
+  readonly onlineInvite: string | null;
+  readonly onlineError: OnlineErrorCode | null;
+  readonly onlineWorking: boolean;
+  readonly onlineQueued: number;
   readonly learning: Learning | null;
   readonly error: SessionCode | null;
   readonly motionKey: string;
@@ -67,7 +80,7 @@ function preference(key: string, setting?: string) {
 
 export const VIEW_STORAGE_KEY = 'remorse-view-v1';
 
-function lastRoll(game: GameSession) {
+function lastRoll(game: GameView) {
   const action = game.record.actions[game.record.cursor - 1];
   return action?.roll ? action.id : null;
 }
@@ -89,6 +102,7 @@ export class Cabinet {
     ready: false, durable: false, storageProblem: null, busy: false, animating: false, teachingReturning: false, thinking: false, searchFailed: false,
     pageVisible: documentVisible(), resultRead: null,
     profile: initialProfile, ledger: [], matches: [], view: 'home', game: null, learning: null,
+    remoteGame: null, onlineRoom: null, onlineTransport: null, onlineInvite: null, onlineError: null, onlineWorking: false, onlineQueued: 0,
     error: null, motionKey: 'home', rollId: null, rollPhase: 'idle', awaitingReaction: false, rollReduced: false, rollStartedAt: null, audioCue: null,
     promotionStage: null, waitingForBloodlust: false, royalPending: false, royalCue: null, royalResolved: false,
   };
@@ -115,6 +129,13 @@ export class Cabinet {
   private overviewSequence = 0;
   private unsavedGameId: string | null = null;
   private unsavedPracticeCopied = false;
+  private onlineClient: OnlineRoomClient | null = null;
+  private latestRemote: OnlineGame | null = null;
+  private onlineQueue: OnlineGame[] = [];
+  private onlineGeneration = 0;
+  private onlineOperation = 0;
+  private onlineAbort: AbortController | null = null;
+  private onlineCreateAttempt: { payload: string; id: string } | null = null;
 
   getSnapshot = () => this.data;
   subscribe = (listener: () => void) => {
@@ -231,6 +252,7 @@ export class Cabinet {
       }
       this.unsavedGameId = null;
       this.unsavedPracticeCopied = false;
+      if (recover && previous.view === 'online') view = 'online';
       this.patch({ ...overview, learning, game, view, error, ready: true, durable: true, storageProblem: null,
         ...(restored ? { motionKey: restored.record.id, rollId: lastRoll(restored) } : {}) });
       if (typeof BroadcastChannel !== 'undefined') {
@@ -267,7 +289,7 @@ export class Cabinet {
   acknowledgeResult = (id: number) => {
     const read = this.data.resultRead;
     if (!read || read.id !== id || read.cueId !== this.data.audioCue?.id || this.readUntil !== null
-      || this.data.view !== 'game' || !this.data.pageVisible || !documentVisible()) return;
+      || (this.data.view !== 'game' && this.data.view !== 'online') || !this.data.pageVisible || !documentVisible()) return;
     this.readUntil = performance.now() + read.durationMs;
     this.pump();
   };
@@ -287,6 +309,7 @@ export class Cabinet {
     const resultRead = this.data.resultRead && cue ? this.newResultRead(cue) : null;
     this.patch({ pageVisible: visible, resultRead });
     if (!visible) this.finishHiddenPresentation();
+    if (!visible && this.data.view === 'online' && this.latestRemote) this.restoreOnlinePresentation(this.latestRemote);
     this.pump();
   };
 
@@ -371,6 +394,7 @@ export class Cabinet {
   }
 
   private enterGame(game: GameSession) {
+    this.leaveOnline();
     this.invalidate();
     if (this.unsavedGameId !== game.record.id) this.unsavedPracticeCopied = false;
     this.unsavedGameId = this.store ? null : game.record.id;
@@ -381,6 +405,7 @@ export class Cabinet {
   }
 
   home = () => this.run(() => {
+    this.leaveOnline();
     this.invalidate();
     this.patch({ view: 'home' });
     preference(VIEW_STORAGE_KEY, 'home');
@@ -449,7 +474,7 @@ export class Cabinet {
     this.finishRoyal();
   };
 
-  private present(game: GameSession, playback?: PromotionPlayback) {
+  private present(game: GameView, playback?: PromotionPlayback) {
     const action = game.record.actions[game.record.cursor - 1];
     if (!action) return;
     // The lesson can resume the remaining presentation of a committed action.
@@ -460,7 +485,7 @@ export class Cabinet {
     const plan = actionPlan(events, Boolean(action.roll), this.shortMotion, Boolean(royal),
       { deferUnrolledBloodlust: mode !== 'tutorial' });
     const audioCue = { id: `${game.record.id}/${action.id}`, events, human, startedAt, royal, plan, playback };
-    const needsRead = mode !== 'tutorial' && game.record.config.level !== null && game.record.status === 'open'
+    const needsRead = mode !== 'tutorial' && (game.record.config.level !== null || mode === 'online') && game.record.status === 'open'
       && (Boolean(plan.roll) || events.some(event => event.type === 'reaction' || event.type === 'affliction'));
     const reveal = (fields: Partial<CabinetState>) => this.patch({ ...fields,
       ...(needsRead ? { resultRead: this.newResultRead(audioCue) } : {}) });
@@ -540,7 +565,8 @@ export class Cabinet {
     this.pump();
   };
 
-  command = (command: Command) => this.run(async () => {
+  command = (command: Command) => this.data.view === 'online'
+    ? Promise.resolve(command.type !== 'agreeDraw' && this.onlineCommand(command)) : this.run(async () => {
     this.requireStorageRecovery();
     if ((this.data.animating || this.data.teachingReturning || this.data.royalCue) && command.type !== 'resign') return;
     if (this.data.view === 'learn' && this.data.learning) {
@@ -617,6 +643,7 @@ export class Cabinet {
     return this.run(async () => {
       const learning = !restart && this.data.learning ? this.data.learning : startLesson();
       await this.updateLearning(learning);
+      this.leaveOnline();
       this.invalidate();
       this.patch({ view: 'learn', rollId: lastRoll(learning.session) });
       preference(VIEW_STORAGE_KEY, 'learn');
@@ -679,8 +706,177 @@ export class Cabinet {
     this.pump();
   };
 
+  dismissOnlineError = () => this.patch({ onlineError: null });
+
+  cancelOnlineEntry = () => {
+    ++this.onlineOperation;
+    this.onlineAbort?.abort();
+    this.onlineAbort = null;
+    this.patch({ onlineWorking: false });
+  };
+
+  private leaveOnline(cancelOperation = true) {
+    if (cancelOperation) this.cancelOnlineEntry();
+    ++this.onlineGeneration;
+    this.onlineClient?.destroy();
+    this.onlineClient = null;
+    this.onlineQueue = [];
+    this.latestRemote = null;
+    clearRoomLocation();
+    this.patch({ onlineQueued: 0, onlineWorking: false });
+  }
+
+  private restoreOnlinePresentation(game: OnlineGame) {
+    this.onlineQueue = [];
+    this.invalidate();
+    this.patch({ remoteGame: game, onlineQueued: 0, rollId: lastRoll(game) });
+  }
+
+  private acceptOnlineSnapshot(snapshot: RoomSnapshot, kind: 'welcome' | 'live') {
+    if (this.data.view !== 'online' || snapshot.id !== this.data.onlineRoom?.id) return;
+    let latest: OnlineGame;
+    try { latest = OnlineGame.fromRoom(snapshot, this.latestRemote); }
+    catch {
+      this.onlineClient?.disconnect();
+      this.patch({ onlineError: 'protocolMismatch' });
+      return;
+    }
+    const previous = this.latestRemote;
+    // Duplicate heartbeat snapshots never replace an active visual sequence.
+    if (previous?.record.id === latest.record.id && latest.record.revision < previous.record.revision) return;
+    this.latestRemote = latest;
+    this.patch({ onlineRoom: snapshot });
+    if (kind === 'welcome' || !previous || previous.record.id !== latest.record.id
+      || !this.data.pageVisible || !documentVisible() || snapshot.status === 'expired') {
+      this.restoreOnlinePresentation(latest);
+      return;
+    }
+    for (let cursor = previous.record.cursor + 1; cursor <= latest.record.cursor; cursor += 1) {
+      this.onlineQueue.push(latest.at(cursor));
+    }
+    const shown = this.data.remoteGame;
+    this.patch({ onlineQueued: this.onlineQueue.length,
+      ...(shown ? { remoteGame: latest.at(shown.record.cursor) } : {}) });
+    this.pump();
+  }
+
+  private enterOnline(snapshot: RoomSnapshot, invite: string | null = null) {
+    this.leaveOnline(false);
+    this.invalidate();
+    const generation = this.onlineGeneration;
+    const game = OnlineGame.fromRoom(snapshot);
+    this.latestRemote = game;
+    this.patch({ view: 'online', onlineRoom: snapshot, remoteGame: game,
+      onlineInvite: invite, onlineError: null, onlineTransport: null, rollId: lastRoll(game) });
+    rememberRoom(snapshot.id);
+    preference(VIEW_STORAGE_KEY, `online/${snapshot.id}`);
+    const current = () => this.onlineGeneration === generation && this.data.view === 'online';
+    const client = new OnlineRoomClient(snapshot.id, {
+      onSnapshot: (room, kind) => { if (current()) this.acceptOnlineSnapshot(room, kind); },
+      onTransport: transport => {
+        if (current()) this.patch({ onlineTransport: transport });
+      },
+      onError: code => { if (current()) this.patch({ onlineError: code }); },
+    });
+    this.onlineClient = client;
+    this.patch({ onlineTransport: client.getState() });
+    client.connect();
+  }
+
+  private async onlineTask(task: (signal: AbortSignal, current: () => boolean) => Promise<void>) {
+    if (this.data.onlineWorking || this.data.busy) return false;
+    const operation = ++this.onlineOperation;
+    const abort = new AbortController();
+    this.onlineAbort = abort;
+    const current = () => this.onlineOperation === operation && !abort.signal.aborted;
+    this.patch({ onlineWorking: true, onlineError: null });
+    try { await task(abort.signal, current); return current(); }
+    catch (error) {
+      if (current()) this.patch({ onlineError: error instanceof OnlineApiError ? error.code : 'serverError' });
+      return false;
+    } finally {
+      if (this.onlineOperation === operation) { this.onlineAbort = null; this.patch({ onlineWorking: false }); }
+    }
+  }
+
+  createRoom = (name: string, side: Side | 'random') => this.onlineTask(async (signal, current) => {
+    const payload = JSON.stringify({ name, side });
+    if (!this.onlineCreateAttempt) {
+      try {
+        const saved = JSON.parse(sessionStorage.getItem('remorse-online-create-v1') ?? 'null');
+        if (saved && typeof saved.payload === 'string' && typeof saved.id === 'string') this.onlineCreateAttempt = saved;
+      } catch { /* Retain the retry key in memory if storage is unavailable. */ }
+    }
+    if (this.onlineCreateAttempt?.payload !== payload) this.onlineCreateAttempt = { payload, id: newId() };
+    try { sessionStorage.setItem('remorse-online-create-v1', JSON.stringify(this.onlineCreateAttempt)); } catch { /* Memory retry still works. */ }
+    await ensureOnlineGuest(undefined, signal);
+    if (!current()) return;
+    const { snapshot, invite } = await createOnlineRoom({ name, side, requestId: this.onlineCreateAttempt.id }, undefined, signal);
+    if (!current()) return;
+    this.onlineCreateAttempt = null;
+    try { sessionStorage.removeItem('remorse-online-create-v1'); } catch { /* Harmless completed retry key. */ }
+    this.enterOnline(snapshot, invite);
+  });
+
+  joinRoom = (roomId: string, invite: string, name: string) => this.onlineTask(async (signal, current) => {
+    await ensureOnlineGuest(undefined, signal);
+    if (!current()) return;
+    const { snapshot } = await joinOnlineRoom(roomId, { invite, name }, undefined, signal);
+    if (!current()) return;
+    this.enterOnline(snapshot);
+  });
+
+  resumeRoom = (roomId: string) => this.onlineTask(async (signal, current) => {
+    await ensureOnlineGuest(undefined, signal);
+    if (!current()) return;
+    const { snapshot } = await fetchOnlineRoom(roomId, undefined, signal);
+    if (!current()) return;
+    this.enterOnline(snapshot);
+  });
+
+  newInvite = () => this.onlineTask(async (signal, current) => {
+    if (!this.data.onlineRoom) return;
+    const { invite } = await refreshOnlineInvite(this.data.onlineRoom.id, undefined, signal);
+    if (current()) this.patch({ onlineInvite: invite });
+  });
+
+  reconnectOnline = () => { this.patch({ onlineError: null }); this.onlineClient?.connect(); };
+
+  onlineCommand = (command: OnlineCommand): boolean => {
+    const { view, onlineRoom: room, onlineTransport: transport, remoteGame: shown } = this.data;
+    if (view !== 'online' || !room || !shown || !this.onlineClient
+      || transport?.status !== 'connected' || transport.pending) return false;
+    if (command.type === 'move' || command.type === 'endTurn' || command.type === 'claimRepetitionDraw') {
+      if (room.status !== 'playing' || !room.players.white?.connected || !room.players.black?.connected
+        || this.data.animating || this.data.royalCue || this.data.resultRead || this.onlineQueue.length
+        || shown.record.id !== room.game.id || shown.record.revision !== room.game.revision
+        || shown.state.side !== room.you) return false;
+    }
+    this.patch({ onlineError: null });
+    return this.onlineClient.send(command) !== null;
+  };
+
+  private pumpOnline() {
+    if (!this.data.pageVisible || !documentVisible() || this.data.animating || this.data.royalCue) return;
+    clearTimeout(this.replyTimer);
+    if (this.data.resultRead) {
+      if (this.readUntil === null) return;
+      const remaining = Math.ceil(this.readUntil - performance.now());
+      if (remaining > 0) { this.replyTimer = setTimeout(() => this.pumpOnline(), remaining); return; }
+      this.readUntil = null;
+      this.patch({ resultRead: null });
+    }
+    const next = this.onlineQueue.shift();
+    if (!next) return;
+    this.patch({ remoteGame: next, onlineQueued: this.onlineQueue.length });
+    this.present(next);
+    // Non-move commands (e.g. agreement) have no animation timer to pump again.
+    if (!this.data.animating && !this.data.royalCue) this.pumpOnline();
+  }
+
   private pump() {
     clearTimeout(this.scheduled);
+    if (this.data.view === 'online') { this.pumpOnline(); return; }
     if (!this.data.ready || this.data.storageProblem) return;
     const { view, busy, game, learning, animating, teachingReturning, royalCue, thinking, searchFailed } = this.data;
     if (busy || animating || teachingReturning || royalCue || searchFailed) return;

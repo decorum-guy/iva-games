@@ -1,0 +1,13 @@
+/* Keep the rulebook readable on a phone; precise exceptions open by topic. */
+.rules-quickstart { padding-bottom: 12px; }
+.reading .rules-quickstart h3 { padding-top: 0; font-size: 1rem; }
+.rules-reactions { width: 100%; border-collapse: collapse; margin: 15px 0; text-align: left; }
+.rules-reactions caption { text-align: left; color: var(--paper); margin-bottom: 7px; font-weight: 650; }
+.rules-reactions thead th { font-size: .75rem; color: var(--quiet); font-weight: 500; }
+.rules-reactions th, .rules-reactions td { padding: 7px 9px; border-bottom: 1px solid #3a3b3a; vertical-align: top; }
+.rules-reactions th:first-child { width: 48px; padding-left: 0; white-space: nowrap; }
+.rules-reactions tbody th { color: var(--paper); font-variant-numeric: tabular-nums; }
+.rules-reactions td { padding-right: 0; }
+.rules-reactions td strong, .rules-reactions td span { display: block; }
+.rules-reactions td strong { font-size: .88rem; margin-bottom: 2px; }
+.reading .rules-inspection { margin-top: 12px; color: var(--paper); }

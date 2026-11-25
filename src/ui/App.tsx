@@ -2,8 +2,11 @@ import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore
 import { canClaimRepetition, createInitialState, isInCheck, opposite, pieceAt } from '../core';
 import type { Command, GameEvent, Move, Promotion, Side, Square } from '../core';
 import { translator } from '../i18n/catalog';
-import { Cabinet } from '../session/cabinet';
-import { captureLedger } from '../session/match';
+import { onlineText } from '../i18n/online';
+import { Cabinet, VIEW_STORAGE_KEY } from '../session/cabinet';
+import { captureLedger, GameSession } from '../session/match';
+import { exportOnlineGame, OnlineGame } from '../online/game';
+import { lastRoom, onlineLocation } from '../online/location';
 import { exportMatch } from '../session/save';
 import { guideCommands, instruction, teachingBeat } from '../tutorial/controller';
 import { actionPlan } from '../scene/actionPresentation';
@@ -21,10 +24,12 @@ import { History, Inspector, LessonPanel, PanelNotice, prepareDieRenderer, Resul
 import { materialBalance } from './projections';
 import { maskBloodlust, maskRollResult, rollSceneEvents } from './rollPresentation';
 import { projectPromotion, promotionEvents } from './promotionProjection';
+import { OnlinePanel, OnlineSetup } from './OnlinePanel';
 
 type Modal =
   | { kind: 'settings' | 'rules' | 'profile' | 'saves' | 'resign' | 'draw' | 'exit' | 'restart' | 'restart-all' | 'repeat' | 'technical' }
   | { kind: 'setup'; hotseat: boolean; choice?: boolean }
+  | { kind: 'online'; invitation?: { roomId: string; invite: string } }
   | { kind: 'capture'; side: Side };
 
 const cabinet = new Cabinet();
@@ -62,7 +67,10 @@ export function App() {
   const [settings, setSettings] = useState(loadSettings);
   const sounded = useRef<string | undefined>(undefined);
   const soundedRoyal = useRef<string | undefined>(undefined);
-  const [modal, setModal] = useState<Modal | null>(null);
+  const [modal, setModal] = useState<Modal | null>(() => {
+    const invitation = onlineLocation(location.hash);
+    return invitation?.invite ? { kind: 'online', invitation: { roomId: invitation.roomId, invite: invitation.invite } } : null;
+  });
   const [selection, setSelection] = useState<{ key: string; id: string | null; clearedAt?: string; pickedFor?: string } | null>(null);
   const [promotion, setPromotion] = useState<{ key: string; move: Move } | null>(null);
   const [review, setReview] = useState<{ key: string; cursor: number } | null>(null);
@@ -74,9 +82,11 @@ export function App() {
   const systemMotion = useQuery('(prefers-reduced-motion: reduce)');
   const reduced = settings.reduce || systemMotion;
   const t = useMemo(() => translator(settings.locale), [settings.locale]);
+  const nt = (key: Parameters<typeof onlineText>[1]) => onlineText(settings.locale, key);
   const { view, learning, game } = snap;
+  const online = view === 'online';
   const lesson = view === 'learn' ? learning : null;
-  const session = view === 'game' ? game : lesson?.session ?? null;
+  const session = online ? snap.remoteGame : view === 'game' ? game : lesson?.session ?? null;
   const reviewing = review && review.key === snap.motionKey && session ? review.cursor : null;
   const royal = reviewing === null ? snap.royalCue : null;
   const animating = snap.animating || royal !== null;
@@ -125,7 +135,7 @@ export function App() {
   const selectionStep = lesson && step ? `${lesson.lesson}/${lesson.position}/${step.id}` : undefined;
   const moves = useMemo(() => session && !position.outcome ? session.legal() : [], [session, position.outcome]);
   const guidance = useMemo(() => lesson ? guideCommands(lesson) : [], [lesson]);
-  const active = Boolean(session && !position.outcome && reviewing === null);
+  const active = Boolean(session && !position.outcome && reviewing === null && (!online || snap.onlineRoom?.status === 'playing'));
   const humanActing = config?.mode === 'hotseat' || config?.human === actor;
   const boosted = active && !concealingResult && position.phase === 'bonus';
   const currentSelection = selection?.key === snap.motionKey &&
@@ -134,7 +144,10 @@ export function App() {
   const selected = position.pieces.find(piece => piece.id === selectedId);
   const tutorialMode = !lesson ? 'none' : beat ? 'result' : lesson.complete ? 'complete' : step?.kind ?? 'position-complete';
   const teachingMove = !lesson || step?.kind === 'move' || step?.kind === 'illegal';
-  const canInput = active && snap.ready && !snap.storageProblem && !animating && !snap.teachingReturning && !snap.busy && humanActing && !snap.thinking && teachingMove && !lesson?.complete;
+  const onlineCurrent = !online || Boolean(snap.onlineTransport?.status === 'connected' && !snap.onlineTransport.pending
+    && snap.onlineRoom?.players.white?.connected && snap.onlineRoom.players.black?.connected
+    && snap.onlineQueued === 0 && snap.onlineRoom.game.revision === session?.record.revision && !snap.resultRead);
+  const canInput = active && snap.ready && (online || !snap.storageProblem) && onlineCurrent && !animating && !snap.teachingReturning && !snap.busy && humanActing && !snap.thinking && teachingMove && !lesson?.complete;
   const canLeaveForPractice = !position.outcome && !beat && !snap.animating && !snap.teachingReturning;
   const shownMoves = lesson ? step?.kind === 'move' ? guidance : [] : moves;
   const mayEnd = moves.some(move => move.type === 'endTurn') && (!lesson || guidance.some(move => move.type === 'endTurn'));
@@ -194,7 +207,16 @@ export function App() {
   const resume = snap.matches.find(match => match.status === 'open' && match.config.mode !== 'rated') ??
     (!snap.durable && game?.record.status === 'open' ? game.record : undefined);
 
-  useEffect(() => { void cabinet.initialize(); }, []);
+  useEffect(() => {
+    void cabinet.initialize().then(() => {
+      const linked = onlineLocation(location.hash);
+      if (linked && !linked.invite) { void cabinet.resumeRoom(linked.roomId); return; }
+      try {
+        const saved = localStorage.getItem(VIEW_STORAGE_KEY);
+        if (!linked && saved?.startsWith('online/')) void cabinet.resumeRoom(saved.slice(7));
+      } catch { /* A private browser can still enter an invitation. */ }
+    });
+  }, []);
   useEffect(() => {
     document.documentElement.lang = settings.locale;
     try { localStorage.setItem(PREFS_KEY, JSON.stringify(settings)); } catch { /* A private profile may deny writes. */ }
@@ -248,7 +270,7 @@ export function App() {
     document.addEventListener('visibilitychange', syncVisibility);
     return () => document.removeEventListener('visibilitychange', syncVisibility);
   }, []);
-  const readableResult = view === 'game' && liveAction?.id === snap.resultRead?.cueId && snap.pageVisible
+  const readableResult = (view === 'game' || online) && liveAction?.id === snap.resultRead?.cueId && snap.pageVisible
     && reviewing === null && !modal && !activePromotion && !concealingResult && !waitingForBloodlust
     && !promotionStage && !snap.royalPending && !royal;
   useEffect(() => {
@@ -271,7 +293,7 @@ export function App() {
   }, [snap.resultRead, readableResult]);
 
   const onFailure = useCallback(() => { setGraphicsFailed(true); }, []);
-  const close = () => setModal(null);
+  const close = () => { if (modal?.kind === 'online') cabinet.cancelOnlineEntry(); setModal(null); };
 
   function skipRoyal() {
     if (snap.royalCue) {
@@ -373,7 +395,8 @@ export function App() {
 
   function download() {
     if (!session || lesson) return;
-    const url = URL.createObjectURL(new Blob([exportMatch(session)], { type: 'application/json' }));
+    const exported = session instanceof OnlineGame ? exportOnlineGame(session) : exportMatch(session);
+    const url = URL.createObjectURL(new Blob([exported], { type: 'application/json' }));
     const link = document.createElement('a');
     link.href = url;
     link.download = `remorse-${session.record.id.slice(0, 8)}.json`;
@@ -381,8 +404,8 @@ export function App() {
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
 
-  const notice = snap.error && !snap.storageProblem && <PanelNotice onClose={cabinet.dismissError} label={t('nav.close')}>{t(`error.${snap.error}`)}</PanelNotice>;
-  const storageNotice = (snap.storageProblem || (snap.ready && !snap.durable)) && <div className="notice"
+  const notice = !online && snap.error && !snap.storageProblem && <PanelNotice onClose={cabinet.dismissError} label={t('nav.close')}>{t(`error.${snap.error}`)}</PanelNotice>;
+  const storageNotice = !online && (snap.storageProblem || (snap.ready && !snap.durable)) && <div className="notice"
     role={snap.storageProblem ? 'alert' : 'status'} data-testid="storage-recovery">
     <div>
       <p>{t(snap.storageProblem ? `error.${snap.storageProblem}` : 'storage.memory')}</p>
@@ -401,7 +424,7 @@ export function App() {
           onClick={() => { if (lesson) setModal({ kind: 'exit' }); else void cabinet.home(); }}>
           <Seal /><span>REMORSE</span>
         </button>
-        <span className="mode-indicator">{mode && t(`setup.${mode}`)}</span>
+        <span className="mode-indicator">{mode === 'online' ? nt('mode') : mode && t(`setup.${mode}`)}</span>
         <div className="top-actions">
           <LanguagePicker t={t} locale={settings.locale} onLocale={locale => changeSettings({ locale })} />
           <span className="nav-separator" />
@@ -420,7 +443,7 @@ export function App() {
       </div>
     </header>
 
-    <main className={`playfield view-${view}`} data-testid="playfield" data-view={view} data-mode={mode ?? 'preview'}
+    <main className={`playfield view-${view}${online ? ' view-game' : ''}`} data-testid="playfield" data-view={view} data-mode={mode ?? 'preview'}
       data-tutorial-mode={tutorialMode}
       data-tutorial-focus={tutorialFocus ? 'true' : 'false'}
       data-tutorial-hud={teachingHud}
@@ -491,6 +514,9 @@ export function App() {
             <button type="button" className="button mode-button" data-testid="mode-hotseat" onClick={() => openSetup(true, false)}>
               <Icon name="local" /><span>{t('home.hotseat')}</span><Icon name="right" />
             </button>
+            <button type="button" className="button mode-button" data-testid="mode-online" onClick={() => { cabinet.dismissOnlineError(); setModal({ kind: 'online' }); }}>
+              <Icon name="online" /><span>{nt('play')}</span><Icon name="right" />
+            </button>
             <button type="button" className="button mode-button" data-testid="mode-learn" disabled={!snap.durable} onClick={() => { void cabinet.learn(); setFlip(false); }}>
               <Icon name="bookOpen" /><span>{t(learning?.complete ? 'home.learnResult' : learning ? 'home.resumeLearn' : 'home.learn')}</span><Icon name="right" />
             </button>
@@ -505,15 +531,22 @@ export function App() {
         </section> : session && <>
           {notice}
           {storageNotice}
-          <div className="decision-row" hidden={Boolean(lesson && beat)}>
+          {online && snap.onlineRoom && <OnlinePanel t={t} locale={settings.locale} room={snap.onlineRoom}
+            transport={snap.onlineTransport} invite={snap.onlineInvite} error={snap.onlineError} working={snap.onlineWorking} queued={snap.onlineQueued}
+            showResult={Boolean(position.outcome && readyForResult && (!royal || snap.royalResolved))}
+            onCommand={cabinet.onlineCommand} onInvite={() => { void cabinet.newInvite(); }} onReconnect={cabinet.reconnectOnline} onDismissError={cabinet.dismissOnlineError} />}
+          <div className="decision-row" hidden={Boolean((lesson && beat) || (online &&
+            (snap.onlineRoom?.status === 'waiting' || snap.onlineRoom?.status === 'expired') && !position.outcome))}>
           {session.state.outcome && readyForResult && (royal?.kind !== 'mate' || snap.royalResolved) ? <Result t={t} locale={settings.locale} session={session}
-            entry={snap.ledger.find(entry => entry.matchId === session.record.id)} onNew={() => openSetup(mode === 'hotseat')} />
+            entry={snap.ledger.find(entry => entry.matchId === session.record.id)} onNew={online ? undefined : () => openSetup(mode === 'hotseat')} />
             : royal?.kind === 'mate' ? <div className="finale-controls">
               <button type="button" className="text-button" onClick={skipRoyal} data-testid="skip-royal">{t('game.skipFinale')}</button>
             </div> : <div className="turn-panel" data-testid="turn-panel">
               <div className="turn-heading" role="status"><span className={`mini-stamp ${displayedActor}`} aria-hidden="true" />
                 <strong>{promotionStage === 'formation' && plannedPromotion
                   ? t('game.forming', { piece: t(`piece.${plannedPromotion.event.promotion}`) })
+                  : online && !rollPending && !awaitingReaction && !boosted
+                    ? nt(snap.onlineTransport?.pending ? 'sending' : snap.onlineQueued ? 'catchingUp' : humanActing ? 'yourTurn' : 'opponentTurn')
                   : t(!snap.ready ? 'storage.opening' : snap.storageProblem ? 'storage.paused' : snap.busy ? 'storage.saving' : rollPending ? 'die.rolling' : awaitingReaction ? 'die.awaitingReaction' : snap.thinking ? 'game.thinking' : step?.kind === 'script' ? 'game.script' : lesson && !teachingMove ?
                   step?.kind === 'inspect' ? 'tutorial.selectCue' : lesson.complete ? 'tutorial.finish' : !step ? 'tutorial.positionDone' : 'tutorial.readCue' : boosted ? 'game.bonus' :
                   config?.mode === 'practice' || config?.mode === 'rated' ? humanActing ? 'game.yourTurn' : 'game.thinking' :
@@ -561,13 +594,14 @@ export function App() {
               onReview={cursor => setReview(cursor === null ? null : { key: snap.motionKey, cursor })} />
           </div>
           <div className="side-actions">
-            {mode !== 'rated' && !lesson && <>
+            {mode !== 'rated' && !lesson && session instanceof GameSession && <>
               <button type="button" className="icon-button" data-testid="undo" aria-label={t('game.undo')} title={t('game.undo')}
                 onClick={() => void cabinet.edit('undo')} disabled={!snap.ready || Boolean(snap.storageProblem) || session.undoTarget() === null || snap.busy || reviewing !== null}><Icon name="undo" /></button>
               <button type="button" className="icon-button" data-testid="redo" aria-label={t('game.redo')} title={t('game.redo')}
                 onClick={() => void cabinet.edit('redo')} disabled={!snap.ready || Boolean(snap.storageProblem) || !session.record.redo.length || snap.busy || reviewing !== null}><Icon name="redo" /></button>
             </>}
-            {!lesson && !session.state.outcome && <button type="button" className="text-button" data-testid="resign"
+            {!lesson && !session.state.outcome && (!online || snap.onlineRoom?.status === 'playing') && <button type="button" className="text-button" data-testid="resign"
+              disabled={online && (snap.onlineTransport?.status !== 'connected' || snap.onlineTransport.pending)}
               onClick={() => setModal({ kind: 'resign' })}>{t('game.resign')}</button>}
             {!lesson && mode === 'hotseat' && !session.state.outcome && <button type="button" className="text-button"
               onClick={() => setModal({ kind: 'draw' })}>{t('game.drawOffer')}</button>}
@@ -583,6 +617,11 @@ export function App() {
     {modal?.kind === 'setup' && <SetupDialog t={t} hotseat={modal.hotseat} pending={pending} durable={snap.durable} busy={!snap.ready || snap.busy}
       onClose={close} onResume={resumeGame} onStart={config => { void cabinet.startGame(config).then(ok => { if (ok) { close(); setFlip(false); } }); }}
       onRelease={id => { void cabinet.closeRated(id); }} onMode={modal.choice ? hotseat => setModal({ ...modal, hotseat }) : undefined} />}
+    {modal?.kind === 'online' && <OnlineSetup t={t} locale={settings.locale} invitation={modal.invitation} previousRoom={lastRoom()}
+      busy={!snap.ready || snap.onlineWorking} error={snap.onlineError} onClose={close}
+      onCreate={(name, side) => { void cabinet.createRoom(name, side).then(ok => { if (ok) { close(); setFlip(false); } }); }}
+      onJoin={(roomId, invite, name) => { void cabinet.joinRoom(roomId, invite, name).then(ok => { if (ok) { close(); setFlip(false); } }); }}
+      onResume={roomId => { void cabinet.resumeRoom(roomId).then(ok => { if (ok) { close(); setFlip(false); } }); }} />}
     {modal?.kind === 'rules' && <RulesDialog t={t} locale={settings.locale} onClose={close} />}
     {modal?.kind === 'profile' && <ProfileDialog t={t} locale={settings.locale} profile={snap.profile} ledger={snap.ledger} onClose={close} />}
     {modal?.kind === 'saves' && <SavesDialog t={t} locale={settings.locale} matches={snap.matches} busy={!snap.ready || Boolean(snap.storageProblem) || snap.busy} onClose={close} onOpen={resumeGame} />}

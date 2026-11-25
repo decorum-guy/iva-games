@@ -54,4 +54,6 @@ The installed berserk ignition combines **Whoosh.wav** by kingsrow and **Flame B
 
 React, React DOM, Three.js, React Three Fiber and Drei are MIT-licensed. `idb` is ISC-licensed. Exact installed versions are pinned in [the lockfile](package-lock.json). The production build generates `dist/THIRD_PARTY_LICENSES.md` from the bundler’s dependency metadata. [The React Three Fiber license](public/assets/licenses/react-three-fiber.txt) is also included because the npm archive lists MIT without a standalone license text.
 
+The online server uses [ws](https://github.com/websockets/ws) 8.23.0 and [better-sqlite3](https://github.com/WiseLibs/better-sqlite3) 13.2.0, both MIT-licensed according to their installed package metadata. Their original license files are distributed with the runtime dependencies in `node_modules`; the server dependencies are not included in the browser bundle.
+
 The stored [frontend-design guide](docs/reference/frontend-design/GUIDE.md) is from Anthropic and retains its [Apache 2.0 license](docs/reference/frontend-design/LICENSE.txt).

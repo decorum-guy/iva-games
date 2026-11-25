@@ -1,3 +1,5 @@
+> Реализация этого задания подготовлена 25 ноября 2026. Актуальная следующая задача — `prompts/ACCEPT_RULES_AND_ONLINE.md`; сначала прочитай BUILD_STATUS, не переписывай существующую сеть заново.
+
 # Реализовать настоящую сетевую REMORSE с комнатами
 
 Владелец попросил начать сетевой режим с перспективой публикации на сайте. Это новый этап после локальной игры. Выполни реализацию самостоятельно в `/Users/aartemida/Developer/remorse-chess`, репозиторий `https://github.com/decorum-guy/remorse-chess`, и доведи её до работающих двух независимых клиентов. Прочитай актуальные `AGENTS.md`, `docs/BUILD_STATUS.md`, `docs/RULES_DIGITAL_V1.md`, `docs/ENGINE_AND_ARCHITECTURE.md` и **`docs/ONLINE_ROOMS_V1.md`**.

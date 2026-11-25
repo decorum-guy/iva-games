@@ -3,21 +3,21 @@ import type { CaptureEvent, Side } from '../core';
 import { getPreset } from '../engine/presets';
 import { countText, numberText } from '../i18n/catalog';
 import type { Locale, Translate } from '../i18n/catalog';
-import type { SessionConfig } from '../session/match';
+import type { ViewConfig } from '../session/view';
 import { PieceIcon } from './pieces';
 import { trophies } from './projections';
 
 export function PlayerRow({ t, locale, side, config, active, captures, advantage, rating, onCaptures, teachingFocus }: {
-  t: Translate; locale: Locale; side: Side; config?: SessionConfig; active: boolean;
+  t: Translate; locale: Locale; side: Side; config?: ViewConfig; active: boolean;
   captures: readonly CaptureEvent[]; advantage: number; rating: number; onCaptures: (side: Side) => void;
   teachingFocus?: 'captures' | 'material';
 }) {
   const list = trophies(captures, side);
-  const bot = Boolean(config?.human && config.human !== side && config.mode !== 'tutorial');
+  const bot = Boolean(config?.human && config.human !== side && config.mode !== 'tutorial' && config.mode !== 'online');
   const preset = bot ? getPreset(config?.level ?? 0) : undefined;
   const name = config?.names?.[side] ?? (bot ? 'Remorse Engine' : config?.human === side ? t('game.you')
     : config?.mode === 'tutorial' ? t('game.mentor') : t(`side.${side}`));
-  const isHuman = config?.human === side && config.mode !== 'tutorial';
+  const isHuman = config?.human === side && config.mode !== 'tutorial' && config.mode !== 'online';
   const notation = `+${numberText(locale, advantage)}`;
   const level = preset && t('setup.levelValue', { level: preset.id, elo: preset.anchor });
   return <div className={`player-row ${active ? 'player-active' : ''}`} data-side={side} data-teaching-hud={teachingFocus}>

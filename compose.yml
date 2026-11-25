@@ -1,0 +1,31 @@
+services:
+  remorse:
+    build: .
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PUBLIC_ORIGIN: https://remorse.chess-2.online
+      DATABASE_PATH: /data/remorse.sqlite
+    volumes:
+      - remorse_data:/data
+    expose:
+      - "4173"
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    depends_on:
+      remorse:
+        condition: service_healthy
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  remorse_data:
+  caddy_data:
+  caddy_config:

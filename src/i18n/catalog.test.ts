@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { AFFLICTIONS, PIECE_TYPES, REACTIONS, SIDES } from '../core'
+import { AFFLICTIONS, PIECE_TYPES, REACTIONS, SIDES, reactionForFace } from '../core'
 import { PRESETS } from '../engine/presets'
 import { LESSONS } from '../tutorial/lessons'
 import { countText, dateText, messages, numberText, translator } from './catalog'
 import type { Message } from './catalog'
-import { digitalRules, rulesMeta, sourceRules } from './rules'
+import { digitalRules, quickRules, reactionRules, rulesMeta, sourceRules } from './rules'
 
 const locales = ['ru', 'en'] as const
 
@@ -57,12 +57,19 @@ describe('Russian and English catalogs', () => {
     const pairs = [
       ...sections.flatMap(section => [section.title, ...section.body]),
       ...LESSONS.map(lesson => lesson.title), ...steps.map(step => step.text),
-      ...Object.values(rulesMeta),
+      ...Object.values(rulesMeta), ...Object.values(quickRules), ...reactionRules.map(row => row.description),
     ]
     for (const pair of pairs) {
       expect(pair.ru).toMatch(/[а-яё]/i)
       expect(pair.en).toMatch(/[a-z]/i)
       expect(pair.en).not.toMatch(/[а-яё]/i)
+    }
+  })
+
+  it('teaches every die face once and agrees with the actual capture rules', () => {
+    expect(reactionRules.flatMap(row => row.faces).sort()).toEqual([1, 2, 3, 4, 5, 6])
+    for (const row of reactionRules) {
+      for (const face of row.faces) expect(row.reaction, `face ${face}`).toBe(reactionForFace(face))
     }
   })
 

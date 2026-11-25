@@ -5,7 +5,8 @@ import type { CaptureEvent, Promotion, Side } from '../core';
 import { DEFAULT_LEVEL, PRESETS } from '../engine/presets';
 import { countText, dateText, numberText } from '../i18n/catalog';
 import type { Locale, Translate } from '../i18n/catalog';
-import { digitalRules, rulesMeta, sourceRules } from '../i18n/rules';
+import { digitalRules, quickRules, reactionRules, rulesMeta, sourceRules } from '../i18n/rules';
+import './rules.css';
 import { displayDelta } from '../rating/elo';
 import type { Profile, RatingEntry } from '../rating/elo';
 import type { MatchRecord, SessionConfig } from '../session/match';
@@ -209,16 +210,34 @@ export function PromotionDialog({ t, side, onPick, onClose, locale, onLocale, al
 export function RulesDialog({ t, locale, onClose }: { t: Translate; locale: Locale; onClose: () => void }) {
   return <Dialog closeLabel={t('nav.close')} title={t('nav.rules')} onClose={onClose} className="reading-dialog">
     <div className="reading">
-      {sourceRules.map(section => <details key={section.id} open={section.id === 'goal'}>
+      <section className="rules-quickstart" aria-label={quickRules.title[locale]}>
+        <h3>{quickRules.title[locale]}</h3>
+        <p>{quickRules.intro[locale]}</p>
+        <table className="rules-reactions">
+          <caption>{quickRules.die[locale]}</caption>
+          <thead><tr><th scope="col">{rulesMeta.face[locale]}</th><th scope="col">{rulesMeta.effect[locale]}</th></tr></thead>
+          <tbody>{reactionRules.map(row => <tr key={row.reaction}>
+            <th scope="row">{row.faces.join('–')}</th>
+            <td><strong className={`affliction-label ${row.reaction}`}>{t(`state.${row.reaction}`)}</strong>
+              <span>{row.description[locale]}</span></td>
+          </tr>)}</tbody>
+        </table>
+        <p>{quickRules.cycle[locale]}</p>
+        <p>{quickRules.memory[locale]}</p>
+        <p>{quickRules.support[locale]}</p>
+        <p>{quickRules.bloodlust[locale]}</p>
+        <p className="rules-inspection">{quickRules.inspection[locale]}</p>
+      </section>
+      <h3>{rulesMeta.detail[locale]}</h3>
+      {sourceRules.map(section => <details key={section.id}>
         <summary>{section.title[locale]}</summary>
         {section.body.map((paragraph, index) => <p key={index}>{paragraph[locale]}</p>)}
       </details>)}
-      <details><summary>{rulesMeta.digital[locale]}</summary>
-        {digitalRules.map(section => <div key={section.id}>
-          <h3>{section.title[locale]}</h3>
-          {section.body.map((paragraph, index) => <p key={index}>{paragraph[locale]}</p>)}
-        </div>)}
-      </details>
+      <h3>{rulesMeta.digital[locale]}</h3>
+      {digitalRules.map(section => <details key={section.id}>
+        <summary>{section.title[locale]}</summary>
+        {section.body.map((paragraph, index) => <p key={index}>{paragraph[locale]}</p>)}
+      </details>)}
       <p className="source-credit">{rulesMeta.credit[locale]}</p>
     </div>
   </Dialog>;
