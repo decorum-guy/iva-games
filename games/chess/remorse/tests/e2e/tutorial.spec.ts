@@ -171,8 +171,8 @@ for (const locale of ['ru', 'en'] as const) {
     await page.getByTestId('lesson-next').click()
     await expect(playfield(page)).toHaveAttribute('data-promotion-stage', 'formation')
     await expect(page.getByTestId('teaching-cause')).toHaveCount(0)
-    await expect(page.getByTestId('teaching-cause')).toContainText(locale === 'ru' ? 'с нуля взятий' : 'capture count to zero')
-    await expect(page.getByTestId('teaching-rule')).toContainText(locale === 'ru' ? 'без дополнительного действия' : 'without an extra action')
+    await expect(page.getByTestId('teaching-cause')).toContainText(locale === 'ru' ? 'число взятий обнулилось' : 'capture count returns to zero')
+    await expect(page.getByTestId('teaching-rule')).toContainText(locale === 'ru' ? 'бонус отменён' : 'the bonus is canceled')
     const t = translator(locale)
     await expect(square(page, 'h8')).toHaveAccessibleName(t('game.cell', {
       square: 'h8', side: t('side.white'), piece: t('piece.bishop'), state: t('state.neutral'),

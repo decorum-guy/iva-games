@@ -54,7 +54,6 @@ async function player(browser: Browser, locale: Locale, mobile: boolean): Promis
     if (!localStorage.getItem('remorse-settings-v1')) localStorage.setItem('remorse-settings-v1',
       JSON.stringify({ locale, board: '2d', reduce: true, sound: false, volume: 0 }));
   }, locale);
-  await context.tracing.start({ screenshots: true, snapshots: true });
   return { context, page: await context.newPage() };
 }
 
@@ -64,7 +63,6 @@ async function closePlayers(players: readonly Player[], info: TestInfo) {
     if (failed && !participant.page.isClosed()) {
       await info.attach(`player-${index + 1}`, { body: await participant.page.screenshot(), contentType: 'image/png' }).catch(() => undefined);
     }
-    await participant.context.tracing.stop(failed ? { path: info.outputPath(`player-${index + 1}-trace.zip`) } : {});
     await participant.context.close();
   }
 }

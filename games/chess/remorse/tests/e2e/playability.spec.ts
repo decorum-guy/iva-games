@@ -761,6 +761,6 @@ test('the promotion lesson schedules formation only after acknowledgment, includ
   await page.getByTestId('lesson-next').click()
   const formation = [{ offset: 0, duration: expect.closeTo(.93, 3) }]
   await expect.poll(windows).toEqual(formation)
-  await expect(page.getByTestId('teaching-cause')).toContainText('capture count to zero')
+  await expect(page.getByTestId('teaching-cause')).toContainText('capture count returns to zero')
   expect(await windows()).toEqual(formation)
 })
