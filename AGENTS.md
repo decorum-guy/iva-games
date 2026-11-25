@@ -2,7 +2,7 @@
 
 ## Сначала прочитать для работы с идеями
 
-Точка входа: `docs/ideas/SHORTLIST.md`, затем `docs/ideas/README.md`. Основание — прямое последнее сообщение владельца в обсуждении Gemini 4 Hydrogen. Здесь «шорт-лист» означает **выбрано для будущей реализации**, не предварительный интерес.
+Точка входа: `docs/ideas/SHORTLIST.md`, затем `docs/ideas/README.md`, `docs/ideas/WILDCARD_TABLE_DECK.md` и `docs/ideas/06_COLOSSUS.md`. Единственный канонический документ Химеры — `docs/chess-2/CHIMERA_RULES.md`; `docs/ideas/05_CHIMERA.md` только указывает на него. При объединении веток не восстанавливать вторую полную версию. Основание — прямое последнее сообщение владельца в обсуждении Gemini 4 Hydrogen. Здесь «шорт-лист» означает **выбрано для будущей реализации**, не предварительный интерес.
 
 Текущий запрос в ветке `ideas` — записать выбор и новые требования. Не считать наличие исторических инструкций REMORSE ниже поручением вместо этого начать его старую итерацию.
 
@@ -92,3 +92,4 @@ Sound selection is complete according to `docs/SHOWCASE_SFX.md`: preserve the ch
 ## Completion
 
 Run the application, play both modes, finish the tutorial and continue its game, verify special rules and browser behavior, inspect motion, fix observed defects, and leave a working local preview with reproducible startup instructions. Report only verified outcomes and remaining limitations.
+
