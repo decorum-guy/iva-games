@@ -17,9 +17,9 @@ async function collect(directory, prefix = '') {
 }
 
 // Validate both outputs and all collisions before replacing the combined build.
-// Each game remains independently deployable from games/<game>/dist.
+// Each game remains independently deployable from games/chess/<game>/dist.
 for (const game of ['remorse', 'overdrive']) {
-  const source = join(root, 'games', game, 'dist')
+  const source = join(root, 'games', 'chess', game, 'dist')
   const entries = await collect(source)
   if (!entries.includes('index.html')) throw new Error(`Build ${game} before composing clients`)
   for (const entry of entries) {

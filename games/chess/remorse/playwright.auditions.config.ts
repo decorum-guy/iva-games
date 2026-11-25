@@ -1,7 +1,7 @@
 import { fileURLToPath } from 'node:url'
 import { defineConfig, devices } from '@playwright/test';
 
-const repository = fileURLToPath(new URL('../../', import.meta.url))
+const repository = fileURLToPath(new URL('../../../', import.meta.url))
 const gameRoot = fileURLToPath(new URL('.', import.meta.url))
 
 const port = process.env.REMORSE_AUDITION_PORT ?? '4174';

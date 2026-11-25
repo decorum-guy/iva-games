@@ -76,12 +76,12 @@ try{
   const moduleResponse=await request(sourceUrl);const moduleBytes=Buffer.from(await moduleResponse.arrayBuffer())
   assert(moduleResponse.ok&&moduleResponse.headers.get('content-type')?.includes('javascript'),'Hashed production module served as JavaScript')
   assert((await request(origin+'/assets/does-not-exist.glb')).status===404,'Missing asset returns 404 rather than HTML')
-  const modelManifest=JSON.parse(await readFile('games/overdrive/public/assets/overdrive/models/manifest.json','utf8'))
+  const modelManifest=JSON.parse(await readFile('games/chess/overdrive/public/assets/overdrive/models/manifest.json','utf8'))
   for(const [type,model] of Object.entries(modelManifest.models)){
     const r=await request(origin+'/assets/overdrive/models/'+model.file);const bytes=Buffer.from(await r.arrayBuffer())
     assert(r.ok&&bytes.subarray(0,4).toString()==='glTF'&&createHash('sha256').update(bytes).digest('hex')===model.sha256,`Production GLB matches manifest: ${type}`)
   }
-  const audioManifest=JSON.parse(await readFile('games/overdrive/public/assets/overdrive/audio/manifest.json','utf8'))
+  const audioManifest=JSON.parse(await readFile('games/chess/overdrive/public/assets/overdrive/audio/manifest.json','utf8'))
   const audioEntries=audioManifest.cues??audioManifest.files
   if(!audioEntries)throw new Error('Unknown audio manifest schema')
   for(const [name,entry]of Object.entries(audioEntries)){
@@ -90,7 +90,7 @@ try{
   }
   for(const file of ['RussoOne-Regular.ttf','GolosText.ttf']){
     const r=await request(origin+'/assets/overdrive/fonts/'+file);const bytes=Buffer.from(await r.arrayBuffer())
-    const expected=await readFile('games/overdrive/public/assets/overdrive/fonts/'+file)
+    const expected=await readFile('games/chess/overdrive/public/assets/overdrive/fonts/'+file)
     assert(r.ok&&r.headers.get('content-type')==='font/ttf'&&bytes.equals(expected),`Production font served intact with correct MIME: ${file}`)
   }
   const whiteGuest=await api('/api/overdrive/guest',null,{}),blackGuest=await api('/api/overdrive/guest',null,{})

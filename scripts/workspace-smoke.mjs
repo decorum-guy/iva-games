@@ -172,16 +172,16 @@ try {
       && !(specifier.startsWith('.') && /(?:^|\/)src\//.test(specifier))), `server ${file}: no workspace or TypeScript source imports`)
     report.serverBundles.push({ file, bytes: bytes.length, sha256: sha256(bytes), imports })
   }
-  const gameFiles = Object.fromEntries(await Promise.all(['remorse', 'overdrive'].map(async game => [game, await filesUnder(join(root, 'games', game, 'dist'))])))
+  const gameFiles = Object.fromEntries(await Promise.all(['remorse', 'overdrive'].map(async game => [game, await filesUnder(join(root, 'games', 'chess', game, 'dist'))])))
   const workers = Object.fromEntries(Object.entries(gameFiles).map(([game, files]) => [game, files.filter(path => /(?:^|\/)search\.worker-[\w-]+\.js$/.test(path))]))
   check(Object.values(workers).every(files => files.length === 1) && workers.remorse[0] !== workers.overdrive[0], 'games emit distinct search Worker bundles')
 
   const layouts = [
     { name: 'combined', output: 'dist', games: ['remorse', 'overdrive'], workspace: false,
       entries: [['/', 'remorse', 'index.html'], ['/overdrive/', 'overdrive', 'overdrive/index.html']] },
-    { name: 'standalone-remorse', output: 'games/remorse/dist', games: ['remorse'], workspace: true,
+    { name: 'standalone-remorse', output: 'games/chess/remorse/dist', games: ['remorse'], workspace: true,
       entries: [['/', 'remorse', 'index.html']] },
-    { name: 'standalone-overdrive', output: 'games/overdrive/dist', games: ['overdrive'], workspace: true,
+    { name: 'standalone-overdrive', output: 'games/chess/overdrive/dist', games: ['overdrive'], workspace: true,
       entries: [['/', 'overdrive', 'index.html'], ['/overdrive/', 'overdrive', 'index.html']] },
   ]
   for (const layout of layouts) {
@@ -214,7 +214,7 @@ try {
       check(JSON.stringify(actualWorkers) === JSON.stringify(expectedWorkers), `${layout.name}: only its games' Worker bundles are present`)
       for (const game of layout.games) {
         const worker = workers[game][0]
-        const ownBytes = await readFile(join(root, 'games', game, 'dist', worker))
+        const ownBytes = await readFile(join(root, 'games', 'chess', game, 'dist', worker))
         const servedBytes = await verifyBytes(origin, '/' + worker, ownBytes)
         const entry = result.entries.find(entry => entry.game === game)
         const module = await readFile(join(root, layout.output, new URL(entry.module, origin).pathname.slice(1)), 'utf8')

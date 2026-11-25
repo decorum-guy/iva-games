@@ -2,7 +2,7 @@ import { fileURLToPath } from 'node:url'
 import { defineConfig, devices } from '@playwright/test'
 
 // Dedicated acceptance server: never reuse the owner's active 4173 session.
-const repository = fileURLToPath(new URL('../../', import.meta.url))
+const repository = fileURLToPath(new URL('../../../', import.meta.url))
 const gameRoot = fileURLToPath(new URL('.', import.meta.url))
 
 const port = process.env.OVERDRIVE_TEST_PORT ?? '5198'

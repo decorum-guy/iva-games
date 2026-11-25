@@ -1,2 +1,2 @@
 // Compatibility entry; the package owns this configuration.
-export { default } from './games/remorse/playwright.config.js'
+export { default } from './games/chess/remorse/playwright.config.js'

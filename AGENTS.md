@@ -1,10 +1,33 @@
-# Chess 2 — active monorepo migration and acceptance
+# Iva Games — latest project direction
+
+On 25 November 2026 the owner expanded this project from Chess 2 to a shared games portal, with **Iva Games** as the working name and **iva-games** as the target repository slug. Chess remains a collection under **games/chess/remorse**, **games/chess/overdrive**, and future games/chess/<variant> packages. Do not put independent games on permanent branches.
+
+Read [docs/iva-games/README.md](docs/iva-games/README.md), [ARCHITECTURE.md](docs/iva-games/ARCHITECTURE.md), [PLATFORM_V1.md](docs/iva-games/PLATFORM_V1.md), [TELEGRAM_LINKING.md](docs/iva-games/TELEGRAM_LINKING.md), and [DELIVERY_PLAN.md](docs/iva-games/DELIVERY_PLAN.md) before work on the expanded platform. The platform and new non-chess games remain specifications. The current branch contains the nested chess workspace layout; its checks are recorded separately in docs/VALIDATION_IVA_GAMES_LAYOUT.md. That source migration does not imply a repository rename, deployment or completed browser acceptance.
+
+## Selected non-chess work
+
+- The owner selected **Harbor / Гавань** and **District / Район** (also referred to conversationally as Город). Record both; District is the first detailed conceptual/prototype rules candidate. See games/district/CONCEPT.md, games/district/RULES_V0_1.md and games/harbor/CONCEPT.md. Numeric parameters are unvalidated hypotheses until actual playtesting.
+- Before product implementation of these games, implement and accept the shared foundation: real accounts, friends, rooms, site invitations and optional linked Telegram delivery. Friends are required scope, not a future placeholder.
+- Keep platform-service (accounts/social/invitations/delivery), session-kit (game sessions/protocol/recovery), and the existing engine-sdk (search) separate. The current engine supports two-player zero-sum public-information search, not arbitrary multiplayer or secret hands.
+- New game servers own authoritative rules, durable transitions and per-player views. Never send opponents' private cards/bids or hidden future events to a client and merely hide them in the UI. Disconnect is not resignation; repeated commands must not produce duplicate effects.
+- Telegram linking starts from an authenticated website session and a single-use opaque deep-link code. A private-chat /start supplies a candidate identity; website confirmation completes the link. Delivery is opt-in and concerns explicitly created invitations. No scheduled reminders, unsolicited announcements or real-recipient messages during tests. A design or mock test is not evidence of real delivery.
+
+## Preserve concurrent work and existing players
+
+The nested layout continues the existing local workspace migration, not a reconstruction from an old src/ snapshot. Inspect current remote refs and local changes before further work. Preserve both the integrated platform specifications and the active OVERDRIVE instructions. The current task finishes this package migration and prepares local acceptance; it does not implement platform-service, session-kit, District or Harbor.
+
+The owner previously assigned the GitHub rename to himself after the package split; this new decision changes its target to iva-games. Do not guess that the rename occurred. Preserve game IDs, package names, browser storage, ratings, databases, routes and domains unless a separate migration explicitly covers them. In particular chess-2.online and remorse.chess-2.online remain valid planned addresses. Accounts for the new portal must not silently break current local or guest chess modes.
+
+The following Remorse instructions remain applicable to that game. The earlier restriction against building its catalogue does not block the newly requested platform architecture/concept documentation; catalogue implementation remains a later delivery stage. Preserve each game's own visual identity and all previously selected/excluded chess directions.
+
+
+# Current task — workspace migration and acceptance
 
 The owner authorized reorganizing the existing implementation into npm workspaces before renaming the GitHub repository. Keep delivery on `feat/overdrive-sdk` / draft PR #3; do not merge `main`, rename GitHub, change DNS, deploy, or replace the owner's active 4173 server as a side effect. The owner will rename the repository separately; update the handoff's actual remote only after that action is confirmed.
 
-Current source paths are `games/remorse/src`, `games/overdrive/src`, `packages/engine-sdk/src` and `apps/server/src`. Each game owns its `public`, tests and asset scripts. Use root npm commands and one lockfile. Preserve rule semantics, runtime asset URLs, storage keys, cookies, protocol/save versions, database paths, engine behavior and each game's distinct visuals/audio. Runtime game dependencies cross package boundaries through explicit exports; the server consumes pure rules/protocols, never UI. Do not add a catalogue implementation or unify game styling.
+The root package is `iva-games`; internal package names remain `@chess-2/*`. Current source paths are `games/chess/remorse/src`, `games/chess/overdrive/src`, `packages/engine-sdk/src` and `apps/server/src`. Each game owns its `public`, tests and asset scripts. Use root npm commands and one lockfile. Preserve rule semantics, runtime asset URLs, storage keys, cookies, protocol/save versions, database paths, engine behavior and each game's distinct visuals/audio. Runtime game dependencies cross package boundaries through explicit exports; the server consumes pure rules/protocols, never UI. Do not add a catalogue implementation or unify game styling.
 
-Read `docs/MONOREPO.md` and `prompts/ACCEPT_OVERDRIVE_MONOREPO.md` for the current structure and local acceptance task. Historical paths/counts/hashes in older validation reports describe their recorded revisions and are not claims about the migrated tree. Keep them intact. Record fresh migration checks separately and distinguish authored code, executed checks, browser observations, listening and activation. The older instructions below retain their behavioral requirements; translate their source paths using the migration document.
+Read `docs/MONOREPO.md` and `prompts/ACCEPT_OVERDRIVE_MONOREPO.md` for the current structure and local acceptance task. The fresh nested-layout report is `docs/VALIDATION_IVA_GAMES_LAYOUT.md`. Historical paths/counts/hashes in older validation reports describe their recorded revisions and are not claims about the migrated tree. Keep them intact. Record fresh migration checks separately and distinguish authored code, executed checks, browser observations, listening and activation. The older instructions below retain their behavioral requirements; translate their source paths using the migration document.
 
 # Chess 2 — active SDK and OVERDRIVE iteration
 

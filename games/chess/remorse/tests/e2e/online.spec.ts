@@ -2,7 +2,7 @@ import { access } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import type { Socket } from 'node:net';
 import type { Browser, BrowserContext, Page, TestInfo } from '@playwright/test';
-import { createOnlineServer } from '../../../../apps/server/src/http';
+import { createOnlineServer } from '../../../../../apps/server/src/http';
 import type { Locale } from '../../src/i18n/catalog';
 import { onlineText } from '../../src/i18n/online';
 import type { RoomResponse, RoomSnapshot } from '../../src/online/protocol';

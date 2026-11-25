@@ -2,8 +2,8 @@ FROM node:24-bookworm-slim AS build
 WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends python3 make g++ ca-certificates && rm -rf /var/lib/apt/lists/*
 COPY package.json package-lock.json ./
-COPY games/remorse/package.json ./games/remorse/package.json
-COPY games/overdrive/package.json ./games/overdrive/package.json
+COPY games/chess/remorse/package.json ./games/chess/remorse/package.json
+COPY games/chess/overdrive/package.json ./games/chess/overdrive/package.json
 COPY packages/engine-sdk/package.json ./packages/engine-sdk/package.json
 COPY apps/server/package.json ./apps/server/package.json
 RUN npm ci

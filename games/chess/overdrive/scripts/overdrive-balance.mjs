@@ -4,7 +4,7 @@ import { mkdirSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 const quick = process.argv.includes('--quick')
-const repository = fileURLToPath(new URL('../../../', import.meta.url))
+const repository = fileURLToPath(new URL('../../../../', import.meta.url))
 const output = resolve(repository, '.qa/overdrive-balance')
 mkdirSync(output, { recursive: true })
 execFileSync(process.execPath, [resolve(repository, 'node_modules/vite/bin/vite.js'), 'build', '--ssr', 'src/engine/balance.ts', '--outDir', `${output}/engine`, '--emptyOutDir'], { cwd: fileURLToPath(new URL('../', import.meta.url)), stdio: 'inherit' })
