@@ -1,12 +1,32 @@
 # Iva Games — latest project direction
 
+## Active implementation: platform and District revision
+
+The owner now explicitly authorizes implementation of accounts, friends, rooms and invitations in parallel with the separate chess finishing/migration agent. Work in an isolated feature branch; the older documentation-only scope below is historical. Do not repeat the chess migration or overwrite that agent's game source. Integrate the existing chess network later through a versioned game-runtime adapter, preserving guest rooms and local saves.
+
+The repository rename to `decorum-guy/iva-games` has been verified by stable GitHub repository ID 1469444922. `games/chess/*` remains the approved collection structure. Check remote refs again before integrating concurrent work.
+
+The published chess migration `d2d9693` is integrated into `feat/iva-platform-foundation`. Preserve its `games/chess/*`, `packages/engine-sdk` and `apps/server` source. This platform feature branch and its review are separate from the chess delivery branch/PR recorded below. Both use one root npm workspace lockfile. The main branch and active Mac/public deployment are not changed by this integration.
+
+District now targets social negotiation, atomic property/resource deals, city events and personal goals inspired by the owner's Colonist / Monopoly One / Jackbox experience. Bots are mandatory in its first release, including solo with bots and mixed rooms. Read `games/district/DESIGN_V0_2.md` and `BOT_DESIGN.md`; v0.1 rules are historical and must not silently fill v0.2 gaps. Design, technical lab bots and an implemented District game are distinct deliverables.
+
+A room participant has its own `participantId`; its controller is a human account or an explicitly labelled bot. Bots have no email, login session, friendship or Telegram identity. Every game declares participant limits and bot capability. Bots act through the same rules and receive only their permitted information.
+
+Telegram traffic must use the owner's existing proxy route through SSH alias `kz-bot`; never silently fall back to direct Telegram access. Read `docs/iva-games/INFRASTRUCTURE_ACCESS.md`. On local development/acceptance, run the read-only `npm run check:kz-bot`, check actual configured SSH access and proxy protocol/port separately, and distinguish cloud limitations from the owner's Mac access. Do not copy SSH keys, proxy passwords, bot tokens or the panel's unrelated settings into this repository. Tests use controlled mail/Telegram transports and never message real recipients.
+
+Current implementation, checks and remaining activation work belong in `docs/iva-games/BUILD_STATUS.md`; the general architecture and earlier spec are not themselves evidence of deployment. Keep QA videos, screenshots, traces, database fixtures and local email files ignored and off GitHub Actions artifacts.
+
+## Player-facing writing
+
+The owner explicitly wants simple interface copy like Colonist: short actions, short statuses and an obvious next step, in Russian and English. Keep delivery internals, duplicate-send explanations, revision numbers, idempotency, runtime architecture, database details and implementation disclaimers in engineering documentation. Players should see “Invite sent”, “Connect Telegram”, “Ready” or a useful retry message. Be accurate without exposing machinery: unfinished catalogue entries can say “Coming soon”, unavailable integrations can say “Telegram is not available yet”. Describe the technical table through its playable rules in the UI; record its engineering purpose in docs. Do not show raw backend exceptions or a paragraph of caveats as the normal user experience. This applies to pages, errors, emails, bot messages and future game tutorials.
+
 On 25 November 2026 the owner expanded this project from Chess 2 to a shared games portal, with **Iva Games** as the working name and **iva-games** as the target repository slug. Chess remains a collection under **games/chess/remorse**, **games/chess/overdrive**, and future games/chess/<variant> packages. Do not put independent games on permanent branches.
 
-Read [docs/iva-games/README.md](docs/iva-games/README.md), [ARCHITECTURE.md](docs/iva-games/ARCHITECTURE.md), [PLATFORM_V1.md](docs/iva-games/PLATFORM_V1.md), [TELEGRAM_LINKING.md](docs/iva-games/TELEGRAM_LINKING.md), and [DELIVERY_PLAN.md](docs/iva-games/DELIVERY_PLAN.md) before work on the expanded platform. The platform and new non-chess games remain specifications. The current branch contains the nested chess workspace layout; its checks are recorded separately in docs/VALIDATION_IVA_GAMES_LAYOUT.md. That source migration does not imply a repository rename, deployment or completed browser acceptance.
+Read [docs/iva-games/README.md](docs/iva-games/README.md), [ARCHITECTURE.md](docs/iva-games/ARCHITECTURE.md), [PLATFORM_V1.md](docs/iva-games/PLATFORM_V1.md), [TELEGRAM_LINKING.md](docs/iva-games/TELEGRAM_LINKING.md), and [DELIVERY_PLAN.md](docs/iva-games/DELIVERY_PLAN.md) before work on the expanded platform. These are design requirements; actual implementation and verification belong in [BUILD_STATUS.md](docs/iva-games/BUILD_STATUS.md). Source availability is not evidence of external activation, deployment, a completed chess migration or implemented product games.
 
 ## Selected non-chess work
 
-- The owner selected **Harbor / Гавань** and **District / Район** (also referred to conversationally as Город). Record both; District is the first detailed conceptual/prototype rules candidate. See games/district/CONCEPT.md, games/district/RULES_V0_1.md and games/harbor/CONCEPT.md. Numeric parameters are unvalidated hypotheses until actual playtesting.
+- The owner selected **Harbor / Гавань** and **District / Район** (also referred to conversationally as Город). District is the first detailed design candidate. Read games/district/CONCEPT.md, DESIGN_V0_2.md, BOT_DESIGN.md and games/harbor/CONCEPT.md. RULES_V0_1.md is historical. Numeric parameters are unvalidated hypotheses until actual playtesting.
 - Before product implementation of these games, implement and accept the shared foundation: real accounts, friends, rooms, site invitations and optional linked Telegram delivery. Friends are required scope, not a future placeholder.
 - Keep platform-service (accounts/social/invitations/delivery), session-kit (game sessions/protocol/recovery), and the existing engine-sdk (search) separate. The current engine supports two-player zero-sum public-information search, not arbitrary multiplayer or secret hands.
 - New game servers own authoritative rules, durable transitions and per-player views. Never send opponents' private cards/bids or hidden future events to a client and merely hide them in the UI. Disconnect is not resignation; repeated commands must not produce duplicate effects.
@@ -14,14 +34,14 @@ Read [docs/iva-games/README.md](docs/iva-games/README.md), [ARCHITECTURE.md](doc
 
 ## Preserve concurrent work and existing players
 
-The nested layout continues the existing local workspace migration, not a reconstruction from an old src/ snapshot. Inspect current remote refs and local changes before further work. Preserve both the integrated platform specifications and the active OVERDRIVE instructions. The current task finishes this package migration and prepares local acceptance; it does not implement platform-service, session-kit, District or Harbor.
+The package migration is being performed in another context. Inspect current remote refs and actual local changes before moving code. A message about a completed local split is not evidence that the remote has that split. Integrate games/chess/* on top of the actual migration, never replace newer work with an old src/ snapshot. Preserve the active OVERDRIVE instructions when combining AGENTS.md across branches.
 
-The owner previously assigned the GitHub rename to himself after the package split; this new decision changes its target to iva-games. Do not guess that the rename occurred. Preserve game IDs, package names, browser storage, ratings, databases, routes and domains unless a separate migration explicitly covers them. In particular chess-2.online and remorse.chess-2.online remain valid planned addresses. Accounts for the new portal must not silently break current local or guest chess modes.
+The GitHub rename to iva-games is now verified; it does not imply that every local checkout was renamed or the package migration was pushed. Preserve game IDs, package names, browser storage, ratings, databases, routes and domains unless a separate migration explicitly covers them. In particular chess-2.online and remorse.chess-2.online remain valid planned addresses. Accounts for the new portal must not silently break current local or guest chess modes.
 
-The following Remorse instructions remain applicable to that game. The earlier restriction against building its catalogue does not block the newly requested platform architecture/concept documentation; catalogue implementation remains a later delivery stage. Preserve each game's own visual identity and all previously selected/excluded chess directions.
+The following Remorse instructions remain applicable to that game. Their earlier restrictions against accounts, notifications and catalogue work concerned the earlier chess-only stage; the current owner request explicitly authorizes the separate shared platform and portal. Preserve each game's own visual identity and all previously selected/excluded chess directions.
 
+# Chess workspace migration — published integration context
 
-# Current task — workspace migration and acceptance
 
 The owner authorized reorganizing the existing implementation into npm workspaces before renaming the GitHub repository. Keep delivery on `feat/overdrive-sdk` / draft PR #3; do not merge `main`, rename GitHub, change DNS, deploy, or replace the owner's active 4173 server as a side effect. The owner will rename the repository separately; update the handoff's actual remote only after that action is confirmed.
 

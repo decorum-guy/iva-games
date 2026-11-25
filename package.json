@@ -42,7 +42,19 @@
     "overdrive:audio": "npm run audio --workspace @chess-2/overdrive --",
     "sdk:test": "npm run test --workspace @chess-2/engine-sdk --",
     "server:test": "npm run test --workspace @chess-2/server --",
-    "workspace:smoke": "node scripts/workspace-smoke.mjs"
+    "workspace:smoke": "node scripts/workspace-smoke.mjs",
+    "dev:portal": "npm --prefix apps/portal run dev",
+    "dev:platform": "npm run build:platform && node --env-file-if-exists=.env dist-platform/main.js",
+    "build:portal": "npm --prefix apps/portal run build",
+    "build:platform": "vite build --config vite.platform.config.ts",
+    "build:foundation": "npm run typecheck:platform && npm run build:platform && npm run build:portal",
+    "typecheck:platform": "tsc --noEmit -p tsconfig.platform.json",
+    "test:platform": "vitest run --config vitest.platform.config.ts",
+    "check:platform": "npm run typecheck:platform && npm run lint:platform && npm run test:platform",
+    "check:kz-bot": "node scripts/check-kz-bot.mjs",
+    "start:platform": "node --env-file-if-exists=.env dist-platform/main.js",
+    "lint:platform": "eslint apps/platform apps/portal/src packages/session-kit packages/telegram-transport scripts/check-kz-bot.mjs vite.platform.config.ts vitest.platform.config.ts",
+    "build:all": "npm run build && npm run build:foundation"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
@@ -61,6 +73,7 @@
     "typescript-eslint": "^8.74.0",
     "vite": "^8.3.8",
     "vitest": "^5.1.1",
-    "ws": "8.23.0"
+    "ws": "8.23.0",
+    "@types/nodemailer": "8.0.2"
   }
 }

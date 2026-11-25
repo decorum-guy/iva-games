@@ -1,0 +1,52 @@
+name: Iva Games platform
+
+on:
+  pull_request:
+    paths:
+      - 'apps/platform/**'
+      - 'apps/portal/**'
+      - 'packages/session-kit/**'
+      - 'packages/telegram-transport/**'
+      - 'package*.json'
+      - '*platform*.ts'
+      - 'tsconfig.platform.json'
+      - 'tsconfig.base.json'
+      - 'eslint.config.js'
+      - 'scripts/check-boundaries.mjs'
+      - '.github/workflows/iva-platform.yml'
+  push:
+    branches: [main, feat/iva-platform-foundation]
+    paths:
+      - 'apps/platform/**'
+      - 'apps/portal/**'
+      - 'packages/session-kit/**'
+      - 'packages/telegram-transport/**'
+      - 'package*.json'
+      - '*platform*.ts'
+      - 'tsconfig.platform.json'
+      - 'tsconfig.base.json'
+      - 'eslint.config.js'
+      - 'scripts/check-boundaries.mjs'
+      - '.github/workflows/iva-platform.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: iva-platform-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: npm run check
+      - run: npm run build:all
+      # QA output stays in the job logs. No upload-artifact or video/trace storage.
