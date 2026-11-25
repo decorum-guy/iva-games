@@ -1,3 +1,17 @@
+# Chess 2 — active SDK and OVERDRIVE iteration
+
+On 25 November 2026 the owner explicitly assigned the next agent to create and test the common engine SDK and complete the whole OVERDRIVE / Форсаж iteration: final rules, measured balance work, new models/audio/effects, an independent interface, implementation, SDK-aware AI, real networking and acceptance. This is the active scope; preserve the existing REMORSE product. Routine decisions and continued execution are authorized.
+
+**Every new Chess 2 game must have its own unmistakably different visual identity**, including materials, models, palette, type, layout, effects and sound. Recolouring REMORSE's marble or repeating a generic generated dashboard does not satisfy this requirement. OVERDRIVE's direction is in `docs/overdrive/ART_DIRECTION.md`.
+
+Use `docs/overdrive/STATUS.md` and the latest validation documents to distinguish authored code, executed checks, browser observations and actual deployment. `docs/ENGINE_SDK.md` defines the shared search contract. Each variant retains a pure authoritative rules core used by rendering, AI, teaching and the server. The SDK currently supports two-player zero-sum games with public information; hidden-card search requires another model.
+
+The other agent is updating **documentation only** on `design/chess-2-concepts`. The owner asked this implementation to periodically fetch and reconcile those changes. Preserve both the newer REMORSE status on main and all concurrent source work; never replace all of AGENTS with that branch's older REMORSE section. Keep imported drafts under `docs/chess-2`, with implementation decisions and evidence under `docs/overdrive`.
+
+Five future directions remain selected: OVERDRIVE, WILDCARD, CHORUS, CHIMERA and SIGNAL. RELAY is excluded. The current action request implements OVERDRIVE and the SDK; do not silently expand implementation to all five games. Their recorded order is complete rules → balance → unique assets/art/audio → implementation/network/engine → local acceptance. A simulator written to test rules is evidence preparation, not a claim of a finished product.
+
+REMORSE and OVERDRIVE have separate entry points, storage keys, rules versions, network protocols, guest sessions and databases. QA stays silent, isolated and out of the owner's visible applications. Preserve all REMORSE saves, ratings, selected sounds and accepted motion. Browser or target-device limitations must be reported literally. No main merge, public release or DNS configuration follows merely from producing a source build.
+
 # Remorse Chess — agent instructions
 
 ## Objective

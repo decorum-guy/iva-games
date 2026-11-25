@@ -12,6 +12,7 @@ import { RoomService } from './rooms'
 import type { RoomOptions } from './rooms'
 import { RoomStore } from './store'
 import { clientMessage, createRequest, emptyRequest, identifier, joinRequest, OnlineError } from './validation'
+import { createOverdriveGateway } from './overdrive/http'
 
 const MAX_BODY = 16_384
 const COOKIE = 'remorse_guest'
@@ -23,6 +24,7 @@ export interface OnlineServerOptions extends RoomOptions {
   allowedOrigins?: readonly string[]
   secureCookies?: boolean
   heartbeatMs?: number
+  overdriveDatabasePath?: string
 }
 
 class RateLimit {
@@ -70,7 +72,7 @@ async function body(request: IncomingMessage): Promise<unknown> {
 const contentTypes: Record<string, string> = {
   '.html': 'text/html; charset=utf-8', '.js': 'application/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8',
   '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg',
-  '.webp': 'image/webp', '.woff2': 'font/woff2', '.woff': 'font/woff', '.glb': 'model/gltf-binary', '.gltf': 'model/gltf+json',
+  '.webp': 'image/webp', '.woff2': 'font/woff2', '.woff': 'font/woff', '.ttf': 'font/ttf', '.glb': 'model/gltf-binary', '.gltf': 'model/gltf+json',
   '.mp3': 'audio/mpeg', '.wav': 'audio/wav', '.ogg': 'audio/ogg', '.ico': 'image/x-icon',
 }
 
@@ -96,6 +98,12 @@ export function createOnlineServer(options: OnlineServerOptions) {
     return value
   }
 
+  const overdrive = createOverdriveGateway({
+    databasePath: options.overdriveDatabasePath ?? (options.databasePath === ':memory:' ? ':memory:' : options.databasePath + '.overdrive.sqlite'),
+    secureCookies: secure, validOrigin, heartbeatMs: options.heartbeatMs,
+    now: options.now, inactiveMs: options.inactiveMs, finishedMs: options.finishedMs,
+  })
+
   const server = createServer(async (request, response) => {
     response.setHeader('X-Content-Type-Options', 'nosniff')
     response.setHeader('Referrer-Policy', 'same-origin')
@@ -103,6 +111,7 @@ export function createOnlineServer(options: OnlineServerOptions) {
     try {
       if (closing) throw new OnlineError('serverError', 503)
       const pathname = new URL(request.url ?? '/', 'http://localhost').pathname
+      if (await overdrive.handle(request, response, pathname)) return
       if (pathname === '/api/health' && request.method === 'GET') {
         store.health()
         json(response, 200, { ok: true, protocol: ONLINE_PROTOCOL, rulesVersion: RULES_VERSION })
@@ -155,7 +164,7 @@ export function createOnlineServer(options: OnlineServerOptions) {
       let info = await stat(file).catch(() => null)
       if (!info?.isFile()) {
         if (extname(decoded) || decoded.startsWith('/assets/')) { json(response, 404, { error: 'roomMissing' }); return }
-        file = resolve(root, 'index.html')
+        file = resolve(root, decoded === '/overdrive' || decoded.startsWith('/overdrive/') ? 'overdrive/index.html' : 'index.html')
         info = await stat(file).catch(() => null)
       }
       if (!info?.isFile()) { json(response, 503, { error: 'serverError' }); return }
@@ -177,6 +186,10 @@ export function createOnlineServer(options: OnlineServerOptions) {
   const identities = new WeakMap<WebSocket, string>()
   const alive = new WeakSet<WebSocket>()
   server.on('upgrade', (request, socket, head) => {
+    if (new URL(request.url ?? '/', 'http://localhost').pathname === '/overdrive-online') {
+      overdrive.upgrade(request, socket, head)
+      return
+    }
     try {
       if (closing || new URL(request.url ?? '/', 'http://localhost').pathname !== '/ws' || !validOrigin(request)) {
         throw new OnlineError('notYourSeat', 403)
@@ -253,7 +266,7 @@ export function createOnlineServer(options: OnlineServerOptions) {
   cleanup.unref()
 
   return {
-    server, service, store,
+    server, service, store, overdrive,
     async listen(port = 4173, host = '127.0.0.1') {
       await new Promise<void>((resolveListen, reject) => {
         server.once('error', reject)
@@ -270,6 +283,7 @@ export function createOnlineServer(options: OnlineServerOptions) {
       clearInterval(cleanup)
       for (const ws of sockets.clients) ws.terminate()
       await new Promise<void>(resolveClose => sockets.close(() => resolveClose()))
+      await overdrive.close()
       if (server.listening) await new Promise<void>((resolveClose, reject) => server.close(error => error ? reject(error) : resolveClose()))
       service.close()
     },

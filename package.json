@@ -22,7 +22,15 @@
     "build:server": "vite build --config vite.server.config.ts",
     "start": "node dist-server/main.js",
     "dev:server": "npm run build:server && node --watch dist-server/main.js",
-    "test:online": "vitest run tests/unit/online*.test.ts"
+    "test:online": "vitest run tests/unit/online*.test.ts",
+    "overdrive:dev": "vite --host 127.0.0.1 --port 5185 --strictPort",
+    "overdrive:test": "vitest run tests/unit/overdrive*.test.ts",
+    "overdrive:e2e": "playwright test --config playwright.overdrive.config.ts",
+    "overdrive:smoke": "node scripts/overdrive-smoke.mjs",
+    "overdrive:balance": "node scripts/overdrive-balance.mjs",
+    "overdrive:models": "node scripts/generate-overdrive-models.mjs",
+    "overdrive:audio": "python3 scripts/generate-overdrive-audio.py",
+    "sdk:test": "vitest run src/sdk src/engine/search.test.ts"
   },
   "dependencies": {
     "@fontsource-variable/cormorant-garamond": "^5.3.0",

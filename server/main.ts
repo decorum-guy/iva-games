@@ -11,6 +11,7 @@ const publicOrigin = process.env.PUBLIC_ORIGIN
 if (process.env.NODE_ENV === 'production' && !publicOrigin) throw new Error('PUBLIC_ORIGIN is required in production')
 const app = createOnlineServer({
   databasePath: resolve(process.env.DATABASE_PATH ?? 'data/remorse.sqlite'),
+  overdriveDatabasePath: process.env.OVERDRIVE_DATABASE_PATH ? resolve(process.env.OVERDRIVE_DATABASE_PATH) : undefined,
   staticDir: resolve(process.env.STATIC_DIR ?? 'dist'),
   publicOrigin,
   allowedOrigins: process.env.DEV_ORIGINS?.split(',').map(value => value.trim()).filter(Boolean),
