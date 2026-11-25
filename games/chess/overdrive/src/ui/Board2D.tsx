@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { CSSProperties } from 'react'
-import type { GameState, PieceType, Side } from '../core'
+import { isInCheck, type GameState, type PieceType, type Side } from '../core'
 import { PieceIcon } from './PieceIcon'
 import { pieceName, sideName, tr, type Language } from './i18n'
 import { piecePoseAt, sceneTiming, squarePoint } from './motion'
@@ -103,6 +103,7 @@ export function Board2D({ state, selected, targets, focusSquares, onSquare, flip
   const impactPoint = impactSquare ? squarePoint(impactSquare) : null
   const impact = impactPoint ? boardPercent(impactPoint.x, impactPoint.z, flipped) : null
   const impactProgress = timing ? Math.max(0, Math.min(1, (elapsed - timing.contact) / Math.max(1, timing.effectEnd - timing.contact))) : 1
+  const checkedSquare = isInCheck(state, state.side) ? state.pieces.find(piece => piece.side === state.side && piece.type === 'king')?.square : undefined
   const cells = Array.from({ length: 64 }, (_, i) => {
     const x = flipped ? 7 - i % 8 : i % 8, y = flipped ? Math.floor(i / 8) : 7 - Math.floor(i / 8)
     return { square: String.fromCharCode(97 + x) + (y + 1), x, y }
@@ -113,8 +114,8 @@ export function Board2D({ state, selected, targets, focusSquares, onSquare, flip
       const piece = state.pieces.find(p => p.square === square), chosen = piece?.id === selected
       const target = targets.includes(square), focus = focusSquares.includes(square)
       return <button key={square} type="button" role="gridcell" data-square={square} data-selected={chosen}
-        data-target={target} data-focus={focus} className={`od-cell ${(x + y) % 2 ? 'light' : 'dark'}`}
-        aria-label={`${square}${piece ? `, ${sideName(piece.side, language)}, ${pieceName(piece.type, language)}` : ''}${target ? tr(language, ', доступный ход', ', available move') : ''}`}
+        data-target={target} data-focus={focus} data-check={square === checkedSquare} className={`od-cell ${(x + y) % 2 ? 'light' : 'dark'}`}
+        aria-label={`${square}${piece ? `, ${sideName(piece.side, language)}, ${pieceName(piece.type, language)}` : ''}${target ? tr(language, ', доступный ход', ', available move') : ''}${square === checkedSquare ? tr(language, ', шах', ', check') : ''}`}
         aria-selected={chosen} onClick={() => onSquare(square)} onKeyDown={event => {
           const direction = ({ ArrowLeft: -1, ArrowRight: 1, ArrowUp: -8, ArrowDown: 8 } as Record<string, number>)[event.key]
           if (direction !== undefined) {

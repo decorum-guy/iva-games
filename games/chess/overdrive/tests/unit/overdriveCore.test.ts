@@ -4,7 +4,7 @@ import type { Action, GameState, PieceInput, PositionInput, Side } from '../../s
 
 const p = (id: string, side: Side, type: PieceInput['type'], square: string, rights: Partial<PieceInput> = {}): PieceInput => ({ id, side, type, square, ...rights })
 function pos(pieces: PieceInput[], extra: Omit<PositionInput, 'pieces'> = {}): GameState {
-  return createPosition({ pieces: [
+  return createPosition({ rulesVersion: 'overdrive-v1', pieces: [
     ...(!pieces.some(x => x.type === 'king' && x.side === 'white') ? [p('wk', 'white', 'king', 'a1')] : []),
     ...(!pieces.some(x => x.type === 'king' && x.side === 'black') ? [p('bk', 'black', 'king', 'h8')] : []), ...pieces,
   ], ...extra })
@@ -325,7 +325,7 @@ describe('teaching uses the unchanged live rules', () => {
       expect(legalActions(fixture.state).map(commandKey), fixture.id).toContain(commandKey(fixture.expected))
       const result = transition(fixture.state, fixture.expected)
       expect(validateState(result.state), fixture.id).toBe(true)
-      if (fixture.id === 'capture') expect(result.state.energy.white).toBe(1)
+      if (fixture.id === 'capture') expect(result.state.energy.white).toBe(2)
       else if (fixture.id === 'check') { expect(result.state.energy.white).toBe(2); expect(isInCheck(result.state)).toBe(true) }
       else if (fixture.id === 'form') expect(result.state.forms.white).toEqual({ pieceId: 'wn', remainingTurns: 2 })
       else expect(result.events.some(e => e.type === 'ability' && e.ability === fixture.id)).toBe(true)

@@ -52,7 +52,7 @@ async function connect(cookie,roomId){
   sockets.push(ws)
   ws.on('message',data=>{const m=JSON.parse(String(data));if(m.snapshot)state.snapshot=m.snapshot;if(m.type==='ack')state.acks.set(m.commandId,m);if(m.type==='error')state.errors.push(m)})
   await new Promise((resolveOpen,reject)=>{ws.once('open',resolveOpen);ws.once('error',reject)})
-  ws.send(JSON.stringify({type:'hello',protocol:'overdrive-online-v1',roomId}))
+  ws.send(JSON.stringify({type:'hello',protocol:'overdrive-online-v2',roomId}))
   await until(()=>state.snapshot!==null)
   return state
 }

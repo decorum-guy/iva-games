@@ -6,7 +6,7 @@ export function evaluate(state: GameState, perspective: Side): number {
   const attacks = { white: attackMap(state, 'white'), black: attackMap(state, 'black') }
   const score = (side: Side) => {
     const enemy = opposite(side)
-    let value = state.energy[side] * .075 + (state.energy[side] >= 5 ? .2 : 0) + (state.energy[side] === 10 ? .12 : 0)
+    let value = state.energy[side] * .075 + (state.energy[side] >= (state.rulesVersion === 'overdrive-v1' ? 5 : 3) ? .2 : 0) + (state.energy[side] === (state.rulesVersion === 'overdrive-v1' ? 10 : 6) ? .12 : 0)
     for (const piece of state.pieces) {
       if (piece.side !== side) continue
       value += MATERIAL[piece.type]

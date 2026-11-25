@@ -1,6 +1,6 @@
 import type { Command, GameEvent, GameState, RejectionCode, Side } from '../core'
 
-export const ONLINE_PROTOCOL = 'overdrive-online-v1' as const
+export const ONLINE_PROTOCOL = 'overdrive-online-v2' as const
 export const ONLINE_SAVE_VERSION = 1 as const
 export const ONLINE_NAME_LIMIT = 24
 

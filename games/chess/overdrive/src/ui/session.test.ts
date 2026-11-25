@@ -171,3 +171,12 @@ describe('Overdrive independent settings', () => {
     expect(saveOverdriveSettings({ ...DEFAULT_OVERDRIVE_SETTINGS, volume: -.1 }, storage)).toBe(false)
   })
 })
+
+
+it('preserves a saved legacy game under its original rules', () => {
+  const storage = memoryStorage()
+  const old = { ...record(), root: { ...record().root, rulesVersion: 'overdrive-v1' as const } }
+  expect(saveLocalSession(old, storage)).toBe(true)
+  expect(loadLocalSession(storage)?.state.rulesVersion).toBe('overdrive-v1')
+  expect(loadLocalSession(storage)?.record.actions).toEqual(old.actions)
+})
