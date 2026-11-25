@@ -4,11 +4,11 @@
 
 Точка входа: `docs/ideas/SHORTLIST.md`, затем `docs/ideas/README.md`, `docs/ideas/WILDCARD_TABLE_DECK.md` и `docs/ideas/06_COLOSSUS.md`. Единственный канонический документ Химеры — `docs/chess-2/CHIMERA_RULES.md`; `docs/ideas/05_CHIMERA.md` только указывает на него. При объединении веток не восстанавливать вторую полную версию. Основание — прямое последнее сообщение владельца в обсуждении Gemini 4 Hydrogen. Здесь «шорт-лист» означает **выбрано для будущей реализации**, не предварительный интерес.
 
-Текущий запрос в ветке `ideas` — записать выбор и новые требования. Не считать наличие исторических инструкций REMORSE ниже поручением вместо этого начать его старую итерацию.
+Текущий запрос в ветке `ideas` — закрепить очередь реализации и убрать завершённое и отменённое из будущих задач. **Приоритет 1 — COLOSSUS / Колосс; приоритет 2 — WILDCARD / Джокер.** Порядок остальных выбранных игр пока не установлен; его владелец определит позже. **REMORSE готова по прямому сообщению владельца и не входит в будущую очередь.** Исторические инструкции ниже не открывают его старые задачи заново.
 
 - Выбраны UMBRA, PARADOX, единая CHIMERA, переработанный COLOSSUS и SYNCHRO.
 - Прежние OVERDRIVE, WILDCARD, CHORUS и SIGNAL сохраняются. CHIMERA не создаёт второй пункт или второй runtime.
-- ORBIT переносится в карточный эффект общей колоды WILDCARD, отдельную игру сейчас не реализовывать. BASALT не выбран и не отклонён.
+- BASALT и ORBIT удалены из актуальных идей по последнему решению владельца. Их досье удалены; прежний перенос ORBIT в карту WILDCARD отменён. Не возвращать эти идеи как резерв или под другим названием при объединении веток.
 - WILDCARD получает **две колоды/стопки**: раздаточную для скрытых рук игроков и колоду общих событий. Не подменять это тремя колодами из старой модели. Ориентир события — раз в пять ходов; единица времени и алгоритм разрешения ещё формализуются.
 - Автоматический шах от события должен давать защищающейся стороне ответ. Сохранить удаление некоролевских фигур вертикали c, прорыв пешки с заданным превращением и односторонний региональный туман как обязательные примеры.
 - COLOSSUS: здоровье фигур/короля, отдельные броня и HP босса, полоса здоровья, разные боссы и способности, защита короля союзниками, карты и содержательная живучесть армии. Приведённые числа — примеры баланса.
@@ -21,19 +21,19 @@
 
 ---
 
-## Сохранённые инструкции существующего REMORSE
+## Исторические инструкции завершённого REMORSE
 
-Применяются к задачам REMORSE, а не вместо текущей фиксации новых идей.
+REMORSE объявлена готовой владельцем 25.11.2026. Материал ниже сохранён как справочная документация для отдельного будущего запроса по сопровождению. Старые формулировки Objective и scope не являются открытыми задачами и не меняют очередь «Колосс → Джокер». Этот статус не означает новую независимую проверку кода или развёртывания.
 
 # Remorse Chess — agent instructions
 
-## Objective
+## Historical objective
 
 Build a finished, beautiful, playable web game on the owner's Mac: Remorse Chess versus a real variant-aware AI with ten difficulty levels, local Elo progression, local two-player play, and a mandatory interactive tutorial. Laptop and phone interfaces and complete Russian/English localization are required. The owner has delegated routine implementation decisions and does not want questions during the build.
 
 The preparation package and implementation are both present. Read `docs/BUILD_STATUS.md` for the current verification state and distinguish isolated source/test results from activation and live browser acceptance. Earlier reviews, including `docs/VALIDATION_FINAL_SHOWCASE.md` and `docs/VALIDATION_ROOT_PLAYTHROUGH.md`, verify only their recorded revisions.
 
-## Current scope: rules audit, clearer teaching and complete online rooms
+## Historical scope: rules audit, clearer teaching and complete online rooms
 
 On 25 November 2026 the owner assigned further development to this assistant: independently audit the rules, simplify overloaded player-facing explanations, repair the tutorial, and implement complete online play before publication. This supersedes the earlier restriction to pacing/selection fixes. Preserve accepted visuals, chosen audio, local saves and rating. Use `docs/ONLINE_ROOMS_V1.md` for the agreed guest-room scope and validate real independent clients; do not call a transport stub a network game.
 
