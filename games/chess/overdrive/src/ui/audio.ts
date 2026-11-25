@@ -144,14 +144,14 @@ export class OverdriveAudio {
 
   /** A first contact belongs to the scene which began while sound was enabled.
    * No late decoding or unmute/visibility backlog for frame-triggered impacts. */
-  contactPlayer(): (support: boolean) => void {
+  contactPlayer(boardVisible: () => boolean): (support: boolean) => void {
     const generation = this.generation
     const audible = this.canPlay()
     let consumed = false
     return support => {
       if (consumed) return
       consumed = true
-      if (!audible || generation !== this.generation || !this.canPlay() || this.options.reducedMotion) return
+      if (!audible || generation !== this.generation || !this.canPlay() || this.options.reducedMotion || !boardVisible()) return
       const name = support ? 'piece-contact' : 'board-contact'
       const buffer = this.buffers.get(name)
       if (buffer) this.voice(name, buffer, this.context!.currentTime)

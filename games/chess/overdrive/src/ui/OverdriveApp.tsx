@@ -137,7 +137,8 @@ export function OverdriveApp() {
     if(motionTimer.current)clearTimeout(motionTimer.current)
     if(key)lastMate.current=key
     finale.current=key&&arenaReady.current&&!document.hidden&&!reduced?{
-      key,startsAt:startedAt+timing.result,elapsed:0,previousFrame:null,settled:false,onContact:audio.contactPlayer(),
+      key,startsAt:startedAt+timing.result,elapsed:0,previousFrame:null,settled:false,
+      onContact:audio.contactPlayer(()=>arenaReady.current&&!document.activeElement?.closest('.od-board-accessible')&&!document.querySelector('.od-overlay')),
     }:null
     lockedRef.current=true;setLocked(true)
     setMotion({id:++motionId.current,before,after,events,startedAt,duration})
