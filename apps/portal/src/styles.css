@@ -21,7 +21,7 @@
 }
 body {
   margin: 0;
-  min-width: 320px;
+  min-width: 0;
 }
 button,
 input,
@@ -2078,6 +2078,14 @@ button {
 }
 .modal > form {
   gap: 18px;
+  min-width: 0;
+  grid-template-columns: minmax(0, 1fr);
+}
+.modal label {
+  min-width: 0;
+}
+.modal .button {
+  white-space: normal;
 }
 .modal > .game-art {
   border-radius: 11px;
@@ -3261,5 +3269,17 @@ button {
     max-width: 112px;
     padding-left: 9px;
     padding-right: 9px;
+  }
+}
+@media (max-width: 320px) {
+  .modal {
+    padding: 13px;
+  }
+  .modal-heading {
+    gap: 8px;
+  }
+  .modal-heading h2 {
+    min-width: 0;
+    overflow-wrap: anywhere;
   }
 }
