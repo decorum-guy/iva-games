@@ -167,7 +167,8 @@ function Arena(props:Board3DProps) {
     {Array.from({length:64},(_,i)=>{
       const x=i%8,y=Math.floor(i/8),square=String.fromCharCode(97+x)+(y+1),p=xy(square)
       const chosen=props.state.pieces.find(q=>q.square===square)?.id===props.selected
-      const color=chosen?'#c88753':(x+y)%2===0?'#3f6880':'#c2d2d9'
+      const kingInCheck=checked&&props.state.pieces.some(piece=>piece.square===square&&piece.side===props.state.side&&piece.type==='king')
+      const color=kingInCheck?'#cf3f39':chosen?'#c88753':(x+y)%2===0?'#3f6880':'#c2d2d9'
       return <group key={square} position={[p[0],0,p[2]]}>
         <mesh receiveShadow onClick={e=>{e.stopPropagation();props.onSquare(square)}}><boxGeometry args={[.982,.10,.982]}/><meshStandardMaterial color={color} metalness={.25} roughness={.33}/></mesh>
         {(targets.has(square)||focus.has(square))&&<mesh position={[0,.057,0]} rotation={[-Math.PI/2,0,0]}>
