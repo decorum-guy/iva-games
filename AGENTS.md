@@ -1,3 +1,49 @@
+# Chess 2 — instructions for the new-games branch
+
+## Current owner instruction, 25 November 2026
+
+This section governs new-game work in `design/chess-2-concepts` in `decorum-guy/remorse-chess`. The owner's latest instruction selects **OVERDRIVE / Форсаж, WILDCARD / Джокер, CHORUS / Хор, CHIMERA / Химера and SIGNAL / Связь**. **RELAY / Эстафета is excluded.** Echo and the existing Remorse are references, not an instruction to implement all archived ideas.
+
+Keep this work on the requested branch. Do not merge it into main, rewrite history, or overwrite concurrent Remorse work as part of writing these rules. The first idea record already exists in the branch's ancestry; the current rules package and selection supersede its older statuses.
+
+Read `docs/chess-2/README.md`, `docs/chess-2/COMMON_RULES.md`, all five `*_RULES.md` files, `docs/chess-2/DEVELOPMENT_SEQUENCE.md` and `docs/chess-2/ASSET_AND_AUDIO_BRIEFS.md`. They are working v0.1 specifications, not evidence that balance, implementation or acceptance has already happened.
+
+## Mandatory next agent task — write and finish full rules for every game
+
+**The next agent must fully specify and independently audit every detail and edge case of all five games.** Existing long drafts do not satisfy this task by their mere presence. Review them as a complete executable contract; resolve contradictions and omissions and record each substantive decision.
+
+Cover initial state; complete commands and simultaneous actions; resource/card economy; every ability; legality and attack maps; check/mate/stalemate; pins and king adjacency; castling/history; pawn double moves and all en-passant cases; all promotion cases; status duration and settlement order; repetitions and draw counters; component identities; hidden information; persistence/replay/import; and authoritative network behavior. Supply precise before/action/after edge-case scenarios. Do not call prose fixtures executed tests.
+
+Preserve the owner's core Overdrive economy (two cells of five, check +2, capture +1, one-cell special move and two-cell lasting enhancement) and selected game principles. Routine missing technical details are delegated: choose coherent versioned defaults and document them without asking permission for each detail. Distinguish owner decisions, draft choices, balance hypotheses and actual evidence.
+
+## Required iteration order
+
+1. **Full rules for each game.** Complete and independently audit all rules and nuances; close blocking ambiguities and version the decisions.
+2. **Balance review.** Use actual directed analysis and games or a reproducible research simulator. Record measured results, seeds/conditions and limitations. Do not claim balance from intuition or fabricate matches.
+3. **Before product implementation: new 3D models, sound and visual preparation for each game.** Search real sources, inspect actual assets, verify licences, prepare the game-specific visual/audio direction and demonstrate readability. The search may run alongside earlier work, but cannot be postponed past implementation. A renamed or recoloured Remorse set alone is not completion.
+4. **Implementation + real network play + a variant-aware engine.** Use the validated rules version in the UI, server, AI, tutorial and replay. Adapt the engine to all rules and state of that game; Joker must respect hidden information. Provide real distinct difficulty levels and clearly approximate internal Elo labels. Approximate labels are not measured FIDE or human ratings.
+5. **Local acceptance.** Actually play the game and tutorial, test the AI and two independent network clients including reconnect, and inspect laptop/phone layouts, graphics, sound, persistence and final results. Report the tested revision and remaining limitations.
+
+Detailed stage conditions and the initial internal Elo-label proposal are in `docs/chess-2/DEVELOPMENT_SEQUENCE.md`. The asset briefs define what must be sourced and verified; they do not claim assets have been found.
+
+Do not collapse these into a single unverified “done”. Keep per-game progress with real evidence. Stage conditions are technical readiness requirements, not a new requirement to ask the owner for routine approvals within already-authorized work.
+
+## Architecture and evidence boundaries
+
+- Use one pure authoritative, versioned rules core per variant. Standard chess move generation is not sufficient authority for the new rules.
+- Keep legality, attack calculation and terminal adjudication separate to avoid recursive loops. Whole-turn composition and lifecycle boundaries are part of the game contract.
+- Network moves are validated by the server, revisioned and idempotent. Two views of one local state are not a multiplayer implementation.
+- Preserve hidden hands/deck order/RNG from the other client and from the acting AI's observation. Do not grant the bot secret information to make it stronger.
+- Treat three-move duration, deck counts and other assistant-selected v0.1 constants as working choices for the next rules/balance iteration, not as owner-measured values.
+- Keep videos, screenshots, traces, bulk game logs and caches out of Git and GitHub Actions artifact storage. Production assets and concise text reports may be committed.
+- If the target Mac, phone, browser or audio output is unavailable, state precisely what remains unverified. Do not present headless checks elsewhere as on-device acceptance.
+- Existing Remorse assets, rules, ratings, saves, sound choices and publication work retain their own scope. New games need their own matching presentation and test evidence.
+- No public release, main-branch merge or completed domain setup is implied by this documentation change.
+
+## Existing Remorse instructions
+
+The following original instructions apply to the existing REMORSE game. Its selected art/audio and original build tasks do not override the new-game branch scope and per-game asset requirement above. Preserve them for work that actually targets Remorse.
+
 # Remorse Chess — agent instructions
 
 ## Objective
@@ -65,3 +111,4 @@ Sound selection is complete according to `docs/SHOWCASE_SFX.md`: preserve the ch
 ## Completion
 
 Run the application, play both modes, finish the tutorial and continue its game, verify special rules and browser behavior, inspect motion, fix observed defects, and leave a working local preview with reproducible startup instructions. Report only verified outcomes and remaining limitations.
+
