@@ -23,6 +23,7 @@ export interface SceneTiming {
   readonly land: number
   readonly followStart: number
   readonly promotionStart: number
+  readonly promotionSwap: number
   readonly promotionEnd: number
   readonly captureEnd: number
   readonly resolved: number
@@ -60,15 +61,16 @@ export function sceneTiming(events: readonly GameEvent[], reduced = false): Scen
     followStart = ability.ability === 'cover' ? moveStart + span * .58 : ability.ability === 'ram' ? contact : moveStart
   }
   const captureEnd = contact + (captured ? reduced ? 65 : 145 : 0)
-  const promotionStart = land + (promoted && reduced ? 70 : 0)
+  const promotionStart = promoted ? Math.max(land + (reduced ? 70 : 0), captured ? contact + (reduced ? 80 : 86) : land) : land
   const promotionEnd = promotionStart + (promoted ? reduced ? 90 : 240 : 0)
+  const promotionSwap = promotionStart + (promotionEnd - promotionStart) * .42
   const resolved = Math.max(land, captureEnd, promotionEnd)
   const energy = resolved + (reduced ? 30 : 55)
   const cellFull = energy + (reduced ? 50 : 130)
   const result = earned ? cellFull + (reduced ? 40 : 120) : resolved + (reduced ? 35 : 80)
   const effectEnd = Math.max(land + (reduced ? 80 : 190), promotionEnd + (reduced ? 40 : 100))
   const duration = Math.max(reduced ? 220 : 420, effectEnd, earned ? cellFull + (reduced ? 50 : 120) : 0, outcome || checked ? result + (reduced ? 100 : outcome ? 340 : 220) : 0)
-  return { duration, moveStart, contact, land, followStart, promotionStart, promotionEnd, captureEnd, resolved, energy, cellFull, result, effectEnd, abilityCue: ability?.ability === 'ram' ? contact : moveStart }
+  return { duration, moveStart, contact, land, followStart, promotionStart, promotionSwap, promotionEnd, captureEnd, resolved, energy, cellFull, result, effectEnd, abilityCue: ability?.ability === 'ram' ? contact : moveStart }
 }
 
 export const motionDuration = (events: readonly GameEvent[], reduced: boolean) => sceneTiming(events, reduced).duration
@@ -152,7 +154,7 @@ export function piecePoseAt(motion: BoardMotion, pieceId: string, elapsedMs: num
     lift = 0
   }
   if (promotion && before) {
-    const changeAt = timing.promotionStart + (timing.promotionEnd - timing.promotionStart) * .42
+    const changeAt = timing.promotionSwap
     if (elapsed < timing.promotionStart) presentationType = before.type
     else if (elapsed < changeAt) {
       presentationType = before.type

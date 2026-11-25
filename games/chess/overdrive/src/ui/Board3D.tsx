@@ -1,13 +1,15 @@
-import { Suspense, useEffect, useMemo, useRef } from 'react'
+import { Suspense, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { ContactShadows, Line, OrthographicCamera, useGLTF } from '@react-three/drei'
 import { Color, Group, Mesh, MeshStandardMaterial, Vector3 } from 'three'
 import { isInCheck, PIECE_TYPES, type GameEvent, type GameState, type Piece, type PieceType, type Side } from '../core'
+import { fallAngles, planKingFall, rimPose, stepFall, type FallPlayback, type KingFall } from './finale'
 import { activationPulseAt, effectStrengthAt, motionTrails, piecePoseAt, progressAt, sceneTiming, squarePoint, type BoardMotion, type MotionTrail } from './motion'
 
 const WHITE = new Color('#eef1eb'), BLUE = new Color('#245b86'), ORANGE = new Color('#f56b30'), BLACK = new Color('#000000')
 const xy = (square: string): [number,number,number] => { const point=squarePoint(square); return [point.x,.07,point.z] }
 export interface Board3DProps {
+  playback: FallPlayback | null; onArenaMounted(ready: boolean): void
   state: GameState; selected: string | null; targets: readonly string[]; focusSquares: readonly string[]
   onSquare(square: string): void; flipped: boolean; motion: BoardMotion | null; reduced: boolean
 }
@@ -64,8 +66,16 @@ function FigureBody({piece,modelType,selected,active,checked=false,defeated=fals
   })
   return <group ref={root}><primitive object={body}/></group>
 }
-function Figure(props:FigureProps) {
-  const {piece,selected,active,defeated,motion,reduced,onSquare}=props
+function Figure(props:FigureProps & {fall:KingFall|null;playback:FallPlayback|null}) {
+  const {piece,selected,active,fall,playback,motion,reduced,onSquare}=props
+  const tip=useRef<Group>(null)
+  const facing=useRef<Group>(null)
+  const lastAngle=useRef<number|null>(null)
+  useLayoutEffect(()=>{
+    lastAngle.current=null
+    if(tip.current){tip.current.position.set(0,0,0);tip.current.quaternion.identity()}
+  },[fall])
+  const axis=useMemo(()=>new Vector3(fall?.dz??0,0,-(fall?.dx??1)),[fall])
   const group=useRef<Group>(null)
   const beforeType=motion?.before.pieces.find(p=>p.id===piece.id)?.type
   const live=!motion||motion.after.pieces.some(p=>p.id===piece.id)
@@ -77,13 +87,32 @@ function Figure(props:FigureProps) {
     group.current.position.set(point.x,.07+point.lift,point.z)
     group.current.scale.setScalar(point.scale)
     group.current.visible=point.visible
-    group.current.rotation.y=point.presentationType==='knight'?(piece.side==='white'?Math.PI/4:-3*Math.PI/4):0
-    const timing=motion?sceneTiming(motion.events,reduced):null
-    group.current.rotation.z=defeated&&!reduced?.12*(timing?progressAt(elapsed,timing.result,timing.result+180):1):0
+    if(facing.current)facing.current.rotation.y=point.presentationType==='knight'?(piece.side==='white'?Math.PI/4:-3*Math.PI/4):0
+    if(!tip.current)return
+    if(!fall){
+      if(lastAngle.current!==null){
+        tip.current.position.set(0,0,0);tip.current.quaternion.identity();lastAngle.current=null
+      }
+      return
+    }
+    const king=piece.id===fall.king
+    // Reduced motion waits for the mating piece to finish before posing the king.
+    const waiting=reduced&&motion&&elapsed<sceneTiming(motion.events,true).result
+    const frame=waiting?0:playback&&!playback.settled?playback.elapsed:fall.duration
+    if(frame===fall.duration&&lastAngle.current===(king?fall.angle:0))return
+    const angles=fallAngles(fall,frame)
+    const angle=king?angles.king:angles.neighbour
+    if(lastAngle.current===angle)return
+    const offset=rimPose(fall.dx,fall.dz,fall.rim,angle,king?.02*Math.min(1,angle/.08):0)
+    tip.current.position.set(offset.x,offset.y,offset.z)
+    tip.current.quaternion.setFromAxisAngle(axis,angle)
+    lastAngle.current=angle
   })
-  return <group ref={group} position={xy(piece.square)} onClick={event=>{if(live){event.stopPropagation();onSquare(piece.square)}}}>
-    <FigureBody {...props} modelType={piece.type}/>
-    {beforeType&&beforeType!==piece.type&&<FigureBody {...props} modelType={beforeType}/>}
+  return <group ref={group} name={'piece-'+piece.id} position={xy(piece.square)} onClick={event=>{if(live){event.stopPropagation();onSquare(piece.square)}}}>
+    <group ref={tip} name="contact-pivot"><group ref={facing} name="model-facing">
+      <FigureBody {...props} modelType={piece.type}/>
+      {beforeType&&beforeType!==piece.type&&<FigureBody {...props} modelType={beforeType}/>}
+    </group></group>
     {(selected||active)&&<mesh rotation={[-Math.PI/2,0,0]} position={[0,.008,0]}><ringGeometry args={[.34,.37,40]}/><meshBasicMaterial color={selected?'#e96b33':'#ffd5a5'} transparent opacity={.85}/></mesh>}
   </group>
 }
@@ -152,6 +181,12 @@ function ActionEffect({motion,reduced}:{motion:BoardMotion|null;reduced:boolean}
   </>
 }
 function Arena(props:Board3DProps) {
+  const fall=useMemo(()=>planKingFall(props.state),[props.state])
+  const {onArenaMounted,playback}=props
+  useLayoutEffect(()=>{onArenaMounted(true);return ()=>onArenaMounted(false)},[onArenaMounted])
+  useFrame(()=>{
+    if(fall&&playback&&!playback.settled&&!document.hidden)stepFall(playback,fall,performance.now())
+  },-1)
   const rotation=useRef<Group>(null)
   const currentAngle=useRef(props.flipped?Math.PI:0)
   useFrame((_,delta)=>{
@@ -179,7 +214,7 @@ function Arena(props:Board3DProps) {
     {[-1,1].flatMap(x=>[-1,1].map(z=><mesh key={`${x}/${z}`} position={[x*4.38,-.025,z*4.38]} rotation={[-Math.PI/2,0,0]}><cylinderGeometry args={[.09,.09,.03,6]}/><meshStandardMaterial color="#294960" metalness={.9} roughness={.21}/></mesh>))}
     {[-1,1].flatMap(x=>Array.from({length:12},(_,i)=><mesh key={`${x}/${i}`} position={[x*4.4,-.042,(i-5.5)*.32]}><boxGeometry args={[.16,.012,.12]}/><meshStandardMaterial color="#365366" roughness={.5}/></mesh>))}
     <CapacitorRail side="white" energy={props.state.energy.white} bank={props.state.rulesVersion==='overdrive-v1'?5:3}/><CapacitorRail side="black" energy={props.state.energy.black} bank={props.state.rulesVersion==='overdrive-v1'?5:3}/>
-    {pieces.map(piece=><Figure key={piece.id} piece={piece} selected={props.selected===piece.id} active={props.state.forms[piece.side]?.pieceId===piece.id} checked={piece.type==='king'&&piece.side===props.state.side&&checked} defeated={piece.type==='king'&&props.state.outcome?.winner!=null&&props.state.outcome.winner!==piece.side} {...{motion:props.motion,reduced:props.reduced,onSquare:props.onSquare}}/>)}
+    {pieces.map(piece=><Figure key={piece.id} piece={piece} selected={props.selected===piece.id} active={props.state.forms[piece.side]?.pieceId===piece.id} checked={piece.type==='king'&&piece.side===props.state.side&&checked} defeated={piece.id===fall?.king} fall={fall&&(piece.id===fall.king||piece.id===fall.support)?fall:null} playback={playback} {...{motion:props.motion,reduced:props.reduced,onSquare:props.onSquare}}/>)}
     <ActionEffect motion={props.motion} reduced={props.reduced}/>
   </group>
 }

@@ -11,7 +11,8 @@ import { clearRoomLocation, lastRoom, onlineLocation, rememberRoom, roomLink } f
 import { Board2D } from './Board2D'
 import { PieceIcon } from './PieceIcon'
 import { abilityDescription, abilityName, lessonText, onlineErrorText, outcomeReason, outcomeText, pieceName, sideName, tr, type Language } from './i18n'
-import { motionDuration, readingDuration, type BoardMotion } from './motion'
+import { checkmateEdge, type FallPlayback } from './finale'
+import { sceneTiming, readingDuration, type BoardMotion } from './motion'
 import { loadLocalSession, loadOverdriveSettings, saveLocalSession, saveOverdriveSettings, type LocalSessionRecord } from './session'
 import { useBot } from './useBot'
 import { OverdriveAudio } from './audio'
@@ -69,6 +70,13 @@ export function OverdriveApp() {
   const [locked,setLocked]=useState(false)
   const lockedRef=useRef(false)
   const motionId=useRef(0)
+  const arenaReady=useRef(false)
+  const finale=useRef<FallPlayback|null>(null)
+  const lastMate=useRef<string|null>(null)
+  const onArenaMounted=useCallback((ready:boolean)=>{
+    arenaReady.current=ready
+    if(!ready&&finale.current)finale.current.settled=true
+  },[])
   const motionTimer=useRef<ReturnType<typeof setTimeout>|null>(null)
   const [notice,setNotice]=useState('')
   const [recentEvents,setRecentEvents]=useState<readonly GameEvent[]>([])
@@ -118,21 +126,44 @@ export function OverdriveApp() {
     dialog.addEventListener('keydown',trap)
     return()=>{dialog.removeEventListener('keydown',trap);if(previous?.isConnected)previous.focus({preventScroll:true})}
   },[panel,choices.length,confirmResign])
-  useEffect(()=>{const visible=()=>{if(!document.hidden)drainRef.current()};document.addEventListener('visibilitychange',visible);return()=>document.removeEventListener('visibilitychange',visible)},[])
 
-  const animate=useCallback((before:GameState,after:GameState,events:readonly GameEvent[])=>{
+
+  const animate=useCallback((before:GameState,after:GameState,events:readonly GameEvent[],scope:string=gameId)=>{
+    const timing=sceneTiming(events,reduced)
+    const duration=timing.duration
+    const startedAt=performance.now()
+    const key=checkmateEdge(scope,before,after,events)
+    if(key&&key===lastMate.current)return
     if(motionTimer.current)clearTimeout(motionTimer.current)
-    const duration=motionDuration(events,reduced)
+    if(key)lastMate.current=key
+    finale.current=key&&arenaReady.current&&!document.hidden&&!reduced?{
+      key,startsAt:startedAt+timing.result,elapsed:0,previousFrame:null,settled:false,onContact:audio.contactPlayer(),
+    }:null
     lockedRef.current=true;setLocked(true)
-    setMotion({id:++motionId.current,before,after,events,startedAt:performance.now(),duration})
+    setMotion({id:++motionId.current,before,after,events,startedAt,duration})
     setRecentEvents(events);audio.playEvents(events,before.rulesVersion==='overdrive-v1'?5:3)
     motionTimer.current=setTimeout(()=>{setMotion(null);lockedRef.current=false;setLocked(false);drainRef.current()},duration+readingDuration(events,reduced))
-  },[audio,reduced])
-  const resetMotion=useCallback(()=>{if(motionTimer.current)clearTimeout(motionTimer.current);motionTimer.current=null;setMotion(null);setLocked(false);lockedRef.current=false;audio.stop();setSelected(null);setPower('normal');setChoices([]);setRecentEvents([])},[audio])
+  },[audio,reduced,gameId])
+  const resetMotion=useCallback(()=>{if(finale.current)finale.current.settled=true;finale.current=null;if(motionTimer.current)clearTimeout(motionTimer.current);motionTimer.current=null;setMotion(null);setLocked(false);lockedRef.current=false;audio.stop();setSelected(null);setPower('normal');setChoices([]);setRecentEvents([])},[audio])
+  useEffect(()=>{
+    const visible=()=>{
+      if(!document.hidden){drainRef.current();return}
+      if(finale.current)finale.current.previousFrame=null
+      const snapshot=roomRef.current
+      if(!snapshot||!queue.current.length)return
+      // Catch up silently to the last authoritative position while hidden.
+      queue.current=[];resetMotion();displayRef.current=snapshot.game.state
+      displayedGame.current={id:snapshot.game.id,revision:snapshot.game.revision}
+      setOnlineDisplay(snapshot.game.state)
+    }
+    document.addEventListener('visibilitychange',visible)
+    return ()=>document.removeEventListener('visibilitychange',visible)
+  },[resetMotion])
   const motionPreference=useRef(reduced)
   useLayoutEffect(()=>{
     if(motionPreference.current===reduced)return
     motionPreference.current=reduced
+    if(finale.current)finale.current.settled=true
     if(!lockedRef.current)return
     // A preference change ends the old visual/audio clock without undoing its committed action.
     // Layout cleanup prevents a frame rendered with new durations and old scheduled sound.
@@ -163,7 +194,7 @@ export function OverdriveApp() {
     displayRef.current=pending.snapshot.game.state;setOnlineDisplay(pending.snapshot.game.state)
     displayedGame.current={id:pending.snapshot.game.id,revision:pending.snapshot.game.revision}
     setSelected(null);setPower('normal');setChoices([])
-    animate(before,pending.snapshot.game.state,pending.action.events)
+    animate(before,pending.snapshot.game.state,pending.action.events,pending.snapshot.game.id)
   },[animate]);drainRef.current=drain
   const connectRoom=useCallback((snapshot:RoomSnapshot,invitation='')=>{
     leaveOnline();resetMotion();setMode('online');setRoom(snapshot);roomRef.current=snapshot;displayRef.current=snapshot.game.state;displayedGame.current={id:snapshot.game.id,revision:snapshot.game.revision};setOnlineDisplay(snapshot.game.state);setFlipped(snapshot.you==='black');setInvite(invitation);setPanel(null);setNotice('');rememberRoom(snapshot.id)
@@ -173,7 +204,8 @@ export function OverdriveApp() {
       onSnapshot:(next,kind,action)=>{
         const previous=roomRef.current
         setRoom(next);roomRef.current=next
-        if(kind==='welcome'||!previous||previous.game.id!==next.game.id){queue.current=[];resetMotion();displayRef.current=next.game.state;displayedGame.current={id:next.game.id,revision:next.game.revision};setOnlineDisplay(next.game.state);setFlipped(next.you==='black');return}
+        if(kind==='welcome'&&previous?.game.id===next.game.id&&previous.game.revision===next.game.revision&&!document.hidden)return
+        if(kind==='welcome'||!previous||previous.game.id!==next.game.id||document.hidden){queue.current=[];resetMotion();displayRef.current=next.game.state;displayedGame.current={id:next.game.id,revision:next.game.revision};setOnlineDisplay(next.game.state);setFlipped(next.you==='black');return}
         if(next.game.revision>previous.game.revision){
           if(action&&next.game.revision===previous.game.revision+1){queue.current.push({snapshot:next,action});drainRef.current()}
           else {queue.current=[];resetMotion();displayRef.current=next.game.state;displayedGame.current={id:next.game.id,revision:next.game.revision};setOnlineDisplay(next.game.state)}
@@ -258,7 +290,7 @@ export function OverdriveApp() {
         <PlayerRail state={state} side={flipped?'white':'black'} language={language} name={owner(flipped?'white':'black')} connected={mode==='online'?room?.players[flipped?'white':'black']?.connected:undefined} thinking={thinking&&state.side===(flipped?'white':'black')}/>
         <div className={`od-board-host ${settings.view==='3d'?'is-3d':''}`}>
           <div className="od-arena-stamp" aria-hidden="true">{tr(language,'Форсаж','Overdrive')}</div>
-          {settings.view==='3d'?<SceneBoundary fallback={focusableBoard}><Suspense fallback={focusableBoard}><Board3D {...boardProps}/></Suspense></SceneBoundary>:focusableBoard}
+          {settings.view==='3d'?<SceneBoundary fallback={focusableBoard}><Suspense fallback={focusableBoard}><Board3D {...boardProps} playback={finale.current} onArenaMounted={onArenaMounted}/></Suspense></SceneBoundary>:focusableBoard}
           {settings.view==='3d'&&<Board2D {...boardProps} language={language} accessibleOnly/>}
         </div>
         <div className="od-board-tools"><button onClick={()=>setFlipped(!flipped)} aria-label={tr(language,'Перевернуть доску','Flip board')}><svg viewBox="0 0 24 24"><path d="M4 9a8 8 0 0 1 14-3l2 3m0-6v6h-6M20 15a8 8 0 0 1-14 3l-2-3m0 6v-6h6"/></svg></button><button onClick={()=>setSettings({...settings,view:settings.view==='3d'?'2d':'3d'})}>{settings.view==='3d'?'2D':'3D'}</button></div>

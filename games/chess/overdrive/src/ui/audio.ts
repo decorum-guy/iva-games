@@ -1,22 +1,22 @@
 import type { GameEvent } from '../core'
 import { sceneTiming } from './motion'
 
-export const OVERDRIVE_AUDIO_BANK = 'overdrive-original-dsp-v1'
+export const OVERDRIVE_AUDIO_BANK = 'overdrive-original-dsp-v2'
 export const OVERDRIVE_CUES = [
   'ui', 'move', 'capture', 'sweep', 'raid', 'battery', 'ram', 'rotation', 'cover',
-  'energy', 'spend', 'cellfull', 'activate', 'expire', 'promotion', 'check', 'mate', 'finish',
+  'energy', 'spend', 'cellfull', 'activate', 'expire', 'promotion', 'check', 'mate', 'finish', 'board-contact', 'piece-contact',
 ] as const
 export type OverdriveCueName = typeof OVERDRIVE_CUES[number]
-export interface OverdriveCue { readonly name: OverdriveCueName; readonly at: number }
+export interface OverdriveCue { readonly name: OverdriveCueName; readonly at: number; readonly gain?: number }
 export interface OverdriveAudioOptions { readonly mute: boolean; readonly volume: number; readonly reducedMotion?: boolean }
 
 const CUE_GAIN: Record<OverdriveCueName, number> = {
   ui: .5, move: .7, capture: .76, sweep: .8, raid: .78, battery: .8, ram: .8, rotation: .8, cover: .8,
-  energy: .66, spend: .66, cellfull: .75, activate: .8, expire: .65, promotion: .8, check: .85, mate: .9, finish: .75,
+  energy: .66, spend: .66, cellfull: .75, activate: .8, expire: .65, promotion: .8, check: .85, mate: .88, finish: .75, 'board-contact': .77, 'piece-contact': .59,
 }
 const CUE_PRIORITY: Record<OverdriveCueName, number> = {
   ui: 0, move: 1, capture: 2, sweep: 3, raid: 3, battery: 3, ram: 3, rotation: 3, cover: 3,
-  energy: 1, spend: 1, cellfull: 2, activate: 4, expire: 2, promotion: 4, check: 5, mate: 6, finish: 5,
+  energy: 1, spend: 1, cellfull: 2, activate: 4, expire: 2, promotion: 4, check: 5, mate: 6, finish: 5, 'board-contact': 4, 'piece-contact': 3,
 }
 export const MAX_OVERDRIVE_VOICES = 8
 
@@ -37,7 +37,7 @@ export function planOverdriveCues(events: readonly GameEvent[], reducedMotion = 
   if (ability) cues.push({ name: ability.ability, at: timing.abilityCue })
   if (capture) cues.push({ name: 'capture', at: timing.contact })
   else if (moving && !ability) cues.push({ name: 'move', at: timing.land })
-  if (promotion) cues.push({ name: 'promotion', at: timing.promotionStart })
+  if (promotion) cues.push({ name: 'promotion', at: timing.promotionSwap })
   if (events.some(event => event.type === 'form' && (event.cause === 'expire' || event.cause === 'capture'))) {
     cues.push({ name: 'expire', at: events.some(event => event.type === 'form' && event.cause === 'capture') ? timing.contact : timing.land })
   }
@@ -51,7 +51,14 @@ export function planOverdriveCues(events: readonly GameEvent[], reducedMotion = 
   }
   if (outcome) cues.push({ name: outcome.outcome.reason === 'checkmate' ? 'mate' : 'finish', at: timing.result })
   else if (events.some(event => event.type === 'turn' && event.check)) cues.push({ name: 'check', at: timing.result })
-  return cues.sort((a, b) => a.at - b.at).map(cue => ({ ...cue, at: cue.at / 1000 }))
+  const signalled = !!outcome || events.some(event => event.type === 'turn' && event.check)
+  return cues.sort((a, b) => a.at - b.at).map(cue => {
+    // Leave space in the middle register for the new model and result.
+    let gain = 1
+    if ((promotion || signalled) && (cue.name === 'energy' || cue.name === 'cellfull')) gain = .52
+    if (capture && (cue.name === 'expire' || cue.name === ability?.ability)) gain = .68
+    return { ...cue, at: cue.at / 1000, gain }
+  })
 }
 
 interface AudioEnvironment {
@@ -135,6 +142,22 @@ export class OverdriveAudio {
     this.schedule(planOverdriveCues(fresh, this.options.reducedMotion, bank))
   }
 
+  /** A first contact belongs to the scene which began while sound was enabled.
+   * No late decoding or unmute/visibility backlog for frame-triggered impacts. */
+  contactPlayer(): (support: boolean) => void {
+    const generation = this.generation
+    const audible = this.canPlay()
+    let consumed = false
+    return support => {
+      if (consumed) return
+      consumed = true
+      if (!audible || generation !== this.generation || !this.canPlay() || this.options.reducedMotion) return
+      const name = support ? 'piece-contact' : 'board-contact'
+      const buffer = this.buffers.get(name)
+      if (buffer) this.voice(name, buffer, this.context!.currentTime)
+    }
+  }
+
   playCue(name: string): void {
     if (isCue(name) && this.canPlay()) this.schedule([{ name, at: 0 }])
   }
@@ -208,7 +231,7 @@ export class OverdriveAudio {
         const due = started + cue.at
         // A slow download must not replay an old click, impact or result in a new scene.
         if (context.currentTime - due > .15) return
-        this.voice(cue.name, buffer, Math.max(context.currentTime, due))
+        this.voice(cue.name, buffer, Math.max(context.currentTime, due), cue.gain)
       }
       const ready = this.buffers.get(cue.name)
       if (ready) fire(ready)
@@ -216,7 +239,7 @@ export class OverdriveAudio {
     }
   }
 
-  private voice(name: OverdriveCueName, buffer: AudioBuffer, at: number): void {
+  private voice(name: OverdriveCueName, buffer: AudioBuffer, at: number, gainScale = 1): void {
     const context = this.context!
     const priority = CUE_PRIORITY[name]
     if (this.voices.size >= MAX_OVERDRIVE_VOICES) {
@@ -227,7 +250,7 @@ export class OverdriveAudio {
     const source = context.createBufferSource()
     const gain = context.createGain()
     source.buffer = buffer
-    gain.gain.value = CUE_GAIN[name]
+    gain.gain.value = CUE_GAIN[name] * gainScale
     source.connect(gain)
     gain.connect(this.compressor!)
     const voice: Voice = { source, gain, priority }

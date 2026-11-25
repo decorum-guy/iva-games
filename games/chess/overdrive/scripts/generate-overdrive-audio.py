@@ -83,9 +83,10 @@ def make(name: str, duration: float, seed: int) -> tuple[np.ndarray, np.ndarray]
         y = modal(t, 780, .07, .5, True) + burst(t, seed, 550, 6700, .032) * .18
         at(y, modal(times(.15), 1180, .042, .13, True), .014)
     elif name == 'capture':
-        y = impact(t, seed, 190, .48)
-        for index, onset in enumerate([.027, .061, .103]):
-            at(y, modal(times(.22), 690 + index * 217, .055, .19 / (index + 1), True), onset)
+        # Short dense ceramic clack with body in the phone speaker range.
+        y = modal(t, 212, .066, .68) + modal(t, 506, .032, .32, True)
+        y += burst(t, seed, 370, 3900, .014) * .17
+        at(y, modal(times(.13), 145, .044, .26), .012)
     elif name == 'sweep':
         # Vacuum pull, rising scrape and a restrained ceramic catch.
         y = motor(t, 160, 390, .21) * .29 + noise(t, seed, 1100, 7800) * np.sin(np.minimum(t / .29, 1) * math.pi) ** 2 * .15
@@ -142,22 +143,23 @@ def make(name: str, duration: float, seed: int) -> tuple[np.ndarray, np.ndarray]
         y = motor(t, 330, 70, .19) * .29 + burst(t, seed, 900, 6200, .14, .01) * .12
         at(y, modal(times(.18), 520, .045, .19), .21)
     elif name == 'promotion':
-        y = motor(t, 220, 880, .25) * .18
-        for index, onset in enumerate([.07, .14, .215]):
-            at(y, modal(times(.5), [440, 660, 880][index], .2, .32, True), onset)
-        at(y, impact(times(.5), seed, 270, .28), .29)
-        pan = .18 * np.sin(t * 9)
+        # A single struck dyad with a soft upper partial blooming out of it.
+        y = modal(t, 587.33, .105, .55, True)
+        y += np.sin(2*math.pi*880*t) * env(t, .023, .145) * .43
+        y += np.sin(2*math.pi*1174.66*t) * env(t, .039, .135) * .21
     elif name == 'check':
-        # Distinct warning pair, not a UI confirmation or a continuous alarm.
-        y = modal(t, 370, .15, .62) + burst(t, seed, 1000, 8000, .03) * .14
-        at(y, modal(times(.46), 415, .19, .6), .17)
-        at(y, modal(times(.37), 830, .12, .17), .205)
+        y = modal(t, 513, .061, .46, True)
+        at(y, modal(times(.21), 648, .068, .39, True), .081)
     elif name == 'mate':
-        y = impact(t, seed, 100, .65)
-        for index, onset in enumerate([.12, .24, .37]):
-            at(y, modal(times(1.1), [440, 330, 220][index], .34, [.33, .36, .46][index]), onset)
-        at(y, noise(times(.9), seed + 1, 100, 2400) * env(times(.9), .03, .26) * .08, .3)
-        pan = .1 * np.sin(t * 4)
+        # Rounded descending stopped tones. No percussive onset before the fall.
+        for f, onset, amp in [(392, 0, .50), (293.66, .125, .61)]:
+            tone = (np.sin(2*math.pi*f*t) + .23*np.sin(2*math.pi*f*2*t))
+            at(y, tone*env(t, .018, .13)*amp, onset)
+    elif name == 'board-contact':
+        y = modal(t, 148, .069, .6) + modal(t, 315, .034, .26)
+        y += burst(t, seed, 160, 2200, .029, .0018) * .16
+    elif name == 'piece-contact':
+        y = modal(t, 560, .033, .55, True) + modal(t, 274, .029, .24)
     elif name == 'finish':
         y = modal(t, 440, .18, .28, True)
         at(y, modal(times(.61), 660, .24, .3, True), .13)
@@ -168,18 +170,19 @@ def make(name: str, duration: float, seed: int) -> tuple[np.ndarray, np.ndarray]
 
 
 CUES = {
-    'ui': (.09, -9.5), 'move': (.22, -6.5), 'capture': (.5, -4.5),
+    'ui': (.09, -9.5), 'move': (.22, -6.5), 'capture': (.29, -5.2),
     'sweep': (.52, -4.5), 'raid': (.56, -4.5), 'battery': (.66, -4.5),
     'ram': (.65, -3.5), 'rotation': (.65, -5.0), 'cover': (.5, -4.5),
     'energy': (.28, -10.0), 'spend': (.16, -9.0), 'cellfull': (.48, -7.5),
     'activate': (1.05, -4.0), 'expire': (.5, -8.0),
-    'promotion': (.9, -4.0), 'check': (.72, -5.0), 'mate': (1.65, -3.5), 'finish': (.8, -7.5),
+    'promotion': (.42, -6.0), 'check': (.31, -7.0), 'mate': (.57, -6.0), 'finish': (.8, -7.5),
+    'board-contact': (.27, -9.0), 'piece-contact': (.15, -13.0),
 }
 
 
 def render() -> None:
     OUT.mkdir(parents=True, exist_ok=True)
-    report = {'bank': 'overdrive-original-dsp-v1', 'generator': 'scripts/generate-overdrive-audio.py',
+    report = {'bank': 'overdrive-original-dsp-v2', 'generator': 'scripts/generate-overdrive-audio.py',
               'provenance': 'Original deterministic DSP composition; no third-party or Remorse samples.',
               'sampleRate': SR, 'channels': 2, 'encoding': 'PCM signed 16-bit little-endian', 'seed': SEED,
               'auditoryReview': 'Not performed; measurements are not a listening assessment.', 'cues': {}}

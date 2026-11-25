@@ -7,7 +7,7 @@ import type { GameEvent } from '../../src/core'
 import { transition } from '../../src/core'
 import { TEACHING_FIXTURES } from '../../src/core/teaching'
 import { sceneTiming } from '../../src/ui/motion'
-import { MAX_OVERDRIVE_VOICES, OVERDRIVE_CUES, OverdriveAudio, planOverdriveCues } from '../../src/ui/audio'
+import { MAX_OVERDRIVE_VOICES, OVERDRIVE_AUDIO_BANK, OVERDRIVE_CUES, OverdriveAudio, planOverdriveCues } from '../../src/ui/audio'
 
 const move: GameEvent = { id: 'game-one/1/move', type: 'move', pieceId: 'white-pawn', side: 'white', pieceType: 'pawn', from: 'e2', to: 'e4', forced: false }
 const gain: GameEvent = { id: 'game-one/1/energy', type: 'energy', side: 'white', before: 4, after: 7, spent: 0, captureEarned: 1, checkEarned: 2 }
@@ -44,6 +44,14 @@ describe('Overdrive semantic sound score', () => {
     const outcome: GameEvent = { id: 'mate', type: 'outcome', outcome: { reason: 'checkmate', winner: 'white' } }
     const cues = planOverdriveCues([move, capture, promotion, gain, check, outcome])
     expect(cues.map(cue => cue.name)).toEqual(['capture', 'promotion', 'energy', 'cellfull', 'mate'])
+    for (const reduce of [false, true]) {
+      const events = [move, capture, promotion, gain, check, outcome]
+      const plan = planOverdriveCues(events, reduce)
+      const swap = plan.find(cue => cue.name === 'promotion')!
+      expect(swap.at*1000).toBeCloseTo(sceneTiming(events, reduce).promotionSwap)
+      expect(swap.at-plan[0].at).toBeGreaterThan(.11)
+      expect(plan.find(cue => cue.name === 'cellfull')!.gain).toBeLessThan(swap.gain!)
+    }
     const reduced = planOverdriveCues([move, capture, promotion, gain, check, outcome], true)
     expect(reduced.map(cue => cue.name)).toEqual(cues.map(cue => cue.name))
     expect(reduced.at(-1)!.at).toBeLessThan(cues.at(-1)!.at)
@@ -118,6 +126,24 @@ function harness(fetcher?: typeof fetch) {
 }
 
 describe('Overdrive pre-rendered audio transport', () => {
+  it('contacts belong to an audible visible 3D scene and are consumed once, including across mute and hiding', async () => {
+    const h = harness()
+    await h.audio.unlock()
+    const free = h.audio.contactPlayer()
+    free(false); free(false)
+    expect(h.context.sources.map(s=>s.buffer?.name)).toEqual(['board-contact'])
+    const blocked = h.audio.contactPlayer()
+    h.audio.setOptions({mute:true,volume:1})
+    const muted = h.audio.contactPlayer()
+    h.audio.setOptions({mute:false,volume:1}); blocked(true); muted(false)
+    const hidden = h.audio.contactPlayer(); h.visibility('hidden'); h.visibility('visible'); hidden(false)
+    const reset = h.audio.contactPlayer(); h.audio.stop(); reset(false)
+    h.audio.setOptions({mute:false,volume:1,reducedMotion:true}); h.audio.contactPlayer()(false)
+    expect(h.context.sources).toHaveLength(1)
+    h.audio.setOptions({mute:false,volume:.5}); h.audio.contactPlayer()(true)
+    expect(h.context.sources.at(-1)?.buffer?.name).toBe('piece-contact')
+    h.audio.dispose()
+  })
   it('does not make a context or sound without a gesture, and never replays pre-unlock history', async () => {
     const h = harness()
     h.audio.playEvents([move])
@@ -268,11 +294,12 @@ describe('Overdrive pre-rendered audio transport', () => {
 })
 
 describe('shipped original PCM bank', () => {
-  it('ships 18 distinct, reproducible stereo PCM files below 2MB with measured headroom and silent edges', () => {
+  it('ships distinct, reproducible stereo PCM files below 2MB with measured headroom and silent edges', () => {
     const root = fileURLToPath(new URL('../../public/assets/overdrive/audio/', import.meta.url))
     const manifest = JSON.parse(readFileSync(resolve(root, 'manifest.json'), 'utf8')) as {
-      totalBytes: number; cues: Record<string, { sha256: string; durationSeconds: number; bytes: number; clippedSamples: number }>
+      bank: string; totalBytes: number; cues: Record<string, { sha256: string; durationSeconds: number; bytes: number; clippedSamples: number }>
     }
+    expect(manifest.bank).toBe(OVERDRIVE_AUDIO_BANK)
     expect(Object.keys(manifest.cues).sort()).toEqual([...OVERDRIVE_CUES].sort())
     expect(new Set(Object.values(manifest.cues).map(item => item.sha256)).size).toBe(OVERDRIVE_CUES.length)
     let bytes = 0
