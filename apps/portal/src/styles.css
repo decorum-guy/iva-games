@@ -312,6 +312,19 @@ button {
   background: white;
   box-shadow: 0 1px 3px #17374412;
 }
+.guest-games {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  min-height: 82px;
+  padding: 20px 126px 20px 24px;
+  border-bottom: 1px solid var(--line);
+}
+.guest-games > span {
+  font-size: 12px;
+  color: var(--muted);
+}
 .brand {
   display: flex;
   align-items: center;

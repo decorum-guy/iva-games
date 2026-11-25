@@ -31,6 +31,19 @@ import type {
 } from "./types";
 
 const entranceAtLoad = readEntrance();
+// These are standalone guest games, not platform room capabilities.
+const chessLaunchUrls: Partial<Record<string, string>> = {
+  remorse:
+    import.meta.env.VITE_REMORSE_URL ||
+    (import.meta.env.DEV
+      ? "http://127.0.0.1:4173/"
+      : "https://chess.iva-games.pro/"),
+  overdrive:
+    import.meta.env.VITE_OVERDRIVE_URL ||
+    (import.meta.env.DEV
+      ? "http://127.0.0.1:4185/overdrive/"
+      : "https://chess.iva-games.pro/overdrive/"),
+};
 const emptySocial: Social = {
   friends: [],
   incoming: [],
@@ -575,6 +588,20 @@ export default function App() {
             EN
           </button>
         </div>
+        {!user && !entrance && (
+          <nav
+            className="guest-games"
+            aria-label={t("Играть без входа", "Play without signing in")}
+          >
+            <span>{t("Играть без входа", "Play without signing in")}</span>
+            <a className="button secondary small" href={chessLaunchUrls.remorse}>
+              Remorse
+            </a>
+            <a className="button secondary small" href={chessLaunchUrls.overdrive}>
+              {t("Форсаж", "Overdrive")}
+            </a>
+          </nav>
+        )}
         {user && !entrance && (
           <a
             className="mobile-account"
@@ -791,13 +818,11 @@ export default function App() {
                           <div className="game-topline">
                             <h3>{gameTitle(game, lang)}</h3>
                             <span
-                              className={`tag ${game.status === "available" ? "success" : ""}`}
+                              className={`tag ${game.status === "available" || chessLaunchUrls[game.gameId] ? "success" : ""}`}
                             >
-                              {game.status === "available"
+                              {game.status === "available" || chessLaunchUrls[game.gameId]
                                 ? t("Можно играть", "Ready to play")
-                                : game.status === "planned"
-                                  ? t("Скоро здесь", "Coming soon")
-                                  : t("Скоро здесь", "Coming soon")}
+                                : t("Скоро здесь", "Coming soon")}
                             </span>
                           </div>
                           <p>{gameDescription(game.gameId, lang)}</p>
@@ -812,23 +837,32 @@ export default function App() {
                                 </span>
                               )}
                             </span>
-                            <button
-                              className={`button small ${game.status === "available" ? "primary" : "secondary"}`}
-                              disabled={
-                                busy ||
-                                (game.status === "available" &&
-                                  !user.emailVerified)
-                              }
-                              onClick={() =>
-                                game.status === "available"
-                                  ? setCreateGame(game.gameId)
-                                  : setGameInfo(game)
-                              }
-                            >
-                              {game.status === "available"
-                                ? t("Собрать стол", "Gather a table")
-                                : t("Об игре", "About game")}
-                            </button>
+                            {chessLaunchUrls[game.gameId] ? (
+                              <a
+                                className="button small primary"
+                                href={chessLaunchUrls[game.gameId]}
+                              >
+                                {t("Открыть", "Play")}
+                              </a>
+                            ) : (
+                              <button
+                                className={`button small ${game.status === "available" ? "primary" : "secondary"}`}
+                                disabled={
+                                  busy ||
+                                  (game.status === "available" &&
+                                    !user.emailVerified)
+                                }
+                                onClick={() =>
+                                  game.status === "available"
+                                    ? setCreateGame(game.gameId)
+                                    : setGameInfo(game)
+                                }
+                              >
+                                {game.status === "available"
+                                  ? t("Собрать стол", "Gather a table")
+                                  : t("Об игре", "About game")}
+                              </button>
+                            )}
                           </div>
                         </div>
                       </article>

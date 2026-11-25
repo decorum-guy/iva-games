@@ -1,0 +1,4 @@
+# Private deployment configuration belongs outside the checkout.
+# Also protect accidental local copies here; the examples remain tracked.
+*.env
+backups/

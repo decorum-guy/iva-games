@@ -1,0 +1,11 @@
+# New Iva Games deployment only. The older ../Caddyfile remains unchanged.
+# No path rewriting: the applications retain their existing API and asset URLs.
+iva-games.pro {
+	encode zstd gzip
+	reverse_proxy platform:4310
+}
+
+chess.iva-games.pro {
+	encode zstd gzip
+	reverse_proxy chess:4173
+}

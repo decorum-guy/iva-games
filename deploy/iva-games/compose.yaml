@@ -1,0 +1,82 @@
+name: iva-games
+
+services:
+  chess:
+    image: ${CHESS_IMAGE:?Set a reviewed chess image tag or digest in release.env}
+    init: true
+    restart: unless-stopped
+    stop_grace_period: 60s
+    read_only: true
+    tmpfs:
+      - /tmp
+    environment:
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      PORT: "4173"
+      PUBLIC_ORIGIN: https://chess.iva-games.pro
+      DATABASE_PATH: /data/remorse.sqlite
+      OVERDRIVE_DATABASE_PATH: /data/overdrive.sqlite
+      STATIC_DIR: /app/dist
+    volumes:
+      - chess-data:/data
+    logging: &bounded-logs
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
+
+  platform:
+    image: ${PLATFORM_IMAGE:?Set a reviewed platform image tag or digest in release.env}
+    init: true
+    restart: unless-stopped
+    stop_grace_period: 60s
+    read_only: true
+    tmpfs:
+      - /tmp
+    env_file:
+      - path: ${PLATFORM_ENV_FILE:?Set the absolute private platform.env path}
+        required: true
+        format: raw
+    environment:
+      NODE_ENV: production
+      PLATFORM_HOST: 0.0.0.0
+      PLATFORM_PORT: "4310"
+      PORTAL_ORIGIN: https://iva-games.pro
+      PLATFORM_ALLOWED_ORIGINS: https://iva-games.pro
+      PLATFORM_ALLOWED_HOSTS: iva-games.pro,127.0.0.1:4310,localhost:4310
+      PLATFORM_DATABASE_PATH: /data/platform.sqlite
+      PLATFORM_LAB_DATABASE_PATH: /data/platform-lab.sqlite
+      PORTAL_DIST_DIRECTORY: /app/dist-portal
+      MAIL_MODE: smtp
+    volumes:
+      - platform-data:/data
+    logging: *bounded-logs
+
+  caddy:
+    image: ${CADDY_IMAGE:?Set a reviewed Caddy image digest in release.env}
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    logging: *bounded-logs
+
+# Explicit external volumes make a typo fail instead of creating an empty DB.
+# Create these once; application updates do not recreate or delete them.
+volumes:
+  chess-data:
+    external: true
+    name: ${CHESS_DATA_VOLUME:?Set the existing chess data volume name}
+  platform-data:
+    external: true
+    name: ${PLATFORM_DATA_VOLUME:?Set the existing platform data volume name}
+  caddy-data:
+    external: true
+    name: ${CADDY_DATA_VOLUME:?Set the existing Caddy data volume name}
+  caddy-config:
+    external: true
+    name: ${CADDY_CONFIG_VOLUME:?Set the existing Caddy config volume name}
