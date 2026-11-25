@@ -1,0 +1,7 @@
+<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Форсаж · Финал</title>
+<style>
+*{box-sizing:border-box}body{max-width:860px;margin:4vh auto;padding:0 24px;font:17px/1.5 system-ui;color:#16364a;background:#edf2f3}h1,h2{line-height:1.1}button{font:inherit;text-align:left;color:inherit;background:white;border:1px solid #a4bac5;border-radius:5px;padding:9px 14px;cursor:pointer}button:hover,button:focus-visible{background:#d5e4e9}section{display:flex;gap:8px;flex-wrap:wrap}label{display:inline-flex;align-items:center;gap:8px;margin:8px 12px 10px 0}input[type=range]{width:110px}
+</style></head><body><h1>Финал Форсажа</h1><p>Выберите позицию, закройте стартовое меню крестиком и сыграйте указанный ход. Стрелка «Назад» браузера вернёт сюда.</p>
+<label><input id="sound" type="checkbox"> Включить звук</label><label>Громкость <input id="volume" type="range" min="0" max="1" step=".05" value=".65"></label>
+<h2>Позиции</h2><section id="positions"></section><h2>Прослушивание</h2><section id="cues"></section><p id="status" role="status"></p>
+<script type="module" src="./laboratory.ts"></script></body></html>
