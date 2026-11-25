@@ -31,6 +31,7 @@ git worktree add -b acceptance/overdrive-monorepo ../iva-games-overdrive-accepta
 
 - `AGENTS.md`, `docs/MONOREPO.md`, корневой `README.md`.
 - `docs/overdrive/STATUS.md`, `docs/overdrive/VALIDATION.md`, `docs/VALIDATION_MONOREPO.md`, `docs/VALIDATION_IVA_GAMES_LAYOUT.md`.
+- `docs/VALIDATION_MIGRATION_PUBLICATION.md` — опубликованные этапы и повторные проверки снимка `32065cb`; перед приёмкой всё равно получить актуальный head ветки.
 - `docs/ENGINE_SDK.md`, `docs/overdrive/RULES_V1.md`, `docs/overdrive/RULES_AUDIT.md`.
 - `docs/overdrive/ART_DIRECTION.md`, `docs/overdrive/ASSETS.md`, `docs/overdrive/AUDIO.md`, `docs/overdrive/BALANCE.md`.
 - `apps/server/README.md`, `docs/overdrive/ONLINE.md`.
