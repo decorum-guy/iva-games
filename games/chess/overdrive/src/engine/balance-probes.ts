@@ -1,11 +1,11 @@
 /**
- * Deterministic, handcrafted tactical positions for the energy-v2 audit.
- * These are reachable-state-independent rule probes, not self-play evidence,
- * human strength measurements, or a claim about their prevalence in games.
+ * Deterministic tactical positions and one exact opening replay for the audit.
+ * Handcrafted fixtures do not establish reachability or game prevalence.
+ * These probes are not self-play evidence or human strength measurements.
  */
 import {
-  checkLayoutKey, commandKey, createPosition, energyBankSize, isInCheck,
-  legalCommands, transition, validateState,
+  checkLayoutKey, commandKey, createInitialState, createPosition, energyBankSize, isInCheck,
+  legalActions, legalCommands, transition, validateState,
   type Action, type GameState, type PieceType, type RulesVersion, type Transition,
 } from '../core'
 import { MATERIAL } from './evaluate'
@@ -22,6 +22,61 @@ function checkedTransition(state: GameState, action: Action) {
   ensure(validateState(result.state), 'Probe returned an invalid state')
   ensure(legalCommands(state).some(command => commandKey(command) === commandKey(action)), 'Probe action was not enumerated as legal')
   return result
+}
+
+/**
+ * Reproduces a trap imposed by an orthodox opening tape. Enumeration proves
+ * only mate in one after each eighth ply, not a forced win from the opening.
+ */
+function sicilianOpeningProbe(rulesVersion: RulesVersion) {
+  let state = createPosition({ rulesVersion, pieces: createInitialState().pieces })
+  const firstSeven = 'e2e4 c7c5 g1f3 d7d6 d2d4 c5d4 f3d4'.split(' ')
+  for (const coordinates of firstSeven) {
+    const piece = state.pieces.find(piece => piece.square === coordinates.slice(0, 2))
+    ensure(piece, `Missing opening piece at ${coordinates}`)
+    state = checkedTransition(state, { type: 'move', mode: 'normal', pieceId: piece!.id, to: coordinates.slice(2, 4) }).state
+  }
+  const beforeEighthPly = state
+  const imposedEighthPly: Action = { type: 'move', mode: 'normal', pieceId: 'black-knight-6', to: 'f6' }
+  const bishopCheck: Action = { type: 'move', mode: 'normal', pieceId: 'white-bishop-5', to: 'b5' }
+  const afterEighthPly = checkedTransition(beforeEighthPly, imposedEighthPly).state
+  const afterBishopCheck = checkedTransition(afterEighthPly, bishopCheck)
+  // Clear only the terminal marker to enumerate the underlying board's replies
+  // independently of legalActions' early return for completed games.
+  const legalReplies = legalActions({ ...afterBishopCheck.state, outcome: null }).map(commandKey)
+  ensure(afterBishopCheck.state.energy.white === 3, 'Sicilian checking-move energy mismatch')
+  ensure(legalReplies.length === (rulesVersion === 'overdrive-v2' ? 0 : 5), 'Sicilian reply count mismatch')
+  ensure(rulesVersion === 'overdrive-v2'
+    ? afterBishopCheck.state.outcome?.winner === 'white' && afterBishopCheck.state.outcome.reason === 'checkmate'
+    : afterBishopCheck.state.outcome === null, 'Sicilian trap outcome mismatch')
+
+  const alternatives = legalActions(beforeEighthPly).map(action => {
+    const next = checkedTransition(beforeEighthPly, action).state
+    const whiteMatesInOne = legalActions(next).filter(reply => {
+      const outcome = transition(next, reply).state.outcome
+      return outcome?.reason === 'checkmate' && outcome.winner === 'white'
+    }).map(commandKey)
+    return { command: commandKey(action), whiteMatesInOne }
+  })
+  const alternativesAvoidingImmediateMate = alternatives.filter(alternative => alternative.whiteMatesInOne.length === 0)
+  ensure(alternatives.length === 28, 'Sicilian alternative count mismatch')
+  ensure(alternativesAvoidingImmediateMate.length === (rulesVersion === 'overdrive-v2' ? 13 : 28), 'Sicilian mate-avoidance count mismatch')
+
+  const searched = search(beforeEighthPly, {
+    id: 0, anchor: 0, maxDepth: 3, maxNodes: 1_400, maxTimeMs: Infinity, temperature: .1,
+  }, { timeLimitMs: Infinity, random: () => .5 })
+  const chosenAlternative = alternatives.find(alternative => searched.command && alternative.command === commandKey(searched.command))
+  ensure(chosenAlternative && chosenAlternative.whiteMatesInOne.length === 0, 'Search selected an avoidable immediate mate')
+  return {
+    probe: 'imposed-sicilian-opening-trap', rulesVersion,
+    method: 'Exact opening replay; exhaustive immediate replies for all 28 black alternatives; not a forced-mate proof from the initial position',
+    opening: `${firstSeven.join(' ')} g8f6 f1b5`,
+    energyBeforeCheck: afterEighthPly.energy, energyAfterCheck: afterBishopCheck.state.energy,
+    outcome: afterBishopCheck.state.outcome, legalReplies,
+    alternatives, alternativesAvoidingImmediateMate: alternativesAvoidingImmediateMate.map(alternative => alternative.command),
+    searchedAlternative: searched.command,
+    search: { depth: searched.diagnostics.depth, nodes: searched.diagnostics.nodes, stopReason: searched.diagnostics.stopReason },
+  }
 }
 
 export function runBalanceProbes() {
@@ -119,6 +174,7 @@ export function runBalanceProbes() {
     }
     ensure(JSON.stringify(remainingOwnTurns) === '[2,2,1,1,0]', 'Form did not expire on the third own turn')
     results.push({ probe: 'form-expires-on-third-own-turn', rulesVersion, remainingOwnTurns })
+    results.push(sicilianOpeningProbe(rulesVersion))
   }
-  return { method: 'Handcrafted deterministic core transitions and two depth-two tactical searches; not full games', probes: results.length, results }
+  return { method: 'Deterministic core probes, exhaustive opening-trap replies and four tactical SDK searches; not full games', probes: results.length, results }
 }

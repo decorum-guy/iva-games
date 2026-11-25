@@ -32,6 +32,7 @@ export interface AuditOptions {
   readonly maxDepth: number
   readonly temperature: number
   readonly maxPly: number
+  readonly openingPlies?: number
 }
 const sides: readonly Side[] = ['white', 'black']
 const both = <T>(factory: () => T): Record<Side, T> => ({ white: factory(), black: factory() })
@@ -46,7 +47,7 @@ const initialState = (rulesVersion: RulesVersion) => createPosition({ pieces: cr
 export function runAuditGame(options: AuditOptions, progress?: (ply: number) => void) {
   const opening = AUDIT_OPENINGS[options.opening]
   if (!opening) throw new Error(`Unknown opening ${options.opening}`)
-  const tape = opening[1].split(' ')
+  const tape = opening[1].split(' ').slice(0, options.openingPlies ?? 8)
   const playerSeeds = [options.seed >>> 0, (options.seed ^ 0x9e3779b9) >>> 0]
   const random = { white: rng(playerSeeds[options.swap ? 1 : 0]), black: rng(playerSeeds[options.swap ? 0 : 1]) }
   const preset: OverdrivePreset = { id: 0, anchor: 0, maxDepth: options.maxDepth, maxNodes: options.nodeCap, maxTimeMs: Infinity, temperature: options.temperature }
@@ -136,7 +137,7 @@ export function runAuditGame(options: AuditOptions, progress?: (ply: number) => 
   const activatedSides = sides.filter(side => stats.firstActivation[side] !== null)
   const firstActivator = activatedSides.sort((a, b) => stats.firstActivation[a]! - stats.firstActivation[b]!)[0] ?? null
   const summary = {
-    options, openingName: opening[0], plies: commands.length, outcome: state.outcome,
+    options, openingName: tape.length ? opening[0] : 'initial-position', plies: commands.length, outcome: state.outcome,
     unfinished: !state.outcome, finalMaterialWhite: material(state, 'white'),
     firstActivator, firstActivatorWon: firstActivator && state.outcome?.winner ? firstActivator === state.outcome.winner : null,
     firstActivatorLost: firstActivator && state.outcome?.winner ? opposite(firstActivator) === state.outcome.winner : null,

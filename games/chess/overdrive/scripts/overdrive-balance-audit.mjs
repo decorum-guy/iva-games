@@ -32,6 +32,8 @@ if (!isMainThread) {
   const nodeCap = integer('nodes', 1400), maxDepth = integer('depth', 3), maxPly = integer('plies', 300)
   const temperature = Number(args.get('--temperature') ?? .1)
   if (!Number.isFinite(temperature) || temperature < 0) throw new Error('Invalid temperature')
+  const openingPlies = Number(args.get('--opening-plies') ?? 8)
+  if (!Number.isInteger(openingPlies) || openingPlies < 0 || openingPlies > 8) throw new Error('Invalid opening-plies')
   mkdirSync(output, { recursive: true })
   execFileSync(process.execPath, [resolve(repository, 'node_modules/vite/bin/vite.js'), 'build', '--ssr', 'src/engine/balance-audit.ts', '--outDir', `${output}/engine`, '--emptyOutDir'], { cwd: fileURLToPath(new URL('../', import.meta.url)), stdio: 'inherit' })
   const sourceCommit = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: repository, encoding: 'utf8' }).trim()
@@ -41,7 +43,7 @@ if (!isMainThread) {
   const jobs = []
   for (let opening = 0; opening < openings; opening++) for (let sample = 0; sample < seeds; sample++) for (const swap of [false, true]) for (const rulesVersion of versions) {
     const seed = 26112601 + opening * 1000 + sample * 2
-    jobs.push({ id: `${rulesVersion}-o${opening + 1}-s${sample + 1}-${swap ? 'ba' : 'ab'}`, rulesVersion, opening, seed, swap, nodeCap, maxDepth, maxPly, temperature })
+    jobs.push({ id: `${rulesVersion}-o${opening + 1}-s${sample + 1}-${swap ? 'ba' : 'ab'}`, rulesVersion, opening, seed, swap, nodeCap, maxDepth, maxPly, temperature, ...(openingPlies !== 8 ? { openingPlies } : {}) })
   }
   const summaries = [], pending = [], active = new Set()
   for (const job of jobs) {
@@ -54,7 +56,7 @@ if (!isMainThread) {
     } else pending.push(job)
   }
   const started = Date.now()
-  const save = () => writeFileSync(resolve(output, 'summary.json'), JSON.stringify({ sourceCommit, engineSha256, settings: { openings, seeds, workers, nodeCap, maxDepth, maxPly, temperature }, expectedGames: jobs.length, completedGames: summaries.length, summaries: [...summaries].sort((a, b) => a.options.id.localeCompare(b.options.id)) }, null, 2))
+  const save = () => writeFileSync(resolve(output, 'summary.json'), JSON.stringify({ sourceCommit, engineSha256, settings: { openings, seeds, workers, nodeCap, maxDepth, maxPly, temperature, openingPlies }, expectedGames: jobs.length, completedGames: summaries.length, summaries: [...summaries].sort((a, b) => a.options.id.localeCompare(b.options.id)) }, null, 2))
   save()
   await new Promise((finish, reject) => {
     if (!pending.length) return finish()
