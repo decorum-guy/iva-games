@@ -9,3 +9,7 @@ test-results/
 .vite/
 .DS_Store
 *.local
+.runtime/
+dist-platform/
+dist-portal/
+apps/portal/dist/

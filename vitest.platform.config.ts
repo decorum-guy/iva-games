@@ -1,0 +1,8 @@
+import { defineConfig } from 'vitest/config';
+
+export default defineConfig({
+  test: {
+    include: ['apps/platform/**/*.test.ts', 'apps/portal/src/**/*.test.ts', 'packages/session-kit/**/*.test.ts', 'packages/telegram-transport/**/*.test.ts'],
+    testTimeout: 15_000,
+  },
+});

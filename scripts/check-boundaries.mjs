@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url'
 import ts from 'typescript'
 
 const root = fileURLToPath(new URL('../', import.meta.url))
-const paths = ['packages/engine-sdk', 'games/chess/remorse', 'games/chess/overdrive', 'apps/server']
+const paths = ['packages/engine-sdk', 'games/chess/remorse', 'games/chess/overdrive', 'apps/server', 'packages/session-kit', 'packages/telegram-transport', 'apps/platform', 'apps/portal']
 const packages = await Promise.all(paths.map(async path => ({
   path, directory: resolve(root, path), manifest: JSON.parse(await readFile(join(root, path, 'package.json'), 'utf8')),
 })))
@@ -39,15 +39,18 @@ for (const pkg of packages) {
       if (pkg.manifest.name === '@chess-2/engine-sdk' || sourceIsCore) {
         failures.push(`${relative(root, file)}: pure rules/search imports an external dependency: ${specifier}`)
       }
-      if (!specifier.startsWith('@chess-2/')) return
+      if (!specifier.startsWith('@chess-2/') && !specifier.startsWith('@iva-games/')) return
       const name = specifier.split('/').slice(0, 2).join('/')
       const dependency = byName.get(name)
       const exportPath = specifier === name ? '.' : '.' + specifier.slice(name.length)
       if (!dependency || !pkg.manifest.dependencies?.[name] || !dependency.manifest.exports?.[exportPath]) {
         failures.push(`${relative(root, file)}: undeclared workspace dependency/export: ${specifier}`)
       }
-      if (pkg.path.startsWith('games/') && name !== '@chess-2/engine-sdk') {
+      if (pkg.path.startsWith('games/') && !['@chess-2/engine-sdk', '@iva-games/session-kit'].includes(name)) {
         failures.push(`${relative(root, file)}: a game depends on another game or server: ${specifier}`)
+      }
+      if (pkg.path === 'apps/portal' && ['@iva-games/platform', '@iva-games/telegram-transport'].includes(name)) {
+        failures.push(`${relative(root, file)}: portal imports a server-only package: ${specifier}`)
       }
     }
     const visit = node => {

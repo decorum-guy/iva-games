@@ -1,0 +1,54 @@
+import { createPlatformLabRegistration } from '@iva-games/session-kit/lab';
+import { createTelegramTransport } from '@iva-games/telegram-transport';
+import { loadPlatformConfig } from './config.js';
+import { createPlatformHttpServer } from './http.js';
+import { PlatformService } from './service.js';
+import { TelegramService } from './telegram/index.js';
+
+process.umask(0o077);
+const config = loadPlatformConfig();
+const lab = createPlatformLabRegistration({ databasePath: config.runtimeDatabasePath });
+const platform = new PlatformService({ databasePath: config.databasePath, publicOrigin: config.publicOrigin, mail: config.mail, games: [lab] });
+await platform.ready;
+const telegramTransport = config.telegram ? createTelegramTransport({
+  botToken: config.telegram.botToken, proxyUrl: config.telegram.proxyUrl,
+  portalOrigin: config.publicOrigin, timeoutMs: 10_000,
+}) : undefined;
+const telegram = config.telegram && telegramTransport ? new TelegramService({
+  db: platform.db, publicOrigin: config.publicOrigin, botId: config.telegram.botId,
+  botUsername: config.telegram.botUsername, webhookSecret: config.telegram.webhookSecret,
+  proofEncryptionKey: config.telegram.proofEncryptionKey, transport: telegramTransport, sendTimeoutMs: 10_000,
+}) : undefined;
+if (telegram) platform.setInvitationDelivery(invitationId => telegram.enqueueInvitation(invitationId));
+const server = createPlatformHttpServer(platform, {
+  publicOrigin: config.publicOrigin, allowedOrigins: config.allowedOrigins,
+  allowedHosts: config.allowedHosts, secureCookies: config.publicOrigin.startsWith('https:'), serveDirectory: config.serveDirectory,
+  telegram, telegramWebhookSecret: config.telegram?.webhookSecret,
+});
+let telegramWork: Promise<void> | undefined;
+const runWorkers = (): void => {
+  void platform.reconcile().catch(() => { console.error('Platform reconciliation failed; durable state retained.'); });
+  if (telegram && !telegramWork) {
+    telegramWork = telegram.drain({ limit: 1 }).then(() => {}, () => {
+      console.error('Telegram outbox attempt failed; durable state retained.');
+    }).finally(() => { telegramWork = undefined; });
+  }
+};
+const timer = setInterval(runWorkers, 1000);
+timer.unref();
+server.listen(config.port, config.host, () => {
+  console.info(`Iva Games platform listening on ${config.host}:${config.port}`);
+  if (config.mailMode === 'file') console.info('Development file mailbox active. No email is sent.');
+  console.info(telegram ? 'Telegram outbox enabled with an explicit proxy.' : 'Telegram integration is not configured.');
+  runWorkers();
+});
+let stopping = false;
+const stop = (): void => {
+  if (stopping) return;
+  stopping = true; clearInterval(timer);
+  server.close(() => { void Promise.all([platform.settle(), telegramWork]).then(() => {
+    telegramTransport?.close(); platform.close(); lab.close();
+  }); });
+};
+process.once('SIGINT', stop);
+process.once('SIGTERM', stop);
