@@ -1,5 +1,15 @@
 # Iva Games — latest project direction
 
+## Active review: OVERDRIVE energy v2 and publication
+
+On 26 November 2026 the owner supplied completed Mac acceptance reports for the portal and OVERDRIVE, explicitly requested new synthetic games to assess the changed energy balance, and purchased **iva-games.pro**. Treat the purchase as owner-provided context, not evidence of configured DNS or hosting. Review and preserve the requested two banks of three, impulse cost 3, form cost 6, capture rewards 1/2/2/3/4 and fresh-check reward 2. Old v1 saves and rooms retain their own rules. A proposed balancing change needs measured evidence; never silently change the accepted rules while calling it a packaging fix.
+
+The review branch combines actual accepted platform head `b7ca237` (PR #7) and energy-v2 head `32c1377` (PR #8). Work proceeds in `review/overdrive-v2-release` / PR #9. Older branch-specific instructions below describe their respective stages. Preserve their history and local demonstrations. Do not repeat the migration or local acceptance merely because old prompts exist. No merge, DNS change or production restart is implied by preparing this release candidate.
+
+Use the real rules core and SDK for balance games; compare v1/v2 with matched opening tapes, seeds and budgets, distinguish unfinished games from draws, and record achieved search depth. Synthetic self-play is evidence about these bots, not a measured human Elo or proof of human balance. Keep full action logs under ignored `.qa`; commit the reproducer and concise measured report. Publish each completed milestone without force-push.
+
+The renewed platform acceptance report records working Mac SSH to `kz-bot` and an existing SOCKS5 route from `ha-vps`. The older SSH timeout is historical. A new game bot still needs its own configuration and accepted real delivery. Do not reuse another project's bot or send real test messages without a named authorized recipient.
+
 ## Active implementation: platform and District revision
 
 The owner now explicitly authorizes implementation of accounts, friends, rooms and invitations in parallel with the separate chess finishing/migration agent. Work in an isolated feature branch; the older documentation-only scope below is historical. Do not repeat the chess migration or overwrite that agent's game source. Integrate the existing chess network later through a versioned game-runtime adapter, preserving guest rooms and local saves.

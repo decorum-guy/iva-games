@@ -38,6 +38,8 @@
     "overdrive:e2e": "playwright test --config games/chess/overdrive/playwright.config.ts",
     "overdrive:smoke": "node scripts/overdrive-smoke.mjs",
     "overdrive:balance": "npm run balance --workspace @chess-2/overdrive --",
+    "overdrive:balance:audit": "node games/chess/overdrive/scripts/overdrive-balance-audit.mjs",
+    "overdrive:balance:probes": "node games/chess/overdrive/scripts/overdrive-balance-probes.mjs",
     "overdrive:models": "npm run models --workspace @chess-2/overdrive --",
     "overdrive:audio": "npm run audio --workspace @chess-2/overdrive --",
     "sdk:test": "npm run test --workspace @chess-2/engine-sdk --",
