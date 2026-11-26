@@ -1,0 +1,12 @@
+{
+  "$schema": "../map.schema.json",
+  "schemaVersion": 1,
+  "id": "gardens",
+  "version": "1",
+  "name": { "ru": "Два сада", "en": "Twin Gardens" },
+  "description": { "ru": "Дома вдоль верхней улицы, парки в двух дворах. Разные части района требуют разных планов.", "en": "Homes along the upper street, park sites in two courtyards. Different blocks call for different plans." },
+  "width": 5,
+  "height": 5,
+  "rows": ["H.H.H", "..P..", "P.S.P", "..H..", "..P.."],
+  "supportedPlayers": [2, 3, 4]
+}

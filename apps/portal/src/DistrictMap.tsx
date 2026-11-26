@@ -1,0 +1,88 @@
+import { useId, useState } from "react";
+import { DISTRICT_ISLAND_MAPS, DISTRICT_MAP_CATALOG, DISTRICT_MAPS } from "@iva-games/district";
+import type { DistrictMap } from "@iva-games/district";
+import { DistrictIslandScene } from "./DistrictIslandScene";
+import { useLanguage } from "./ui";
+import "./district.css";
+
+export function DistrictGlyph({ kind }: { kind: string }) {
+  return (
+    <svg viewBox="0 0 48 48" fill="none" aria-hidden="true" className="district-glyph">
+      {kind === "house" || kind === "neutral-house" ? <>
+        <path d="M7 24 24 9l17 15" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M12 22v18h24V22" fill="currentColor" fillOpacity=".14" stroke="currentColor" strokeWidth="2.5" />
+        <path d="M21 40V29h7v11M16 25h4" stroke="currentColor" strokeWidth="2.5" />
+      </> : kind === "cafe" ? <>
+        <path d="M9 20h30l-4-10H13z" fill="currentColor" fillOpacity=".18" stroke="currentColor" strokeWidth="2.5" />
+        <path d="M12 22v18h24V22M10 40h28M19 40V29h9v11M20 10l-2 10M28 10l2 10" stroke="currentColor" strokeWidth="2.5" />
+        <path d="M9 20v3a4 4 0 0 0 8 0 4 4 0 0 0 8 0 4 4 0 0 0 8 0 3 3 0 0 0 6 0v-3" stroke="currentColor" strokeWidth="2.5" />
+      </> : kind === "workshop" ? <>
+        <path d="M8 40V23l11-7v8l12-8v10h8v14z" fill="currentColor" fillOpacity=".16" stroke="currentColor" strokeWidth="2.5" strokeLinejoin="round" />
+        <path d="M33 25V9h5v17M14 31h4m5 0h4m6 0h2M14 36h4m5 0h4" stroke="currentColor" strokeWidth="2.5" />
+      </> : kind === "park" ? <>
+        <path d="M25 38V25" stroke="currentColor" strokeWidth="3" />
+        <path d="M14 27a7 7 0 0 1 1-13 10 10 0 0 1 20 1 7 7 0 0 1-1 13H14Z" fill="currentColor" fillOpacity=".2" stroke="currentColor" strokeWidth="2.5" />
+        <path d="M10 39h29" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
+      </> : kind === "square" ? <>
+        <path d="M10 34h28l-4 6H14z" fill="currentColor" fillOpacity=".2" stroke="currentColor" strokeWidth="2.5" />
+        <path d="M24 34V15m-8 8c0-5 8-9 8-9s8 4 8 9M20 10h8" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
+      </> : <>
+        <path d="M10 15h28v24H10z" stroke="currentColor" strokeWidth="2" strokeDasharray="4 4" />
+        <path d="M20 27h8m-4-4v8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+      </>}
+    </svg>
+  );
+}
+
+export function DistrictMapMini({ map }: { map: DistrictMap }) {
+  if (map.schemaVersion === 2) return <DistrictIslandScene map={map} mini />;
+  return <div className="district-map-mini" style={{ gridTemplateColumns: `repeat(${map.width}, 1fr)` }} aria-hidden="true">
+    {map.rows.flatMap((row, y) => [...row].map((kind, x) => <span key={`${x}:${y}`} className={`mini-${kind === "." ? "lot" : kind}`} />))}
+  </div>;
+}
+
+const mapKey = (map: DistrictMap) => `${map.id}@${map.version}`;
+
+export function DistrictMapSelect({ value, version, onChange }: { value: string; version?: string; onChange: (map: DistrictMap) => void }) {
+  const { t, lang } = useLanguage();
+  const group = useId();
+  const [search, setSearch] = useState("");
+  const selected = DISTRICT_MAP_CATALOG.find(map => map.id === value && (version === undefined || map.version === version)) ?? DISTRICT_ISLAND_MAPS[0];
+  const catalog = selected.schemaVersion === 1 ? DISTRICT_MAPS : DISTRICT_ISLAND_MAPS;
+  const latest = catalog.filter((map, index) => catalog.findIndex(item => item.id === map.id) === index);
+  const maps = latest.some(map => mapKey(map) === mapKey(selected)) ? latest : [selected, ...latest];
+  if (selected.schemaVersion === 1) return <div className="district-map-picker">
+    <label>{t("Карта района", "District map")}
+      <select aria-label={t("Карта района", "District map")} value={mapKey(selected)} onChange={event => {
+        const map = maps.find(item => mapKey(item) === event.target.value);
+        if (map) onChange(map);
+      }}>
+        {maps.map(map => <option value={mapKey(map)} key={mapKey(map)}>{map.name[lang]}</option>)}
+      </select>
+    </label>
+    <div className="district-map-preview"><DistrictMapMini map={selected} /><p>{selected.description[lang]}</p></div>
+  </div>;
+  const visible = maps.filter(map => map.name[lang].toLocaleLowerCase(lang).includes(search.trim().toLocaleLowerCase(lang)));
+  return <fieldset className="district-map-picker island-picker">
+    <legend>{t("Карта района", "District map")}</legend>
+    {maps.length > 6 && <input type="search" value={search} onChange={event => setSearch(event.target.value)}
+      aria-label={t("Найти карту", "Find a map")} placeholder={t("Поиск по картам", "Search maps")} />}
+    {visible.length === 0 && <p>{t("Карты не найдены", "No maps found")}</p>}
+    <div className="district-map-cards">
+      {visible.map(map => <label className="district-map-card" key={mapKey(map)}>
+        <input type="radio" name={group} checked={mapKey(map) === mapKey(selected)} onChange={() => onChange(map)} aria-label={map.name[lang]} />
+        <div className="district-map-card-image"><DistrictMapMini map={map} /></div>
+        <strong>{map.name[lang]}</strong>
+        <small>{t("2–4 игрока", "2–4 players")}</small>
+      </label>)}
+    </div>
+    <p>{selected.description[lang]}</p>
+  </fieldset>;
+}
+
+export function DistrictLobbyMap({ mapId, mapVersion, rulesVersion }: { mapId?: unknown; mapVersion?: unknown; rulesVersion?: string }) {
+  const { lang, t } = useLanguage();
+  const map = DISTRICT_MAP_CATALOG.find(item => item.id === mapId && (mapVersion === undefined || item.version === mapVersion)) ??
+    (rulesVersion === "district@0.2" ? DISTRICT_MAPS[0] : DISTRICT_ISLAND_MAPS[0]);
+  return <div className="district-lobby-map"><DistrictMapMini map={map} /><div><small>{t("Карта", "Map")}</small><strong>{map.name[lang]}</strong><p>{map.description[lang]}</p></div></div>;
+}
