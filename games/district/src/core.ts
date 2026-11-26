@@ -1,8 +1,8 @@
 import type { Participant } from '@iva-games/session-kit';
-import { DISTRICT_CONTENT_VERSION, parseDistrictMap } from './map-schema';
+import { parseDistrictMap } from './map-schema';
 import type { DistrictMap } from './maps';
 import { randomStream, sha256Words, shuffled } from './random';
-import { DistrictError, DISTRICT_RULES_VERSION, DISTRICT_TIMERS, GOALS } from './types';
+import { DistrictError, districtProfileForMap, districtProfileForVersion, DISTRICT_TIMERS, GOALS } from './types';
 import type { BotNegotiationMemory, BuildingKind, Bundle, CityEvent, DistrictAction, DistrictCell, DistrictHistoryEntry, DistrictOffer, DistrictPlayer, DistrictResult, DistrictState, EventId, GoalId, IncomeLine, ParkOffer, Resources, TradeOffer } from './types';
 
 export const RESOURCE_KEYS = ['coins', 'materials', 'crews'] as const;
@@ -87,7 +87,7 @@ export function playerById(state: DistrictState, participantId: string): Distric
 }
 const cellById = (state: DistrictState, cellId: string): DistrictCell => state.cells.find(c => c.id === cellId) ?? fail('INVALID_LOT','Выберите участок.');
 export function adjacentCells(cells: readonly DistrictCell[], cell: DistrictCell): DistrictCell[] {
-  return cells.filter(c => Math.abs(c.x-cell.x)+Math.abs(c.y-cell.y) === 1);
+  return cells.filter(c => cell.neighborIds ? cell.neighborIds.includes(c.id) : Math.abs(c.x-cell.x)+Math.abs(c.y-cell.y) === 1);
 }
 export function roundOrder(state: DistrictState): string[] {
   const shift = Math.max(0,state.round-1) % state.initialOrder.length;
@@ -147,7 +147,15 @@ function newOfferAllowed(state: DistrictState, authorId: string, now: number, co
 }
 export function createDistrictState(input: { matchId: string; roomId: string; participants: Participant[]; map: DistrictMap; now: number; seed: string }): DistrictState {
   const { participants,now,seed }=input;
-  const map=(()=>{try{return parseDistrictMap(input.map);}catch{return fail('INVALID_MAP','Выберите другую карту.');}})();
+  const map = (() => {
+    try {
+      if (input.map.schemaVersion === 1) return parseDistrictMap(input.map);
+      const definition: Partial<typeof input.map> = { ...input.map };
+      delete definition.geometry;
+      return parseDistrictMap(definition);
+    } catch { return fail('INVALID_MAP', 'Выберите другую карту.'); }
+  })();
+  const { schemaVersion, rulesVersion, contentVersion, botVersion } = districtProfileForMap(map.schemaVersion);
   if (!Number.isFinite(now) || !seed || !input.matchId || !input.roomId || participants.length<2 || participants.length>4 || !map.supportedPlayers.includes(participants.length)) fail('INVALID_ROSTER','Нужно от двух до четырёх участников.');
   const ids=new Set<string>(), seats=new Set<number>(), humans=new Set<string>();
   for (const p of participants) {
@@ -157,13 +165,16 @@ export function createDistrictState(input: { matchId: string; roomId: string; pa
       if (!p.playerId || p.playerId!==p.controller.playerId || humans.has(p.playerId)) fail('INVALID_ROSTER','Учётная запись занимает одно место.');
       humans.add(p.controller.playerId);
     } else if (p.controller.kind==='bot') {
-      if (p.playerId!==null || !['easy','normal','hard'].includes(p.controller.difficulty) || p.controller.botVersion!=='1' || p.controller.botProfileId!==`district:${p.controller.difficulty}`) fail('INCOMPATIBLE_VERSION','Добавьте бота заново.',409);
+      if (p.playerId!==null || !['easy','normal','hard'].includes(p.controller.difficulty) || p.controller.botVersion!==botVersion || p.controller.botProfileId!==`district:${p.controller.difficulty}`) fail('INCOMPATIBLE_VERSION','Добавьте бота заново.',409);
     } else fail('INVALID_ROSTER','Проверьте участников.');
   }
   if (!humans.size) fail('INVALID_ROSTER','В комнате нужен хотя бы один человек.');
-  const cells: DistrictCell[]=map.rows.flatMap((row,y)=>[...row].map((symbol,x)=>({ id:String.fromCharCode(65+x)+(y+1),x,y,kind:({'.':'lot',H:'neutral-house',P:'park',S:'square'} as const)[symbol as '.'|'H'|'P'|'S'],ownerId:null,building:null,completed:false,sponsors:[] })));
+  const spaces = map.schemaVersion === 2
+    ? map.geometry.hexes.map(({ id, x, y, kind, neighborIds, zoneId }) => ({ id, x, y, kind, neighborIds, zoneId }))
+    : map.rows.flatMap((row,y)=>[...row].map((symbol,x)=>({ id:String.fromCharCode(65+x)+(y+1),x,y,kind:({'.':'lot',H:'neutral-house',P:'park',S:'square'} as const)[symbol as '.'|'H'|'P'|'S'] })));
+  const cells: DistrictCell[] = spaces.map(cell => ({ ...cell, ownerId: null, building: null, completed: false, sponsors: [] }));
   const sorted=[...participants].sort((a,b)=>a.seatIndex-b.seatIndex);
-  const state: DistrictState={ schemaVersion:1,gameId:'district',rulesVersion:DISTRICT_RULES_VERSION,contentVersion:DISTRICT_CONTENT_VERSION,
+  const state: DistrictState={ schemaVersion,gameId:'district',rulesVersion,contentVersion,
     matchId:input.matchId,roomId:input.roomId,revision:0,round:0,totalRounds:participants.length===4?8:6,
     phase:'goals',phaseId:'0:goals:0',deadlineAt:now+DISTRICT_TIMERS.goals,updatedAt:now,developmentIndex:0,
     map:clone(map),cells,participants:clone(sorted),players:sorted.map(p=>({participant:clone(p),resources:{coins:12,materials:2,crews:2},left:false,ready:false,
@@ -171,6 +182,10 @@ export function createDistrictState(input: { matchId: string; roomId: string; pa
     initialOrder:shuffled(sorted.map(p=>p.participantId),randomStream(seed,'priority')),seed,eventDeck:shuffled(EVENT_DECK,randomStream(seed,'events')),
     event:null,offers:[],nextOfferId:1,history:[],outcome:null };
   assertDistrictInvariants(state); return state;
+}
+
+export function isDistrictRoadworksCell(cell: DistrictCell, event: CityEvent | null): boolean {
+  return event?.kind === 'roadworks' && (event.zoneId !== undefined ? event.zoneId === cell.zoneId : event.row === cell.y + 1);
 }
 
 export function incomeForCell(cells: readonly DistrictCell[], cell: DistrictCell, event: CityEvent | null): IncomeLine | null {
@@ -181,7 +196,7 @@ export function incomeForCell(cells: readonly DistrictCell[], cell: DistrictCell
   const workshops=neighbors.filter(c=>c.building?.kind==='workshop').length;
   const {kind,level}=cell.building;
   const eventCoins=(event?.kind==='filming' && kind==='cafe'?1:0)+(event?.kind==='fair' && kind==='house' && parks>0?1:0)
-    -(event?.kind==='traffic' && kind==='cafe'?1:0)-(event?.kind==='roadworks' && event.row===cell.y+1?1:0);
+    -(event?.kind==='traffic' && kind==='cafe'?1:0)-(isDistrictRoadworksCell(cell, event)?1:0);
   const base=kind==='workshop'?2:1;
   const coins=Math.max(0,base+level-1+(kind==='cafe'?houses:0)+(kind==='workshop'?0:parks)-workshops+eventCoins);
   return {lotId:cell.id,ownerId:cell.ownerId,building:clone(cell.building),coins,
@@ -218,7 +233,12 @@ function finalResults(state: DistrictState): DistrictResult[] {
 function startRound(state: DistrictState, now: number): void {
   state.phase='negotiation'; state.developmentIndex=0; state.deadlineAt=now+DISTRICT_TIMERS.negotiation;
   const kind=state.eventDeck[state.round-1];
-  state.event={kind,row:kind==='roadworks'?randomStream(state.seed,`roadworks:${state.round}`)(state.map.height)+1:null};
+  state.event = { kind, row: null };
+  if (kind === 'roadworks') {
+    const draw = randomStream(state.seed, `roadworks:${state.round}`);
+    if (state.map.schemaVersion === 1) state.event.row = draw(state.map.height) + 1;
+    else state.event.zoneId = state.map.zones[draw(state.map.zones.length)].id;
+  }
   for(const p of state.players) { p.ready=false; p.bid=null; p.bidConfirmed=false; p.botMemory=memory(state.round); }
   record(state,'event',{event:state.event}); state.revision++; refreshPhase(state);
 }
@@ -478,7 +498,7 @@ export function applyDistrictAction(original: DistrictState, participantId: stri
 
 /** Runtime/tests can validate loaded snapshots without changing them. */
 export function assertDistrictInvariants(state: DistrictState): void {
-  if(state.schemaVersion!==1 || state.rulesVersion!==DISTRICT_RULES_VERSION || state.contentVersion!==DISTRICT_CONTENT_VERSION) fail('INCOMPATIBLE_VERSION','Эта версия партии пока недоступна.',409);
+  if(districtProfileForVersion(state.rulesVersion, state.contentVersion)?.schemaVersion !== state.schemaVersion || state.map.schemaVersion !== state.schemaVersion) fail('INCOMPATIBLE_VERSION','Эта версия партии пока недоступна.',409);
   if(!integer(state.revision) || !integer(state.round) || state.round>state.totalRounds || state.phaseId!==`${state.round}:${state.phase}:${state.developmentIndex}`) fail('INVALID_STATE','Не удалось прочитать партию.',500);
   if(state.phase==='finished' ? (!state.outcome || state.deadlineAt!==null) : (!Number.isFinite(state.deadlineAt) || state.outcome!==null)) fail('INVALID_STATE','Не удалось прочитать партию.',500);
   for(const p of state.players) {

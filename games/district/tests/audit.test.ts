@@ -1,3 +1,4 @@
+import type { LegacyDistrictMap } from '../src/maps';
 import { describe, expect, it } from 'vitest';
 import { createHash } from 'node:crypto';
 import type { Participant } from '@iva-games/session-kit';
@@ -10,7 +11,7 @@ import type { DistrictAction, DistrictState, ParkOffer } from '../src/types';
 
 const participant = (index: number, bot = false): Participant => ({ participantId: `p${index}`, playerId: bot ? null : `u${index}`, displayName: `Player ${index}`, seatIndex: index,
   controller: bot ? { kind: 'bot', difficulty: 'normal', botProfileId: 'district:normal', botVersion: '1' } : { kind: 'human', playerId: `u${index}` } });
-const input = (participants = [participant(0), participant(1)]) => ({ participants, matchId: 'audit-match', roomId: 'audit-room', map: getDistrictMap('crossroads'), now: 1_000, seed: 'audit-reproducible-seed' });
+const input = (participants = [participant(0), participant(1)]) => ({ participants, matchId: 'audit-match', roomId: 'audit-room', map: (getDistrictMap('crossroads') as LegacyDistrictMap), now: 1_000, seed: 'audit-reproducible-seed' });
 const act = (state: DistrictState, id: string, action: DistrictAction, now = 1_001) => applyDistrictAction(state, id, action, now);
 function negotiation(participants = [participant(0), participant(1)]): DistrictState {
   let state = createDistrictState(input(participants));

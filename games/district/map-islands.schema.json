@@ -1,0 +1,177 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "District island map",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "profile",
+    "theme",
+    "id",
+    "version",
+    "name",
+    "description",
+    "supportedPlayers",
+    "landmasses",
+    "cells",
+    "zones"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "const": "../map-islands.schema.json"
+    },
+    "schemaVersion": {
+      "const": 2
+    },
+    "profile": {
+      "const": "district@0.3"
+    },
+    "theme": {
+      "const": "adriatic"
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]{1,47}$"
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^[1-9][0-9]{0,5}$"
+    },
+    "name": {
+      "$ref": "#/$defs/name"
+    },
+    "description": {
+      "type": "object",
+      "required": [
+        "ru",
+        "en"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "ru": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 240
+        },
+        "en": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 240
+        }
+      }
+    },
+    "supportedPlayers": {
+      "const": [
+        2,
+        3,
+        4
+      ]
+    },
+    "landmasses": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 5
+    },
+    "cells": {
+      "type": "array",
+      "minItems": 25,
+      "maxItems": 25,
+      "items": {
+        "$ref": "#/$defs/cell"
+      }
+    },
+    "zones": {
+      "type": "array",
+      "minItems": 5,
+      "maxItems": 5,
+      "items": {
+        "$ref": "#/$defs/zone"
+      }
+    }
+  },
+  "$defs": {
+    "name": {
+      "type": "object",
+      "required": [
+        "ru",
+        "en"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "ru": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 60
+        },
+        "en": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 60
+        }
+      }
+    },
+    "cell": {
+      "type": "object",
+      "required": [
+        "id",
+        "q",
+        "r",
+        "kind"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/cellId"
+        },
+        "q": {
+          "type": "integer",
+          "minimum": -12,
+          "maximum": 12
+        },
+        "r": {
+          "type": "integer",
+          "minimum": -12,
+          "maximum": 12
+        },
+        "kind": {
+          "enum": [
+            "lot",
+            "neutral-house",
+            "park",
+            "square"
+          ]
+        }
+      }
+    },
+    "cellId": {
+      "type": "string",
+      "pattern": "^[A-Z][A-Z0-9-]{0,7}$"
+    },
+    "zone": {
+      "type": "object",
+      "required": [
+        "id",
+        "name",
+        "cells"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{0,31}$"
+        },
+        "name": {
+          "$ref": "#/$defs/name"
+        },
+        "cells": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/cellId"
+          }
+        }
+      }
+    }
+  }
+}

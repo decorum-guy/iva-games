@@ -1,3 +1,4 @@
+import type { LegacyDistrictMap } from '../src/maps';
 import { describe, expect, it } from 'vitest';
 import type { Participant } from '@iva-games/session-kit';
 import { advanceDistrictTime, applyDistrictAction, assertDistrictInvariants, availableResources, buildingValue, calculateIncome, createDistrictState, emptyBundle, goalSatisfied, parseDistrictAction, reservedAssets, roundOrder } from '../src/core';
@@ -8,7 +9,7 @@ import type { BuildingKind, Bundle, DistrictAction, DistrictState, GoalId, Resou
 
 const person=(i:number,bot=false):Participant=>({participantId:`p${i}`,playerId:bot?null:`u${i}`,displayName:`Player ${i}`,seatIndex:i,
   controller:bot?{kind:'bot',difficulty:'normal',botProfileId:'district:normal',botVersion:'1'}:{kind:'human',playerId:`u${i}`}});
-const fresh=(count=3)=>createDistrictState({matchId:'match',roomId:'room',participants:Array.from({length:count},(_,i)=>person(i)),map:getDistrictMap('crossroads'),now:1000,seed:'test-seed'});
+const fresh=(count=3)=>createDistrictState({matchId:'match',roomId:'room',participants:Array.from({length:count},(_,i)=>person(i)),map:(getDistrictMap('crossroads') as LegacyDistrictMap),now:1000,seed:'test-seed'});
 const action=(s:DistrictState,pid:string,a:DistrictAction,now=1001)=>applyDistrictAction(s,pid,a,now);
 function negotiate(count=3):DistrictState {
   let s=fresh(count); for(const p of s.players) s=action(s,p.participant.participantId,{type:'choose-goal',goal:p.goalOptions[0]}); return s;
@@ -26,11 +27,11 @@ function development(s=auction()):DistrictState { for(const p of s.players) if(s
 
 describe('District initialization and parsing',()=>{
   it('pins a deep map/roster snapshot and deterministic independent randomness',()=>{
-    const map=getDistrictMap('crossroads'),participants=[person(0),person(1,true)];
+    const map=(getDistrictMap('crossroads') as LegacyDistrictMap),participants=[person(0),person(1,true)];
     const input={matchId:'m',roomId:'r',participants,map,now:0,seed:'0123456789abcdef'.repeat(4)};
     const s=createDistrictState(input); expect(createDistrictState(input)).toEqual(s);
     map.rows[0]='.....'; participants[0].displayName='changed';
-    expect(s.map.rows[0]).toBe('..P..'); expect(s.participants[0].displayName).toBe('Player 0');
+    expect((s.map as LegacyDistrictMap).rows[0]).toBe('..P..'); expect(s.participants[0].displayName).toBe('Player 0');
     expect(s.players.every(p=>p.resources.coins===12 && new Set(p.goalOptions).size===2)).toBe(true);
     expect(s.eventDeck).toHaveLength(12); expect(s.totalRounds).toBe(6); expect(fresh(4).totalRounds).toBe(8);
     expect(s.players[0].goalOptions).not.toBe(s.players[1].goalOptions);
@@ -39,7 +40,7 @@ describe('District initialization and parsing',()=>{
     expect(sha256Words('abc').map(n=>n.toString(16).padStart(8,'0')).join('')).toBe('ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad');
   });
   it('rejects all-bot public games, duplicate seats/accounts and unsupported roster',()=>{
-    const create=(participants:Participant[])=>createDistrictState({matchId:'m',roomId:'r',participants,map:getDistrictMap('crossroads'),now:0,seed:'x'});
+    const create=(participants:Participant[])=>createDistrictState({matchId:'m',roomId:'r',participants,map:(getDistrictMap('crossroads') as LegacyDistrictMap),now:0,seed:'x'});
     expect(()=>create([person(0,true),person(1,true)])).toThrow();
     expect(()=>create([person(0),person(0)])).toThrow();
     expect(()=>create([person(0)])).toThrow();
@@ -227,7 +228,7 @@ describe('goals, finish and exits',()=>{
     expect(JSON.stringify(s.outcome)).not.toContain('goalOptions');
   });
   it('explicit last-human exit abandons before pending auto-work/income/final',()=>{
-    let s=createDistrictState({matchId:'m',roomId:'r',participants:[person(0),person(1,true)],map:getDistrictMap('crossroads'),now:1000,seed:'z'});
+    let s=createDistrictState({matchId:'m',roomId:'r',participants:[person(0),person(1,true)],map:(getDistrictMap('crossroads') as LegacyDistrictMap),now:1000,seed:'z'});
     for(const p of s.players) s=action(s,p.participant.participantId,{type:'choose-goal',goal:p.goalOptions[0]});
     s=development(auction(s));s.round=6;s.initialOrder=['p1','p0'];s.developmentIndex=1;s.phaseId='6:development:1';
     const before=s.players[0].resources.coins;s=action(s,'p0',{type:'leave'});
@@ -255,8 +256,8 @@ describe('private observations',()=>{
     expect(after).toEqual(before);expect(JSON.stringify(after)).not.toContain('test-seed');expect(after.you.offers).toEqual([]);
   });
   it('returns independent copies with no authority or private account ids',()=>{
-    const s=negotiate(),v=viewDistrict(s,'p0');v.cells[0].ownerId='fake';v.you.resources.coins=999;v.map.rows[0]='.....';
-    expect(s.players[0].resources.coins).toBe(12);expect(s.cells[0].ownerId).toBeNull();expect(s.map.rows[0]).toBe('..P..');
+    const s=negotiate(),v=viewDistrict(s,'p0');v.cells[0].ownerId='fake';v.you.resources.coins=999;(v.map as LegacyDistrictMap).rows[0]='.....';
+    expect(s.players[0].resources.coins).toBe(12);expect(s.cells[0].ownerId).toBeNull();expect((s.map as LegacyDistrictMap).rows[0]).toBe('..P..');
     expect(JSON.stringify(viewDistrict(s,'p1'))).not.toContain('"playerId"');expect(()=>viewDistrict(s,'intruder')).toThrow();
   });
 });

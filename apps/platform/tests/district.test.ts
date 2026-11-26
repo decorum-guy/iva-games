@@ -1,3 +1,4 @@
+import Database from 'better-sqlite3';
 import { afterEach, describe, expect, it } from 'vitest';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -5,7 +6,7 @@ import { join } from 'node:path';
 import { request as httpRequest } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { createDistrictRegistration } from '@iva-games/district/runtime';
-import { DISTRICT_MAPS } from '@iva-games/district/maps';
+import { DEFAULT_ISLAND_MAP_ID, DISTRICT_ISLAND_MAPS, DISTRICT_MAPS } from '@iva-games/district/maps';
 import type { DistrictView } from '@iva-games/district';
 import { createPlatformLabRegistration } from '@iva-games/session-kit/lab';
 import { PlatformService } from '../src/service';
@@ -52,7 +53,7 @@ async function fixture() {
       },
     };
   }
-  return { platform, district, signup, now };
+  return { platform, district, signup, now, directory };
 }
 
 describe('District platform integration', () => {
@@ -61,18 +62,20 @@ describe('District platform integration', () => {
     const host = await f.signup('host');
     expect(f.platform.catalogue().find(game => game.gameId === 'district')).toMatchObject({ status: 'available', supportsBots: true, minPlayers: 2, maxPlayers: 4 });
     expect(f.platform.catalogue().find(game => game.gameId === 'district')).not.toHaveProperty('normalizeSettings');
-    const map = DISTRICT_MAPS[1];
+    const map = DISTRICT_ISLAND_MAPS.find(item => item.id === DEFAULT_ISLAND_MAP_ID)!;
     const created = await host.request<{ room: Room }>('/rooms', { gameId: 'district', capacity: 3, settings: { mapId: map.id, mapVersion: map.version } });
     expect(created.status).toBe(200);
     let room = created.body.room;
+    expect(room).toMatchObject({ rulesVersion: 'district@0.3', contentVersion: 'district-maps@0.2' });
     expect(room.settings).toEqual({ mapId: map.id, mapVersion: map.version });
     f.platform.setReady(host.id, room.roomId, { ready: true, expectedRevision: room.revision });
-    const changed = await host.request<{ room: Room }>(`/rooms/${room.roomId}/settings`, { expectedRevision: room.revision, settings: { mapId: DISTRICT_MAPS[2].id } });
+    const selected = DISTRICT_ISLAND_MAPS.find(item => item.id !== map.id) ?? map;
+    const changed = await host.request<{ room: Room }>(`/rooms/${room.roomId}/settings`, { expectedRevision: room.revision, settings: { mapId: selected.id } });
     expect(changed.status).toBe(200);
     room = changed.body.room;
-    expect(room.settings).toEqual({ mapId: DISTRICT_MAPS[2].id, mapVersion: DISTRICT_MAPS[2].version });
+    expect(room.settings).toEqual({ mapId: selected.id, mapVersion: selected.version });
     expect(room.members[0].ready).toBe(false);
-    const invalid = await host.request<{ error: { code: string } }>(`/rooms/${room.roomId}/settings`, { expectedRevision: room.revision, settings: { mapId: 'not-a-map' } });
+    const invalid = await host.request<{ error: { code: string } }>(`/rooms/${room.roomId}/settings`, { expectedRevision: room.revision, settings: { mapId: DISTRICT_MAPS[0].id } });
     expect(invalid).toMatchObject({ status: 400, body: { error: { code: 'INVALID_SETTINGS' } } });
     expect(f.platform.getRoom(host.id, room.roomId).settings).toEqual(room.settings);
     expect(f.platform.getRoom(host.id, room.roomId).revision).toBe(room.revision);
@@ -82,6 +85,38 @@ describe('District platform integration', () => {
     expect(labExtra).toMatchObject({ status: 400, body: { error: { code: 'INVALID_SETTINGS' } } });
   });
 
+  it('starts a persisted v0.2 lobby with its legacy map selection, bot version and snapshot', async () => {
+    const f = await fixture();
+    const host = await f.signup('host');
+    const created = f.platform.createRoom(host.id, { gameId: 'district', capacity: 2 });
+    expect(created.settings.mapId).toBe(DEFAULT_ISLAND_MAP_ID);
+    const db = new Database(join(f.directory, 'platform.sqlite'));
+    try {
+      db.prepare('UPDATE rooms SET rules_version=?,content_version=?,settings_json=? WHERE room_id=?')
+        .run('district@0.2', 'district-maps@0.1', JSON.stringify({ mapId: 'crossroads', mapVersion: '1' }), created.roomId);
+    } finally { db.close(); }
+
+    let room = f.platform.getRoom(host.id, created.roomId);
+    const settingsPath = `/rooms/${room.roomId}/settings`;
+    const rejected = await host.request(settingsPath, { expectedRevision: room.revision, settings: { mapId: DEFAULT_ISLAND_MAP_ID } });
+    expect(rejected).toMatchObject({ status: 400, body: { error: { code: 'INVALID_SETTINGS' } } });
+    const other = DISTRICT_MAPS.find(item => item.id !== 'crossroads')!;
+    const changed = await host.request<{ room: Room }>(settingsPath, { expectedRevision: room.revision, settings: { mapId: other.id } });
+    expect(changed.status).toBe(200);
+    room = changed.body.room;
+    expect(room.settings).toEqual({ mapId: other.id, mapVersion: other.version });
+    room = f.platform.addBot(host.id, room.roomId, { expectedRevision: room.revision, difficulty: 'normal' });
+    expect(room.members.find(member => member.controller.kind === 'bot')?.controller).toMatchObject({ botVersion: '1' });
+    f.platform.setReady(host.id, room.roomId, { ready: true, expectedRevision: room.revision });
+    const started = await host.request<{ room: Room }>(`/rooms/${room.roomId}/start`, { expectedRevision: room.revision });
+    expect(started.body.room).toMatchObject({ state: 'playing', rulesVersion: 'district@0.2', contentVersion: 'district-maps@0.1' });
+    const runtimeDb = new Database(join(f.directory, 'runtime.sqlite'), { readonly: true });
+    try {
+      const snapshot = runtimeDb.prepare('SELECT state FROM district_matches WHERE match_id=?').pluck().get(started.body.room.matchId) as string;
+      expect(JSON.parse(snapshot)).toMatchObject({ schemaVersion: 1, rulesVersion: 'district@0.2', contentVersion: 'district-maps@0.1', map: other });
+    } finally { runtimeDb.close(); }
+  });
+
   it('starts a mixed room with friends, freezes its map, rejects outsiders and reports abandonment once', async () => {
     const f = await fixture();
     const host = await f.signup('host');
@@ -89,12 +124,13 @@ describe('District platform integration', () => {
     const outsider = await f.signup('outsider');
     const friendship = f.platform.requestFriend(host.id, friend.id);
     f.platform.respondFriend(friend.id, friendship.requestId, 'accept');
-    const map = DISTRICT_MAPS[1];
+    const map = DISTRICT_ISLAND_MAPS.find(item => item.id === DEFAULT_ISLAND_MAP_ID)!;
     let room = f.platform.createRoom(host.id, { gameId: 'district', capacity: 3, settings: { mapId: map.id, mapVersion: map.version } });
     const invite = f.platform.invite(host.id, room.roomId, friend.id);
     f.platform.acceptInvitation(friend.id, invite.invitationId);
     room = f.platform.joinRoom(friend.id, room.roomId);
     room = f.platform.addBot(host.id, room.roomId, { difficulty: 'hard', expectedRevision: room.revision });
+    expect(room.members.find(member => member.controller.kind === 'bot')?.controller).toMatchObject({ botVersion: '2' });
     expect(() => f.platform.changeSettings(friend.id, room.roomId, { expectedRevision: room.revision, settings: { mapId: 'crossroads' } })).toThrow();
     f.platform.setReady(host.id, room.roomId, { expectedRevision: room.revision, ready: true });
     f.platform.setReady(friend.id, room.roomId, { expectedRevision: room.revision, ready: true });
