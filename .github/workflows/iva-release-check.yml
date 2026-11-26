@@ -3,16 +3,27 @@ name: Iva Games release images
 on:
   pull_request:
   workflow_dispatch:
+  workflow_run:
+    workflows: [Iva Games platform]
+    types: [completed]
+    branches: [main]
 
 permissions:
   contents: read
 
 concurrency:
-  group: iva-release-check-${{ github.ref }}
-  cancel-in-progress: true
+  group: iva-release-check-${{ github.event.workflow_run.head_sha || github.sha }}
+  cancel-in-progress: false
 
 jobs:
   image:
+    if: >-
+      github.event_name != 'workflow_run' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'push' &&
+       github.event.workflow_run.head_repository.full_name == github.repository)
+    permissions:
+      contents: read
     name: ${{ matrix.service }} image
     runs-on: ubuntu-24.04
     timeout-minutes: 20
@@ -37,6 +48,7 @@ jobs:
       - uses: actions/checkout@v6
         with:
           persist-credentials: false
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
 
       - name: Validate deployment Compose and Caddy configuration
         if: matrix.service == 'platform'
@@ -86,192 +98,110 @@ jobs:
       - name: Check isolated production runtime and persistent volume
         run: |
           set -euo pipefail
-          docker volume create "$SMOKE_VOLUME" >/dev/null
+          deploy/iva-games/verify-image.sh
 
-          start_runtime() {
-            local args=(
-              --detach --name "$SMOKE_CONTAINER" --init --network none
-              --read-only --tmpfs /tmp
-              --mount "type=volume,src=$SMOKE_VOLUME,dst=/data"
-              --health-interval 2s --health-start-period 5s --health-retries 10
-              --env NODE_ENV=production
-            )
-            if [[ "$IMAGE_KIND" == chess ]]; then
-              args+=(
-                --env PUBLIC_ORIGIN=https://chess.iva-games.pro
-                --env DATABASE_PATH=/data/remorse.sqlite
-                --env OVERDRIVE_DATABASE_PATH=/data/overdrive.sqlite
-              )
-            else
-              # These are CI-only non-delivering placeholders, not an SMTP server.
-              # The container has loopback only; no real credentials or recipients.
-              # Production still requires SMTP configuration. No mail action is run.
-              args+=(
-                --env PORTAL_ORIGIN=https://iva-games.pro
-                --env MAIL_MODE=smtp
-                --env SMTP_HOST=mail.invalid
-                --env SMTP_PORT=465
-                --env SMTP_SECURE=true
-                --env SMTP_FROM=ci@example.invalid
-                --env TELEGRAM_ENABLED=false
-              )
-            fi
-            docker run "${args[@]}" "$IMAGE_TAG" >/dev/null
-            test "$(docker inspect --format '{{.HostConfig.NetworkMode}}' "$SMOKE_CONTAINER")" = none
-          }
-
-          wait_healthy() {
-            local state
-            for attempt in {1..30}; do
-              state="$(docker inspect --format '{{.State.Status}}/{{.State.Health.Status}}' "$SMOKE_CONTAINER")"
-              if [[ "$state" == running/healthy ]]; then return 0; fi
-              if [[ "$state" == exited/* || "$state" == dead/* || "$state" == */unhealthy ]]; then
-                printf 'Runtime failed health check: %s\n' "$state" >&2
-                return 1
-              fi
-              sleep 2
-            done
-            printf 'Runtime did not become healthy within 60 seconds.\n' >&2
-            return 1
-          }
-
-          # Passed over stdin to Node in /app so imports resolve to runtime deps.
-          cat > "$RUNNER_TEMP/iva-image-check.mjs" <<'NODE'
-          import assert from 'node:assert/strict';
-          import { accessSync, constants, readFileSync, writeFileSync } from 'node:fs';
-          import Database from 'better-sqlite3';
-
-          const [kind, phase] = process.argv.slice(2);
-          assert.ok(['chess', 'platform'].includes(kind));
-          assert.ok(['initial', 'restored'].includes(phase));
-          assert.equal(process.env.NODE_ENV, 'production');
-          assert.notEqual(process.getuid(), 0, 'Application must run as a non-root user');
-          const base = kind === 'chess' ? 'http://127.0.0.1:4173' : 'http://127.0.0.1:4310';
-          const get = async (path, options = {}) => {
-            const response = await fetch(new URL(path, base), {
-              ...options, signal: AbortSignal.timeout(5000), redirect: 'error',
-            });
-            assert.equal(response.status, 200, `${path}: expected HTTP 200`);
-            return response;
-          };
-
-          const healthPaths = kind === 'chess'
-            ? ['/api/health', '/api/overdrive/health']
-            : ['/health/live', '/health/ready'];
-          for (const path of healthPaths) {
-            const response = await get(path);
-            assert.match(response.headers.get('content-type') ?? '', /application\/json/);
-            const health = await response.json();
-            assert.equal(health.ok, true);
-            if (kind === 'platform') assert.equal(health.service, 'iva-platform');
-            else {
-              assert.equal(health.protocol, path.includes('overdrive') ? 'overdrive-online-v2' : 'remorse-online-v1');
-              assert.equal(health.rulesVersion, path.includes('overdrive') ? 'overdrive-v2' : 'remorse-digital-v1');
-            }
-          }
-
-          for (const path of kind === 'chess' ? ['/', '/overdrive/'] : ['/']) {
-            const response = await get(path);
-            assert.match(response.headers.get('content-type') ?? '', /text\/html/);
-            const html = await response.text();
-            assert.ok(html.includes('id="root"'), `${path}: missing application root`);
-            const assets = [...html.matchAll(/(?:src|href)="([^"]+\.(?:js|css))"/g)].map(match => match[1]);
-            assert.ok(assets.some(asset => asset.endsWith('.js')), `${path}: missing JavaScript bundle`);
-            assert.ok(assets.some(asset => asset.endsWith('.css')), `${path}: missing stylesheet`);
-            for (const asset of assets) {
-              const target = new URL(asset, new URL(path, base));
-              assert.equal(target.origin, base, 'Static assets must stay on the application origin');
-              const resource = await get(target.pathname);
-              const mime = resource.headers.get('content-type') ?? '';
-              assert.match(mime, asset.endsWith('.js') ? /javascript/ : /text\/css/);
-              assert.ok((await resource.arrayBuffer()).byteLength > 100, `${asset}: empty resource`);
-            }
-          }
-
-          if (kind === 'platform') {
-            assert.equal(process.env.MAIL_MODE, 'smtp');
-            assert.equal(process.env.SMTP_HOST, 'mail.invalid');
-            assert.equal(process.env.TELEGRAM_ENABLED, 'false');
-            const catalogue = await (await get('/api/platform/v1/games')).json();
-            assert.ok(catalogue.games.some(game => game.gameId === 'platform-lab' && game.status === 'available'));
-            if (phase === 'initial') {
-              const response = await get('/api/platform/v1/session');
-              assert.match(response.headers.get('set-cookie') ?? '', /__Host-iva_session=/);
-              assert.match(response.headers.get('set-cookie') ?? '', /HttpOnly/);
-              assert.match(response.headers.get('set-cookie') ?? '', /Secure/);
-              const session = await response.json();
-              assert.equal(session.user, null);
-              assert.equal(typeof session.csrfToken, 'string');
-              assert.ok(session.csrfToken.length > 20);
-            }
-          } else if (phase === 'initial') {
-            for (const path of ['/api/guest', '/api/overdrive/guest']) {
-              const response = await get(path, {
-                method: 'POST', body: '{}',
-                headers: { Origin: 'https://chess.iva-games.pro', 'Content-Type': 'application/json' },
-              });
-              assert.match(response.headers.get('set-cookie') ?? '', /HttpOnly/);
-              assert.match(response.headers.get('set-cookie') ?? '', /Secure/);
-              assert.equal(typeof (await response.json()).protocol, 'string');
-            }
-          }
-
-          const databases = kind === 'chess'
-            ? [
-                ['remorse.sqlite', ['guests', 'rooms', 'commands'], 'guests'],
-                ['overdrive.sqlite', ['guests', 'rooms', 'commands'], 'guests'],
-              ]
-            : [
-                ['platform.sqlite', ['players', 'web_sessions', 'rooms', 'invitations'], 'web_sessions'],
-                ['platform-lab.sqlite', ['matches', 'action_receipts'], 'matches'],
-              ];
-          const counts = {};
-          for (const [file, expectedTables, countTable] of databases) {
-            const path = `/data/${file}`;
-            accessSync(path, constants.R_OK | constants.W_OK);
-            const db = new Database(path, { readonly: true, fileMustExist: true });
-            try {
-              assert.equal(db.pragma('journal_mode', { simple: true }), 'wal');
-              assert.equal(db.pragma('quick_check', { simple: true }), 'ok');
-              assert.deepEqual(db.pragma('foreign_key_check'), []);
-              const tables = new Set(db.prepare("SELECT name FROM sqlite_master WHERE type='table'").all().map(row => row.name));
-              for (const table of expectedTables) assert.ok(tables.has(table), `${file}: missing ${table}`);
-              counts[file] = db.prepare(`SELECT count(*) AS count FROM ${countTable}`).get().count;
-              if (countTable !== 'matches') assert.ok(counts[file] > 0, `${file}: API session was not persisted`);
-            } finally { db.close(); }
-          }
-          const marker = '/data/ci-persistence.json';
-          if (phase === 'initial') writeFileSync(marker, JSON.stringify({ kind, counts }), { flag: 'wx', mode: 0o600 });
-          else {
-            const before = JSON.parse(readFileSync(marker, 'utf8'));
-            assert.equal(before.kind, kind);
-            assert.deepEqual(counts, before.counts, 'Application data changed after container replacement');
-          }
-          console.log(`${kind}/${phase}: health, HTML, JS/CSS, API session and two SQLite databases passed.`);
-          NODE
-
-          start_runtime
-          wait_healthy
-          docker exec --interactive "$SMOKE_CONTAINER" node --input-type=module - "$IMAGE_KIND" initial < "$RUNNER_TEMP/iva-image-check.mjs"
-          docker stop --timeout 60 "$SMOKE_CONTAINER" >/dev/null
-          test "$(docker inspect --format '{{.State.ExitCode}}' "$SMOKE_CONTAINER")" = 0
-          docker rm "$SMOKE_CONTAINER" >/dev/null
-
-          # A new container uses the same named volume; no fixture DB is imported.
-          start_runtime
-          wait_healthy
-          docker exec --interactive "$SMOKE_CONTAINER" node --input-type=module - "$IMAGE_KIND" restored < "$RUNNER_TEMP/iva-image-check.mjs"
-          docker stop --timeout 60 "$SMOKE_CONTAINER" >/dev/null
-          test "$(docker inspect --format '{{.State.ExitCode}}' "$SMOKE_CONTAINER")" = 0
-
-      - name: Show isolated runtime log on failure
-        if: failure()
-        run: docker logs --tail 150 "$SMOKE_CONTAINER" 2>&1 || true
-
-      - name: Remove temporary container and data
-        if: always()
+  publish:
+    needs: image
+    if: github.event_name == 'workflow_run'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - service: chess
+            dockerfile: Dockerfile
+          - service: platform
+            dockerfile: Dockerfile.platform
+    env:
+      RELEASE_SHA: ${{ github.event.workflow_run.head_sha }}
+      SERVICE: ${{ matrix.service }}
+      DOCKERFILE: ${{ matrix.dockerfile }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          persist-credentials: false
+      - name: Publish the reviewed main revision
+        env:
+          REGISTRY_TOKEN: ${{ github.token }}
         run: |
-          docker rm --force "$SMOKE_CONTAINER" >/dev/null 2>&1 || true
-          docker volume rm "$SMOKE_VOLUME" >/dev/null 2>&1 || true
-          rm -f "$RUNNER_TEMP/iva-image-check.mjs"
-      # No registry login, image push, deployment, secrets or artifact upload.
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$RELEASE_SHA"
+          trap 'docker logout ghcr.io >/dev/null 2>&1 || true' EXIT
+          printf '%s\n' "$REGISTRY_TOKEN" | docker login ghcr.io -u "$GITHUB_REPOSITORY_OWNER" --password-stdin
+          image="ghcr.io/${GITHUB_REPOSITORY}-$SERVICE:$RELEASE_SHA"
+          if docker buildx imagetools inspect "$image" >/dev/null 2>&1; then
+            echo "Reusing the existing immutable SHA tag for $SERVICE."
+            exit 0
+          fi
+          read -r inputs compatibility < <(deploy/iva-games/image-inputs.sh "$SERVICE")
+          docker build --pull --platform linux/amd64 --file "$DOCKERFILE" \
+            --build-arg VCS_REF="$RELEASE_SHA" \
+            --label "org.iva-games.inputs=$inputs" \
+            --label "org.iva-games.compatibility=$compatibility" --tag "$image" .
+          export IMAGE_KIND="$SERVICE" IMAGE_TAG="$image"
+          export SMOKE_CONTAINER="iva-publish-$SERVICE-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          export SMOKE_VOLUME="$SMOKE_CONTAINER-data"
+          deploy/iva-games/verify-image.sh
+          docker push "$image"
+
+
+  deploy:
+    needs: publish
+    if: github.event_name == 'workflow_run'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    permissions:
+      contents: read
+      packages: read
+    environment: production
+    concurrency:
+      group: iva-games-vps
+      cancel-in-progress: false
+    env:
+      RELEASE_SHA: ${{ github.event.workflow_run.head_sha }}
+      VPS_HOST: ${{ vars.IVA_SSH_HOST }}
+      VPS_PORT: ${{ vars.IVA_SSH_PORT }}
+      VPS_HOST_KEY: ${{ vars.IVA_SSH_HOST_KEY }}
+    steps:
+      - name: Promote the reviewed image digests
+        env:
+          DEPLOY_KEY: ${{ secrets.IVA_DEPLOY_SSH_KEY }}
+          REGISTRY_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          umask 077
+          config="$(mktemp -d)"
+          trap 'docker logout ghcr.io >/dev/null 2>&1 || true; rm -rf -- "$config"' EXIT
+          test -n "$DEPLOY_KEY" && test -n "$VPS_HOST_KEY"
+          printf '%s\n' "$DEPLOY_KEY" > "$config/key"
+          printf '%s\n' "$VPS_HOST_KEY" > "$config/known_hosts"
+          main_sha="$(curl -fsS https://api.github.com/repos/"$GITHUB_REPOSITORY"/branches/main | jq -er .commit.sha)"
+          if [[ "$main_sha" != "$RELEASE_SHA" ]]; then
+            echo "A newer main revision superseded this run."
+            exit 0
+          fi
+          printf '%s\n' "$REGISTRY_TOKEN" | docker login ghcr.io -u "$GITHUB_REPOSITORY_OWNER" --password-stdin
+          digest() {
+            docker buildx imagetools inspect --format '{{json .Manifest}}' \
+              "ghcr.io/${GITHUB_REPOSITORY}-$1:$RELEASE_SHA" | jq -er .digest
+          }
+          chess="$(digest chess)"
+          platform="$(digest platform)"
+          # The server validates evidence against GitHub and GHCR independently.
+          # Registry auth is short-lived and goes via stdin, never argv.
+          for attempt in 1 2 3; do
+            status=0
+            printf '%s %s %s\n%s\n' "$RELEASE_SHA" "$chess" "$platform" "$REGISTRY_TOKEN" |
+              ssh -T -p "$VPS_PORT" -i "$config/key" -o IdentitiesOnly=yes -o BatchMode=yes \
+                -o ControlMaster=no -o ControlPath=none -o ConnectTimeout=10 \
+                -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$config/known_hosts" \
+                "iva-deploy@$VPS_HOST" || status=$?
+            if [[ "$status" != 75 ]]; then exit "$status"; fi
+            sleep "$((attempt * 10))"
+          done
+          exit 75

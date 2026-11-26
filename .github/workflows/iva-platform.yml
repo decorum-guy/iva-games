@@ -2,34 +2,8 @@ name: Iva Games platform
 
 on:
   pull_request:
-    paths:
-      - 'apps/platform/**'
-      - 'apps/portal/**'
-      - 'packages/session-kit/**'
-      - 'packages/telegram-transport/**'
-      - 'package*.json'
-      - '*platform*.ts'
-      - 'tsconfig.platform.json'
-      - 'tsconfig.base.json'
-      - 'eslint.config.js'
-      - 'scripts/check-boundaries.mjs'
-      - 'scripts/platform-smoke.mjs'
-      - '.github/workflows/iva-platform.yml'
   push:
     branches: [main, feat/iva-platform-foundation]
-    paths:
-      - 'apps/platform/**'
-      - 'apps/portal/**'
-      - 'packages/session-kit/**'
-      - 'packages/telegram-transport/**'
-      - 'package*.json'
-      - '*platform*.ts'
-      - 'tsconfig.platform.json'
-      - 'tsconfig.base.json'
-      - 'eslint.config.js'
-      - 'scripts/check-boundaries.mjs'
-      - 'scripts/platform-smoke.mjs'
-      - '.github/workflows/iva-platform.yml'
 
 permissions:
   contents: read
@@ -50,6 +24,7 @@ jobs:
           cache: npm
       - run: npm ci --no-audit --no-fund
       - run: npm run check
+      - run: python3 -B deploy/iva-games/test_activation.py
       - run: npm run build:all
       - run: npm run platform:smoke
       - run: npx playwright install --with-deps chromium
