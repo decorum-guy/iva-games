@@ -25,7 +25,7 @@
 .district-map-column, .district-decisions { min-width: 0; }
 .district-map-surface { padding: 13px; background: #e7eddf; border: 1px solid #d4deca; border-radius: 18px; }
 .district-board { display: grid; gap: 7px; }
-.district-cell { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; min-width: 0; min-height: 82px; padding: 14px 3px 7px; border: 1px solid #cfddc4; border-radius: 9px; color: #8b9f80; background: #f7f9ed; transition: border-color .12s, box-shadow .12s, transform .12s; }
+.district-cell { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; min-width: 0; min-height: 82px; padding: 14px 3px 7px; border: 1px solid #cfddc4; border-radius: 9px; color: #586f50; background: #f7f9ed; transition: border-color .12s, box-shadow .12s, transform .12s; }
 .district-cell:hover { transform: translateY(-2px); }
 .district-cell.selected { box-shadow: 0 0 0 3px #173744; z-index: 1; }
 .district-cell.actionable { border-color: #79a292; background: #fbfcf0; }
@@ -33,11 +33,11 @@
 .district-cell.cell-house { color: #437b76; background: #e9f2e5; }
 .district-cell.cell-cafe { color: #bc6a35; background: #fff0ce; }
 .district-cell.cell-workshop { color: #657a89; background: #e5eaf0; }
-.district-cell.cell-neutral-house { color: #8c967f; background: #e2e7d8; }
-.district-cell.cell-park { color: #7b9870; background: #d7e6ce; }
+.district-cell.cell-neutral-house { color: #5d6b52; background: #e2e7d8; }
+.district-cell.cell-park { color: #4c6745; background: #d7e6ce; }
 .district-cell.cell-park:not(.completed) .district-glyph { opacity: .38; }
 .district-cell.cell-park.completed { background: #bfd8ad; color: #3f743d; }
-.district-cell.cell-square { color: #89948d; background: #d9e0d5; }
+.district-cell.cell-square { color: #56665d; background: #d9e0d5; }
 .district-coordinate { position: absolute; top: 4px; left: 6px; font-size: 9px; font-weight: 800; opacity: .8; }
 .district-glyph { display: block; flex-shrink: 0; width: 43px; height: 43px; }
 .district-cell-caption { display: block; max-width: 100%; margin-top: 3px; font-size: 8px; font-weight: 800; line-height: 1.1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -65,8 +65,8 @@ button.district-goal:hover:not(:disabled), button.district-goal[aria-pressed="tr
 .district-goal > b { margin-left: auto; color: #a7893c; font-size: 18px; }
 .district-phase-title { gap: 8px; min-height: 38px; margin-bottom: 12px; }
 .district-phase-title h4 { font-size: 20px; letter-spacing: -.5px; }
-.district-phase-title time { padding: 5px 9px; border-radius: 7px; background: #eef1e7; font-variant-numeric: tabular-nums; font-weight: 800; font-size: 13px; }
-.district-phase-title time.urgent { color: #9b4b30; background: #f9e3d4; }
+.district-phase-title time, .district-mobile-turn time { padding: 5px 9px; border-radius: 7px; background: #eef1e7; font-variant-numeric: tabular-nums; font-weight: 800; font-size: 13px; }
+.district-phase-title time.urgent, .district-mobile-turn time.urgent { color: #9b4b30; background: #f9e3d4; }
 .district-goal-choices, .district-negotiation, .district-bank, .district-auction, .district-development, .district-results, .district-away { display: grid; gap: 14px; }
 .district-decisions p { font-size: 12px; line-height: 1.65; }
 .district-tabs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3px; padding: 4px; background: #eaf0e5; border-radius: 9px; }
@@ -168,7 +168,7 @@ button.district-goal:hover:not(:disabled), button.district-goal[aria-pressed="tr
 .district-lobby-map strong { font-size: 14px; }
 @media (max-width: 1080px) { .district-layout { grid-template-columns: minmax(0, 1fr); } .district-map-column { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(170px, 1fr); gap: 12px 18px; align-items: start; } .district-map-surface { grid-row: span 3; } .district-cell-detail { flex-direction: column; } .district-your-goal { padding-top: 0; } .district-news { padding-top: 0; } .district-decisions { padding-top: 8px; border-top: 1px solid var(--district-edge); } }
 @media (max-width: 700px) { .district-map-column { display: block; } .district-cell { min-height: 72px; } .district-your-goal { padding-top: 14px; } .district-news { padding-top: 14px; } .district-players { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; } .district-player { padding: 9px; } .district-heading h3 { font-size: 26px; } .district-panel { border-radius: 16px; } .district-cell-detail { flex-direction: row; } }
-@media (max-width: 420px) { .district-heading { align-items: start; gap: 8px; } .district-heading-actions { flex-direction: column; align-items: end; gap: 8px; } .district-board { gap: 4px; } .district-map-surface { padding: 8px; } .district-cell { min-height: 60px; padding-top: 13px; border-radius: 6px; } .district-cell .district-glyph { width: 31px; height: 31px; } .district-cell-caption { font-size: 6.5px; } .district-coordinate { font-size: 8px; left: 4px; top: 3px; } .district-owner-dot { width: 12px; height: 12px; font-size: 7px; } .district-cell-detail { flex-direction: column; } .district-phase-title h4 { font-size: 18px; } .district-player > div { flex-wrap: wrap; gap: 5px; } .district-player > div > small { margin-left: 0; } .district-resources.compact { gap: 8px; } .district-map-preview { align-items: start; } }
+@media (max-width: 420px) { .district-heading { align-items: start; gap: 8px; } .district-heading-actions { flex-direction: column; align-items: end; gap: 8px; } .district-board { gap: 4px; } .district-map-surface { padding: 8px; } .district-cell { min-height: 60px; padding-top: 13px; border-radius: 6px; } .district-cell .district-glyph { width: 31px; height: 31px; } .district-cell-caption { font-size: 8px; } .district-coordinate { font-size: 8px; left: 4px; top: 3px; } .district-owner-dot { width: 12px; height: 12px; font-size: 7px; } .district-cell-detail { flex-direction: column; } .district-phase-title h4 { font-size: 18px; } .district-player > div { flex-wrap: wrap; gap: 5px; } .district-player > div > small { margin-left: 0; } .district-resources.compact { gap: 8px; } .district-map-preview { align-items: start; } }
 @media (prefers-reduced-motion: reduce) { .district-cell { transition: none; } .district-cell:hover { transform: none; } }
 
 .room-columns.district-playing-seats { display: none; }
@@ -176,3 +176,10 @@ button.district-goal:hover:not(:disabled), button.district-goal[aria-pressed="tr
 .district-mobile-turn { display: none; }
 .district-decisions { scroll-margin-top: 20px; }
 @media (max-width: 700px) { .district-mobile-turn { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: -6px 0 16px; padding: 9px 0; border-top: 1px solid var(--district-edge); border-bottom: 1px solid var(--district-edge); font-size: 12px; font-weight: 750; } .district-mobile-turn .text-button { font-size: 11px; white-space: nowrap; } }
+
+@media (max-width: 700px) {
+  .district-mobile-turn { position: sticky; top: 0; z-index: 3; background: #fffdf7; }
+  .district-mobile-turn > span { display: flex; align-items: center; gap: 8px; }
+  .district-phase-title time { display: none; }
+  .district-decisions { scroll-margin-top: 52px; }
+}
