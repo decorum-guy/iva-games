@@ -185,7 +185,7 @@ def render() -> None:
     report = {'bank': 'overdrive-original-dsp-v2', 'generator': 'scripts/generate-overdrive-audio.py',
               'provenance': 'Original deterministic DSP composition; no third-party or Remorse samples.',
               'sampleRate': SR, 'channels': 2, 'encoding': 'PCM signed 16-bit little-endian', 'seed': SEED,
-              'auditoryReview': 'Not performed; measurements are not a listening assessment.', 'cues': {}}
+              'auditoryReview': 'Accepted by the owner on 2026-11-26 with a lower playback gain for the shared move cue.', 'cues': {}}
     for index, (name, (duration, peak_db)) in enumerate(CUES.items()):
         signal, pan = make(name, duration, SEED + index * 103)
         signal -= signal.mean()

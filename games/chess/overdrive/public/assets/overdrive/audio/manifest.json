@@ -6,7 +6,7 @@
   "channels": 2,
   "encoding": "PCM signed 16-bit little-endian",
   "seed": 20261125,
-  "auditoryReview": "Not performed; measurements are not a listening assessment.",
+  "auditoryReview": "Accepted by the owner on 2026-11-26 with a lower playback gain for the shared move cue.",
   "cues": {
     "ui": {
       "file": "ui.wav",
