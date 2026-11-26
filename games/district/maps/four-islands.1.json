@@ -1,0 +1,56 @@
+{
+  "$schema": "../map-islands.schema.json",
+  "schemaVersion": 2,
+  "profile": "district@0.3",
+  "theme": "adriatic",
+  "id": "four-islands",
+  "version": "1",
+  "name": {
+    "ru": "Четыре острова",
+    "en": "Four Islands"
+  },
+  "description": {
+    "ru": "Четыре острова образуют отдельные группы соседей. Площадь находится в северном порту.",
+    "en": "Four islands form independent neighborhoods. The public square sits in the northern port."
+  },
+  "supportedPlayers": [
+    2,
+    3,
+    4
+  ],
+  "landmasses": 4,
+  "cells": [
+    {"id": "A1", "q": -3, "r": -3, "kind": "lot"},
+    {"id": "A2", "q": -2, "r": -3, "kind": "neutral-house"},
+    {"id": "A3", "q": -4, "r": -2, "kind": "lot"},
+    {"id": "A4", "q": -3, "r": -2, "kind": "square"},
+    {"id": "B1", "q": -4, "r": -1, "kind": "park"},
+    {"id": "B2", "q": -3, "r": -1, "kind": "lot"},
+    {"id": "B3", "q": -2, "r": -1, "kind": "lot"},
+    {"id": "C1", "q": 2, "r": -3, "kind": "lot"},
+    {"id": "C2", "q": 3, "r": -3, "kind": "lot"},
+    {"id": "C3", "q": 4, "r": -3, "kind": "park"},
+    {"id": "C4", "q": 1, "r": -2, "kind": "neutral-house"},
+    {"id": "C5", "q": 2, "r": -2, "kind": "lot"},
+    {"id": "C6", "q": 3, "r": -2, "kind": "lot"},
+    {"id": "D1", "q": -5, "r": 1, "kind": "park"},
+    {"id": "D2", "q": -4, "r": 1, "kind": "lot"},
+    {"id": "D3", "q": -5, "r": 2, "kind": "lot"},
+    {"id": "D4", "q": -4, "r": 2, "kind": "lot"},
+    {"id": "D5", "q": -3, "r": 2, "kind": "neutral-house"},
+    {"id": "D6", "q": -5, "r": 3, "kind": "lot"},
+    {"id": "D7", "q": -4, "r": 3, "kind": "lot"},
+    {"id": "E1", "q": 2, "r": 1, "kind": "park"},
+    {"id": "E2", "q": 3, "r": 1, "kind": "neutral-house"},
+    {"id": "E3", "q": 1, "r": 2, "kind": "lot"},
+    {"id": "E4", "q": 2, "r": 2, "kind": "lot"},
+    {"id": "E5", "q": 3, "r": 2, "kind": "lot"}
+  ],
+  "zones": [
+    {"id": "north-port", "name": {"ru": "Северный порт", "en": "North Port"}, "cells": ["A1", "A2", "A3", "A4"]},
+    {"id": "high-quay", "name": {"ru": "Высокий причал", "en": "High Quay"}, "cells": ["B1", "B2", "B3"]},
+    {"id": "beacon", "name": {"ru": "Маячный остров", "en": "Beacon Island"}, "cells": ["C1", "C2", "C3", "C4", "C5", "C6"]},
+    {"id": "orchard", "name": {"ru": "Садовый остров", "en": "Orchard Island"}, "cells": ["D1", "D2", "D3", "D4", "D5", "D6", "D7"]},
+    {"id": "salt-quay", "name": {"ru": "Соляная пристань", "en": "Salt Quay"}, "cells": ["E1", "E2", "E3", "E4", "E5"]}
+  ]
+}

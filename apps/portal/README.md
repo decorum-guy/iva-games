@@ -31,12 +31,15 @@ Production uses the built `apps/portal/dist` directory served on the platform or
 - Addressed invitation inbox and sent invitations, reservation acceptance followed by explicit room entry.
 - Room creation/settings, fixed participants, readiness, host transfer, departure/cancellation and invitations.
 - Host-controlled bot seats when the game explicitly supports them; difficulty selection and removal.
+- **District**: three selectable versioned maps, goals, economy, deals, joint parks, private bids, development, results and history on 2–4 seats with bots. See [current status](../../games/district/STATUS.md).
 - The server-backed **Practice table**: three simultaneous hidden number choices, per-player state, revealed round results, scores and return after refresh.
 - Telegram linking when the platform enables it: recent-password confirmation, a private Start link, masked candidate, proof code, explicit notification choice, cancellation, mute/unmute and unlink.
 
-Remorse/Overdrive rooms remain unavailable until their adapter is connected. District/Harbor are marked as planned. The practice table demonstrates session behaviour; it is not either new product game. Telegram remains unavailable in the UI when the backend returns `available: false`; source implementation does not imply an activated bot or real delivery.
+Remorse/Overdrive rooms remain unavailable until their adapter is connected. District is playable in the implementation branch; Harbor remains planned. The practice table demonstrates session behaviour; it is not either new product game. Telegram remains unavailable in the UI when the backend returns `available: false`; source implementation does not imply an activated bot or real delivery.
 
-## Telegram behaviour
+Current production accounts use the dedicated Telegram code flow described in [TELEGRAM_ACCOUNTS](../../docs/iva-games/TELEGRAM_ACCOUNTS.md), with no mandatory SMTP. The legacy linking path below is a separate optional mode.
+
+## Legacy Telegram linking behaviour
 
 The profile uses the same-origin `/api/platform/v1/telegram` endpoints. A Start response only supplies a candidate; the user must enter the bot's proof code and explicitly choose whether to receive invitations before confirming on the website. Both radio options begin unselected, and connecting without notifications is supported. A recent password is requested only when the server returns `REAUTH_REQUIRED`; after successful reauthentication the UI resumes the action the user already selected. Unlink has a separate explicit confirmation.
 
@@ -55,4 +58,4 @@ Attempt reads run every three seconds while the page is visible and the attempt 
 
 ## Verification scope
 
-TypeScript checks, the Vite production build and scoped ESLint were run during implementation. Twelve portal tests cover concurrent anonymous session creation, mutation retry keys, explicit Telegram consent, expiry, stale reads, safe Start links, reference-only storage and static RU/EN status rendering; run them with `npm --prefix apps/portal test`. The static HTML checks do not exercise browser events or layout. The final project validation report records API integration results separately. Visual browser acceptance was not possible from the available browser surfaces and remains a local Mac check. This README does not claim that production email, Telegram, hosting or chess integration has been activated.
+TypeScript checks, the Vite production build and scoped ESLint were run during implementation. Twelve portal tests cover concurrent anonymous session creation, mutation retry keys, explicit Telegram consent, expiry, stale reads, safe Start links, reference-only storage and static RU/EN status rendering; run them with `npm --prefix apps/portal test`. The static HTML checks do not exercise browser events or layout. The final project validation report records API integration results separately. That original foundation check did not have browser access. The later District implementation includes browser automation with actual rules and a separate built-server, two-browser full game; see [District validation](../../games/district/VALIDATION_V0_2.md). Human/physical-device acceptance remains separate. This README does not claim that production email, Telegram, hosting or chess integration has been activated.

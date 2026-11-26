@@ -1,0 +1,12 @@
+{
+  "$schema": "../map.schema.json",
+  "schemaVersion": 1,
+  "id": "crossroads",
+  "version": "1",
+  "name": { "ru": "Перекрёсток", "en": "Crossroads" },
+  "description": { "ru": "Четыре квартала вокруг площади. Нейтральные дома в центре, парки по краям.", "en": "Four blocks around a square. Neutral houses at the center, parks at the edges." },
+  "width": 5,
+  "height": 5,
+  "rows": ["..P..", "..H..", "PHSHP", "..H..", "..P.."],
+  "supportedPlayers": [2, 3, 4]
+}

@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url'
 import ts from 'typescript'
 
 const root = fileURLToPath(new URL('../', import.meta.url))
-const paths = ['packages/engine-sdk', 'games/chess/remorse', 'games/chess/overdrive', 'apps/server', 'packages/session-kit', 'packages/telegram-transport', 'apps/platform', 'apps/portal']
+const paths = ['games/district', 'packages/engine-sdk', 'games/chess/remorse', 'games/chess/overdrive', 'apps/server', 'packages/session-kit', 'packages/telegram-transport', 'apps/platform', 'apps/portal']
 const packages = await Promise.all(paths.map(async path => ({
   path, directory: resolve(root, path), manifest: JSON.parse(await readFile(join(root, path, 'package.json'), 'utf8')),
 })))

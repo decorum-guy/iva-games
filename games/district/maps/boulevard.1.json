@@ -1,0 +1,12 @@
+{
+  "$schema": "../map.schema.json",
+  "schemaVersion": 1,
+  "id": "boulevard",
+  "version": "1",
+  "name": { "ru": "Бульвар", "en": "Boulevard" },
+  "description": { "ru": "Парки внутри кварталов, готовые дома на углах. Соседи решают, где появится жизнь.", "en": "Park sites inside the blocks and homes on the corners. Neighbors decide where the district comes alive." },
+  "width": 5,
+  "height": 5,
+  "rows": ["H...H", ".P.P.", "..S..", ".P.P.", "H...H"],
+  "supportedPlayers": [2, 3, 4]
+}

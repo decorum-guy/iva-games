@@ -44,6 +44,13 @@ export interface GameRegistration {
   rulesVersion: string;
   contentVersion: string;
   status: 'available' | 'unavailable' | 'planned';
+  /** Validate and freeze game-owned room settings before players confirm readiness. */
+  normalizeSettings?: (input: unknown) => Record<string, unknown>;
+  /** Resolve settings and bot policy against a persisted room's version pair. */
+  resolveRoomVersion?: (rulesVersion: string, contentVersion: string) => {
+    normalizeSettings: (input: unknown) => Record<string, unknown>;
+    botVersion: string;
+  } | undefined;
   runtime?: GameRuntime;
 }
 

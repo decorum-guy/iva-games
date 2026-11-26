@@ -1,3 +1,4 @@
+import { createDistrictRegistration } from '@iva-games/district/runtime';
 import { createPlatformLabRegistration } from '@iva-games/session-kit/lab';
 import { createTelegramTransport } from '@iva-games/telegram-transport';
 import { loadPlatformConfig } from './config.js';
@@ -9,7 +10,8 @@ import { TelegramService } from './telegram/index.js';
 process.umask(0o077);
 const config = loadPlatformConfig();
 const lab = createPlatformLabRegistration({ databasePath: config.runtimeDatabasePath });
-const platform = new PlatformService({ databasePath: config.databasePath, publicOrigin: config.publicOrigin, mail: config.mail, games: [lab] });
+const district = createDistrictRegistration({ databasePath: config.runtimeDatabasePath });
+const platform = new PlatformService({ databasePath: config.databasePath, publicOrigin: config.publicOrigin, mail: config.mail, games: [lab, district] });
 await platform.ready;
 const telegramTransport = config.telegram ? createTelegramTransport({
   botToken: config.telegram.botToken, proxyUrl: config.telegram.proxyUrl,
@@ -51,7 +53,7 @@ const stop = (): void => {
   if (stopping) return;
   stopping = true; clearInterval(timer);
   server.close(() => { void Promise.all([platform.settle(), telegramWork]).then(() => {
-    telegramTransport?.close(); platform.close(); lab.close();
+    telegramTransport?.close(); platform.close(); lab.close(); district.close();
   }); });
 };
 process.once('SIGINT', stop);

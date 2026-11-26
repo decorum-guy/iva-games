@@ -11,9 +11,10 @@ case "${1:-}" in
       ':(glob)games/chess/**/src/core/**' ':(glob)games/chess/**/src/online/protocol.ts')
     ;;
   platform)
-    inputs=(Dockerfile.platform apps/platform apps/portal packages/session-kit packages/telegram-transport
+    inputs=(Dockerfile.platform apps/platform apps/portal games/district/src games/district/maps packages/session-kit packages/telegram-transport
       vite.platform.config.ts tsconfig.platform.json)
-    compatibility=(apps/platform/src/database.ts apps/platform/src/telegram/schema.ts packages/session-kit/src)
+    compatibility=(apps/platform/src/database.ts apps/platform/src/telegram/schema.ts packages/session-kit/src
+      games/district/src/types.ts games/district/src/core.ts games/district/src/runtime.ts)
     ;;
   *) exit 2 ;;
 esac
