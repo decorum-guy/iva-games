@@ -8,6 +8,7 @@
 
 Прочитай верхние актуальные разделы `AGENTS.md`, затем:
 
+- `docs/iva-games/PROJECT_STATUS.md`;
 - `docs/iva-games/BUILD_STATUS.md`;
 - `docs/iva-games/TELEGRAM_ACCOUNTS.md`;
 - `docs/iva-games/VPS_ACTIVATION_2026_11_26.md`;

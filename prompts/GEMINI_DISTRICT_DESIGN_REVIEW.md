@@ -17,9 +17,9 @@
 ## Сначала прочитай
 
 - актуальные верхние разделы `AGENTS.md`;
-- `docs/iva-games/PROJECT_STATUS.md`, `ARCHITECTURE.md`;
-- `games/district/STATUS.md`, `CONCEPT.md`, `DESIGN_V0_2.md`;
-- полностью `games/district/RULES_V0_2.md` и `BOT_DESIGN.md`;
+- `docs/iva-games/PROJECT_STATUS.md`, `docs/iva-games/ARCHITECTURE.md`;
+- `games/district/STATUS.md`, `games/district/CONCEPT.md`, `games/district/DESIGN_V0_2.md`;
+- полностью `games/district/RULES_V0_2.md` и `games/district/BOT_DESIGN.md`;
 - `games/district/REFERENCES_AND_DESIGN_NOTES.md`;
 - `docs/iva-games/GEMINI_MODEL_GUIDE.md`, если он включён в checkout; иначе руководство по ссылке над заданием.
 
