@@ -74,7 +74,9 @@ export class PlatformService {
   private dummyHash = '';
   private passwordWork = 0;
   private ticking = false;
+  private reconciliationStopping = false;
   private reconciliationFinished: Promise<void> | null = null;
+  private readonly runtimeWork = new Set<Promise<unknown>>();
   private invitationDelivery: ((invitationId: string) => unknown) | null = null;
   private readonly rateBuckets = new Map<string, { hits: number; until: number }>();
 
@@ -97,13 +99,21 @@ export class PlatformService {
   }
   get emailDeliveryEnabled(): boolean { return !!this.options.mail; }
   close(): void { this.db.close(); }
+  stopReconciliation(): void { this.reconciliationStopping = true; }
   setInvitationDelivery(handler: (invitationId: string) => unknown): void { this.invitationDelivery = handler; }
-  async settle(): Promise<void> { await this.reconciliationFinished; }
+  /** Call after HTTP has drained and reconciliation has stopped accepting work.
+   * A response deadline does not cancel the underlying runtime adapter. */
+  async settle(): Promise<void> {
+    await this.reconciliationFinished;
+    while (this.runtimeWork.size) await Promise.allSettled([...this.runtimeWork]);
+  }
   async backup(destination: string): Promise<void> { await this.db.backup(destination); chmodSync(destination, 0o600); }
   private row(sql: string, ...values: (string | number | null)[]): Row | undefined { return this.db.prepare(sql).get(...values) as Row | undefined; }
   private rows(sql: string, ...values: (string | number | null)[]): Row[] { return this.db.prepare(sql).all(...values) as Row[]; }
   private run(sql: string, ...values: (string | number | null)[]): void { this.db.prepare(sql).run(...values); }
   private async runtimeCall<T>(operation: Promise<T>): Promise<T> {
+    this.runtimeWork.add(operation);
+    void operation.then(() => this.runtimeWork.delete(operation), () => this.runtimeWork.delete(operation));
     let timer: ReturnType<typeof setTimeout> | undefined;
     try {
       return await Promise.race([operation, new Promise<T>((_resolve, reject) => {
@@ -115,7 +125,7 @@ export class PlatformService {
     let next = 0;
     // Independent rooms progress even when one adapter has stopped answering.
     await Promise.all(Array.from({ length: Math.min(4, rows.length) }, async () => {
-      while (next < rows.length) { const row = rows[next++]; await operation(row); }
+      while (next < rows.length && !this.reconciliationStopping) { const row = rows[next++]; await operation(row); }
     }));
   }
 
@@ -709,7 +719,7 @@ export class PlatformService {
     return this.roomView(roomId);
   }
   async reconcile(): Promise<void> {
-    if (this.ticking || !this.db.open) return;
+    if (this.ticking || this.reconciliationStopping || !this.db.open) return;
     this.ticking = true;
     let complete!: () => void;
     this.reconciliationFinished = new Promise<void>(resolve => { complete = resolve; });

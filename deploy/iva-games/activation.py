@@ -7,12 +7,14 @@ import json
 import os
 from pathlib import Path
 import re
+import signal
 import smtplib
 import ssl
 import subprocess
 import sys
 import tempfile
 import time
+import urllib.error
 import urllib.request
 
 CONFIG = Path('/etc/iva-games')
@@ -28,6 +30,16 @@ HEALTH = (
     ('chess.iva-games.pro', '/api/overdrive/health', 'protocol', 'overdrive-online-v2'),
 )
 OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+
+
+class RefuseRedirects(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, _request, _fp, _code, _message, _headers, _new_url):
+        # Checking response.url after following a redirect is too late for a
+        # request carrying the short-lived Actions token.
+        raise RuntimeError('GitHub API redirect refused')
+
+
+GITHUB_OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}), RefuseRedirects())
 SHA = re.compile(r'[0-9a-f]{40}')
 DIGEST = re.compile(r'sha256:[0-9a-f]{64}')
 
@@ -59,14 +71,76 @@ def save(path, data):
             tmp.unlink(missing_ok=True)
 
 
-def command(*args, timeout=30, env=None, data=None):
+class CommandInterrupted(subprocess.SubprocessError):
+    """An external cancellation must wait for the backup's bounded cleanup."""
+
+
+def command(*args, timeout=30, env=None, data=None, cleanup_timeout=0):
+    previous_handlers = {}
+    interrupted = None
+    waiting = False
+
+    def on_interrupt(signum, _frame):
+        nonlocal interrupted
+        if interrupted is not None:
+            return  # Repeated signals neither kill cleanup nor renew its deadline.
+        interrupted = signum
+        if waiting:
+            raise CommandInterrupted()
+
     try:
-        return subprocess.run(
-            args, input=data, capture_output=True, text=True, check=True, timeout=timeout, env=env,
-        ).stdout.strip()
+        if cleanup_timeout:
+            # Install before Popen: a TERM during child creation is remembered
+            # and handled immediately after its process group becomes known.
+            for signum in (signal.SIGTERM, signal.SIGINT):
+                previous_handlers[signum] = signal.signal(signum, on_interrupt)
+        with subprocess.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                              text=True, env=env, start_new_session=bool(cleanup_timeout)) as process:
+            try:
+                waiting = bool(cleanup_timeout)
+                if interrupted is not None:
+                    raise CommandInterrupted()
+                output, _ = process.communicate(data, timeout=timeout)
+            except (subprocess.TimeoutExpired, CommandInterrupted):
+                waiting = False
+                # The backup shell must thaw its container and remove its
+                # verifier before exiting. subprocess.run's immediate KILL
+                # would bypass those traps and could leave production frozen.
+                # Keep this call (and main's release.lock) alive during cleanup,
+                # including TERM/INT sent by outer timeout or CI cancellation.
+                if cleanup_timeout:
+                    try:
+                        os.killpg(process.pid, interrupted or signal.SIGTERM)
+                    except ProcessLookupError:
+                        pass
+                    try:
+                        process.communicate(timeout=cleanup_timeout)
+                    except subprocess.TimeoutExpired:
+                        try:
+                            os.killpg(process.pid, signal.SIGKILL)
+                        except ProcessLookupError:
+                            pass
+                        process.communicate()
+                else:
+                    process.kill()
+                    process.communicate()
+                raise
+            finally:
+                waiting = False
+            if interrupted is not None:
+                raise CommandInterrupted()
+            if process.returncode:
+                raise subprocess.CalledProcessError(process.returncode, args)
     except (subprocess.SubprocessError, OSError) as error:
         # Docker output or exception arguments may contain private configuration.
-        raise RuntimeError(f'{Path(args[0]).name} {args[1] if len(args) > 1 else ""} failed') from error
+        reason = 'interrupted after cleanup' if isinstance(error, CommandInterrupted) else 'failed'
+        raise RuntimeError(f'{Path(args[0]).name} {args[1] if len(args) > 1 else ""} {reason}') from error
+    finally:
+        for signum, handler in previous_handlers.items():
+            signal.signal(signum, handler)
+    if interrupted is not None:
+        raise RuntimeError(f'{Path(args[0]).name} interrupted after cleanup')
+    return output.strip()
 
 
 def get_json(url, timeout=6):
@@ -77,6 +151,57 @@ def get_json(url, timeout=6):
         if response.url != url or not response.headers.get_content_type().endswith('json'):
             raise RuntimeError('Unexpected health or GitHub response')
         return json.load(response)
+
+
+def github_json(path, token):
+    """Authenticated, bounded GETs; never fall back to an anonymous request.
+
+    A 403 alone does not establish whether a rate limit or a permission caused
+    it. Keep safe response metadata so the next failure is diagnosable without
+    printing credentials, response bodies, or private configuration.
+    """
+    if not re.fullmatch(r'[A-Za-z0-9_.-]+', token):
+        raise RuntimeError('GitHub API token is missing or invalid')
+    url = f'https://api.github.com/repos/{REPOSITORY}/{path}'
+    request = urllib.request.Request(url, headers={
+        'User-Agent': 'iva-games-release', 'Accept': 'application/vnd.github+json',
+        'Authorization': f'Bearer {token}', 'X-GitHub-Api-Version': '2022-11-28',
+        'Cache-Control': 'no-cache',
+    })
+    for attempt in range(3):
+        try:
+            with GITHUB_OPENER.open(request, timeout=10) as response:
+                if response.url != url or not response.headers.get_content_type().endswith('json'):
+                    raise RuntimeError('Unexpected GitHub API response')
+                return json.load(response)
+        except urllib.error.HTTPError as error:
+            metadata = []
+            for header in ('x-github-request-id', 'x-ratelimit-remaining', 'x-ratelimit-reset', 'retry-after'):
+                value = error.headers.get(header, '')
+                if value and re.fullmatch(r'[A-Za-z0-9:._-]{1,100}', value):
+                    metadata.append(f'{header}={value}')
+            reason = f'GitHub API HTTP {error.code}' + (f' ({", ".join(metadata)})' if metadata else '')
+            delay = None
+            if error.code in (502, 503, 504):
+                delay = 2 ** attempt
+            elif error.code in (403, 429):
+                retry_after = error.headers.get('retry-after', '')
+                reset = error.headers.get('x-ratelimit-reset', '')
+                if retry_after.isdigit():
+                    delay = int(retry_after)
+                elif error.headers.get('x-ratelimit-remaining') == '0' and reset.isdigit():
+                    delay = max(1, int(reset) - int(time.time()) + 1)
+            error.close()
+            # Do not retry permission errors, hammer a secondary limit, or wait
+            # past the release budget. A later workflow retry can recover.
+            if delay is None or delay > 20 or attempt == 2:
+                raise RuntimeError(reason) from error
+            time.sleep(delay)
+        except (urllib.error.URLError, TimeoutError) as error:
+            if attempt == 2:
+                raise RuntimeError('GitHub API network request failed after 3 attempts') from error
+            time.sleep(2 ** attempt)
+    raise RuntimeError('GitHub API request failed')
 
 
 def write_state(status, reason, dns=None, release=None):
@@ -236,6 +361,29 @@ def running(release, service):
     return bool(container)
 
 
+def container_snapshot(release, services):
+    """Read identity and restart counters without copying any container env."""
+    snapshot = {}
+    for service in services:
+        containers = compose(release, 'ps', '--all', '--quiet', service).splitlines()
+        if len(containers) != 1:
+            raise RuntimeError(f'Expected one untouched {service} container')
+        fields = json.loads(command('docker', 'inspect', '--format',
+            '[{{json .Id}},{{json .Image}},{{json .State.StartedAt}},{{.RestartCount}},{{.State.Running}},{{.State.Paused}}]',
+            containers[0]))
+        if len(fields) != 6 or fields[4:] != [True, False]:
+            raise RuntimeError(f'Untouched {service} container is not running normally')
+        snapshot[service] = fields[:4]
+    return snapshot
+
+
+def verify_untouched(release, expected):
+    current = container_snapshot(release, expected)
+    if current != expected:
+        raise RuntimeError('An untouched service changed container identity or restarted')
+    return current
+
+
 def activate():
     state = load(STATE / 'state.json', {})
     if state.get('status') == 'ACTIVE':
@@ -277,13 +425,12 @@ def activate():
         command('systemctl', 'disable', '--now', 'iva-games-activate.timer')
 
 
-def verify_main(sha):
-    base = f'https://api.github.com/repos/{REPOSITORY}'
-    main = get_json(f'{base}/branches/main')
+def verify_main(sha, token):
+    main = github_json('branches/main', token)
     if main['commit']['sha'] != sha:
         raise RuntimeError('Requested release is no longer the head of main')
-    checks = get_json(
-        f'{base}/actions/workflows/iva-platform.yml/runs?branch=main&event=push&head_sha={sha}&status=success'
+    checks = github_json(
+        f'actions/workflows/iva-platform.yml/runs?branch=main&event=push&head_sha={sha}&status=success', token,
     )
     if not any(run['head_sha'] == sha and run['conclusion'] == 'success'
                for run in checks['workflow_runs']):
@@ -318,7 +465,7 @@ def pull_release(sha, digests, token, previous):
             if not re.fullmatch('[0-9a-f]{64}', fingerprint) or not re.fullmatch('[0-9a-f]{64}', compatibility):
                 raise RuntimeError('Missing build input or compatibility fingerprint')
             existing = previous.get('services', {}).get(service)
-            if existing and existing['inputs'] == fingerprint:
+            if existing and existing['inputs'] == fingerprint and existing.get('compatibility') == compatibility:
                 try:
                     command('docker', 'image', 'inspect', existing['image'], '--format', '{{.Id}}')
                 except RuntimeError:
@@ -335,27 +482,32 @@ def promote(candidate, previous):
     path = CONFIG / 'pins.json'
     changed = [name for name in SERVICES
                if candidate['services'][name]['image'] != previous['services'][name]['image']]
+    untouched = container_snapshot(previous, [name for name in SERVICES if name not in changed] + ['caddy'])
     # Capture both databases for each changed service before replacing anything.
     stamp = time.strftime('%Y%m%dT%H%M%SZ', time.gmtime())
     for service in changed:
         command(str(RUNTIME / 'backup.sh'), service,
                 f'/srv/iva-games-backups/{stamp}-{candidate["sha"][:12]}-{service}',
-                timeout=115, env=release_env(previous))
+                timeout=180, cleanup_timeout=25, env=release_env(previous))
     pending = STATE / 'pending.json'
-    save(pending, {'previous': previous, 'candidate': candidate, 'changed': changed})
+    save(pending, {'previous': previous, 'candidate': candidate, 'changed': changed, 'untouched': untouched})
     try:
         if changed:
             up(candidate, *changed)
+        verified = verify_untouched(candidate, untouched)
         if not public_health():
             raise RuntimeError('Updated HTTPS health failed')
         save(path, candidate)
         write_state('ACTIVE', 'updated release passed HTTPS health', release=candidate)
+        save(STATE / 'last-deploy.json', {'sha': candidate['sha'], 'changed': changed,
+                                        'untouched_before': untouched, 'untouched_after': verified})
     except RuntimeError:
         # Incompatible migrations or protocols must be fixed forward. Never
         # replace a live volume with the pre-update snapshot.
         if changed and all(candidate['services'][name]['compatibility']
                            == previous['services'][name]['compatibility'] for name in changed):
             up(previous, *changed)
+            verify_untouched(previous, untouched)
             if public_health():
                 pending.unlink()
         raise
@@ -386,10 +538,10 @@ def deploy():
     if pins.get('sha') == sha:
         print('UNCHANGED release already current')
         return
-    verify_main(sha)
+    verify_main(sha, token)
     candidate = pull_release(sha, digests, token, pins)
     compose(candidate, 'config', '--quiet')
-    verify_main(sha)
+    verify_main(sha, token)
     if not active:
         save(CONFIG / 'pins.json', candidate)
         print(f'STAGED {sha}')

@@ -5,7 +5,7 @@ import { createReadStream } from 'node:fs'
 import { stat } from 'node:fs/promises'
 import { extname, resolve, sep } from 'node:path'
 import { WebSocket, WebSocketServer } from 'ws'
-import { createClientAddressReader } from '@iva-games/session-kit/http'
+import { createClientAddressReader, createHttpLifecycle } from '@iva-games/session-kit/http'
 import { RULES_VERSION } from '@chess-2/remorse/core'
 import { ONLINE_PROTOCOL } from '@chess-2/remorse/online/protocol'
 import type { OnlineServerMessage } from '@chess-2/remorse/online/protocol'
@@ -27,6 +27,7 @@ export interface OnlineServerOptions extends RoomOptions {
   trustedProxyIps?: readonly string[]
   heartbeatMs?: number
   overdriveDatabasePath?: string
+  shutdownGraceMs?: number
 }
 
 class RateLimit {
@@ -107,7 +108,7 @@ export function createOnlineServer(options: OnlineServerOptions) {
     now: options.now, inactiveMs: options.inactiveMs, finishedMs: options.finishedMs,
   })
 
-  const server = createServer(async (request, response) => {
+  const server = createServer((request, response) => { void lifecycle.run(async () => {
     response.setHeader('X-Content-Type-Options', 'nosniff')
     response.setHeader('Referrer-Policy', 'same-origin')
     response.setHeader('X-Frame-Options', 'DENY')
@@ -181,14 +182,19 @@ export function createOnlineServer(options: OnlineServerOptions) {
       response.writeHead(200, { 'Content-Type': contentTypes[extname(file)] ?? 'application/octet-stream',
         'Content-Length': info.size, 'Cache-Control': pathname.startsWith('/assets/') ? 'public, max-age=31536000, immutable' : 'no-cache' })
       if (request.method === 'HEAD') response.end()
-      else createReadStream(file).on('error', () => response.destroy()).pipe(response)
+      else {
+        const stream = createReadStream(file)
+        response.once('close', () => stream.destroy())
+        stream.on('error', () => response.destroy()).pipe(response)
+      }
     } catch (error) {
       if (!response.headersSent && !response.destroyed) {
         const failure = error instanceof OnlineError ? error : new OnlineError('serverError', 500)
         json(response, failure.status, { error: failure.code })
       }
     }
-  })
+  }) })
+  const lifecycle = createHttpLifecycle(server, options.shutdownGraceMs)
   server.requestTimeout = 15_000
   server.headersTimeout = 10_000
 
@@ -275,6 +281,8 @@ export function createOnlineServer(options: OnlineServerOptions) {
   const cleanup = setInterval(() => { try { service.cleanup() } catch { /* Retry on the next bounded sweep. */ } }, 60_000)
   cleanup.unref()
 
+  let closeWork: Promise<void> | undefined
+
   return {
     server, service, store, overdrive,
     async listen(port = 4173, host = '127.0.0.1') {
@@ -286,16 +294,18 @@ export function createOnlineServer(options: OnlineServerOptions) {
       if (!address || typeof address === 'string') throw new Error('Missing HTTP listener')
       return { host, port: address.port }
     },
-    async close() {
-      if (closing) return
+    close(): Promise<void> {
+      if (closeWork) return closeWork
       closing = true
       clearInterval(heartbeat)
       clearInterval(cleanup)
+      const httpClosed = lifecycle.close()
       for (const ws of sockets.clients) ws.terminate()
-      await new Promise<void>(resolveClose => sockets.close(() => resolveClose()))
-      await overdrive.close()
-      if (server.listening) await new Promise<void>((resolveClose, reject) => server.close(error => error ? reject(error) : resolveClose()))
-      service.close()
+      const socketsClosed = new Promise<void>(resolveClose => sockets.close(() => resolveClose()))
+      // Both games share HTTP. Keep their stores open until accepted requests
+      // finish, including actions whose client disconnected during the drain.
+      closeWork = Promise.all([httpClosed, socketsClosed, overdrive.close(httpClosed)]).then(() => { service.close() })
+      return closeWork
     },
   }
 }

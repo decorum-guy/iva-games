@@ -2,6 +2,7 @@
 # Isolated runtime and persistence smoke check for the exact candidate image.
 set -euo pipefail
 umask 077
+script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 fixture="$(mktemp)"
 cleanup() {
   local result=$?
@@ -175,8 +176,21 @@ NODE
 
 start_runtime
 wait_healthy
+# Exercise the real image entrypoint and SIGTERM path with a stalled TCP client,
+# not just an idle process. Its upload must not prolong a release until SIGKILL.
+docker cp "$script_dir/shutdown-client.mjs" "$SMOKE_CONTAINER:/tmp/iva-shutdown-client.mjs"
+docker exec --detach "$SMOKE_CONTAINER" node /tmp/iva-shutdown-client.mjs "$IMAGE_KIND"
+client_ready=false
+for attempt in {1..30}; do
+  if docker exec "$SMOKE_CONTAINER" test -f /tmp/iva-shutdown-client.ready; then client_ready=true; break; fi
+  sleep 0.1
+done
+test "$client_ready" = true
 docker exec --interactive "$SMOKE_CONTAINER" node --input-type=module - "$IMAGE_KIND" initial < "$fixture"
-docker stop --timeout 60 "$SMOKE_CONTAINER" >/dev/null
+# The client removes this marker on any response, close, error or exit. Check
+# again after the API/static/SQLite fixture, immediately before sending SIGTERM.
+docker exec "$SMOKE_CONTAINER" test -f /tmp/iva-shutdown-client.ready
+docker stop --timeout 15 "$SMOKE_CONTAINER" >/dev/null
 test "$(docker inspect --format '{{.State.ExitCode}}' "$SMOKE_CONTAINER")" = 0
 docker rm "$SMOKE_CONTAINER" >/dev/null
 
