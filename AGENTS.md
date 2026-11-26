@@ -1,5 +1,15 @@
 # Iva Games — latest project direction
 
+## Current handoff: portal, OVERDRIVE, District and deployment
+
+Start with [PROJECT_STATUS](docs/iva-games/PROJECT_STATUS.md), then the current component documents. On 26 November 2026 the owner requested a shared readiness status and Google prompts for District design and other non-chess multiplayer games. This task updates documentation; it does not implement District, change accepted chess rules or activate production.
+
+District v0.2 already defines a closed first prototype for 2–4 total human/bot seats. A document audit found no missing mandatory phase or win condition blocking implementation; it is not a balance test. There is still no District rules package, runtime, UI or bot policy. The platform lab is not District. Read [District status](games/district/STATUS.md); preserve normative v0.2 while creative revisions remain proposals. New games require bots from their first playable release, solo with bots and mixed rooms, explicit human/total-seat limits, private per-player observations and simple UI copy.
+
+The portal and OVERDRIVE are implemented and locally accepted. Preserve accepted energy v2, finale and all 20 sounds. Current production accounts use Telegram without mandatory SMTP. VPS provisioning and staging exist; current live state, public acceptance and a post-activation DEPLOYED must still be established by the local executor. Guest chess publication does not depend on the future shared-account adapter. The diagnostic Actions permission test passed; installation and a live VPS snapshot remain separate checks.
+
+Use [the District design prompt](prompts/GEMINI_DISTRICT_DESIGN_REVIEW.md) and [the new-game prompt](prompts/GEMINI_NEW_MULTIPLAYER_GAMES.md). The Google model guide is in open PR #14 at the reviewed snapshot, not yet main; the prompts link its exact revision. Do not silently merge Colossus or other concurrent work. Historical stages below preserve context and applicable data-preservation rules, but their old task lists, domains, SMTP requirements and unperformed-acceptance claims do not override this handoff or newer evidence.
+
 ## Current request: server diagnostics from chat
 
 On 26 November 2026 the owner asked whether GitHub can give this chat access to the Iva Games VPS. Prepare a separate read-only `iva-ops` channel and an independent Actions snapshot workflow; preserve the existing deployment key and its fixed command. Do not turn it into an arbitrary SSH shell. See [chat server access](docs/iva-games/CHAT_SERVER_ACCESS.md). Host helper installation requires the existing local administrator once; repository code and passing tests alone are not proof of installed or working access. Do not claim a fresh VPS state from historical deployment logs.
