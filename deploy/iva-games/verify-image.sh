@@ -178,7 +178,9 @@ start_runtime
 wait_healthy
 # Exercise the real image entrypoint and SIGTERM path with a stalled TCP client,
 # not just an idle process. Its upload must not prolong a release until SIGKILL.
-docker cp "$script_dir/shutdown-client.mjs" "$SMOKE_CONTAINER:/tmp/iva-shutdown-client.mjs"
+# The root filesystem stays read-only. Write through the running process into
+# the existing writable /tmp tmpfs; Docker's archive-copy API rejects this rootfs.
+docker exec --interactive "$SMOKE_CONTAINER" sh -c 'cat > /tmp/iva-shutdown-client.mjs' < "$script_dir/shutdown-client.mjs"
 docker exec --detach "$SMOKE_CONTAINER" node /tmp/iva-shutdown-client.mjs "$IMAGE_KIND"
 client_ready=false
 for attempt in {1..30}; do
