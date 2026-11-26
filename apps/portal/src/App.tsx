@@ -1,6 +1,7 @@
 import { AVATARS } from "./types";
 import { DISTRICT_MAPS } from "@iva-games/district";
 import { DistrictPanel } from "./District";
+import { districtBotName } from "./districtCopy";
 import { DistrictMapSelect, DistrictLobbyMap } from "./DistrictMap";
 import type { AvatarStyle } from "./types";
 import { friendRequestFeedback } from "./socialFeedback";
@@ -1539,7 +1540,7 @@ function RoomDetail({
               <Avatar player={member} bot={member.controller.kind === "bot"} />
               <div className="player-name">
                 <strong>
-                  {member.displayName}
+                  {room.gameId === "district" && member.controller.kind === "bot" ? districtBotName(member.seatIndex, lang) : member.displayName}
                   {member.playerId === user.playerId && (
                     <span className="you-label">{t("вы", "you")}</span>
                   )}

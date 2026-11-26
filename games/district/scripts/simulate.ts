@@ -7,6 +7,7 @@ import { applyDistrictAction, assertDistrictInvariants, advanceDistrictTime, cre
 import { chooseDistrictBotAction } from '../src/bot';
 import { DISTRICT_MAPS } from '../src/maps';
 import { viewDistrict } from '../src/view';
+import { runParkProbe } from './park-probe';
 import type { BotNegotiationMemory, DistrictAction, DistrictState, DistrictView } from '../src/types';
 import type { BotDifficulty, Participant } from '@iva-games/session-kit';
 
@@ -15,6 +16,12 @@ const output = resolve('.qa/district-simulation');
 mkdirSync(output, { recursive: true });
 const hash = (state: DistrictState): string => createHash('sha256').update(JSON.stringify(state)).digest('hex');
 const samples: number[] = [];
+if (process.argv.includes('--park-probe')) {
+  const probe = runParkProbe();
+  writeFileSync(resolve(output, 'park-probe.json'), JSON.stringify(probe, null, 2));
+  console.info(JSON.stringify(probe, null, 2));
+  process.exit(0);
+}
 const gameResults: Array<Record<string, unknown>> = [];
 const groups = ['normal', 'mixed', 'hard'] as const;
 const kinds: BotDifficulty[] = ['easy', 'normal', 'hard'];

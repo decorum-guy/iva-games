@@ -111,9 +111,16 @@ test('plays all six rounds through real core, exposes bidding and results, survi
   await page.getByRole('button', { name: 'Готов', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Земля на торгах' })).toBeVisible();
   await page.getByLabel('Участок', { exact: true }).selectOption('A1');
-  await page.getByLabel('Ваша ставка', { exact: true }).fill('1');
+  const bidInput = page.getByLabel('Ваша ставка', { exact: true });
+  await bidInput.fill('1');
+  await expect(page.getByRole('button', { name: 'Подтвердить пропуск' })).toBeDisabled();
   await page.getByRole('button', { name: 'Сохранить выбор' }).click();
-  await expect(page.getByRole('button', { name: 'Подтвердить ставку' })).toBeEnabled();
+  const confirmBid = page.getByRole('button', { name: 'Подтвердить ставку' });
+  await expect(confirmBid).toBeEnabled();
+  await bidInput.fill('2');
+  await expect(confirmBid).toBeDisabled();
+  await bidInput.fill('1');
+  await expect(confirmBid).toBeEnabled();
   await page.getByRole('button', { name: 'Подтвердить ставку' }).click();
   await page.getByRole('button', { name: /Построить дом/ }).click();
   for (let round = 2; round <= 6; round++) {
@@ -176,6 +183,9 @@ test('narrow screen, keyboard rules dialog, English copy and return to an ongoin
   await page.keyboard.press('Escape');
   await expect(page.getByRole('dialog')).toBeHidden();
   await expect(page.getByRole('button', { name: 'Как играть', exact: true })).toBeFocused();
+  await page.getByRole('button', { name: 'К действиям ↓' }).click();
+  await expect(page.locator('.district-decisions')).toBeFocused();
+  await expect(page.locator('.district-mobile-turn').getByLabel('Осталось времени')).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   if (process.env.DISTRICT_UI_SCREENSHOTS) await page.screenshot({ path: '.qa/district/ui-mobile.png', fullPage: true });
   await page.getByRole('button', { name: 'Выйти из партии', exact: true }).click();
