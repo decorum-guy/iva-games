@@ -26,6 +26,26 @@
 
 Проверенные тесты и исходники: [unit/tutorial](../../games/chess/colossus/tests/unit), [HTTP](../../apps/server/tests/colossusOnlineHttp.test.ts), [transport](../../apps/server/tests/colossusOnlineClient.test.ts), [workspace smoke](../../scripts/workspace-smoke.mjs). Происхождение и генераторы ассетов описаны в [ASSETS.md](ASSETS.md); файлы и манифесты находятся в [assets/colossus](../../games/chess/colossus/public/assets/colossus).
 
+## Итог после интеграции актуальной базы `4a86989`
+
+После контрольного коммита полного клиента `cf3f142` приняты изменения проекта `c259bdc` (trusted proxy), `9e36f56` (публичные коллекции) и `4a86989` (high zoom). Разрешены конфликты каталога и server Vite; существующие исходники REMORSE, OVERDRIVE и engine-sdk, а также модульный portal App совпадают с этой принятой базой. Правила Колосса и его 3D/UI при этой интеграции не изменялись, поэтому позиционный прогон ниже остаётся применимым.
+
+| Выполненная итоговая проверка | Результат |
+| --- | --- |
+| `npm run check` | **907 тестов / 66 файлов**, boundaries по 183 source files, TypeScript и ESLint — passed |
+| `npm run build:all` | Три игровых клиента, chess server, platform и portal — passed |
+| `npm run workspace:smoke` | **52 проверки / 320 HTTP-сравнений**; `.qa/workspace-migration-5a810825/report.json` |
+| `npm run platform:smoke` | Passed: каталог трёх шахматных игр, два клиента, три раунда, static bytes, restart/replay; внешних сообщений 0 |
+| Полный server suite | **79/79 в 9 файлах**, включая две новые COLOSSUS proxy-регрессии |
+| Проверка нового каталога | Реальный гостевой HTTP и SSR assertions: коллекция chess, 1–2 игрока, прямой запуск, RU/EN и отсутствие заявленного GameRuntime |
+| Backup / release configuration | Bash и embedded Node syntax passed; workflow YAML/shell/JS проверены. Это не выполнение Docker локально |
+
+IP-лимитер Колосса теперь использует общий принятый server-only reader доверенного proxy. Две HTTP-регрессии подтверждают независимые лимиты доверенных клиентских адресов и невозможность сбросить лимит недоверенного соединения подменой заголовка. Прежние бюджеты сохранены. Auto-merge release workflow сохранил и новый шаг Compose/Caddy validation, и все проверки трёх игр с постоянными базами и повтором команды после замены контейнера.
+
+Первый platform smoke после merge обнаружил устаревшее ожидание только двух шахматных игр. Проверка обновлена до фактического каталога из трёх игр с явной проверкой состава 1–2 для Колосса; повторный полный smoke прошёл. Другие проверки не ослаблялись.
+
+Журналы: `.qa/colossus-postmerge-check.log`, `.qa/colossus-postmerge-build.log`, `.qa/colossus-postmerge-workspace-smoke.log`, `.qa/colossus-postmerge-platform-smoke-fixed.log`, `.qa/colossus-integration/server-postmerge-tests.json`. Результаты последующего GitHub CI нужно читать в Checks конкретного PR; на момент составления этого локального отчёта они ещё не получены.
+
 ## Позиционные результаты
 
 Все 13 сценариев заново выполнены после исправления `archivist_border` и `spire_bent_dash` по [CARDS_AND_PRESENTATION.md](CARDS_AND_PRESENTATION.md); таблица не смешивает результаты разных вариантов этих правил. Параметры прогона: seed **26011**, максимум **300 узлов** на решение, глубина поиска до **2 отдельных решений**. Политика игрока использует только публичную текущую фазу и уже объявленный ответ босса; будущий seed и порядок колод в поиск не передаются. Весь бой выполняется настоящим ядром, а после завершения повторяется по журналу команд. «Решения» включают команды фигур, карты, завершение фазы и привалы; это не число шахматных ходов или полных раундов.
@@ -78,7 +98,7 @@ node games/chess/colossus/scripts/colossus-balance.mjs
 
 ## Открытые этапы приёмки
 
-- **Browser acceptance НЕ выполнена.** Подготовлены четыре сценария [colossus.spec.ts](../../games/chess/colossus/tests/e2e/colossus.spec.ts): ход/карта/reload, сохранность обычного боя при практике и обучении, все шесть уроков, два независимых сетевых браузерных контекста с полным раундом и reload. Сценарии используют только публичный UI, без подмены состояния или storage. Их TypeScript/ESLint-проверка не означает прохождения в браузере.
+- **Browser acceptance COLOSSUS НЕ выполнена.** Подготовлены четыре сценария [colossus.spec.ts](../../games/chess/colossus/tests/e2e/colossus.spec.ts): ход/карта/reload, сохранность обычного боя при практике и обучении, все шесть уроков, два независимых сетевых браузерных контекста с полным раундом и reload. Сценарии используют только публичный UI, без подмены состояния или storage. Их TypeScript/ESLint-проверка не означает прохождения в браузере.
 - Desktop/mobile, 3D, визуальные реакции, читаемость оформления редкости и звучание на устройстве пользователя требуют фактической браузерной/пользовательской приёмки. Проверка файлов ассетов подтверждает структуру и целостность, а не художественное одобрение.
 - **Docker локально недоступен.** Локальный build/run контейнера не выполнен; проверка в CI на момент отчёта ещё не имеет результата.
 - Общий локальный прогон полного UI завершён: `.qa/colossus-final-check.log`, `.qa/colossus-final-build-smoke.log`, `.qa/colossus-final-workspace-smoke.log`, `.qa/colossus-final-platform-smoke.log`. Его граница исходников — принятая база `82668cd` и текущая реализация Колосса; последующие интеграции и CI должны указываться отдельно.

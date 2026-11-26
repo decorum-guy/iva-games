@@ -3,6 +3,6 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "exports": { ".": "./src/index.ts", "./lab": "./src/lab.ts" },
+  "exports": { ".": "./src/index.ts", "./lab": "./src/lab.ts", "./http": "./src/http.ts" },
   "dependencies": { "better-sqlite3": "13.2.0" }
 }

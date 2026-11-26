@@ -17,7 +17,7 @@ test.beforeEach(async ({ page }) => {
 
 test('keeps focus in the dialog and returns it to its opener', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto('/');
+  await page.goto('/rooms');
   const opener = page.getByRole('button', { name: 'Создать комнату' });
   await opener.focus();
   await page.keyboard.press('Enter');
@@ -34,20 +34,31 @@ test('keeps focus in the dialog and returns it to its opener', async ({ page }) 
 
 test('fits the viewport and keeps form controls reachable at high zoom equivalent', async ({ page }) => {
   await page.setViewportSize({ width: 195, height: 422 });
-  await page.goto('/');
+  await page.goto('/rooms');
   await page.getByRole('button', { name: 'Создать комнату' }).click();
   const dialog = page.getByRole('dialog');
   await expect(dialog).toBeVisible();
   const geometry = await dialog.evaluate((node) => {
     const rect = node.getBoundingClientRect();
+    const documentWidth = document.documentElement.scrollWidth;
+    const overflowing = documentWidth > innerWidth
+      ? [...document.querySelectorAll('body *')].flatMap((element) => {
+        if (!element.getClientRects().length) return [];
+        const box = element.getBoundingClientRect();
+        if (box.left >= 0 && box.right <= innerWidth) return [];
+        return [{ tag: element.tagName, className: element.getAttribute('class'),
+          left: box.left, right: box.right, width: box.width,
+          whiteSpace: getComputedStyle(element).whiteSpace }];
+      }).slice(0, 20)
+      : [];
     return { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom, width: innerWidth, height: innerHeight,
-      documentWidth: document.documentElement.scrollWidth,
+      documentWidth, overflowing,
       controlsFit: [...node.querySelectorAll('input, select, button')].every((control) => {
         const box = control.getBoundingClientRect();
         return box.left >= rect.left - 1 && box.right <= rect.right + 1;
       }) };
   });
-  expect(geometry.documentWidth).toBeLessThanOrEqual(geometry.width);
+  expect(geometry.documentWidth, `Overflowing element geometry: ${JSON.stringify(geometry.overflowing)}`).toBeLessThanOrEqual(geometry.width);
   expect(geometry.left).toBeGreaterThanOrEqual(0);
   expect(geometry.right).toBeLessThanOrEqual(geometry.width);
   expect(geometry.top).toBeGreaterThanOrEqual(0);

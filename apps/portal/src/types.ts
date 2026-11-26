@@ -14,6 +14,7 @@ export interface Session {
 }
 export interface Game {
   gameId: string;
+  collectionId?: "chess" | "other";
   title: string;
   minPlayers: number;
   maxPlayers: number;

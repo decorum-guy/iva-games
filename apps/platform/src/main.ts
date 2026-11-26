@@ -22,6 +22,7 @@ const telegram = config.telegram && telegramTransport ? new TelegramService({
 if (telegram) platform.setInvitationDelivery(invitationId => telegram.enqueueInvitation(invitationId));
 const server = createPlatformHttpServer(platform, {
   publicOrigin: config.publicOrigin, allowedOrigins: config.allowedOrigins,
+  trustedProxyIps: config.trustedProxyIps,
   allowedHosts: config.allowedHosts, secureCookies: config.publicOrigin.startsWith('https:'), serveDirectory: config.serveDirectory,
   telegram, telegramWebhookSecret: config.telegram?.webhookSecret,
 });

@@ -1,4 +1,8 @@
 import { friendRequestFeedback } from "./socialFeedback";
+import { Catalogue } from "./Catalogue";
+import { gameDescription, gameTitle } from "./gameCopy";
+import { go, PortalLink, readRoute } from "./navigation";
+import type { Route } from "./navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import type { LabView } from "@iva-games/session-kit/lab";
@@ -31,48 +35,12 @@ import type {
 } from "./types";
 
 const entranceAtLoad = readEntrance();
-// These are standalone guest games, not platform room capabilities.
-const chessLaunchUrls: Partial<Record<string, string>> = {
-  remorse:
-    import.meta.env.VITE_REMORSE_URL ||
-    (import.meta.env.DEV
-      ? "http://127.0.0.1:4173/"
-      : "https://chess.iva-games.pro/"),
-  overdrive:
-    import.meta.env.VITE_OVERDRIVE_URL ||
-    (import.meta.env.DEV
-      ? "http://127.0.0.1:4185/overdrive/"
-      : "https://chess.iva-games.pro/overdrive/"),
-  colossus:
-    import.meta.env.VITE_COLOSSUS_URL ||
-    (import.meta.env.DEV
-      ? "http://127.0.0.1:5195/"
-      : "https://chess.iva-games.pro/colossus/"),
-};
 const emptySocial: Social = {
   friends: [],
   incoming: [],
   outgoing: [],
   blocked: [],
 };
-type Page = "games" | "friends" | "rooms" | "invitations" | "profile";
-type Route = { page: Page; roomId?: string; invitationId?: string };
-function readRoute(): Route {
-  const url = new URL(location.href);
-  const path = location.hash.slice(1) || url.pathname;
-  const bits = path.split("/").filter(Boolean);
-  if (["invite", "invites", "invitations"].includes(bits[0] ?? "") && bits[1])
-    return { page: "invitations", invitationId: bits[1] };
-  if (bits[0] === "rooms") return { page: "rooms", roomId: bits[1] };
-  return {
-    page: ["friends", "invitations", "profile"].includes(bits[0] ?? "")
-      ? (bits[0] as Page)
-      : "games",
-  };
-}
-function go(page: Page, roomId?: string) {
-  location.hash = `/${page}${roomId ? `/${encodeURIComponent(roomId)}` : ""}`;
-}
 
 const errorCopy: Record<string, [string, string]> = {
   NETWORK: [
@@ -304,6 +272,7 @@ export default function App() {
     null,
   );
   const user = session?.user ?? null;
+  const cataloguePage = route.page === "home" || route.page === "chess" || route.page === "games" ? route.page : null;
 
   useEffect(() => {
     setCreateGame(null);
@@ -320,9 +289,15 @@ export default function App() {
     const listener = () => {
       setRoute(readRoute());
       setSelectedRoom(null);
+      if (!/^\/(verify|reset(?:-password)?)\/?$/.test(location.pathname) || location.hash.startsWith("#/"))
+        setEntrance(null);
     };
     window.addEventListener("hashchange", listener);
-    return () => window.removeEventListener("hashchange", listener);
+    window.addEventListener("popstate", listener);
+    return () => {
+      window.removeEventListener("hashchange", listener);
+      window.removeEventListener("popstate", listener);
+    };
   }, []);
 
   const refresh = useCallback(() => {
@@ -487,12 +462,18 @@ export default function App() {
   ).length;
   const friendCount = social.incoming.length;
   const title = {
-    games: t("Игры", "Games"),
+    home: "Iva Games",
+    chess: t("Шахматы", "Chess"),
+    games: t("Другие игры", "Other games"),
+    login: t("Войти", "Sign in"),
     friends: t("Друзья", "Friends"),
     rooms: t("Мои комнаты", "My rooms"),
     invitations: t("Приглашения", "Invitations"),
     profile: t("Мой профиль", "My profile"),
   }[route.page];
+  useEffect(() => {
+    document.title = title === "Iva Games" ? title : `${title} — Iva Games`;
+  }, [title]);
   const availableGames = games.filter((g) => g.status === "available");
   const existingFriend = (playerId: string) =>
     social.friends.some((p) => p.playerId === playerId);
@@ -584,7 +565,7 @@ export default function App() {
 
   return (
     <LanguageContext.Provider value={{ lang, t }}>
-      <div className={`portal ${user && !entrance ? "signed-in" : ""}`}>
+      <div className={`portal ${user && !entrance && !cataloguePage && route.page !== "login" ? "signed-in" : ""}`}>
         <div className="language-switch" aria-label={t("Язык", "Language")}>
           <button aria-pressed={lang === "ru"} onClick={() => setLang("ru")}>
             RU
@@ -593,24 +574,20 @@ export default function App() {
             EN
           </button>
         </div>
-        {!user && !entrance && (
+        {!user && !entrance && !cataloguePage && (
           <nav
             className="guest-games"
-            aria-label={t("Играть без входа", "Play without signing in")}
+            aria-label={t("Разделы игр", "Game collections")}
           >
-            <span>{t("Играть без входа", "Play without signing in")}</span>
-            <a className="button secondary small" href={chessLaunchUrls.remorse}>
-              Remorse
-            </a>
-            <a className="button secondary small" href={chessLaunchUrls.overdrive}>
-              {t("Форсаж", "Overdrive")}
-            </a>
-            <a className="button secondary small" href={chessLaunchUrls.colossus}>
-              {t("Колосс", "Colossus")}
-            </a>
+            <PortalLink className="button secondary small" href="/chess">
+              {t("Шахматы", "Chess")}
+            </PortalLink>
+            <PortalLink className="button secondary small" href="/games">
+              {t("Другие игры", "Other games")}
+            </PortalLink>
           </nav>
         )}
-        {user && !entrance && (
+        {user && !entrance && !cataloguePage && route.page !== "login" && (
           <a
             className="mobile-account"
             href="#/profile"
@@ -660,15 +637,28 @@ export default function App() {
               {t("Повторить", "Retry")}
             </button>
           </div>
-        ) : !user || entrance ? (
+        ) : cataloguePage && !entrance ? (
+          <Catalogue page={cataloguePage} games={games} user={user} busy={busy} offline={offline}
+            retry={() => void perform(refresh)}
+            onPlay={(game) => {
+              if (!user) go("rooms");
+              else if (!user.emailVerified) go("profile");
+              else setCreateGame(game.gameId);
+            }}
+            onAbout={setGameInfo}
+          />
+        ) : !user || entrance || route.page === "login" ? (
           <Auth
             busy={busy}
             perform={perform}
-            onAuthenticated={refresh}
+            onAuthenticated={async () => {
+              await refresh();
+              if (readRoute().page === "login" && !entrance) go("home", undefined, true);
+            }}
             entrance={entrance}
             clearEntrance={() => {
               setEntrance(null);
-              history.replaceState(null, "", `/${location.hash || "#/games"}`);
+              go(user ? "profile" : "login", undefined, true);
             }}
           />
         ) : (
@@ -680,7 +670,7 @@ export default function App() {
                   (page) => (
                     <a
                       key={page}
-                      href={`#/${page}`}
+                      href={page === "games" ? "/" : `/${page}`}
                       className={`nav-item ${route.page === page ? "active" : ""}`}
                       aria-current={route.page === page ? "page" : undefined}
                     >
@@ -688,7 +678,7 @@ export default function App() {
                       <span>
                         {
                           {
-                            games: t("Игры", "Games"),
+                            games: t("Каталог", "Games"),
                             friends: t("Друзья", "Friends"),
                             rooms: t("Комнаты", "Rooms"),
                             invitations: t("Приглашения", "Invitations"),
@@ -803,80 +793,6 @@ export default function App() {
                     {t("Отправить ещё раз", "Resend email")}
                   </button>
                 </section>
-              )}
-              {route.page === "games" && (
-                <>
-                  <div className="section-intro">
-                    <h2>{t("Во что сыграем?", "What shall we play?")}</h2>
-                    <p>
-                      {t(
-                        "Один стол, разные истории.",
-                        "One table, different stories.",
-                      )}
-                    </p>
-                  </div>
-                  <div className="game-grid">
-                    {games.map((game) => (
-                      <article
-                        className={`game-tile game-${game.gameId}`}
-                        key={game.gameId}
-                      >
-                        <GameArt kind={game.gameId} />
-                        <div className="game-tile-body">
-                          <div className="game-topline">
-                            <h3>{gameTitle(game, lang)}</h3>
-                            <span
-                              className={`tag ${game.status === "available" || chessLaunchUrls[game.gameId] ? "success" : ""}`}
-                            >
-                              {game.status === "available" || chessLaunchUrls[game.gameId]
-                                ? t("Можно играть", "Ready to play")
-                                : t("Скоро здесь", "Coming soon")}
-                            </span>
-                          </div>
-                          <p>{gameDescription(game.gameId, lang)}</p>
-                          <div className="game-bottom">
-                            <span className="game-players">
-                              <Icon name="friends" size={18} />
-                              {game.minPlayers}–{game.maxPlayers}
-                              {game.supportsBots && (
-                                <span className="bot-capability">
-                                  <Icon name="robot" size={17} />
-                                  {t("Боты", "Bots")}
-                                </span>
-                              )}
-                            </span>
-                            {chessLaunchUrls[game.gameId] ? (
-                              <a
-                                className="button small primary"
-                                href={chessLaunchUrls[game.gameId]}
-                              >
-                                {t("Открыть", "Play")}
-                              </a>
-                            ) : (
-                              <button
-                                className={`button small ${game.status === "available" ? "primary" : "secondary"}`}
-                                disabled={
-                                  busy ||
-                                  (game.status === "available" &&
-                                    !user.emailVerified)
-                                }
-                                onClick={() =>
-                                  game.status === "available"
-                                    ? setCreateGame(game.gameId)
-                                    : setGameInfo(game)
-                                }
-                              >
-                                {game.status === "available"
-                                  ? t("Собрать стол", "Gather a table")
-                                  : t("Об игре", "About game")}
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                      </article>
-                    ))}
-                  </div>
-                </>
               )}
               {user.emailVerified && route.page === "friends" && (
                 <>
@@ -1229,7 +1145,7 @@ export default function App() {
                 />
               )}
               {!user.emailVerified &&
-                route.page !== "games" &&
+                !cataloguePage &&
                 route.page !== "profile" && (
                   <Empty
                     icon="mail"
@@ -1394,48 +1310,6 @@ function StateBadge({ state }: { state: Room["state"] }) {
   );
 }
 
-function gameTitle(game: Game, lang: Language) {
-  return (
-    {
-      district: ["Район", "District"],
-      harbor: ["Гавань", "Harbor"],
-      overdrive: ["Форсаж", "Overdrive"],
-      remorse: ["Remorse", "Remorse"],
-      colossus: ["Колосс", "Colossus"],
-      "platform-lab": ["Пробный стол", "Practice table"],
-    }[game.gameId]?.[lang === "ru" ? 0 : 1] || game.title
-  );
-}
-function gameDescription(gameId: string, lang: Language) {
-  return (
-    {
-      district: [
-        "Общий город, личные планы и сделки, о которых вы ещё поспорите.",
-        "A shared city, personal plans and deals worth arguing about.",
-      ],
-      harbor: [
-        "Грузы, корабли и торговля. Узнайте, кто лучше договорится.",
-        "Cargo, ships and trading. Find out who makes the best deals.",
-      ],
-      remorse: [
-        "Шахматы, в которых у каждого взятия есть последствия.",
-        "Chess where every capture has consequences.",
-      ],
-      overdrive: [
-        "Шахматные фигуры с характером и собственными усилениями.",
-        "Chess pieces with their own character and abilities.",
-      ],
-      colossus: [
-        "Восемь фигур против босса. Читайте его замысел, разбивайте броню и разыгрывайте карты — сами или вдвоём.",
-        "Eight pieces against a boss. Read its intent, break its armour and play your cards — alone or together.",
-      ],
-      "platform-lab": [
-        "Выберите число, перехитрите друзей и наберите больше очков за три раунда.",
-        "Pick a number, outsmart your friends and score the most points in three rounds.",
-      ],
-    }[gameId]?.[lang === "ru" ? 0 : 1] || ""
-  );
-}
 
 function CreateRoom({
   games,

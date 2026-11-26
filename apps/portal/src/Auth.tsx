@@ -133,8 +133,8 @@ export function Auth({
         </div>
         <p className="story-footer">
           {t(
-            "Один аккаунт для всех игр Iva Games",
-            "One account for every Iva Games title",
+            "Друзья и игры в одном месте",
+            "Friends and games in one place",
           )}
         </p>
       </section>

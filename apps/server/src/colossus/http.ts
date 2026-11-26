@@ -10,6 +10,7 @@ const COOKIE = 'colossus_guest';
 const MAX_BODY = 16_384;
 interface GatewayOptions extends ServiceOptions {
   databasePath: string; secureCookies: boolean; validOrigin(request: IncomingMessage): boolean;
+  clientAddress(request: IncomingMessage): string;
 }
 function cookie(request: IncomingMessage) {
   return request.headers.cookie?.split(';').map(s => s.trim()).find(s => s.startsWith(COOKIE + '='))?.slice(COOKIE.length + 1);
@@ -49,7 +50,7 @@ export function createColossusGateway(options: GatewayOptions) {
       if (pathname !== '/api/colossus' && !pathname.startsWith('/api/colossus/')) return false;
       try {
         if (closing) throw new ColossusError('serverError', 503);
-        if (!allow('ip/' + request.socket.remoteAddress, 600)) throw new ColossusError('rateLimited', 429);
+        if (!allow('ip/' + options.clientAddress(request), 600)) throw new ColossusError('rateLimited', 429);
         if (pathname === '/api/colossus/health' && request.method === 'GET') {
           store.health(); json(response, 200, { ok: true, protocol: ONLINE_PROTOCOL, rulesVersion: RULES_VERSION }); return true;
         }

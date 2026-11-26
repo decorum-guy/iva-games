@@ -6,7 +6,7 @@ The owner requested code implementation, attractive cards whose whole background
 
 ## Source and isolation
 
-- Branch: `feat/colossus-v1`, initially based on integrated platform/OVERDRIVE source `8d8556d`; accepted OVERDRIVE audio update `82668cd` was merged without changing its content.
+- Branch: `feat/colossus-v1`, initially based on integrated platform/OVERDRIVE source `8d8556d`; accepted OVERDRIVE audio update `82668cd` and subsequent proxy/catalogue/zoom changes through `4a86989` were integrated. Existing game source and the modular portal App remain identical to that accepted base.
 - Rules imported from `ideas` at `583624db298792c107ce6418bd06087f30b310bb`; boss-card additions are in [CARDS_AND_PRESENTATION.md](CARDS_AND_PRESENTATION.md).
 - Game package: `games/chess/colossus`, with independent assets, saves, rules, search worker, API protocol, guest cookie and SQLite database.
 - Production activation, DNS changes and merging into the target/main are outside this implementation.
@@ -22,16 +22,17 @@ The owner requested code implementation, attractive cards whose whole background
 - Server-authoritative shared actions, private future decks/seed, exact durable acknowledgements, disconnect pause, explicit takeover and consensual restoration at a round boundary.
 - Direct guest-game entry from the portal, combined and standalone client builds, three independent server health endpoints and release workflow coverage. Platform account rooms are not advertised as connected to this game runtime.
 
-Original assets were published in `6d952d604e014f1657625ffcbfcb5d0b886e5765`; rules and transport in `31f5e5cde0c57bd1378d0fb267fca817685d6191`. See [README.md](README.md) for run commands and [ASSETS.md](ASSETS.md) for provenance/generators.
+Original assets were published in `6d952d604e014f1657625ffcbfcb5d0b886e5765`; rules and transport in `31f5e5cde0c57bd1378d0fb267fca817685d6191`, full client in `cf3f142430323f3c41f8a1dea30c67f87b4d6d4b`. See [README.md](README.md) for run commands and [ASSETS.md](ASSETS.md) for provenance/generators.
 
-## Executed local checks — full UI checkpoint
+## Executed local checks — integrated candidate
 
-- `npm run check`: **883 tests passed in 63 files**, package boundaries, TypeScript and ESLint passed after the last core/UI fixes and integration of `82668cd`.
+- `npm run check`: **907 tests passed in 66 files**, package boundaries, TypeScript and ESLint passed after the last core/UI fixes and integration through `4a86989`.
 - `npm run build:all`: all three game clients, chess server, platform and portal built successfully.
 - `npm run workspace:smoke`: **52 checks, 320 byte-for-byte HTTP file comparisons** across combined and three standalone layouts.
 - `npm run platform:smoke`: two independent HTTP clients, three rounds, static assets, database restart and exact replay passed; external messages: zero.
-- Within the above suites: **93 core/tutorial tests** and **72 chess-server tests**, including **14 COLOSSUS HTTP** and **5 client transport** tests.
+- Within the above suites: **93 core/tutorial tests** and **79 chess-server tests**, including **14 COLOSSUS HTTP**, **5 client transport** and **2 new COLOSSUS trusted-proxy HTTP** tests.
 - Twelve full positional battles plus one three-boss campaign completed and replayed identically after both final boss-card fixes. Seed 26011, public-position policy, 300-node budget. Campaign: 92 decisions, two camps, 20 total rounds. These results do not measure human win rate or establish final balance.
+- Public catalogue HTTP/SSR checks confirmed Colossus in the chess collection, 1–2 players, RU/EN copy, direct guest launch and no claimed platform-room runtime. The final platform smoke includes all three chess games.
 - SHA-256 and format checks passed for **9 GLB, 9 WAV and 25 SVG** assets. Seventeen additional executed Node assertions checked result categories/ranking and event feedback; they were not browser tests.
 
 Detailed results, specific fixes and the 13-run table: [VALIDATION_2026_11_26.md](VALIDATION_2026_11_26.md). Raw logs, databases, screenshots and traces stay under ignored `.qa`, with no Actions artifact upload.

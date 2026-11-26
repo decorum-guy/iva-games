@@ -5,6 +5,7 @@ import { createReadStream } from 'node:fs'
 import { stat } from 'node:fs/promises'
 import { extname, resolve, sep } from 'node:path'
 import { WebSocket, WebSocketServer } from 'ws'
+import { createClientAddressReader } from '@iva-games/session-kit/http'
 import { RULES_VERSION } from '@chess-2/remorse/core'
 import { ONLINE_PROTOCOL } from '@chess-2/remorse/online/protocol'
 import type { OnlineServerMessage } from '@chess-2/remorse/online/protocol'
@@ -24,6 +25,7 @@ export interface OnlineServerOptions extends RoomOptions {
   publicOrigin?: string
   allowedOrigins?: readonly string[]
   secureCookies?: boolean
+  trustedProxyIps?: readonly string[]
   heartbeatMs?: number
   overdriveDatabasePath?: string
   colossusDatabasePath?: string
@@ -83,6 +85,7 @@ export function createOnlineServer(options: OnlineServerOptions) {
   const store = new RoomStore(options.databasePath)
   const service = new RoomService(store, options)
   const limits = new RateLimit()
+  const clientAddress = createClientAddressReader(options.trustedProxyIps)
   const origin = options.publicOrigin ? new URL(options.publicOrigin).origin : null
   const allowed = new Set([...(origin ? [origin] : []), ...(options.allowedOrigins ?? []).map(value => new URL(value).origin)])
   const secure = options.secureCookies ?? origin?.startsWith('https:') ?? false
@@ -103,12 +106,12 @@ export function createOnlineServer(options: OnlineServerOptions) {
 
   const overdrive = createOverdriveGateway({
     databasePath: options.overdriveDatabasePath ?? (options.databasePath === ':memory:' ? ':memory:' : options.databasePath + '.overdrive.sqlite'),
-    secureCookies: secure, validOrigin, heartbeatMs: options.heartbeatMs,
+    secureCookies: secure, validOrigin, clientAddress, heartbeatMs: options.heartbeatMs,
     now: options.now, inactiveMs: options.inactiveMs, finishedMs: options.finishedMs,
   })
   const colossus = createColossusGateway({
     databasePath: options.colossusDatabasePath ?? (options.databasePath === ':memory:' ? ':memory:' : options.databasePath + '.colossus.sqlite'),
-    secureCookies: secure, validOrigin, now: options.now, inactiveMs: options.inactiveMs, finishedMs: options.finishedMs,
+    secureCookies: secure, validOrigin, clientAddress, now: options.now, inactiveMs: options.inactiveMs, finishedMs: options.finishedMs,
     presenceTimeoutMs: options.colossusPresenceTimeoutMs,
   })
 
@@ -127,7 +130,7 @@ export function createOnlineServer(options: OnlineServerOptions) {
         return
       }
       if (pathname.startsWith('/api/')) {
-        const address = request.socket.remoteAddress ?? 'unknown'
+        const address = clientAddress(request)
         if (!limits.allow('http/' + address, 180)) throw new OnlineError('rateLimited', 429)
         if (request.method === 'POST' && !validOrigin(request)) throw new OnlineError('notYourSeat', 403)
         if (pathname === '/api/guest' && request.method === 'POST') {
@@ -211,7 +214,7 @@ export function createOnlineServer(options: OnlineServerOptions) {
       if (closing || new URL(request.url ?? '/', 'http://localhost').pathname !== '/ws' || !validOrigin(request)) {
         throw new OnlineError('notYourSeat', 403)
       }
-      if (sockets.clients.size >= 1000 || !limits.allow('upgrade/' + request.socket.remoteAddress, 60)) throw new OnlineError('rateLimited', 429)
+      if (sockets.clients.size >= 1000 || !limits.allow('upgrade/' + clientAddress(request), 60)) throw new OnlineError('rateLimited', 429)
       const identity = guest(request)
       sockets.handleUpgrade(request, socket, head, ws => {
         identities.set(ws, identity)

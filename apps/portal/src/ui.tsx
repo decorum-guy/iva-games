@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useRef } from "react";
 import type { ReactNode } from "react";
 import type { Language, PublicPlayer } from "./types";
+import { PortalLink } from "./navigation";
 
 export const LanguageContext = createContext<{
   lang: Language;
@@ -115,7 +116,7 @@ export function Icon({
 
 export function Brand({ compact = false }: { compact?: boolean }) {
   return (
-    <a href="#/games" className="brand" aria-label="Iva Games">
+    <PortalLink href="/" className="brand" aria-label="Iva Games">
       <span className="brand-die">
         <Icon name="games" size={34} />
       </span>
@@ -124,7 +125,7 @@ export function Brand({ compact = false }: { compact?: boolean }) {
           Iva<span className="brand-small">games</span>
         </span>
       )}
-    </a>
+    </PortalLink>
   );
 }
 

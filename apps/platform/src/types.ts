@@ -39,6 +39,7 @@ export interface GameRuntime {
 }
 export interface GameRegistration {
   gameId: string;
+  collectionId?: 'chess' | 'other';
   title: string;
   minPlayers: number;
   maxPlayers: number;

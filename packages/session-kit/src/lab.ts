@@ -144,7 +144,7 @@ export class PlatformLabRuntime implements GameRuntime {
   }
 
   registration(): GameRegistration {
-    return { gameId: 'platform-lab', title: 'Пробный стол', minPlayers: 2, maxPlayers: 6,
+    return { gameId: 'platform-lab', collectionId: 'other', title: 'Пробный стол', minPlayers: 2, maxPlayers: 6,
       supportsBots: true, rulesVersion: RULES_VERSION, contentVersion: CONTENT_VERSION, status: 'available', runtime: this };
   }
 

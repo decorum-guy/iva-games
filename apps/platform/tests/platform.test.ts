@@ -66,7 +66,7 @@ interface Fixture {
   client: () => Client; stop: () => Promise<void>;
 }
 const fixtures: Fixture[] = [];
-async function fixture(options: { directory?: string; now?: { value: number }; runtimeTimeoutMs?: number; telegram?: boolean; games?: (lab: ReturnType<typeof createPlatformLabRegistration>) => GameRegistration[] } = {}): Promise<Fixture> {
+async function fixture(options: { directory?: string; now?: { value: number }; runtimeTimeoutMs?: number; telegram?: boolean; trustedProxyIps?: readonly string[]; games?: (lab: ReturnType<typeof createPlatformLabRegistration>) => GameRegistration[] } = {}): Promise<Fixture> {
   const directory = options.directory ?? await mkdtemp(join(tmpdir(), 'iva-platform-'));
   const now = options.now ?? { value: Date.now() };
   const mailbox = new MemoryMailbox();
@@ -80,7 +80,7 @@ async function fixture(options: { directory?: string; now?: { value: number }; r
     transport: { sendMessage: async message => { telegramMessages.push(message); return { outcome: 'accepted', messageId: String(telegramMessages.length) }; } },
   }) : undefined;
   if (telegram) platform.setInvitationDelivery(id => telegram.enqueueInvitation(id));
-  const server = createPlatformHttpServer(platform, { publicOrigin: ORIGIN, allowedHosts: ['portal.test'], secureCookies: false, telegram, telegramWebhookSecret: telegram ? WEBHOOK_SECRET : undefined });
+  const server = createPlatformHttpServer(platform, { publicOrigin: ORIGIN, allowedHosts: ['portal.test'], secureCookies: false, trustedProxyIps: options.trustedProxyIps, telegram, telegramWebhookSecret: telegram ? WEBHOOK_SECRET : undefined });
   await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
   const endpoint = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
   const value: Fixture = { directory, platform, lab, mailbox, server, endpoint, now, telegram, telegramMessages, stopped: false, client: () => new Client(endpoint),
@@ -140,6 +140,30 @@ async function webhook(f: Fixture, body: unknown, secret = WEBHOOK_SECRET): Prom
 }
 
 describe('Iva Games platform: independent HTTP clients and persistent authority', () => {
+  it('keeps signup and recovery limits separate for clients behind the trusted edge proxy', async () => {
+    const f = await fixture({ trustedProxyIps: ['127.0.0.1'] });
+    const alice = f.client(), bob = f.client();
+    await alice.session(); await bob.session();
+    const a = { 'X-Iva-Client-IP': '198.51.100.10' }, b = { 'X-Iva-Client-IP': '198.51.100.11' };
+    // Invalid registrations still consume the abuse limit, without creating test accounts.
+    for (let i = 0; i < 10; i++) expect((await alice.request('/auth/register', {}, a)).status).toBe(400);
+    expect((await alice.request('/auth/register', {}, a)).status).toBe(429);
+    expect((await bob.request('/auth/register', {}, b)).status).toBe(400);
+    for (let i = 0; i < 5; i++) expect((await alice.request('/auth/forgot-password', { email: 'absent@example.test' }, a)).status).toBe(202);
+    expect((await alice.request('/auth/forgot-password', { email: 'absent@example.test' }, { ...a, 'X-Forwarded-For': '203.0.113.200' })).status).toBe(429);
+    expect((await bob.request('/auth/forgot-password', { email: 'absent@example.test' }, b)).status).toBe(202);
+    expect(f.mailbox.messages).toHaveLength(0);
+  });
+
+  it('does not let an untrusted peer escape recovery limits with forged address headers', async () => {
+    const f = await fixture({ trustedProxyIps: ['192.0.2.20'] });
+    const client = f.client(); await client.session();
+    for (let i = 0; i < 5; i++) {
+      expect((await client.request('/auth/forgot-password', { email: 'absent@example.test' }, { 'X-Iva-Client-IP': `198.51.100.${i + 1}` })).status).toBe(202);
+    }
+    expect((await client.request('/auth/forgot-password', { email: 'absent@example.test' }, { 'X-Iva-Client-IP': '203.0.113.1', 'X-Forwarded-For': '203.0.113.2' })).status).toBe(429);
+  });
+
   it('registers a real hashed account, gates unverified actions, verifies once and rotates sessions at login', async () => {
     const f = await fixture();
     const { client, account } = await signup(f, 'alice', false);

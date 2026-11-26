@@ -1353,6 +1353,9 @@ button {
 }
 .empty-state .button {
   margin-top: 22px;
+  max-width: 100%;
+  white-space: normal;
+  text-align: center;
 }
 .inline-empty {
   padding: 25px 5px;
@@ -3293,6 +3296,17 @@ button {
   }
 }
 @media (max-width: 320px) {
+  .page-heading {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .page-heading > div {
+    overflow-wrap: anywhere;
+  }
+  .page-heading > .button {
+    max-width: 100%;
+    align-self: flex-start;
+  }
   .modal {
     padding: 13px;
   }
@@ -3303,4 +3317,148 @@ button {
     min-width: 0;
     overflow-wrap: anywhere;
   }
+}
+
+/* Public collections share the portal's existing cards and palette. */
+.catalogue-shell {
+  max-width: 1260px;
+  margin: 0 auto;
+  padding: 26px 42px 24px;
+}
+.catalogue-header {
+  display: flex;
+  align-items: center;
+  gap: 30px;
+  padding-right: 110px;
+  min-height: 58px;
+}
+.catalogue-nav {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 20px;
+  font-size: 13px;
+  font-weight: 750;
+}
+.catalogue-nav a {
+  padding: 10px 0;
+  border-bottom: 2px solid transparent;
+}
+.catalogue-nav a[aria-current="page"] {
+  color: var(--orange);
+  border-color: currentColor;
+}
+.catalogue-account {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-left: auto;
+}
+.catalogue-avatar { display: flex; }
+.catalogue-main { padding-top: 52px; }
+.catalogue-heading { margin-bottom: 36px; }
+.catalogue-heading h1 {
+  font-size: clamp(32px, 5vw, 54px);
+  line-height: 1.12;
+  letter-spacing: -1.8px;
+  margin-bottom: 16px;
+}
+.catalogue-heading > p:last-child {
+  font-size: 15px;
+  line-height: 1.6;
+  max-width: 620px;
+}
+.collection-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 26px;
+}
+.collection-card {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 19px;
+  box-shadow: 0 4px 0 #dfe7de88;
+  transition: transform 160ms ease, box-shadow 160ms ease;
+}
+.collection-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 7px 0 #dfe7de88;
+}
+.collection-card .game-art { height: 235px; }
+.collection-copy { padding: 28px; }
+.collection-copy h2 {
+  font-size: 28px;
+  letter-spacing: -.8px;
+  margin-bottom: 12px;
+}
+.collection-copy p { font-size: 14px; line-height: 1.65; }
+.collection-copy > span {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 25px;
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--orange);
+}
+.catalogue-games .game-tile,
+.catalogue-games .game-tile:first-child {
+  grid-column: auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.catalogue-games .game-art,
+.catalogue-games .game-tile:first-child .game-art {
+  height: 200px;
+  min-height: 0;
+  flex-shrink: 0;
+}
+.catalogue-games .game-tile-body,
+.catalogue-games .game-tile:first-child .game-tile-body {
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  padding: 24px;
+}
+.catalogue-games .game-topline h2 { font-size: 23px; letter-spacing: -.7px; }
+.catalogue-games .game-bottom,
+.catalogue-games .game-tile:first-child .game-bottom { margin-top: auto; padding-top: 22px; }
+.catalogue-footer {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 18px;
+  margin-top: 58px;
+  padding-top: 24px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 12px;
+}
+@media (max-width: 1000px) {
+  .catalogue-header { flex-wrap: wrap; gap: 20px; }
+  .catalogue-nav { order: 3; width: 100%; }
+}
+@media (max-width: 650px) {
+  .catalogue-shell { padding: 22px 20px; }
+  .catalogue-header { padding-right: 0; }
+  .catalogue-header > .brand { flex-basis: 100%; }
+  .catalogue-nav { order: 0; width: auto; flex: 1 1 170px; gap: 15px; }
+  .catalogue-account { gap: 9px; }
+  .catalogue-main { padding-top: 34px; }
+  .catalogue-heading { margin-bottom: 27px; }
+  .collection-grid, .catalogue-games { grid-template-columns: minmax(0, 1fr); gap: 22px; }
+  .collection-card .game-art { height: 180px; }
+  .collection-copy { padding: 23px; }
+  .collection-copy h2 { font-size: 25px; }
+  .catalogue-games .game-bottom { flex-wrap: wrap; }
+  .catalogue-footer { margin-top: 36px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .collection-card { transition: none; }
+  .collection-card:hover { transform: none; }
 }

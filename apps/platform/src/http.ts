@@ -3,6 +3,7 @@ import { timingSafeEqual } from 'node:crypto';
 import type { IncomingMessage, Server, ServerResponse } from 'node:http';
 import { createReadStream, existsSync, statSync } from 'node:fs';
 import { extname, resolve, sep } from 'node:path';
+import { createClientAddressReader } from '@iva-games/session-kit/http';
 import { PlatformError } from './types.js';
 import type { SessionRecord, TelegramIntegration } from './types.js';
 import { PlatformService, textField } from './service.js';
@@ -13,6 +14,7 @@ export interface HttpOptions {
   publicOrigin: string;
   allowedOrigins?: string[];
   allowedHosts?: string[];
+  trustedProxyIps?: readonly string[];
   secureCookies?: boolean;
   serveDirectory?: string;
   telegram?: TelegramIntegration;
@@ -50,6 +52,7 @@ export function createPlatformHttpServer(service: PlatformService, options: Http
   const origin = new URL(options.publicOrigin).origin;
   const origins = new Set(options.allowedOrigins ?? [origin]);
   const hosts = new Set(options.allowedHosts ?? [new URL(origin).host]);
+  const clientAddress = createClientAddressReader(options.trustedProxyIps);
   const secure = options.secureCookies ?? origin.startsWith('https:');
   const cookieName = secure ? '__Host-iva_session' : 'iva_dev_session';
   const staticRoot = options.serveDirectory ? resolve(options.serveDirectory) : null;
@@ -81,7 +84,7 @@ export function createPlatformHttpServer(service: PlatformService, options: Http
       const url = new URL(request.url, origin);
       const path = url.pathname;
       const method = request.method ?? 'GET';
-      const client = request.socket.remoteAddress ?? 'unknown';
+      const client = clientAddress(request);
       // Reverse proxies and household NAT legitimately share one source address.
       service.rateLimit(`http:${client}`, 3000);
       if (method === 'GET' && (path === '/health/live' || path === '/health/ready')) {
