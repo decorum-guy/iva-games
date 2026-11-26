@@ -4,6 +4,10 @@
 
 **Колосс:** [запуск и режимы](docs/colossus/README.md) · [карты и редкость](docs/colossus/CARDS_AND_PRESENTATION.md) · [фактический статус проверок](docs/colossus/BUILD_STATUS.md). Это PvE с шахматной армией, тремя боссами и кооперативом. Публикация кода и внешняя активация игры — отдельные этапы.
 
+Первый выпуск готовится для **iva-games.pro**. Публичный портал открывает выбор раздела на `/`, шахматы на `/chess` и остальные игры на `/games`; просмотр не требует входа. Сами гостевые шахматы размещаются отдельно на `chess.iva-games.pro/` и `/overdrive/`. Актуальные проверки и оставшиеся настройки хостинга — в [отчёте готовности](docs/iva-games/VALIDATION_PUBLICATION_READINESS_2026_11_26.md) и [пакете выпуска](docs/iva-games/RELEASE_IVA_GAMES_PRO.md).
+
+В этой feature-ветке добавлен Колосс по `/colossus/`: [draft PR №10](https://github.com/decorum-guy/iva-games/pull/10). Его кодовые проверки и ещё открытая браузерная приёмка записаны [отдельно](docs/colossus/VALIDATION_2026_11_26.md); отчёт готовности предыдущего выпуска не принимает автоматически новую игру.
+
 **Решение владельца от 25 ноября 2026 года:** развивать общую платформу с аккаунтами, друзьями, комнатами и приглашениями, а «Район» проектировать как социальную экономическую игру со сделками, событиями и обязательными ботами. «Гавань» остаётся второй выбранной концепцией. Telegram использует существующий прокси `kz-bot`.
 
 [Проектный пакет Iva Games](docs/iva-games/README.md) · [Архитектура](docs/iva-games/ARCHITECTURE.md) · [Платформа и друзья](docs/iva-games/PLATFORM_V1.md) · [Telegram](docs/iva-games/TELEGRAM_LINKING.md) · [«Район»](games/district/CONCEPT.md) · [«Гавань»](games/harbor/CONCEPT.md) · [Порядок реализации](docs/iva-games/DELIVERY_PLAN.md)

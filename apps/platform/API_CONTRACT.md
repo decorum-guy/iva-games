@@ -48,7 +48,7 @@ Verified email is required for friend actions and player lookup. Search is a lit
 
 ## Games and rooms
 
-GET `/games` is available without login and returns `{games: GameManifest[]}`. Manifest fields: `gameId,title,minPlayers,maxPlayers,supportsBots,rulesVersion,contentVersion,status`. Status is `available`, `unavailable` or `planned`; only a registration with an actual runtime is available.
+GET `/games` is available without login and returns `{games: GameManifest[]}`. Manifest fields: `gameId,title,minPlayers,maxPlayers,supportsBots,rulesVersion,contentVersion,status`, with optional `collectionId: 'chess' | 'other'` for catalogue grouping. The built-in registrations supply this field; older/custom registrations may omit it. Status is `available`, `unavailable` or `planned`; only a registration with an actual shared-room runtime is available. A separate guest launch link in the portal does not change this status. Public portal pages `/chess` and `/games` are distinct from this API endpoint under `/api/platform/v1`.
 
 `Room = {roomId,gameId,title,hostPlayerId,state,capacity,rulesVersion,contentVersion,revision,settings,members,reservedSeats,matchId,outcome,createdAt}`. State is `lobby | starting | playing | finished | cancelled`; `matchId` and `outcome` start as null.
 

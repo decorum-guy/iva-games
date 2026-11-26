@@ -6,7 +6,7 @@ The owner requested code implementation, attractive cards whose whole background
 
 ## Source and isolation
 
-- Branch: `feat/colossus-v1`, initially based on integrated platform/OVERDRIVE source `8d8556d`; accepted OVERDRIVE audio update `82668cd` and subsequent proxy/catalogue/zoom changes through `4a86989` were integrated. Existing game source and the modular portal App remain identical to that accepted base.
+- Branch: `feat/colossus-v1`, [draft PR #10](https://github.com/decorum-guy/iva-games/pull/10), initially based on integrated platform/OVERDRIVE source `8d8556d`; accepted OVERDRIVE audio update `82668cd` and subsequent proxy/catalogue/zoom changes through `4a86989` were integrated. The later documentation-only handoff `156a3ac` is preserved too; it changes no tested source. Existing game source and the modular portal App remain identical to that accepted base.
 - Rules imported from `ideas` at `583624db298792c107ce6418bd06087f30b310bb`; boss-card additions are in [CARDS_AND_PRESENTATION.md](CARDS_AND_PRESENTATION.md).
 - Game package: `games/chess/colossus`, with independent assets, saves, rules, search worker, API protocol, guest cookie and SQLite database.
 - Production activation, DNS changes and merging into the target/main are outside this implementation.
