@@ -1,0 +1,193 @@
+{
+  "bank": "overdrive-original-dsp-v2",
+  "generator": "scripts/generate-overdrive-audio.py",
+  "provenance": "Original deterministic DSP composition; no third-party or Remorse samples.",
+  "sampleRate": 32000,
+  "channels": 2,
+  "encoding": "PCM signed 16-bit little-endian",
+  "seed": 20261125,
+  "auditoryReview": "Accepted by the owner on 2026-11-26 with a lower playback gain for the shared move cue.",
+  "cues": {
+    "ui": {
+      "file": "ui.wav",
+      "durationSeconds": 0.09,
+      "bytes": 11564,
+      "peakDbFS": -9.5,
+      "rmsDbFS": -23.678,
+      "clippedSamples": 0,
+      "sha256": "41107e2a990f3189b51d87ebb66c607674e7bd3caad3f513d0fa68c95074ba0f"
+    },
+    "move": {
+      "file": "move.wav",
+      "durationSeconds": 0.22,
+      "bytes": 28204,
+      "peakDbFS": -6.5,
+      "rmsDbFS": -20.118,
+      "clippedSamples": 0,
+      "sha256": "efa132ce117035127669e0bcd79feafcf50dba9bdda7e8982ba91d7575a204ed"
+    },
+    "capture": {
+      "file": "capture.wav",
+      "durationSeconds": 0.29,
+      "bytes": 37164,
+      "peakDbFS": -5.2,
+      "rmsDbFS": -18.664,
+      "clippedSamples": 0,
+      "sha256": "b51e9561615f71037b0d1f6b0cdffc9f38a41b876bfcbbec5d80713620b04c7d"
+    },
+    "sweep": {
+      "file": "sweep.wav",
+      "durationSeconds": 0.52,
+      "bytes": 66604,
+      "peakDbFS": -4.5,
+      "rmsDbFS": -18.462,
+      "clippedSamples": 0,
+      "sha256": "3736b6c97c9f3f4e6371747bd6d7a56d8690809ef8b9c6a2ee6a875e21cfbd2f"
+    },
+    "raid": {
+      "file": "raid.wav",
+      "durationSeconds": 0.56,
+      "bytes": 71724,
+      "peakDbFS": -4.5,
+      "rmsDbFS": -18.74,
+      "clippedSamples": 0,
+      "sha256": "450cf05e800400952c091f09f01feae8e63455dad7c3b8cb5ac676aca07418ab"
+    },
+    "battery": {
+      "file": "battery.wav",
+      "durationSeconds": 0.66,
+      "bytes": 84524,
+      "peakDbFS": -4.5,
+      "rmsDbFS": -21.089,
+      "clippedSamples": 0,
+      "sha256": "df1e8044aa2abff74ffb988ceddd4d069107d5e509bc6400d7b05203168e9494"
+    },
+    "ram": {
+      "file": "ram.wav",
+      "durationSeconds": 0.65,
+      "bytes": 83244,
+      "peakDbFS": -3.5,
+      "rmsDbFS": -15.893,
+      "clippedSamples": 0,
+      "sha256": "d09a8910166136d66cf5058a14d4f2606acf908d6ac5f5927835edf13e1bac4e"
+    },
+    "rotation": {
+      "file": "rotation.wav",
+      "durationSeconds": 0.65,
+      "bytes": 83244,
+      "peakDbFS": -5.0,
+      "rmsDbFS": -18.803,
+      "clippedSamples": 0,
+      "sha256": "36602cee88bd5ac7c83f94efd38704f63f00a8e35b66a7bac40ee6f39863081b"
+    },
+    "cover": {
+      "file": "cover.wav",
+      "durationSeconds": 0.5,
+      "bytes": 64044,
+      "peakDbFS": -4.5,
+      "rmsDbFS": -17.513,
+      "clippedSamples": 0,
+      "sha256": "1654eb1da2103ca031fe6562cd8f225e0e77860f73a0f01cb07fbea02428bc41"
+    },
+    "energy": {
+      "file": "energy.wav",
+      "durationSeconds": 0.28,
+      "bytes": 35884,
+      "peakDbFS": -10.0,
+      "rmsDbFS": -24.584,
+      "clippedSamples": 0,
+      "sha256": "f70c6208643ef25fa94fc8f7ddb82fc545d81b978b291445935fb9dd1585fc97"
+    },
+    "spend": {
+      "file": "spend.wav",
+      "durationSeconds": 0.16,
+      "bytes": 20524,
+      "peakDbFS": -9.0,
+      "rmsDbFS": -22.266,
+      "clippedSamples": 0,
+      "sha256": "440a83e79de1c8b67f1e6d716eb380160881d888df50d1ee606fd6538a2d2bbf"
+    },
+    "cellfull": {
+      "file": "cellfull.wav",
+      "durationSeconds": 0.48,
+      "bytes": 61484,
+      "peakDbFS": -7.5,
+      "rmsDbFS": -19.386,
+      "clippedSamples": 0,
+      "sha256": "c2ff71e214d938713672062506e26a296febd41f74002f74e41fc20a46bcbfee"
+    },
+    "activate": {
+      "file": "activate.wav",
+      "durationSeconds": 1.05,
+      "bytes": 134444,
+      "peakDbFS": -4.0,
+      "rmsDbFS": -17.216,
+      "clippedSamples": 0,
+      "sha256": "43ec27fb3bbf3ce5d944078e6e84fbfcfc5f4d020d57fc00c40cae6159531647"
+    },
+    "expire": {
+      "file": "expire.wav",
+      "durationSeconds": 0.5,
+      "bytes": 64044,
+      "peakDbFS": -8.0,
+      "rmsDbFS": -21.48,
+      "clippedSamples": 0,
+      "sha256": "32d607fe82b748a22942d2a9647484bfaec29d9d6dba7d1a02b3ac8a7aa1dced"
+    },
+    "promotion": {
+      "file": "promotion.wav",
+      "durationSeconds": 0.42,
+      "bytes": 53804,
+      "peakDbFS": -6.0,
+      "rmsDbFS": -18.35,
+      "clippedSamples": 0,
+      "sha256": "20bfa4b25a2c2b57edf75cdb0cf123029c60ab1228e5c7e0d797022fa1ec00cd"
+    },
+    "check": {
+      "file": "check.wav",
+      "durationSeconds": 0.31,
+      "bytes": 39724,
+      "peakDbFS": -7.001,
+      "rmsDbFS": -19.485,
+      "clippedSamples": 0,
+      "sha256": "6b30f6ef838a6b46989e8ae386802480dc84cbfb6a565e8faabd969cfa9e36c3"
+    },
+    "mate": {
+      "file": "mate.wav",
+      "durationSeconds": 0.57,
+      "bytes": 73004,
+      "peakDbFS": -6.0,
+      "rmsDbFS": -16.469,
+      "clippedSamples": 0,
+      "sha256": "6bb2fd984ce23f66ecbefbe4bced45364cbdd95a4ca57776c295545daaab626e"
+    },
+    "finish": {
+      "file": "finish.wav",
+      "durationSeconds": 0.8,
+      "bytes": 102444,
+      "peakDbFS": -7.5,
+      "rmsDbFS": -20.267,
+      "clippedSamples": 0,
+      "sha256": "52fd4513a54329f948b20bfbeb41418514e02f719f3d3b2bc3731f29a5436fb7"
+    },
+    "board-contact": {
+      "file": "board-contact.wav",
+      "durationSeconds": 0.27,
+      "bytes": 34604,
+      "peakDbFS": -9.0,
+      "rmsDbFS": -22.459,
+      "clippedSamples": 0,
+      "sha256": "a6f79aa2ba9067c4edcf2af7ce777ef06a2b75091837eda1a1b54563c34696d6"
+    },
+    "piece-contact": {
+      "file": "piece-contact.wav",
+      "durationSeconds": 0.15,
+      "bytes": 19244,
+      "peakDbFS": -13.0,
+      "rmsDbFS": -27.208,
+      "clippedSamples": 0,
+      "sha256": "b174266d7d7995c035351adc4bddbba2269cdb30511311b0a74476dfea3dbdb6"
+    }
+  },
+  "totalBytes": 1169520
+}

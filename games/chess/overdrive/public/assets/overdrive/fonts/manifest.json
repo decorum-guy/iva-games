@@ -1,0 +1,58 @@
+{
+  "source": "Official google/fonts repository, unmodified upstream binaries and license texts",
+  "license": "SIL Open Font License 1.1",
+  "verification": "Exact-byte comparison against the source URLs on 2026-11-25; upstream main may change after verification",
+  "fonts": [
+    {
+      "family": "Russo One",
+      "file": "RussoOne-Regular.ttf",
+      "version": "1.001",
+      "licenseFile": "RussoOne-OFL.txt",
+      "reservedFontName": "Russo",
+      "weight": [
+        400
+      ]
+    },
+    {
+      "family": "Golos Text",
+      "file": "GolosText.ttf",
+      "version": "2.004",
+      "licenseFile": "GolosText-OFL.txt",
+      "weight": [
+        400,
+        900
+      ],
+      "variableAxis": "wght"
+    }
+  ],
+  "files": [
+    {
+      "file": "RussoOne-Regular.ttf",
+      "bytes": 39124,
+      "sha256": "bc0abcc660bd8b7ad3000ecb2898a27c58a29a50f7ec81652fa12e75148d09df",
+      "source": "https://raw.githubusercontent.com/google/fonts/main/ofl/russoone/RussoOne-Regular.ttf",
+      "matchesOfficialSource": true
+    },
+    {
+      "file": "RussoOne-OFL.txt",
+      "bytes": 4390,
+      "sha256": "3ac1301549523d9861fedca12871f24e575fbd26d520632fc00ba849b471d275",
+      "source": "https://raw.githubusercontent.com/google/fonts/main/ofl/russoone/OFL.txt",
+      "matchesOfficialSource": true
+    },
+    {
+      "file": "GolosText.ttf",
+      "bytes": 184292,
+      "sha256": "17bb58fb69aec2dfb047a2ebf52534023e9b688c97a6b7ac795b0a72912c2063",
+      "source": "https://raw.githubusercontent.com/google/fonts/main/ofl/golostext/GolosText%5Bwght%5D.ttf",
+      "matchesOfficialSource": true
+    },
+    {
+      "file": "GolosText-OFL.txt",
+      "bytes": 4394,
+      "sha256": "ff532f9e8789f09a9fdffc3c0954eedfb0a48be77b2e2eb90f5f82e4f347f50c",
+      "source": "https://raw.githubusercontent.com/google/fonts/main/ofl/golostext/OFL.txt",
+      "matchesOfficialSource": true
+    }
+  ]
+}

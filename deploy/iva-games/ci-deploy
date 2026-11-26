@@ -1,0 +1,4 @@
+#!/bin/sh
+# ForceCommand for the CI SSH account. Ignore SSH_ORIGINAL_COMMAND and argv.
+set -eu
+exec /usr/bin/timeout --kill-after=20s 720s /usr/bin/sudo -n -- /opt/iva-games/deploy/activation.py deploy

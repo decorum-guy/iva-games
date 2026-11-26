@@ -1,0 +1,11 @@
+[Unit]
+Description=Retry first Iva Games activation after boot and DNS changes
+
+[Timer]
+OnBootSec=30s
+OnUnitInactiveSec=60s
+AccuracySec=2s
+Unit=iva-games-activate.service
+
+[Install]
+WantedBy=timers.target

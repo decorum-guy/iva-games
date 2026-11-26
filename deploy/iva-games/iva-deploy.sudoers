@@ -1,0 +1,1 @@
+iva-deploy ALL=(root) NOPASSWD: /opt/iva-games/deploy/activation.py deploy

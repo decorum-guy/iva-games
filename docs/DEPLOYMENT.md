@@ -4,7 +4,7 @@
 
 ## Один сервер для страницы и комнаты
 
-`npm run build` создаёт `dist/` для браузера и `dist-server/main.js` для Node. `npm start` отдаёт страницу, `/api/*` и WebSocket `/ws` с одного адреса. SQLite лежит отдельно от сборки. Нужен один процесс приложения: активные соединения хранятся в памяти процесса, поэтому несколько реплик пока не поддерживаются.
+`npm run build` собирает пакеты `games/chess/remorse` и `games/chess/overdrive`, объединяет их в `dist/` и создаёт `dist-server/main.js` из `apps/server` для Node. Отдельные клиентские результаты находятся в `games/chess/<game>/dist`; корневой `dist/` сохраняет адреса REMORSE `/` и OVERDRIVE `/overdrive/`. `npm start` отдаёт страницу, `/api/*` и WebSocket `/ws` с одного адреса. SQLite лежит отдельно от сборки. Нужен один процесс приложения: активные соединения хранятся в памяти процесса, поэтому несколько реплик пока не поддерживаются.
 
 Статический `vite preview` оставлен для старых локальных проверок и звуковых демонстраций. Он не запускает комнаты. Для сетевого режима используется `npm start`.
 
@@ -32,15 +32,17 @@ Vite проксирует `/api` и `/ws` на `127.0.0.1:4173`. Изменен�
 
 ## Подготовленная поставка через Docker Compose
 
-В репозитории есть `Dockerfile`, `compose.yml` и `deploy/Caddyfile`. Приложение работает от непривилегированного пользователя, порт 4173 доступен только внутри Compose, снаружи открыты HTTP/HTTPS Caddy. Постоянные тома сохраняют базу и сертификаты между пересборками. Cookies ограничены поддоменом REMORSE.
+В репозитории есть `Dockerfile`, `compose.yml` и `deploy/Caddyfile`. Docker устанавливает зависимости по общему lockfile и манифестам четырёх npm workspaces; серверный bundle включает чистые игровые модули и не требует TypeScript-исходников в runtime-образе. Приложение работает от непривилегированного пользователя, порт 4173 доступен только внутри Compose, снаружи открыты HTTP/HTTPS Caddy. Постоянные тома сохраняют базу и сертификаты между пересборками. Cookies ограничены поддоменом REMORSE.
 
 До запуска нужны адрес и доступ к выбранному серверу. В DNS создаётся запись `A` для `remorse` на IPv4 сервера; `AAAA` добавляется только при работающем IPv6. Порты 80 и 443 должны доходить до Caddy. Пример рассчитан на сервер, где эти порты свободны; при существующем reverse proxy добавляется только виртуальный хост REMORSE, без замены чужих сайтов.
+
+Пример ниже использует подтверждённое текущее имя GitHub `iva-games` (repository ID `1469444922`). В существующей копии со старым origin `remorse-chess` обновите URL с сохранением истории и способа аутентификации. Переименование репозитория не означает публикацию сервера и не требует перемещать рабочие базы.
 
 На таком сервере:
 
 ```sh
-git clone https://github.com/decorum-guy/remorse-chess.git
-cd remorse-chess
+git clone https://github.com/decorum-guy/iva-games.git
+cd iva-games
 docker compose up -d --build
 docker compose ps
 ```
@@ -54,10 +56,12 @@ Caddy умеет проксировать WebSocket и автоматическ�
 Перед обновлением создать согласованную копию SQLite. Скрипт использует API backup, учитывает WAL и не перезаписывает существующий файл:
 
 ```sh
-docker compose exec remorse node server/backup.mjs /data/before-release.sqlite
+docker compose exec remorse node apps/server/scripts/backup.mjs /data/before-release.sqlite
 ```
 
 Имя для каждой новой копии должно быть новым. Копию следует вынести с сервера в выбранное владельцем хранилище. Не копировать только основной файл активной WAL-базы обычным `cp`. [Документация better-sqlite3 backup](https://github.com/WiseLibs/better-sqlite3/blob/master/docs/api.md#backupdestination-options---promise).
+
+У сервера есть также отдельная база OVERDRIVE. Для неё использовать тот же backup-скрипт с явным `DATABASE_PATH`, равным настроенному `OVERDRIVE_DATABASE_PATH` либо умолчанию `DATABASE_PATH + .overdrive.sqlite`. Копии двух игр не заменяют друг друга.
 
 Обычное обновление:
 

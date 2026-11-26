@@ -1,0 +1,12 @@
+[Unit]
+Description=Check Iva Games initial release, DNS and HTTPS
+After=docker.service network-online.target
+Wants=network-online.target
+Requires=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/opt/iva-games/deploy/activation.py activate
+TimeoutStartSec=210s
+UMask=0077
+SuccessExitStatus=75

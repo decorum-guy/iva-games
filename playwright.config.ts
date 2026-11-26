@@ -1,23 +1,2 @@
-import { defineConfig, devices } from '@playwright/test';
-
-const port = process.env.REMORSE_TEST_PORT ?? '4173';
-const url = `http://127.0.0.1:${port}`;
-
-export default defineConfig({
-  testDir: 'tests/e2e',
-  fullyParallel: true,
-  workers: 3,
-  timeout: 75_000,
-  retries: 0,
-  outputDir: '.qa/playwright',
-  use: { baseURL: url, screenshot: 'only-on-failure', trace: 'retain-on-failure' },
-  projects: [
-    { name: 'chromium', use: { ...devices['Desktop Chrome'], viewport: { width: 1440, height: 900 }, launchOptions: { args: ['--mute-audio'] } } },
-    { name: 'webkit', use: { ...devices['iPhone 13'], viewport: { width: 390, height: 844 } } },
-  ],
-  webServer: {
-    command: `npm run build && node dist-server/main.js`,
-    env: { PORT: port, HOST: '127.0.0.1', DATABASE_PATH: `.qa/e2e-${port}-${process.pid}.sqlite`, PUBLIC_ORIGIN: url },
-    url, reuseExistingServer: process.env.REMORSE_REUSE_TEST_SERVER === '1', timeout: 90_000,
-  },
-});
+// Compatibility entry; the package owns this configuration.
+export { default } from './games/chess/remorse/playwright.config.js'

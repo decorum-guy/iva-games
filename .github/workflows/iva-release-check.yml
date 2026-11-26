@@ -1,0 +1,207 @@
+name: Iva Games release images
+
+on:
+  pull_request:
+  workflow_dispatch:
+  workflow_run:
+    workflows: [Iva Games platform]
+    types: [completed]
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: iva-release-check-${{ github.event.workflow_run.head_sha || github.sha }}
+  cancel-in-progress: false
+
+jobs:
+  image:
+    if: >-
+      github.event_name != 'workflow_run' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'push' &&
+       github.event.workflow_run.head_repository.full_name == github.repository)
+    permissions:
+      contents: read
+    name: ${{ matrix.service }} image
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - service: chess
+            dockerfile: Dockerfile
+          - service: platform
+            dockerfile: Dockerfile.platform
+    env:
+      IMAGE_KIND: ${{ matrix.service }}
+      IMAGE_DOCKERFILE: ${{ matrix.dockerfile }}
+      IMAGE_TAG: iva-games-check:${{ matrix.service }}-${{ github.run_id }}-${{ github.run_attempt }}
+      SMOKE_CONTAINER: iva-release-${{ matrix.service }}-${{ github.run_id }}-${{ github.run_attempt }}
+      SMOKE_VOLUME: iva-release-${{ matrix.service }}-${{ github.run_id }}-${{ github.run_attempt }}-data
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - name: Validate deployment Compose and Caddy configuration
+        if: matrix.service == 'platform'
+        run: |
+          set -euo pipefail
+          umask 077
+          config_dir="$(mktemp -d "$RUNNER_TEMP/iva-config.XXXXXX")"
+          trap 'rm -rf -- "$config_dir"' EXIT
+          # Configuration-only fixtures: no credentials, recipients or delivery.
+          cat > "$config_dir/platform.env" <<'ENV'
+          SMTP_HOST=mail.invalid
+          SMTP_PORT=465
+          SMTP_SECURE=true
+          SMTP_FROM=ci@example.invalid
+          TELEGRAM_ENABLED=false
+          ENV
+          docker pull caddy:2
+          caddy_image="$(docker image inspect caddy:2 --format '{{index .RepoDigests 0}}')"
+          cat > "$config_dir/release.env" <<ENV
+          CHESS_IMAGE=iva-games-config-check:chess
+          PLATFORM_IMAGE=iva-games-config-check:platform
+          CADDY_IMAGE=$caddy_image
+          PLATFORM_ENV_FILE=$config_dir/platform.env
+          IVA_NETWORK_SUBNET=172.30.239.0/24
+          IVA_NETWORK_DYNAMIC_RANGE=172.30.239.128/25
+          CADDY_PROXY_IP=172.30.239.2
+          CHESS_DATA_VOLUME=iva-config-chess-data
+          PLATFORM_DATA_VOLUME=iva-config-platform-data
+          CADDY_DATA_VOLUME=iva-config-caddy-data
+          CADDY_CONFIG_VOLUME=iva-config-caddy-config
+          ENV
+          docker compose version --short
+          IVA_RELEASE_ENV="$config_dir/release.env" deploy/iva-games/compose.sh config --quiet
+          # Validate provisioning only: never start listeners or obtain certificates.
+          # The container has no external network, published ports or persistent data.
+          docker run --rm --network none --read-only \
+            --tmpfs /data --tmpfs /config --tmpfs /tmp \
+            --mount "type=bind,src=$GITHUB_WORKSPACE/deploy/iva-games/Caddyfile,dst=/etc/caddy/Caddyfile,readonly" \
+            --entrypoint caddy "$caddy_image" validate --config /etc/caddy/Caddyfile --adapter caddyfile
+
+      - name: Build runtime image from the checked-out revision
+        run: |
+          set -euo pipefail
+          docker build --pull --build-arg VCS_REF="$(git rev-parse HEAD)" \
+            --file "$IMAGE_DOCKERFILE" --tag "$IMAGE_TAG" .
+
+      - name: Check isolated production runtime and persistent volume
+        run: |
+          set -euo pipefail
+          deploy/iva-games/verify-image.sh
+
+  publish:
+    needs: image
+    if: github.event_name == 'workflow_run'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - service: chess
+            dockerfile: Dockerfile
+          - service: platform
+            dockerfile: Dockerfile.platform
+    env:
+      RELEASE_SHA: ${{ github.event.workflow_run.head_sha }}
+      SERVICE: ${{ matrix.service }}
+      DOCKERFILE: ${{ matrix.dockerfile }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          persist-credentials: false
+      - name: Publish the reviewed main revision
+        env:
+          REGISTRY_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$RELEASE_SHA"
+          trap 'docker logout ghcr.io >/dev/null 2>&1 || true' EXIT
+          printf '%s\n' "$REGISTRY_TOKEN" | docker login ghcr.io -u "$GITHUB_REPOSITORY_OWNER" --password-stdin
+          image="ghcr.io/${GITHUB_REPOSITORY}-$SERVICE:$RELEASE_SHA"
+          if docker buildx imagetools inspect "$image" >/dev/null 2>&1; then
+            echo "Reusing the existing immutable SHA tag for $SERVICE."
+            exit 0
+          fi
+          read -r inputs compatibility < <(deploy/iva-games/image-inputs.sh "$SERVICE")
+          docker build --pull --platform linux/amd64 --file "$DOCKERFILE" \
+            --build-arg VCS_REF="$RELEASE_SHA" \
+            --label "org.iva-games.inputs=$inputs" \
+            --label "org.iva-games.compatibility=$compatibility" --tag "$image" .
+          export IMAGE_KIND="$SERVICE" IMAGE_TAG="$image"
+          export SMOKE_CONTAINER="iva-publish-$SERVICE-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          export SMOKE_VOLUME="$SMOKE_CONTAINER-data"
+          deploy/iva-games/verify-image.sh
+          docker push "$image"
+
+
+  deploy:
+    needs: publish
+    if: github.event_name == 'workflow_run'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    permissions:
+      contents: read
+      packages: read
+    environment: production
+    concurrency:
+      group: iva-games-vps
+      cancel-in-progress: false
+    env:
+      RELEASE_SHA: ${{ github.event.workflow_run.head_sha }}
+      VPS_HOST: ${{ vars.IVA_SSH_HOST }}
+      VPS_PORT: ${{ vars.IVA_SSH_PORT }}
+      VPS_HOST_KEY: ${{ vars.IVA_SSH_HOST_KEY }}
+    steps:
+      - name: Promote the reviewed image digests
+        env:
+          DEPLOY_KEY: ${{ secrets.IVA_DEPLOY_SSH_KEY }}
+          REGISTRY_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          umask 077
+          config="$(mktemp -d)"
+          trap 'docker logout ghcr.io >/dev/null 2>&1 || true; rm -rf -- "$config"' EXIT
+          test -n "$DEPLOY_KEY" && test -n "$VPS_HOST_KEY"
+          printf '%s\n' "$DEPLOY_KEY" > "$config/key"
+          printf '%s\n' "$VPS_HOST_KEY" > "$config/known_hosts"
+          main_sha="$(curl -fsS https://api.github.com/repos/"$GITHUB_REPOSITORY"/branches/main | jq -er .commit.sha)"
+          if [[ "$main_sha" != "$RELEASE_SHA" ]]; then
+            echo "A newer main revision superseded this run."
+            exit 0
+          fi
+          printf '%s\n' "$REGISTRY_TOKEN" | docker login ghcr.io -u "$GITHUB_REPOSITORY_OWNER" --password-stdin
+          digest() {
+            docker buildx imagetools inspect --format '{{json .Manifest}}' \
+              "ghcr.io/${GITHUB_REPOSITORY}-$1:$RELEASE_SHA" | jq -er .digest
+          }
+          chess="$(digest chess)"
+          platform="$(digest platform)"
+          # The server validates evidence against GitHub and GHCR independently.
+          # Registry auth is short-lived and goes via stdin, never argv.
+          for attempt in 1 2 3; do
+            status=0
+            printf '%s %s %s\n%s\n' "$RELEASE_SHA" "$chess" "$platform" "$REGISTRY_TOKEN" |
+              ssh -T -p "$VPS_PORT" -i "$config/key" -o IdentitiesOnly=yes -o BatchMode=yes \
+                -o ControlMaster=no -o ControlPath=none -o ConnectTimeout=10 \
+                -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$config/known_hosts" \
+                "iva-deploy@$VPS_HOST" || status=$?
+            if [[ "$status" != 75 ]]; then exit "$status"; fi
+            sleep "$((attempt * 10))"
+          done
+          exit 75

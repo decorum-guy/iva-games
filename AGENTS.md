@@ -1,3 +1,98 @@
+# Iva Games — latest project direction
+
+## Current activation: new VPS, SSH and owner-managed DNS
+
+On 26 November 2026 the owner requested the local activation prompt with placeholders for the new VPS IP and initial root password. The local executor is authorized to configure the supplied VPS, project-specific SSH keys and Apple Keychain, move SSH from 22 to **2233** (the support-recommended example), verify an independent connection, then disable password/keyboard-interactive access and close 22. Prepare rollback and preserve the old live session until replacement access is verified. Account for ssh.socket, effective sshd configuration, persistent firewall rules and fail2ban on the selected port. Use a separate tested sudo administrator before disabling SSH root login; rotate the initial root password and store recovery credentials in Keychain. The Mac private key remains a protected file; Keychain stores its passphrase.
+
+The owner will change DNS personally later. Do not edit registrar records. Install a real persistent systemd activation service/timer on the supplied VPS that waits for **both iva-games.pro and chess.iva-games.pro**, checks A/CNAME and any AAAA, verifies required application/SMTP readiness, and activates a pinned accepted release once. Preserve ACME state and avoid repeated Caddy/container restarts. The activation handler and deployment updates share a lock and readiness gate. A waiting timer is not evidence of a live site or external browser acceptance.
+
+This activation includes preparing the actual release and automatic updates after successful CI, but explicitly **excludes Telegram**: keep TELEGRAM_ENABLED=false; do not configure a bot/webhook/proxy or touch kz-bot. Historical Telegram-access checks do not block this task. The old Chess 2 domains are unused for this deployment; do not add their sites, redirects or certificates. Use `prompts/PUBLISH_IVA_GAMES_PRO.md` with owner-supplied values; commit only the unfilled template. No real VPS address, password, installed handler or completed activation is claimed by this documentation update.
+
+## Previous stage: publication readiness for iva-games.pro
+
+On 26 November 2026 the owner confirmed **iva-games.pro** (not iva-games.online), requested separate public chess and other-game pages, and asked for a publication-readiness check before providing the new VPS. The OVERDRIVE finale and auditory acceptance are complete according to the owner's report and the checked-in acceptance record: all 20 sounds were accepted, and commit `82668cd` lowers only the shared move mix from 0.70 to 0.42 (about 4.4 dB). Preserve that bank, the intact falling king/contact motion, the accepted rules and energy balance. Do not restart the historical polish prompt or change REMORSE's sound bank.
+
+The public portal now has `/` for the two collections, `/chess` for REMORSE/OVERDRIVE, and `/games` for other games. Browsing does not require an account; rooms, friends and invitations retain their existing account checks. Guest chess still launches at `chess.iva-games.pro/` and `/overdrive/`; this does not implement the shared-account chess adapter. District and Harbor remain planned games. Keep old hash links and account verification/reset links working.
+
+Read `docs/iva-games/VALIDATION_PUBLICATION_READINESS_2026_11_26.md`, `docs/iva-games/RELEASE_IVA_GAMES_PRO.md`, and `docs/iva-games/TRUSTED_PROXY.md` for the latest candidate and executed checks. Release services trust only the configured exact Caddy socket IP; Caddy must overwrite `X-Iva-Client-IP`. Validate the private subnet against the actual VPS before installation. Real hosting/SSH, DNS/HTTPS, SMTP delivery, target-volume backup/restore and public acceptance remain activation work; Telegram is optional and disabled until separately configured. Current CI checks and builds the release but does not deploy on push. No merge, DNS change, real message or production restart is implied by this readiness review. Use `prompts/PUBLISH_IVA_GAMES_PRO.md` when the owner proceeds with the actual server.
+
+## Active review: OVERDRIVE energy v2 and publication
+
+On 26 November 2026 the owner supplied completed Mac acceptance reports for the portal and OVERDRIVE, explicitly requested new synthetic games to assess the changed energy balance, and purchased **iva-games.pro**. Treat the purchase as owner-provided context, not evidence of configured DNS or hosting. Review and preserve the requested two banks of three, impulse cost 3, form cost 6, capture rewards 1/2/2/3/4 and fresh-check reward 2. Old v1 saves and rooms retain their own rules. A proposed balancing change needs measured evidence; never silently change the accepted rules while calling it a packaging fix.
+
+The review branch combines actual accepted platform head `b7ca237` (PR #7) and energy-v2 head `32c1377` (PR #8). Work proceeds in `review/overdrive-v2-release` / PR #9. Older branch-specific instructions below describe their respective stages. Preserve their history and local demonstrations. Do not repeat the migration or local acceptance merely because old prompts exist. No merge, DNS change or production restart is implied by preparing this release candidate.
+
+The energy audit is complete: 192 comparative game runs, 17,933 validated/replayed plies and 32 tactical probes. Read `docs/overdrive/BALANCE_ENERGY_V2.md` for the measured recommendation to retain v2 and its limits. The earlier source candidate `1e54f60` passed 759 tests and real GitHub Docker build/runtime/persistence checks for both images; `docs/iva-games/VALIDATION_RELEASE_CANDIDATE_2026_11_26.md` records that historical snapshot. The latest readiness report above supersedes its current-status claims. Do not repeat the tournament solely because its ignored logs are absent from another machine. Public hosting, real SMTP/Telegram and automatic deployment after push still require their actual activation.
+
+Use the real rules core and SDK for balance games; compare v1/v2 with matched opening tapes, seeds and budgets, distinguish unfinished games from draws, and record achieved search depth. Synthetic self-play is evidence about these bots, not a measured human Elo or proof of human balance. Keep full action logs under ignored `.qa`; commit the reproducer and concise measured report. Publish each completed milestone without force-push.
+
+The renewed platform acceptance report records working Mac SSH to `kz-bot` and an existing SOCKS5 route from `ha-vps`. The older SSH timeout is historical. A new game bot still needs its own configuration and accepted real delivery. Do not reuse another project's bot or send real test messages without a named authorized recipient.
+
+## Active implementation: platform and District revision
+
+The owner now explicitly authorizes implementation of accounts, friends, rooms and invitations in parallel with the separate chess finishing/migration agent. Work in an isolated feature branch; the older documentation-only scope below is historical. Do not repeat the chess migration or overwrite that agent's game source. Integrate the existing chess network later through a versioned game-runtime adapter, preserving guest rooms and local saves.
+
+The repository rename to `decorum-guy/iva-games` has been verified by stable GitHub repository ID 1469444922. `games/chess/*` remains the approved collection structure. Check remote refs again before integrating concurrent work.
+
+The published chess migration `d2d9693` and Mac acceptance fixes `c18e57c` are integrated into `feat/iva-platform-foundation`. Preserve the accepted `games/chess/*`, `packages/engine-sdk` and `apps/server` source. Platform PR #5 is stacked on `acceptance/overdrive-monorepo` / PR #6, which is based on `feat/overdrive-sdk` / PR #3. Both use one root npm workspace lockfile. The Mac report is `docs/overdrive/VALIDATION_MAC_2026_11_25.md`; it does not accept the new portal. The main branch and active Mac/public deployment are not changed by this integration.
+
+District now targets social negotiation, atomic property/resource deals, city events and personal goals inspired by the owner's Colonist / Monopoly One / Jackbox experience. Bots are mandatory in its first release, including solo with bots and mixed rooms. Read `games/district/RULES_V0_2.md` for normative prototype rules, `DESIGN_V0_2.md` for rationale, and `BOT_DESIGN.md` for policy requirements. The v0.1 rules are historical; they must not override or silently extend v0.2. Prices and strength levels remain unvalidated design choices. Rules, technical lab bots and an implemented District game are distinct deliverables.
+
+A room participant has its own `participantId`; its controller is a human account or an explicitly labelled bot. Bots have no email, login session, friendship or Telegram identity. Every game declares participant limits and bot capability. Bots act through the same rules and receive only their permitted information.
+
+Telegram traffic must use the owner's existing proxy route through SSH alias `kz-bot`; never silently fall back to direct Telegram access. Read `docs/iva-games/INFRASTRUCTURE_ACCESS.md`. On local development/acceptance, run the read-only `npm run check:kz-bot`, check actual configured SSH access and proxy protocol/port separately, and distinguish cloud limitations from the owner's Mac access. Do not copy SSH keys, proxy passwords, bot tokens or the panel's unrelated settings into this repository. Tests use controlled mail/Telegram transports and never message real recipients.
+
+Current implementation, checks and remaining activation work belong in `docs/iva-games/BUILD_STATUS.md`; the general architecture and earlier spec are not themselves evidence of deployment. Keep QA videos, screenshots, traces, database fixtures and local email files ignored and off GitHub Actions artifacts.
+
+## Player-facing writing
+
+The owner explicitly wants simple interface copy like Colonist: short actions, short statuses and an obvious next step, in Russian and English. Keep delivery internals, duplicate-send explanations, revision numbers, idempotency, runtime architecture, database details and implementation disclaimers in engineering documentation. Players should see “Invite sent”, “Connect Telegram”, “Ready” or a useful retry message. Be accurate without exposing machinery: unfinished catalogue entries can say “Coming soon”, unavailable integrations can say “Telegram is not available yet”. Describe the technical table through its playable rules in the UI; record its engineering purpose in docs. Do not show raw backend exceptions or a paragraph of caveats as the normal user experience. This applies to pages, errors, emails, bot messages and future game tutorials.
+
+On 25 November 2026 the owner expanded this project from Chess 2 to a shared games portal, with **Iva Games** as the working name and **iva-games** as the target repository slug. Chess remains a collection under **games/chess/remorse**, **games/chess/overdrive**, and future games/chess/<variant> packages. Do not put independent games on permanent branches.
+
+Read [docs/iva-games/README.md](docs/iva-games/README.md), [ARCHITECTURE.md](docs/iva-games/ARCHITECTURE.md), [PLATFORM_V1.md](docs/iva-games/PLATFORM_V1.md), [TELEGRAM_LINKING.md](docs/iva-games/TELEGRAM_LINKING.md), and [DELIVERY_PLAN.md](docs/iva-games/DELIVERY_PLAN.md) before work on the expanded platform. These are design requirements; actual implementation and verification belong in [BUILD_STATUS.md](docs/iva-games/BUILD_STATUS.md). Source availability is not evidence of external activation, deployment, a completed chess migration or implemented product games.
+
+## Selected non-chess work
+
+- The owner selected **Harbor / Гавань** and **District / Район** (also referred to conversationally as Город). District is the first detailed design candidate. Read games/district/CONCEPT.md, DESIGN_V0_2.md, BOT_DESIGN.md and games/harbor/CONCEPT.md. RULES_V0_1.md is historical. Numeric parameters are unvalidated hypotheses until actual playtesting.
+- Before product implementation of these games, implement and accept the shared foundation: real accounts, friends, rooms, site invitations and optional linked Telegram delivery. Friends are required scope, not a future placeholder.
+- Keep platform-service (accounts/social/invitations/delivery), session-kit (game sessions/protocol/recovery), and the existing engine-sdk (search) separate. The current engine supports two-player zero-sum public-information search, not arbitrary multiplayer or secret hands.
+- New game servers own authoritative rules, durable transitions and per-player views. Never send opponents' private cards/bids or hidden future events to a client and merely hide them in the UI. Disconnect is not resignation; repeated commands must not produce duplicate effects.
+- Telegram linking starts from an authenticated website session and a single-use opaque deep-link code. A private-chat /start supplies a candidate identity; website confirmation completes the link. Delivery is opt-in and concerns explicitly created invitations. No scheduled reminders, unsolicited announcements or real-recipient messages during tests. A design or mock test is not evidence of real delivery.
+
+## Preserve concurrent work and existing players
+
+The package migration is being performed in another context. Inspect current remote refs and actual local changes before moving code. A message about a completed local split is not evidence that the remote has that split. Integrate games/chess/* on top of the actual migration, never replace newer work with an old src/ snapshot. Preserve the active OVERDRIVE instructions when combining AGENTS.md across branches.
+
+The GitHub rename to iva-games is now verified; it does not imply that every local checkout was renamed or the package migration was pushed. Preserve game IDs, package names, browser storage, ratings, databases, routes and domains unless a separate migration explicitly covers them. In particular chess-2.online and remorse.chess-2.online remain valid planned addresses. Accounts for the new portal must not silently break current local or guest chess modes.
+
+The following Remorse instructions remain applicable to that game. Their earlier restrictions against accounts, notifications and catalogue work concerned the earlier chess-only stage; the current owner request explicitly authorizes the separate shared platform and portal. Preserve each game's own visual identity and all previously selected/excluded chess directions.
+
+# Chess workspace migration — published integration context
+
+
+The owner authorized reorganizing the existing implementation into npm workspaces and has since renamed the repository to `decorum-guy/iva-games`. Keep delivery on `feat/overdrive-sdk` / draft PR #3; do not merge `main`, perform another rename, change DNS, deploy, or replace the owner's active 4173 server as a side effect. Use the confirmed current remote while preserving the existing repository history and local work.
+
+The owner explicitly requires intermediate GitHub publication: commit and publish each completed logical milestone in the working branch as work proceeds. Do not hold the entire implementation until one final large upload. Before each branch update, read its current head, preserve concurrent work and use a normal fast-forward or an expected-head check without force. A local commit or uploaded unreferenced blob is not a published checkpoint; verify the remote branch and give the commit link. Record checks still pending without describing them as passed.
+
+The root package is `iva-games`; internal package names remain `@chess-2/*`. Current source paths are `games/chess/remorse/src`, `games/chess/overdrive/src`, `packages/engine-sdk/src` and `apps/server/src`. Each game owns its `public`, tests and asset scripts. Use root npm commands and one lockfile. Preserve rule semantics, runtime asset URLs, storage keys, cookies, protocol/save versions, database paths, engine behavior and each game's distinct visuals/audio. Runtime game dependencies cross package boundaries through explicit exports; the server consumes pure rules/protocols, never UI. Do not add a catalogue implementation or unify game styling.
+
+Read `docs/MONOREPO.md` and `prompts/ACCEPT_OVERDRIVE_MONOREPO.md` for the current structure and local acceptance task. The fresh nested-layout report is `docs/VALIDATION_IVA_GAMES_LAYOUT.md`. Historical paths/counts/hashes in older validation reports describe their recorded revisions and are not claims about the migrated tree. Keep them intact. Record fresh migration checks separately and distinguish authored code, executed checks, browser observations, listening and activation. The older instructions below retain their behavioral requirements; translate their source paths using the migration document.
+
+# Chess 2 — active SDK and OVERDRIVE iteration
+
+On 25 November 2026 the owner explicitly assigned the next agent to create and test the common engine SDK and complete the whole OVERDRIVE / Форсаж iteration: final rules, measured balance work, new models/audio/effects, an independent interface, implementation, SDK-aware AI, real networking and acceptance. This is the active scope; preserve the existing REMORSE product. Routine decisions and continued execution are authorized.
+
+**Every new Chess 2 game must have its own unmistakably different visual identity**, including materials, models, palette, type, layout, effects and sound. Recolouring REMORSE's marble or repeating a generic generated dashboard does not satisfy this requirement. OVERDRIVE's direction is in `docs/overdrive/ART_DIRECTION.md`.
+
+Use `docs/overdrive/STATUS.md` and the latest validation documents to distinguish authored code, executed checks, browser observations and actual deployment. `docs/ENGINE_SDK.md` defines the shared search contract. Each variant retains a pure authoritative rules core used by rendering, AI, teaching and the server. The SDK currently supports two-player zero-sum games with public information; hidden-card search requires another model.
+
+The other agent is updating **documentation only** on `design/chess-2-concepts`. The owner asked this implementation to periodically fetch and reconcile those changes. Preserve both the newer REMORSE status on main and all concurrent source work; never replace all of AGENTS with that branch's older REMORSE section. Keep imported drafts under `docs/chess-2`, with implementation decisions and evidence under `docs/overdrive`.
+
+Five future directions remain selected: OVERDRIVE, WILDCARD, CHORUS, CHIMERA and SIGNAL. RELAY is excluded. The current action request implements OVERDRIVE and the SDK; do not silently expand implementation to all five games. Their recorded order is complete rules → balance → unique assets/art/audio → implementation/network/engine → local acceptance. A simulator written to test rules is evidence preparation, not a claim of a finished product.
+
+REMORSE and OVERDRIVE have separate entry points, storage keys, rules versions, network protocols, guest sessions and databases. QA stays silent, isolated and out of the owner's visible applications. Preserve all REMORSE saves, ratings, selected sounds and accepted motion. Browser or target-device limitations must be reported literally. No main merge, public release or DNS configuration follows merely from producing a source build.
+
 # Remorse Chess — agent instructions
 
 ## Objective
