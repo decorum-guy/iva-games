@@ -12,7 +12,7 @@
 
 ## Подключение на Mac
 
-Используйте отдельного бота из BotFather. Скрипт `deploy/iva-games/telegram-auth-setup-mac.py` запрашивает токен скрыто, проверяет бота и регистрирует webhook `https://iva-games.pro/integrations/telegram/auth-webhook`. Для Mac используется проверенный временный SSH-туннель к Telegram Bot API через существующий `kz-bot`. Корневой помощник `configure-telegram-auth.py` пишет настройки вне checkout, под общим lock пересоздаёт только platform и сверяет доступность Telegram-входа локальным запросом.
+Используйте отдельного бота из BotFather. Скрипт `deploy/iva-games/telegram-auth-setup-mac.py` запрашивает токен скрыто, проверяет бота и регистрирует webhook `https://iva-games.pro/integrations/telegram/auth-webhook`. Для Mac используется проверенный временный SSH-туннель к Telegram Bot API через существующий `kz-bot`. Mac проверяет TLS до передачи токена. Туннель использует учётную запись `kz-bot` на обоих маршрутах, с промежуточным SSH через `ha-vps` или напрямую. Корневой помощник `configure-telegram-auth.py` пишет настройки вне checkout, под общим lock пересоздаёт только platform и сверяет доступность Telegram-входа локальным запросом.
 
 На VPS хранятся ID и имя бота, секрет webhook и ключ формирования кодов. Токен BotFather в среду VPS не передаётся. Telegram выполняет ответный метод Bot API из ответа на webhook. Для этого режима runtime не нужна исходящая связь с Telegram. Входящие заявки открываются по команде бота. Режим уведомлений о приглашениях старой интеграции отдельно зависит от своего транспорта.
 
