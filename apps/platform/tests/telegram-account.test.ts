@@ -149,22 +149,31 @@ describe('Telegram accounts and the private bot menu', () => {
   });
 
   it('shares profiles, avatars, search, incoming requests and decisions across the portal and bot', async () => {
+    expect((await webhook(command(72021, '/start'))).body.reply_markup.inline_keyboard).toEqual([[
+      { text: 'Iva Games', url: `${ORIGIN}/login`, style: 'primary' },
+    ]]);
     const alice = await register(72021, 'alice');
     const boris = await register(72022, 'boris');
     const charlie = await register(72023, 'charlie');
+    expect((await webhook(command(72022, '/start'))).body.reply_markup.keyboard).toEqual([[
+      { text: '/profile' }, { text: '/friends' }, { text: '/requests', style: 'primary' },
+    ]]);
     expect((await alice.client.get('/players?handle=bor')).body.players[0].handle).toBe('boris');
     expect((await alice.client.post('/profile', { displayName: 'Alice', avatar: 'queen' })).body.user.avatar).toBe('queen');
     expect((await webhook(command(72021, '/profile'))).body.text).toContain('♛ Alice');
     const inbound = await alice.client.post('/friend-requests', { playerId: boris.user.playerId });
     const requests = (await webhook(command(72022, '/requests'))).body;
     expect(requests.text).toContain('♛ Alice (@alice)');
-    const accept = requests.reply_markup.inline_keyboard[0][0].callback_data;
+    const accept = `fr:a:${inbound.body.requestId}`;
+    expect(requests.reply_markup.inline_keyboard).toEqual([[
+      { text: 'Accept @alice', callback_data: accept, style: 'success' },
+      { text: 'Decline', callback_data: `fr:d:${inbound.body.requestId}`, style: 'danger' },
+    ]]);
     expect((await webhook(callback(72023, accept))).body.text).toContain('no longer available');
     expect((await webhook(callback(72022, accept))).body.text).toContain('accepted');
     expect((await webhook(callback(72022, accept))).body.text).toContain('accepted');
     expect((await boris.client.get('/friends')).body.friends[0].avatar).toBe('queen');
     expect((await webhook(command(72022, '/friends'))).body.text).toContain('@alice');
-    expect(inbound.body.requestId).toBe(accept.slice(5));
     const other = await charlie.client.post('/friend-requests', { playerId: boris.user.playerId });
     const decline = `fr:d:${other.body.requestId}`;
     expect((await webhook(callback(72022, decline))).body.text).toContain('declined');
