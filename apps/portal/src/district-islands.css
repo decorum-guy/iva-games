@@ -17,3 +17,8 @@
 @media (prefers-reduced-motion: reduce) { .di-scene .di-arrival { animation: none; } }
 .di-scene .di-hit.di-available:not(.di-selected):not(:focus-visible) { stroke: #f6efc0; stroke-width: 2; stroke-dasharray: 2 5; }
 .di-scene .di-hit.di-reserved:not(.di-selected):not(:focus-visible) { stroke: #7a5737; stroke-dasharray: 5 4; }
+@media (max-width: 700px) {
+  .di-scene:not(.di-mini) { background: #225770; }
+  .di-scene .di-zoom { position: static; width: max-content; margin: 0 8px 8px auto; }
+  .di-scene .di-zoom button { min-width: 39px; min-height: 34px; }
+}

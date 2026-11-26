@@ -20,6 +20,7 @@ async function harness(page: Page, options: { lobby?: boolean; loseBankResponse?
   const mutations: Array<{ path: string; body: Record<string, unknown> }> = [];
   const receipts = new Map<string, ReturnType<typeof viewDistrict>>();
   let lost = false;
+  let islandRoom = false;
   let settings: Record<string, unknown> = { mapId: 'crossroads', mapVersion: '1' };
   const now = () => Date.now();
   function otherPlayer() {
@@ -37,7 +38,7 @@ async function harness(page: Page, options: { lobby?: boolean; loseBankResponse?
   const room = () => ({
     roomId: 'district-room', gameId: 'district', title: 'Наш район', hostPlayerId: 'self',
     state: options.lobby || options.noRooms ? 'lobby' : state.phase === 'finished' ? 'finished' : 'playing', capacity: 2,
-    rulesVersion: 'district@0.2', contentVersion: 'district-maps@0.1', revision: 0, settings,
+    rulesVersion: islandRoom ? 'district@0.3' : 'district@0.2', contentVersion: islandRoom ? 'district-maps@0.2' : 'district-maps@0.1', revision: 0, settings,
     members: participants.map(p => ({ ...p, ready: true, handle: p.playerId, avatar: 'king' })),
     reservedSeats: 0, matchId: options.lobby || options.noRooms ? null : state.matchId, outcome: state.outcome, createdAt: now(),
   });
@@ -47,6 +48,7 @@ async function harness(page: Page, options: { lobby?: boolean; loseBankResponse?
       const body = route.request().postDataJSON() as Record<string, unknown>;
       mutations.push({ path, body });
       if (path === '/rooms' || path === '/rooms/district-room/settings') {
+        if (path === '/rooms') islandRoom = true;
         if (body.settings) settings = body.settings as Record<string, unknown>;
         await route.fulfill({ json: { room: room() } }); return;
       }
@@ -92,15 +94,15 @@ test('new room and lobby settings select maps without changing game rules', asyn
   const fixture = await harness(page, { noRooms: true });
   await page.goto('/rooms');
   await page.getByRole('button', { name: 'Создать комнату', exact: true }).first().click();
-  await page.getByLabel('Карта района', { exact: true }).selectOption('gardens@1');
-  await expect(page.locator('.district-map-mini > span')).toHaveCount(25);
+  await page.getByRole('radio', { name: 'Два берега' }).check();
+  await expect(page.locator('.district-map-card .di-map')).toHaveCount(3);
   await page.getByRole('dialog').getByRole('button', { name: 'Создать комнату', exact: true }).click();
-  await expect.poll(() => fixture.mutations.find(item => item.path === '/rooms')?.body.settings).toEqual({ mapId: 'gardens', mapVersion: '1' });
+  await expect.poll(() => fixture.mutations.find(item => item.path === '/rooms')?.body.settings).toEqual({ mapId: 'two-shores', mapVersion: '1' });
   await page.goto('/rooms/district-room');
   await page.getByRole('button', { name: 'Настройки комнаты', exact: true }).click();
-  await page.getByLabel('Карта района', { exact: true }).selectOption('boulevard@1');
+  await page.getByRole('radio', { name: 'Четыре острова' }).check();
   await page.getByRole('button', { name: 'Сохранить', exact: true }).click();
-  await expect.poll(() => fixture.settings().mapId).toBe('boulevard');
+  await expect.poll(() => fixture.settings().mapId).toBe('four-islands');
 });
 
 test('plays all six rounds through real core, exposes bidding and results, survives reload', async ({ page }) => {

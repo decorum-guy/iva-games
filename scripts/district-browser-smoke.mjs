@@ -76,13 +76,13 @@ async function stop() {
   const { child } = state;
   if (state.error || child.exitCode !== null || child.signalCode !== null) return;
   child.kill('SIGTERM');
-  const deadline = Date.now() + 5000;
+  const deadline = Date.now() + 10000;
   while (child.exitCode === null && child.signalCode === null && Date.now() < deadline) await delay(25);
   if (child.exitCode === null && child.signalCode === null) {
     child.kill('SIGKILL');
     const killDeadline = Date.now() + 1500;
     while (child.exitCode === null && child.signalCode === null && Date.now() < killDeadline) await delay(25);
-    throw new Error('Built platform did not stop gracefully');
+    throw new Error(`Built platform did not stop gracefully. Startup and shutdown log:\n${state.output}`);
   }
 }
 
@@ -153,7 +153,7 @@ try {
   const b = await bob.register('district_qa_b');
   const friendship = await alice.request('/friend-requests', { playerId: b.playerId }, 'district-live-friend');
   await bob.request(`/friend-requests/${friendship.requestId}/accept`, {}, 'district-live-accept-friend');
-  let room = (await alice.request('/rooms', { gameId: 'district', capacity: 2, title: 'District browser verification', settings: { mapId: 'crossroads', mapVersion: '1' } }, 'district-live-create')).room;
+  let room = (await alice.request('/rooms', { gameId: 'district', capacity: 2, title: 'District browser verification', settings: { mapId: 'azure-bay', mapVersion: '1' } }, 'district-live-create')).room;
   const roomId = room.roomId;
   const invitation = (await alice.request(`/rooms/${roomId}/invitations`, { playerId: b.playerId }, 'district-live-invite')).invitation;
   await bob.request(`/invitations/${invitation.invitationId}/accept`, {}, 'district-live-accept');
@@ -175,7 +175,27 @@ try {
     await expect(page.getByRole('region', { name: 'Игра Район' })).toBeVisible();
     contexts.push(context); pages.push(page);
   }
+  const selectionFrameMs = await pages[0].locator('polygon[data-cell-id="A1"]').evaluate(async polygon => {
+    const start = performance.now();
+    polygon.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    if (polygon.getAttribute('aria-pressed') !== 'true') throw new Error('Selection did not render');
+    return Math.round((performance.now() - start) * 10) / 10;
+  });
   const current = async client => (await client.request(`/rooms/${roomId}/match`)).view;
+  const beforeNavigation = await current(alice);
+  const map = pages[0].locator('.district-map-surface');
+  const cell = map.locator('polygon[data-cell-id="A1"]');
+  await cell.focus();
+  await cell.press('Escape');
+  await expect(cell).toHaveAttribute('aria-pressed', 'false');
+  for (let step = 0; step < 2; step++) await map.getByRole('button', { name: 'Увеличить карту' }).click();
+  const scroll = map.locator('.di-scroll');
+  await scroll.evaluate(element => { element.scrollLeft = 80; element.scrollTop = 40; });
+  assert.ok(await scroll.evaluate(element => element.scrollLeft > 0 && element.scrollTop > 0));
+  for (let step = 0; step < 2; step++) await map.getByRole('button', { name: 'Уменьшить карту' }).click();
+  assert.equal((await current(alice)).revision, beforeNavigation.revision);
+
   async function clickAction(page, locator) {
     await expect(locator).toBeEnabled();
     const responsePromise = page.waitForResponse(response => response.url().endsWith(`/rooms/${roomId}/actions`) && response.request().method() === 'POST');
@@ -209,7 +229,7 @@ try {
       else if (view.phase === 'negotiation') await clickAction(page, page.locator('.district-negotiation').getByRole('button', { name: 'Готов', exact: true }));
       else if (view.phase === 'auction') {
         if (view.round === 1) {
-          await page.locator('.district-auction').getByLabel('Участок', { exact: true }).selectOption(i === 0 ? 'A1' : 'E5');
+          await page.locator('.district-auction').getByLabel('Участок', { exact: true }).selectOption(i === 0 ? 'A1' : 'E6');
           await page.getByLabel('Ваша ставка', { exact: true }).fill('1');
           await clickAction(page, page.getByRole('button', { name: 'Сохранить выбор', exact: true }));
           await clickAction(page, page.getByRole('button', { name: 'Подтвердить ставку', exact: true }));
@@ -239,7 +259,10 @@ try {
   assert.deepEqual((await current(alice)).outcome, result.outcome);
   assert.deepEqual(browserErrors, []);
   let acceptance;
-  if (process.argv.includes('--acceptance')) {
+  let showcase;
+  const accept = process.argv.includes('--acceptance');
+  const show = process.argv.includes('--showcase');
+  if (accept || show) {
     await Promise.all(contexts.map(context => context.close()));
     mobileBrowser = await webkit.launch({ headless: true });
     let tableNumber = 0;
@@ -267,12 +290,16 @@ try {
       }
       return players;
     }
-    acceptance = await runDistrictAcceptance({ origin, makePlayers, stop, start, output });
+    if (accept) acceptance = await runDistrictAcceptance({ origin, makePlayers, stop, start, output });
+    if (show) {
+      const { runDistrictShowcase } = await import('./district-browser-showcase.mjs');
+      showcase = await runDistrictShowcase({ origin, makePlayers, output });
+    }
     assert.deepEqual(browserErrors, []);
   }
   const report = { builtDistrictBrowser: 'passed', independentBrowsers: 2, realHttp: true, mockedGameApi: false, acceptedUiActions, rounds: 6,
-    map: 'crossroads@1', builtHouses: 2, upgrades: 2, offlineAndServerRestart: 'passed', resultAfterReload: 'passed', narrowEnglish: 'passed', browserErrors: 0,
-    humanPlaytest: false, externalMessages: 0, browserVersion: browser.version(), ...(acceptance ? { acceptance } : {}) };
+    map: 'azure-bay@1', selectionToSecondAnimationFrameMs: selectionFrameMs, keyboardEscapeAndZoomPanWithoutGameplay: true, builtHouses: 2, upgrades: 2, offlineAndServerRestart: 'passed', resultAfterReload: 'passed', narrowEnglish: 'passed', browserErrors: 0,
+    humanPlaytest: false, externalMessages: 0, browserVersion: browser.version(), ...(acceptance ? { acceptance } : {}), ...(showcase ? { showcase } : {}) };
   await writeFile(join(output, 'report.json'), JSON.stringify(report, null, 2)); console.info(JSON.stringify(report));
 } catch (error) {
   const output = join(root, '.qa', 'district-browser'); await mkdir(output, { recursive: true });

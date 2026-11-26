@@ -11,10 +11,10 @@ const read = async (player, roomId) => (await player.client.request(`/rooms/${ro
 const roomInfo = async (player, roomId) => (await player.client.request(`/rooms/${roomId}`)).room;
 const me = view => view.players.find(player => player.participantId === view.you.participantId);
 const changed = (view, type) => view.history.filter(entry => entry.type === type);
-const mapNames = { crossroads: 'Перекрёсток', boulevard: 'Бульвар', gardens: 'Два сада' };
+const mapNames = { 'azure-bay': 'Лазурная бухта', 'two-shores': 'Два берега', 'four-islands': 'Четыре острова' };
 const resources = (coins = 0, materials = 0, crews = 0) => ({ coins, materials, crews });
 
-async function createRoom(origin, players, { title, map, bots = [], changeFrom }) {
+async function createRoom(origin, players, { title, map, bots = [], changeFrom, output }) {
   const [host, ...guests] = players;
   const { page, client } = host;
   await page.goto(origin + '/rooms');
@@ -23,15 +23,18 @@ async function createRoom(origin, players, { title, map, bots = [], changeFrom }
   await dialog.getByLabel('Игра', { exact: false }).first().selectOption('district');
   await label(dialog, 'Название комнаты').fill(title);
   await dialog.getByLabel('Мест за столом').selectOption(String(players.length + bots.length));
+  const cards = dialog.locator('.district-map-card');
+  await expect(cards).toHaveCount(3);
   const previews = [];
-  for (const id of Object.keys(mapNames)) {
-    await label(dialog, 'Карта района').selectOption(id + '@1');
-    const cells = dialog.locator('.district-map-mini > span');
-    await expect(cells).toHaveCount(25);
-    previews.push(await cells.evaluateAll(elements => elements.map(cell => cell.className).join(',')));
+  for (const name of Object.values(mapNames)) {
+    const card = cards.filter({ hasText: name });
+    const polygons = card.locator('svg[aria-hidden="true"] polygon');
+    await expect(polygons.first()).toBeVisible();
+    previews.push(await polygons.evaluateAll(nodes => nodes.map(node => node.getAttribute('points')).join('|')));
   }
   assert.equal(new Set(previews).size, 3);
-  await label(dialog, 'Карта района').selectOption((changeFrom ?? map) + '@1');
+  await dialog.getByRole('radio', { name: new RegExp(mapNames[changeFrom ?? map]) }).check();
+  if (output) await dialog.screenshot({ path: join(output, 'map-catalog.png') });
   await button(dialog, 'Создать комнату').click();
   await expect(page.getByRole('heading', { name: title, exact: true })).toBeVisible();
   const roomId = new URL(page.url()).pathname.split('/').pop();
@@ -54,7 +57,7 @@ async function createRoom(origin, players, { title, map, bots = [], changeFrom }
   }
   if (changeFrom) {
     await button(page, 'Настройки комнаты').click();
-    await label(page.getByRole('dialog'), 'Карта района').selectOption(map + '@1');
+    await page.getByRole('dialog').getByRole('radio', { name: new RegExp(mapNames[map]) }).check();
     const savedResponse = page.waitForResponse(response => response.url().endsWith(`/rooms/${roomId}/settings`) && response.request().method() === 'POST');
     await button(page.getByRole('dialog'), 'Сохранить').click();
     const response = await savedResponse;
@@ -79,9 +82,33 @@ async function createRoom(origin, players, { title, map, bots = [], changeFrom }
     await expect(player.page.locator('.district-heading .district-eyebrow')).toHaveText(mapNames[map]);
   }
   await expect(button(page, 'Настройки комнаты')).toHaveCount(0);
+  if (output) {
+    const cells = page.locator('polygon[role="button"][data-cell-id]');
+    const view = await read(host, roomId);
+    await expect(cells.first()).toBeVisible();
+    await page.screenshot({ path: join(output, map + '-empty.png'), fullPage: true });
+    const lot = view.cells.find(cell => cell.kind === 'lot');
+    const selected = page.locator(`polygon[role="button"][data-cell-id="${lot.id}"]`);
+    const posts = [];
+    const record = request => { if (request.method() === 'POST' && request.url().endsWith('/actions')) posts.push(request.url()); };
+    page.on('request', record);
+    try {
+      await selected.focus();
+      await selected.press('Enter');
+      await expect(selected).toHaveAttribute('aria-pressed', 'true');
+      await page.screenshot({ path: join(output, map + '-selected.png'), fullPage: true });
+      const park = view.cells.find(cell => cell.kind === 'park');
+      await page.locator(`polygon[data-cell-id="${park.id}"]`).hover();
+      const prices = page.locator('.district-map-tooltip .district-cell-prices');
+      await expect(prices).toContainText('Разбить парк');
+      await page.screenshot({ path: join(output, map + '-park-price-hover.png'), fullPage: true });
+      assert.deepEqual(posts, []);
+      assert.equal((await read(host, roomId)).revision, view.revision);
+    } finally { page.off('request', record); }
+  }
   const playing = await roomInfo(host, roomId);
   await assert.rejects(client.request(`/rooms/${roomId}/settings`, {
-    expectedRevision: playing.revision, settings: { mapId: map === 'gardens' ? 'crossroads' : 'gardens', mapVersion: '1' },
+    expectedRevision: playing.revision, settings: { mapId: map === 'four-islands' ? 'azure-bay' : 'four-islands', mapVersion: '1' },
   }), /HTTP 409/);
   return roomId;
 }
@@ -236,6 +263,7 @@ async function mixedDeals({ roomId, players, click, output }) {
   assert.ok(!JSON.stringify(third).includes(open.id));
   assert.ok(third.players.every(player => !('available' in player) && !('reserved' in player) && !('goal' in player) && !('bid' in player)));
   await expect(cards(c.page, `${a.name} ↔ ${b.name}`)).toHaveCount(0);
+  await bPage.screenshot({ path: join(output, 'incoming-offer.png'), fullPage: true });
   await click(bPage, button(terms, 'Принять'));
   assert.ok(changed(await read(c, roomId), 'trade').some(entry => entry.data.give?.coins === 2));
 
@@ -295,6 +323,16 @@ async function mobileCheck(page, output) {
   await button(page, 'EN').click();
   await expect(page.getByRole('region', { name: 'District game' })).toBeVisible();
   await expect(exact(page.getByRole('region', { name: 'District game' }), 'Bot 4')).toBeVisible();
+  const lot = page.locator('polygon[data-cell-id="E6"]');
+  const posts = [];
+  const record = request => { if (request.method() === 'POST' && request.url().endsWith('/actions')) posts.push(request.url()); };
+  page.on('request', record);
+  try {
+    await lot.tap();
+    await expect(lot).toHaveAttribute('aria-pressed', 'true');
+    await page.screenshot({ path: join(output, 'mobile-tap-detail.png'), fullPage: true });
+    assert.deepEqual(posts, []);
+  } finally { page.off('request', record); }
   const help = button(page, 'How to play');
   await help.focus();
   await page.keyboard.press('Enter');
@@ -326,7 +364,7 @@ function leaveGame(page, click) {
 
 async function expireAndLeave({ origin, players, count }) {
   const [host, guest] = players;
-  const roomId = await createRoom(origin, players, { title: 'Район · время и выход', map: 'boulevard', bots: ['normal'] });
+  const roomId = await createRoom(origin, players, { title: 'Район · время и выход', map: 'two-shores', bots: ['normal'] });
   const click = clickAction(roomId, count);
   await click(host.page, host.page.locator('.district-goal-choices button').first());
   const before = await read(guest, roomId);
@@ -362,18 +400,30 @@ async function expireAndLeave({ origin, players, count }) {
 export async function runDistrictAcceptance({ origin, makePlayers, stop, start, output }) {
   const count = { actions: 0, stale: 0 };
   const matches = [];
+  const photographed = new Set();
   for (const fixture of [
-    { title: 'Район · один бот', map: 'boulevard', bots: ['easy'], humans: 1 },
-    { title: 'Район · три бота', map: 'gardens', bots: ['easy', 'normal', 'hard'], humans: 1, changeFrom: 'crossroads' },
-    { title: 'Район · смешанный стол', map: 'crossroads', bots: ['hard'], humans: 3, changeFrom: 'boulevard' },
+    { title: 'Район · один бот', map: 'two-shores', bots: ['easy'], humans: 1 },
+    { title: 'Район · два бота', map: 'azure-bay', bots: ['easy', 'normal'], humans: 1 },
+    { title: 'Район · три бота', map: 'four-islands', bots: ['easy', 'normal', 'hard'], humans: 1, changeFrom: 'azure-bay' },
+    { title: 'Район · смешанный стол', map: 'azure-bay', bots: ['hard'], humans: 3, changeFrom: 'two-shores' },
   ]) {
     const people = await makePlayers(fixture.humans);
     const [a, b, c] = people;
     console.info(`Accepting ${fixture.map}: ${fixture.humans} human slots, ${fixture.bots.length} bots`);
-    const roomId = await createRoom(origin, people, fixture);
+    const roomId = await createRoom(origin, people, { ...fixture, output });
     const click = clickAction(roomId, count);
     const visited = new Set();
     const result = await finish(people, roomId, click, async view => {
+      for (const cell of view.cells.filter(cell => cell.building)) {
+        const { kind, level } = cell.building;
+        const key = kind + level;
+        if (photographed.has(key)) continue;
+        const names = { house: 'Дом', cafe: 'Кафе', workshop: 'Мастерская' };
+        const tile = a.page.locator(`polygon[data-cell-id="${cell.id}"]`);
+        await expect(tile).toHaveAttribute('aria-label', new RegExp(names[kind] + ' ' + (level === 2 ? 'II' : 'I') + ' ·'));
+        await a.page.locator('.di-map[role="group"]').screenshot({ path: join(output, 'developed-' + key + '.png') });
+        photographed.add(key);
+      }
       const stage = `${view.round}:${view.phase}`;
       if (visited.has(stage)) return;
       visited.add(stage);
@@ -393,13 +443,14 @@ export async function runDistrictAcceptance({ origin, makePlayers, stop, start, 
       }
       if (view.phase === 'auction' && view.round === 1) {
         // The third human bids elsewhere, so they have property to trade.
-        const lot = 'A1';
+        const lot = 'D1';
         const saved = await submitBid(a.page, click, lot, 4);
         assert.equal(saved.you.bid.amount, 4);
+        await a.page.screenshot({ path: join(output, 'sealed-bid.png'), fullPage: true });
         const otherViews = await Promise.all([read(b, roomId), read(c, roomId)]);
         assert.ok(otherViews.every(peer => peer.phase === 'auction' && peer.you.bid === null && !peer.players.some(p => 'bid' in p)));
         await submitBid(b.page, click, lot, 4);
-        const revealed = await submitBid(c.page, click, 'E5', 3);
+        const revealed = await submitBid(c.page, click, 'E6', 8);
         const auction = changed(revealed, 'auction').at(-1);
         const tied = [saved.you.participantId, otherViews[0].you.participantId];
         const highest = Math.max(...auction.data.bids.filter(entry => entry.bid?.lotId === lot).map(entry => entry.bid.amount));
@@ -408,22 +459,22 @@ export async function runDistrictAcceptance({ origin, makePlayers, stop, start, 
       }
       if (view.phase === 'negotiation' && view.round === 2) {
         const peers = [view, await read(b, roomId), await read(c, roomId)];
-        const winner = people[peers.findIndex(peer => peer.you.participantId === view.cells.find(cell => cell.id === 'A1').ownerId)];
+        const winner = people[peers.findIndex(peer => peer.you.participantId === view.cells.find(cell => cell.id === 'D1').ownerId)];
         const winId = (await read(winner, roomId)).you.participantId;
         const cId = peers[2].you.participantId;
         // The auctioned properties can be exchanged even after development.
-        const target = view.cells.find(cell => cell.id === 'E5').ownerId;
+        const target = view.cells.find(cell => cell.id === 'E6').ownerId;
         assert.equal(target, cId);
         await button(winner.page, 'Сделки').click();
         await label(winner.page, 'С кем договоримся').selectOption(cId);
-        await fillTrade(winner.page, resources(), resources(), ['A1', 'E5']);
+        await fillTrade(winner.page, resources(), resources(), ['D1', 'E6']);
         await click(winner.page, button(winner.page, 'Предложить обмен'));
         const card = c.page.locator('.district-offer').filter({ hasText: `${winner.name} ↔ ${c.name}` });
-        await expect(card).toContainText('Участки: A1');
-        await expect(card).toContainText('Участки: E5');
+        await expect(card).toContainText('Участки: D1');
+        await expect(card).toContainText('Участки: E6');
         const swapped = await click(c.page, button(card, 'Принять'));
-        assert.equal(swapped.cells.find(cell => cell.id === 'A1').ownerId, cId);
-        assert.equal(swapped.cells.find(cell => cell.id === 'E5').ownerId, winId);
+        assert.equal(swapped.cells.find(cell => cell.id === 'D1').ownerId, cId);
+        assert.equal(swapped.cells.find(cell => cell.id === 'E6').ownerId, winId);
 
         await leaveGame(b.page, click);
         const away = await read(b, roomId);
@@ -442,5 +493,5 @@ export async function runDistrictAcceptance({ origin, makePlayers, stop, start, 
   console.info('Accepting real goal deadline, offline recovery, and abandonment');
   const people = await makePlayers(2);
   await expireAndLeave({ origin, players: people, count });
-  return { matches, acceptedUiActions: count.actions, staleUiActionsRetried: count.stale, mobileWebKitEmulation: 'passed', realGoalDeadlineAndAbandonment: 'passed' };
+  return { matches, photographedBuildings: [...photographed].sort(), acceptedUiActions: count.actions, staleUiActionsRetried: count.stale, mobileWebKitEmulation: 'passed', realGoalDeadlineAndAbandonment: 'passed' };
 }
