@@ -33,8 +33,8 @@ test('registers through the Telegram code and opens the profile on a narrow scre
   await page.getByLabel('Имя пользователя').fill('iva_user');
   await page.getByLabel('Как вас называть').fill('Iva');
   await page.getByRole('button', { name: 'Создать аккаунт' }).click();
-  await expect(page.getByText('Iva', { exact: true }).first()).toBeVisible();
-  await page.goto('/profile');
+  await page.getByRole('link', { name: 'Мой профиль' }).click();
+  await expect(page.getByRole('heading', { name: 'Iva', exact: true })).toBeVisible();
   await expect(page.getByText('Подтверждён', { exact: true })).toBeVisible();
   await page.getByLabel('Аватар').selectOption('knight');
   await expect(page.locator('.profile-identity .avatar')).toHaveText('♞');
