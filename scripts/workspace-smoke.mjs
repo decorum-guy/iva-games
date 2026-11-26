@@ -1,4 +1,4 @@
-/** Verify the three built workspace layouts over HTTP; this does not run a browser. */
+/** Verify the combined and standalone workspace layouts over HTTP; this does not run a browser. */
 import { spawn } from 'node:child_process'
 import { createHash, randomUUID } from 'node:crypto'
 import { createServer } from 'node:net'
@@ -16,6 +16,17 @@ if (requestedPort !== null && (!Number.isInteger(requestedPort) || requestedPort
   throw new Error('WORKSPACE_SMOKE_PORT must be an isolated port from 1024–65535, excluding 4173')
 }
 const report = { browser: false, sourceState: 'working tree', status: 'running', checks: [], serverBundles: [], layouts: [] }
+const games = ['remorse', 'overdrive', 'colossus']
+const healthEndpoints = [
+  ['/api/health', 'remorse-online-v1', 'remorse-digital-v1'],
+  ['/api/overdrive/health', 'overdrive-online-v2', 'overdrive-v2'],
+  ['/api/colossus/health', 'colossus-online-v1', 'colossus-v1'],
+]
+const ownedAssets = {
+  remorse: ['remorse.svg', 'assets/chess/chess_set_1k.gltf', 'assets/audio/board.wav'],
+  overdrive: ['overdrive.svg', 'assets/overdrive/models/king.glb'],
+  colossus: ['assets/colossus/models/king.glb', 'assets/colossus/audio/move.wav'],
+}
 const sha256 = bytes => createHash('sha256').update(bytes).digest('hex')
 const check = (condition, label) => {
   if (!condition) throw new Error(label)
@@ -88,10 +99,11 @@ async function boot(layout) {
   await mkdir(data, { recursive: true })
   const database = relative(root, join(data, 'remorse.sqlite'))
   const overdriveDatabase = relative(root, join(data, 'overdrive.sqlite'))
+  const colossusDatabase = relative(root, join(data, 'colossus.sqlite'))
   const child = spawn(process.execPath, layout.workspace ? ['scripts/start.mjs'] : ['dist-server/main.js'], {
     cwd: layout.workspace ? join(root, 'apps/server') : root,
     env: { ...process.env, HOST: '127.0.0.1', PORT: String(port), NODE_ENV: 'production', PUBLIC_ORIGIN: origin,
-      DATABASE_PATH: database, OVERDRIVE_DATABASE_PATH: overdriveDatabase, STATIC_DIR: layout.output },
+      DATABASE_PATH: database, OVERDRIVE_DATABASE_PATH: overdriveDatabase, COLOSSUS_DATABASE_PATH: colossusDatabase, STATIC_DIR: layout.output },
     stdio: ['ignore', 'pipe', 'pipe'],
   })
   const state = { child, output: '', error: null }
@@ -101,7 +113,7 @@ async function boot(layout) {
   child.stderr.on('data', collect)
   child.on('error', error => { state.error = error })
   const deadline = Date.now() + 8000
-  const ready = `REMORSE HTTP/WebSocket listening on 127.0.0.1:${port}`
+  const ready = `Iva Games chess HTTP/WebSocket listening on 127.0.0.1:${port}`
   while (Date.now() < deadline) {
     if (state.error) throw state.error
     if (child.exitCode !== null || child.signalCode !== null) throw new Error(`Test server exited: ${state.output}`)
@@ -109,9 +121,11 @@ async function boot(layout) {
       // Only our child can establish readiness; an existing listener is never accepted.
       const health = await request(origin + '/api/health')
       if (!health.ok || child.exitCode !== null || child.signalCode !== null) throw new Error('Test child health check failed')
-      const locations = await Promise.all([database, overdriveDatabase].map(path => stat(join(root, path)).catch(() => null)))
+      const paths = [database, overdriveDatabase, colossusDatabase]
+      const locations = await Promise.all(paths.map(path => stat(join(root, path)).catch(() => null)))
+      check(new Set(paths).size === 3, `${layout.name}: three games use distinct database paths`)
       check(locations.every(info => info?.isFile()), `${layout.name}: relative database paths resolve from repository root`)
-      return { origin, database, overdriveDatabase, port }
+      return { origin, database, overdriveDatabase, colossusDatabase, port }
     }
     await pause(50)
   }
@@ -139,7 +153,9 @@ function attributes(tag) {
 async function inspectEntry(layout, result, origin, route, game, expectedEntry, sourceFiles) {
   const expected = await readFile(join(root, layout.output, expectedEntry))
   const html = (await verifyBytes(origin, route, expected)).toString('utf8')
-  const expectedTitle = game === 'remorse' ? '<title>REMORSE</title>' : '<title>Форсаж / OVERDRIVE — Chess 2</title>'
+  const sourceHtml = await readFile(join(root, 'games', 'chess', game, 'index.html'), 'utf8')
+  const expectedTitle = sourceHtml.match(/<title>[^<]+<\/title>/)?.[0]
+  if (!expectedTitle) throw new Error(`Missing title in ${game} source index.html`)
   check(html.includes(expectedTitle), `${layout.name}: ${route} serves ${game} entry`)
   const tags = [...html.matchAll(/<(?:script|link)\b[^>]*>/g)].map(match => attributes(match[0]))
   const modules = tags.filter(tag => tag.type === 'module' && tag.src).map(tag => tag.src)
@@ -172,26 +188,29 @@ try {
       && !(specifier.startsWith('.') && /(?:^|\/)src\//.test(specifier))), `server ${file}: no workspace or TypeScript source imports`)
     report.serverBundles.push({ file, bytes: bytes.length, sha256: sha256(bytes), imports })
   }
-  const gameFiles = Object.fromEntries(await Promise.all(['remorse', 'overdrive'].map(async game => [game, await filesUnder(join(root, 'games', 'chess', game, 'dist'))])))
+  const gameFiles = Object.fromEntries(await Promise.all(games.map(async game => [game, await filesUnder(join(root, 'games', 'chess', game, 'dist'))])))
   const workers = Object.fromEntries(Object.entries(gameFiles).map(([game, files]) => [game, files.filter(path => /(?:^|\/)search\.worker-[\w-]+\.js$/.test(path))]))
-  check(Object.values(workers).every(files => files.length === 1) && workers.remorse[0] !== workers.overdrive[0], 'games emit distinct search Worker bundles')
+  check(games.every(game => workers[game].length === 1) && new Set(games.map(game => workers[game][0])).size === games.length,
+    'Remorse, Overdrive and Colossus emit distinct search Worker bundles')
 
   const layouts = [
-    { name: 'combined', output: 'dist', games: ['remorse', 'overdrive'], workspace: false,
-      entries: [['/', 'remorse', 'index.html'], ['/overdrive/', 'overdrive', 'overdrive/index.html']] },
+    { name: 'combined', output: 'dist', games, workspace: false,
+      entries: [['/', 'remorse', 'index.html'], ['/overdrive/', 'overdrive', 'overdrive/index.html'], ['/colossus/', 'colossus', 'colossus/index.html']] },
     { name: 'standalone-remorse', output: 'games/chess/remorse/dist', games: ['remorse'], workspace: true,
       entries: [['/', 'remorse', 'index.html']] },
     { name: 'standalone-overdrive', output: 'games/chess/overdrive/dist', games: ['overdrive'], workspace: true,
       entries: [['/', 'overdrive', 'index.html'], ['/overdrive/', 'overdrive', 'index.html']] },
+    { name: 'standalone-colossus', output: 'games/chess/colossus/dist', games: ['colossus'], workspace: true,
+      entries: [['/', 'colossus', 'index.html'], ['/colossus/', 'colossus', 'index.html']] },
   ]
   for (const layout of layouts) {
     const result = { name: layout.name, output: layout.output, launch: layout.workspace ? 'server workspace launcher' : 'root production entry',
       files: [], entries: [], workers: [], databasePaths: [] }
     report.layouts.push(result)
     try {
-      const { origin, database, overdriveDatabase, port } = await boot(layout)
+      const { origin, database, overdriveDatabase, colossusDatabase, port } = await boot(layout)
       result.port = port
-      result.databasePaths = [database, overdriveDatabase]
+      result.databasePaths = [database, overdriveDatabase, colossusDatabase]
       const files = await filesUnder(join(root, layout.output))
       for (const [route, game, entry] of layout.entries) await inspectEntry(layout, result, origin, route, game, entry, files)
       for (const file of files) {
@@ -221,26 +240,26 @@ try {
         if (!module.includes(basename(worker))) throw new Error(`${game} entry does not reference its Worker bundle`)
         result.workers.push({ game, file: worker, sha256: sha256(servedBytes) })
       }
-      check(true, `${layout.name}: entry modules reference the correct intact Worker bundles`)
+      check(true, `${layout.name}: entry modules reference each game’s own intact search Worker`)
       if (layout.games.length === 1) {
-        const other = layout.games[0] === 'remorse' ? 'overdrive' : 'remorse'
-        const forbidden = other === 'overdrive' ? ['overdrive.svg', 'assets/overdrive/models/king.glb'] : ['remorse.svg', 'assets/chess/chess_set_1k.gltf', 'assets/audio/board.wav']
-        for (const file of forbidden) {
-          if (files.includes(file) || (await request(origin + '/' + file)).status !== 404) throw new Error(`${layout.name} contains unrelated ${other} asset ${file}`)
+        for (const other of games.filter(game => game !== layout.games[0])) {
+          for (const file of ownedAssets[other]) {
+            if (files.includes(file) || (await request(origin + '/' + file)).status !== 404) throw new Error(`${layout.name} contains unrelated ${other} asset ${file}`)
+          }
+          check(true, `${layout.name}: unrelated ${other} production assets absent`)
         }
-        check(true, `${layout.name}: unrelated ${other} production assets absent`)
       }
-      for (const pathname of ['/assets/missing.glb', '/assets/does-not-exist', '/overdrive/missing.js']) {
+      for (const pathname of ['/assets/missing.glb', '/assets/does-not-exist', '/overdrive/missing.js', '/colossus/missing.js', '/colossus/assets/does-not-exist']) {
         const response = await request(origin + pathname)
         if (response.status !== 404 || !response.headers.get('content-type')?.startsWith('application/json')) throw new Error(`Missing asset returned HTML: ${pathname}`)
       }
       check(true, `${layout.name}: missing assets return 404`)
-      for (const [path, protocol] of [['/api/health', 'remorse-online-v1'], ['/api/overdrive/health', 'overdrive-online-v2']]) {
+      for (const [path, protocol, rulesVersion] of healthEndpoints) {
         const response = await request(origin + path)
         const health = await response.json()
-        if (!response.ok || health.ok !== true || health.protocol !== protocol) throw new Error(`Health failed for ${path}`)
+        if (!response.ok || health.ok !== true || health.protocol !== protocol || health.rulesVersion !== rulesVersion) throw new Error(`Health failed for ${path}`)
       }
-      check(true, `${layout.name}: both independent API health endpoints respond`)
+      check(true, `${layout.name}: three independent API health endpoints report their own protocol and rules`)
       result.status = 'passed'
     } finally {
       if (running) result.serverOutput = running.output

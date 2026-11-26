@@ -154,12 +154,16 @@ function cardPlans(state: GameState, base: Intent[], cardId: string, pattern: nu
         path.push(to); cursor = to;
       }
       if (path.length !== first + second) continue;
-      for (const d of DIRECTIONS) add([movement(b, path, 'dash', 1, label), rays([ray(cursor, d)], 2, label, 0)]);
+      for (const startDirection of DIRECTIONS) for (const endDirection of DIRECTIONS) add([
+        rays([ray(b.anchor, startDirection)], 1, names('Начальная насечка', 'Opening Slash')),
+        movement(b, path, 'dash', 1, label),
+        rays([ray(cursor, endDirection)], 2, names('Конечная насечка', 'Closing Slash'), 1),
+      ]);
     }
   } else if (cardId.startsWith('archivist_')) {
     const lines: number[][] = [];
     const files = allLines('file'), ranks = allLines('rank');
-    if (cardId === 'archivist_border') lines.push(files[0], files[7], ranks[0], ranks[7]);
+    if (cardId === 'archivist_border') lines.push(unique([...files[0], ...files[7], ...ranks[0], ...ranks[7]]));
     else if (cardId === 'archivist_parallel') {
       for (const parallel of [files, ranks]) for (let i = 0; i < 8; i++) for (let j = i + 1; j < 8; j++) {
         if (!activeLine(state, parallel[i]) && !activeLine(state, parallel[j])) lines.push(unique([...parallel[i], ...parallel[j]]));

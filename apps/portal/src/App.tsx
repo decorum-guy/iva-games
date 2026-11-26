@@ -43,6 +43,11 @@ const chessLaunchUrls: Partial<Record<string, string>> = {
     (import.meta.env.DEV
       ? "http://127.0.0.1:4185/overdrive/"
       : "https://chess.iva-games.pro/overdrive/"),
+  colossus:
+    import.meta.env.VITE_COLOSSUS_URL ||
+    (import.meta.env.DEV
+      ? "http://127.0.0.1:5195/"
+      : "https://chess.iva-games.pro/colossus/"),
 };
 const emptySocial: Social = {
   friends: [],
@@ -599,6 +604,9 @@ export default function App() {
             </a>
             <a className="button secondary small" href={chessLaunchUrls.overdrive}>
               {t("Форсаж", "Overdrive")}
+            </a>
+            <a className="button secondary small" href={chessLaunchUrls.colossus}>
+              {t("Колосс", "Colossus")}
             </a>
           </nav>
         )}
@@ -1393,6 +1401,7 @@ function gameTitle(game: Game, lang: Language) {
       harbor: ["Гавань", "Harbor"],
       overdrive: ["Форсаж", "Overdrive"],
       remorse: ["Remorse", "Remorse"],
+      colossus: ["Колосс", "Colossus"],
       "platform-lab": ["Пробный стол", "Practice table"],
     }[game.gameId]?.[lang === "ru" ? 0 : 1] || game.title
   );
@@ -1415,6 +1424,10 @@ function gameDescription(gameId: string, lang: Language) {
       overdrive: [
         "Шахматные фигуры с характером и собственными усилениями.",
         "Chess pieces with their own character and abilities.",
+      ],
+      colossus: [
+        "Восемь фигур против босса. Читайте его замысел, разбивайте броню и разыгрывайте карты — сами или вдвоём.",
+        "Eight pieces against a boss. Read its intent, break its armour and play your cards — alone or together.",
       ],
       "platform-lab": [
         "Выберите число, перехитрите друзей и наберите больше очков за три раунда.",

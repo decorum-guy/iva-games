@@ -79,9 +79,9 @@ export class PlatformService {
     if (!Number.isFinite(this.runtimeTimeoutMs) || this.runtimeTimeoutMs < 1 || this.runtimeTimeoutMs > 30_000) throw new Error('Invalid runtime deadline');
     this.db = openPlatformDatabase(options.databasePath);
     this.games = new Map((options.games ?? []).map(game => [game.gameId, game]));
-    for (const [gameId, title] of [['remorse', 'Remorse'], ['overdrive', 'Форсаж'], ['district', 'Район'], ['harbor', 'Гавань']]) {
+    for (const [gameId, title] of [['remorse', 'Remorse'], ['overdrive', 'Форсаж'], ['colossus', 'Колосс'], ['district', 'Район'], ['harbor', 'Гавань']]) {
       if (!this.games.has(gameId)) this.games.set(gameId, {
-        gameId, title, minPlayers: 2, maxPlayers: gameId === 'harbor' ? 6 : gameId === 'district' ? 4 : 2,
+        gameId, title, minPlayers: gameId === 'colossus' ? 1 : 2, maxPlayers: gameId === 'harbor' ? 6 : gameId === 'district' ? 4 : 2,
         supportsBots: false, rulesVersion: 'pending', contentVersion: 'pending',
         status: gameId === 'district' || gameId === 'harbor' ? 'planned' : 'unavailable',
       });

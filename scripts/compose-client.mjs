@@ -18,12 +18,12 @@ async function collect(directory, prefix = '') {
 
 // Validate both outputs and all collisions before replacing the combined build.
 // Each game remains independently deployable from games/chess/<game>/dist.
-for (const game of ['remorse', 'overdrive']) {
+for (const game of ['remorse', 'overdrive', 'colossus']) {
   const source = join(root, 'games', 'chess', game, 'dist')
   const entries = await collect(source)
   if (!entries.includes('index.html')) throw new Error(`Build ${game} before composing clients`)
   for (const entry of entries) {
-    const destination = game === 'overdrive' && entry === 'index.html' ? 'overdrive/index.html' : entry
+    const destination = game !== 'remorse' && entry === 'index.html' ? `${game}/index.html` : entry
     const bytes = await readFile(join(source, entry))
     const previous = files.get(destination)
     if (previous && !previous.equals(bytes)) throw new Error(`Conflicting game build outputs: ${destination}`)
@@ -44,4 +44,4 @@ try {
 } finally {
   await rm(staging, { recursive: true, force: true })
 }
-process.stdout.write(`Composed ${files.size} client files: REMORSE / and OVERDRIVE /overdrive/\n`)
+process.stdout.write(`Composed ${files.size} client files: REMORSE /, OVERDRIVE /overdrive/, COLOSSUS /colossus/\n`)

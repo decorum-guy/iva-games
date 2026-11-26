@@ -41,6 +41,29 @@ describe('Colossus browser transport recovery', () => {
     expect(client.hasPendingCommand()).toBe(false); expect(client.snapshot?.revision).toBe(3); expect(fetcher).toHaveBeenCalledTimes(2);
   });
 
+  it('returns the latest polled snapshot with a delayed retry ACK after an uncertain command', async () => {
+    const client = new ColossusOnlineClient(); client.snapshot = room();
+    const newer = room('room-one', 3);
+    const commandBodies: string[] = [];
+    let release!: (response: Response) => void;
+    vi.stubGlobal('fetch', vi.fn(async (url: string, init: RequestInit) => {
+      if (url.endsWith('/presence')) return json({ snapshot: newer });
+      commandBodies.push(String(init.body));
+      if (commandBodies.length === 1) throw new Error('ACK lost after commit');
+      return new Promise<Response>(resolve => { release = resolve; });
+    }));
+    await expect(client.action({ type: 'guard', unitId: 'king' })).rejects.toMatchObject({ code: 'networkError' });
+    const retry = client.retryPending();
+    await client.presence();
+    const ack = { commandId: JSON.parse(commandBodies[0]).commandId, revision: 1, gameRevision: 1 };
+    release(json({ ack, snapshot: room('room-one', 1) }));
+    const result = await retry;
+    expect(commandBodies).toHaveLength(2); expect(commandBodies[1]).toBe(commandBodies[0]);
+    expect(result.ack).toEqual(ack);
+    expect(result.snapshot).toEqual(newer); expect(result.snapshot).toBe(client.snapshot);
+    expect(client.hasPendingCommand()).toBe(false);
+  });
+
   it('does not let a late old-room heartbeat overwrite a newly loaded room', async () => {
     const client = new ColossusOnlineClient(); client.snapshot = room('old-room');
     let release!: (response: Response) => void;

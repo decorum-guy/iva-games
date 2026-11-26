@@ -80,6 +80,20 @@ describe('Colossus real HTTP cooperative rooms', () => {
     expect(await (await request('/health')).json()).toEqual({ ok: true, protocol: ONLINE_PROTOCOL, rulesVersion: 'colossus-v1' });
   });
 
+  it('serves a standalone Colossus build at both its root and collection route', async () => {
+    const standalone = join(directory, 'colossus-only');
+    await mkdir(standalone);
+    await writeFile(join(standalone, 'index.html'), '<!doctype html><title>Standalone COLOSSUS</title>');
+    await app.close();
+    app = createOnlineServer({ databasePath: join(directory, 'standalone.sqlite'), staticDir: standalone, now: () => now });
+    const address = await app.listen(0); origin = 'http://127.0.0.1:' + address.port;
+    for (const path of ['/', '/colossus', '/colossus/']) {
+      const response = await fetch(origin + path); expect(response.status).toBe(200);
+      expect(await response.text()).toContain('Standalone COLOSSUS');
+    }
+    expect((await fetch(origin + '/colossus/assets/missing')).status).toBe(404);
+  });
+
   it('uses independent cookies, a single-use invite, protected seats and origin checks', async () => {
     const { a, b, id, created } = await pair(); const stranger = await guest();
     expect(a).not.toBe(b);

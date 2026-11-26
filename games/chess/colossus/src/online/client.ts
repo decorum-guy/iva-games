@@ -107,7 +107,10 @@ export class ColossusOnlineClient {
     try {
       const result = await this.request<CommandResponse>('/rooms/' + roomId + '/commands', request);
       if (this.pending !== request || this.snapshot?.id !== roomId) throw new OnlineError('roomChanged');
-      this.pending = null; this.adopt(result.snapshot); return result;
+      this.pending = null;
+      // A poll may already have delivered a newer revision while this ACK was
+      // in flight. Keep the command's own ACK, but never return an older view.
+      return { ...result, snapshot: this.adopt(result.snapshot) };
     } catch (error) {
       if (this.pending === request && this.snapshot?.id === roomId && error instanceof OnlineError && error.status >= 400 && error.status < 500 && error.status !== 429) {
         this.pending = null;

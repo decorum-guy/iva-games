@@ -52,10 +52,10 @@ export const BOSS_CARD_LIST: BossCardDefinition[] = [
   bossCard('regent_crossfire', 'regent', 'legendary', 'Двусторонний раскол', 'Opposing Fracture', 'Четыре блокируемых луча по 2 с противоположных граней.', 'Four blockable 2-damage rays from opposite faces.'),
   bossCard('spire_retreat', 'spire', 'rare', 'Скользящий отход', 'Gliding Retreat', 'После приёма — шаг без контакта на указанную клетку.', 'After the maneuver, take a non-contact step to the marked square.'),
   bossCard('spire_fork', 'spire', 'epic', 'Коневая вилка', 'Knight Fork', 'Последний удар заменяется площадью ходов коня с уроном 2.', 'Replace the final attack with a 2-damage area on all knight-move destinations.'),
-  bossCard('spire_bent_dash', 'spire', 'legendary', 'Ломаный выпад', 'Bent Lunge', 'Рывок с одним прямоугольным поворотом, контакт 1; при успехе луч 2.', 'A dash with one right-angle turn, contact 1; a ray of 2 if it completes.'),
+  bossCard('spire_bent_dash', 'spire', 'legendary', 'Ломаный выпад', 'Bent Lunge', 'Начальный луч 1, затем рывок с одним прямоугольным поворотом и контактом 1; при полном завершении — конечный луч 2.', 'An opening ray of 1, then a dash with one right-angle turn and contact 1; a closing ray of 2 if the whole dash completes.'),
   bossCard('archivist_parallel', 'archivist', 'rare', 'Двойная строка', 'Double Line', 'Огонь на двух параллельных вертикалях или горизонталях.', 'Fire across two parallel files or ranks.'),
   bossCard('archivist_cross', 'archivist', 'epic', 'Перекрёстная правка', 'Crossed Revision', 'Огонь по вертикали и горизонтали. Пересечение получает одно попадание за пакет.', 'Fire across one file and one rank. The intersection is hit once per packet.'),
-  bossCard('archivist_border', 'archivist', 'legendary', 'Обугленный край', 'Charred Edge', 'Поджечь один край доски: a, h, 1 или 8.', 'Ignite one edge of the board: a, h, 1 or 8.'),
+  bossCard('archivist_border', 'archivist', 'legendary', 'Обугленный край', 'Charred Edge', 'Поджечь весь внешний периметр: 28 клеток, углы один раз. Огонь наносит 1 сейчас и 1 при следующем ответе.', 'Ignite the entire outer perimeter: 28 squares, counting corners once. Fire deals 1 now and 1 on the next response.'),
 ];
 export const BOSS_CARDS = Object.fromEntries(BOSS_CARD_LIST.map(c => [c.id, c])) as Record<string, BossCardDefinition>;
 export const CAMPAIGN_BOSSES: BossId[] = ['regent', 'spire', 'archivist'];

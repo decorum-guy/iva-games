@@ -178,8 +178,8 @@ export function createOnlineServer(options: OnlineServerOptions) {
         file = resolve(root, colossusRoute ? 'colossus/index.html' : overdriveRoute ? 'overdrive/index.html' : 'index.html')
         info = await stat(file).catch(() => null)
         // A separately built game has its entry at the static root. The combined
-        // build retains the dedicated /overdrive/ entry, which takes precedence.
-        if (overdriveRoute && !info?.isFile()) {
+        // build retains the dedicated game entries, which take precedence.
+        if ((overdriveRoute || colossusRoute) && !info?.isFile()) {
           file = resolve(root, 'index.html')
           info = await stat(file).catch(() => null)
         }
