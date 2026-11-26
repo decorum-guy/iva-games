@@ -16,6 +16,10 @@ export const phaseCopy: Record<DistrictPhase, [string, string]> = {
   development: ["Пора строить", "Time to build"],
   finished: ["Итоги района", "District results"],
 };
+export function districtBotName(seatIndex: number, lang: Language) {
+  return `${lang === "ru" ? "Бот" : "Bot"} ${seatIndex + 1}`;
+}
+
 export const buildActionCopy: Record<BuildingKind, [string, string]> = {
   house: ["Построить дом", "Build a house"],
   cafe: ["Построить кафе", "Build a cafe"],
