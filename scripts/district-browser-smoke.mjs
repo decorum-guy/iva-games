@@ -1,6 +1,6 @@
 /** Exercise two real browsers against the built District server with isolated accounts. */
 import assert from 'node:assert/strict';
-import { chromium, expect } from '@playwright/test';
+import { chromium, devices, expect, webkit } from '@playwright/test';
 import { spawn } from 'node:child_process';
 import { createServer } from 'node:net';
 import { mkdir, mkdtemp, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
@@ -8,6 +8,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { setTimeout as delay } from 'node:timers/promises';
+import { runDistrictAcceptance } from './district-browser-acceptance.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 for (const path of ['dist-platform/main.js', 'apps/portal/dist/index.html']) {
@@ -17,6 +18,7 @@ const directory = await mkdtemp(join(tmpdir(), 'iva-district-browser-'));
 const mailbox = join(directory, 'mail');
 let running = null;
 let browser = null;
+let mobileBrowser = null;
 let origin = '';
 let port = 0;
 
@@ -127,8 +129,17 @@ class Client {
   }
 }
 
-async function cleanup() {
-  try { await browser?.close(); await stop(); } finally { await rm(directory, { recursive: true, force: true }); }
+let cleanupPromise;
+function cleanup() {
+  cleanupPromise ??= (async () => {
+    try {
+      await Promise.allSettled([mobileBrowser?.close(), browser?.close()]);
+      await stop();
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  })();
+  return cleanupPromise;
 }
 for (const signal of ['SIGINT', 'SIGTERM']) process.once(signal, () => {
   void cleanup().finally(() => process.exit(signal === 'SIGINT' ? 130 : 143));
@@ -227,13 +238,45 @@ try {
   await pages[1].screenshot({ path: join(output, 'result-mobile-en.png'), fullPage: true });
   assert.deepEqual((await current(alice)).outcome, result.outcome);
   assert.deepEqual(browserErrors, []);
+  let acceptance;
+  if (process.argv.includes('--acceptance')) {
+    await Promise.all(contexts.map(context => context.close()));
+    mobileBrowser = await webkit.launch({ headless: true });
+    let tableNumber = 0;
+    async function makePlayers(seats) {
+      const table = ++tableNumber;
+      const players = [];
+      for (let seat = 0; seat < seats; seat++) {
+        const client = new Client();
+        const user = await client.register(`district_mac_${table}_${seat}`);
+        if (seat > 0) {
+          const relation = await players[0].client.request('/friend-requests', { playerId: user.playerId });
+          await client.request(`/friend-requests/${relation.requestId}/accept`, {});
+        }
+        const context = seat === 2 ? await mobileBrowser.newContext(devices['iPhone 13'])
+          : await browser.newContext({ viewport: { width: 1440, height: 1000 } });
+        const separator = client.cookie.indexOf('=');
+        await context.addCookies([{ name: client.cookie.slice(0, separator), value: client.cookie.slice(separator + 1), url: origin }]);
+        const page = await context.newPage();
+        page.setDefaultTimeout(7000);
+        page.on('pageerror', error => browserErrors.push(error.message));
+        page.on('response', response => {
+          if (response.status() === 429) console.warn(`Unexpected rate limit on ${new URL(response.url()).pathname}`);
+        });
+        players.push({ client, page, context, id: user.playerId, name: user.displayName, seat });
+      }
+      return players;
+    }
+    acceptance = await runDistrictAcceptance({ origin, makePlayers, stop, start, output });
+    assert.deepEqual(browserErrors, []);
+  }
   const report = { builtDistrictBrowser: 'passed', independentBrowsers: 2, realHttp: true, mockedGameApi: false, acceptedUiActions, rounds: 6,
     map: 'crossroads@1', builtHouses: 2, upgrades: 2, offlineAndServerRestart: 'passed', resultAfterReload: 'passed', narrowEnglish: 'passed', browserErrors: 0,
-    humanPlaytest: false, externalMessages: 0, browserVersion: browser.version() };
+    humanPlaytest: false, externalMessages: 0, browserVersion: browser.version(), ...(acceptance ? { acceptance } : {}) };
   await writeFile(join(output, 'report.json'), JSON.stringify(report, null, 2)); console.info(JSON.stringify(report));
 } catch (error) {
   const output = join(root, '.qa', 'district-browser'); await mkdir(output, { recursive: true });
-  for (const [index, context] of (browser?.contexts() ?? []).entries()) {
+  for (const [index, context] of [...(browser?.contexts() ?? []), ...(mobileBrowser?.contexts() ?? [])].entries()) {
     const page = context.pages()[0];
     if (page) {
       await page.screenshot({ path: join(output, `failure-${index}.png`), fullPage: true }).catch(() => {});
