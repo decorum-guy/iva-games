@@ -140,6 +140,17 @@ try {
   const html = await page.text();
   assert.equal(page.status, 200);
   assert.equal(html, await readFile(join(root, 'apps/portal/dist/index.html'), 'utf8'));
+  for (const route of ['/chess', '/games']) {
+    const cataloguePage = await request(origin + route);
+    assert.equal(cataloguePage.status, 200, `Public route ${route}`);
+    assert.equal(await cataloguePage.text(), html, `SPA entry for ${route}`);
+  }
+  const publicCatalogue = await request(origin + '/api/platform/v1/games');
+  assert.equal(publicCatalogue.status, 200);
+  const publicGames = (await publicCatalogue.json()).games;
+  assert.deepEqual(publicGames.filter(game => game.collectionId === 'chess').map(game => game.gameId).sort(), ['overdrive', 'remorse']);
+  assert.ok(publicGames.some(game => game.gameId === 'platform-lab' && game.collectionId === 'other'));
+  assert.ok(publicGames.filter(game => game.collectionId === 'chess').every(game => game.status === 'unavailable'));
   const asset = html.match(/src="(\/assets\/[^"]+\.js)"/)?.[1];
   assert.ok(asset, 'Built portal must have a module entry');
   const assetResponse = await request(origin + asset);

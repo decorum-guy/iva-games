@@ -17,7 +17,7 @@ test.beforeEach(async ({ page }) => {
 
 test('keeps focus in the dialog and returns it to its opener', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto('/');
+  await page.goto('/rooms');
   const opener = page.getByRole('button', { name: 'Создать комнату' });
   await opener.focus();
   await page.keyboard.press('Enter');
@@ -34,7 +34,7 @@ test('keeps focus in the dialog and returns it to its opener', async ({ page }) 
 
 test('fits the viewport and keeps form controls reachable at high zoom equivalent', async ({ page }) => {
   await page.setViewportSize({ width: 195, height: 422 });
-  await page.goto('/');
+  await page.goto('/rooms');
   await page.getByRole('button', { name: 'Создать комнату' }).click();
   const dialog = page.getByRole('dialog');
   await expect(dialog).toBeVisible();

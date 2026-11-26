@@ -38,6 +38,45 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Validate deployment Compose and Caddy configuration
+        if: matrix.service == 'platform'
+        run: |
+          set -euo pipefail
+          umask 077
+          config_dir="$(mktemp -d "$RUNNER_TEMP/iva-config.XXXXXX")"
+          trap 'rm -rf -- "$config_dir"' EXIT
+          # Configuration-only fixtures: no credentials, recipients or delivery.
+          cat > "$config_dir/platform.env" <<'ENV'
+          SMTP_HOST=mail.invalid
+          SMTP_PORT=465
+          SMTP_SECURE=true
+          SMTP_FROM=ci@example.invalid
+          TELEGRAM_ENABLED=false
+          ENV
+          docker pull caddy:2
+          caddy_image="$(docker image inspect caddy:2 --format '{{index .RepoDigests 0}}')"
+          cat > "$config_dir/release.env" <<ENV
+          CHESS_IMAGE=iva-games-config-check:chess
+          PLATFORM_IMAGE=iva-games-config-check:platform
+          CADDY_IMAGE=$caddy_image
+          PLATFORM_ENV_FILE=$config_dir/platform.env
+          IVA_NETWORK_SUBNET=172.30.239.0/24
+          IVA_NETWORK_DYNAMIC_RANGE=172.30.239.128/25
+          CADDY_PROXY_IP=172.30.239.2
+          CHESS_DATA_VOLUME=iva-config-chess-data
+          PLATFORM_DATA_VOLUME=iva-config-platform-data
+          CADDY_DATA_VOLUME=iva-config-caddy-data
+          CADDY_CONFIG_VOLUME=iva-config-caddy-config
+          ENV
+          docker compose version --short
+          IVA_RELEASE_ENV="$config_dir/release.env" deploy/iva-games/compose.sh config --quiet
+          # Validate provisioning only: never start listeners or obtain certificates.
+          # The container has no external network, published ports or persistent data.
+          docker run --rm --network none --read-only \
+            --tmpfs /data --tmpfs /config --tmpfs /tmp \
+            --mount "type=bind,src=$GITHUB_WORKSPACE/deploy/iva-games/Caddyfile,dst=/etc/caddy/Caddyfile,readonly" \
+            --entrypoint caddy "$caddy_image" validate --config /etc/caddy/Caddyfile --adapter caddyfile
+
       - name: Build runtime image from the checked-out revision
         run: |
           set -euo pipefail
