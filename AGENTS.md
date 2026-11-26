@@ -1,6 +1,14 @@
 # Iva Games — latest project direction
 
-## Current priority: publication readiness for iva-games.pro
+## Current activation: new VPS, SSH and owner-managed DNS
+
+On 26 November 2026 the owner requested the local activation prompt with placeholders for the new VPS IP and initial root password. The local executor is authorized to configure the supplied VPS, project-specific SSH keys and Apple Keychain, move SSH from 22 to **2233** (the support-recommended example), verify an independent connection, then disable password/keyboard-interactive access and close 22. Prepare rollback and preserve the old live session until replacement access is verified. Account for ssh.socket, effective sshd configuration, persistent firewall rules and fail2ban on the selected port. Use a separate tested sudo administrator before disabling SSH root login; rotate the initial root password and store recovery credentials in Keychain. The Mac private key remains a protected file; Keychain stores its passphrase.
+
+The owner will change DNS personally later. Do not edit registrar records. Install a real persistent systemd activation service/timer on the supplied VPS that waits for **both iva-games.pro and chess.iva-games.pro**, checks A/CNAME and any AAAA, verifies required application/SMTP readiness, and activates a pinned accepted release once. Preserve ACME state and avoid repeated Caddy/container restarts. The activation handler and deployment updates share a lock and readiness gate. A waiting timer is not evidence of a live site or external browser acceptance.
+
+This activation includes preparing the actual release and automatic updates after successful CI, but explicitly **excludes Telegram**: keep TELEGRAM_ENABLED=false; do not configure a bot/webhook/proxy or touch kz-bot. Historical Telegram-access checks do not block this task. The old Chess 2 domains are unused for this deployment; do not add their sites, redirects or certificates. Use `prompts/PUBLISH_IVA_GAMES_PRO.md` with owner-supplied values; commit only the unfilled template. No real VPS address, password, installed handler or completed activation is claimed by this documentation update.
+
+## Previous stage: publication readiness for iva-games.pro
 
 On 26 November 2026 the owner confirmed **iva-games.pro** (not iva-games.online), requested separate public chess and other-game pages, and asked for a publication-readiness check before providing the new VPS. The OVERDRIVE finale and auditory acceptance are complete according to the owner's report and the checked-in acceptance record: all 20 sounds were accepted, and commit `82668cd` lowers only the shared move mix from 0.70 to 0.42 (about 4.4 dB). Preserve that bank, the intact falling king/contact motion, the accepted rules and energy balance. Do not restart the historical polish prompt or change REMORSE's sound bank.
 
