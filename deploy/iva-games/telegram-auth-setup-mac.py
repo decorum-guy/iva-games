@@ -129,15 +129,20 @@ def main():
                 'ip_address': '78.137.109.13', 'allowed_updates': ['message', 'callback_query']})
         configure_vps(options.admin_helper, request)
         try:
+            info = bot_api(port, token, 'getWebhookInfo')
+        except (OSError, RuntimeError, subprocess.TimeoutExpired):
+            print('Telegram подтвердил установку webhook, VPS применил настройки. Повторная проверка webhook пока недоступна.')
+        else:
+            if info.get('url') != WEBHOOK:
+                raise RuntimeError('Настройки VPS применены. Telegram вернул другой адрес webhook.')
+        try:
             for language, labels in (('', ('Profile', 'Friends', 'Incoming requests')),
                                      ('ru', ('Профиль', 'Друзья', 'Входящие заявки'))):
                 commands = [{'command': cmd, 'description': label}
-                            for cmd, label in zip(('profile', 'friends', 'requests'), labels, strict=True)]
+                            for cmd, label in zip(('profile', 'friends', 'requests'), labels)]
                 bot_api(port, token, 'setMyCommands', {'commands': commands, 'language_code': language})
-        except RuntimeError:
+        except (OSError, RuntimeError, subprocess.TimeoutExpired):
             print('Вход настроен. Команды можно открыть кнопками бота после /start.')
-        if bot_api(port, token, 'getWebhookInfo').get('url') != WEBHOOK:
-            raise RuntimeError('Telegram не подтвердил адрес webhook.')
         print('Webhook сохранён. Регистрация станет доступна после публичного HTTPS.')
     finally:
         stop_tunnel(tunnel)
