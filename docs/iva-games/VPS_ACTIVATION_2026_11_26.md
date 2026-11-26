@@ -1,6 +1,8 @@
 # Iva Games на VPS — 26 ноября 2026
 
-## Состояние выпуска
+**Исторический отчёт первичной установки.** Он сохраняет выполненные SSH/firewall/backup-проверки и конфигурацию того этапа. Позднее владелец выбрал [Telegram-аккаунты](TELEGRAM_ACCOUNTS.md) с `MAIL_MODE=disabled`; требования SMTP и `TELEGRAM_ENABLED=false` ниже не являются текущим заданием. Продолжать по [PROJECT_STATUS](PROJECT_STATUS.md) и [новому промпту](../../prompts/ACCEPT_PUBLIC_IVA_GAMES.md), используя существующий доступ, без повторной первичной установки.
+
+## Состояние при первичной установке
 
 На `78.137.109.13` установлен первый выпуск [`9f9be34f46840ce1afa93f5db7f39528a3e6c3f9`](https://github.com/decorum-guy/iva-games/commit/9f9be34f46840ce1afa93f5db7f39528a3e6c3f9). Он объединяет принятый кандидат `de63b90328ecd436fee79c12bd0fcb49358832b6` из [PR №9](https://github.com/decorum-guy/iva-games/pull/9) и процедуры размещения. Игровые файлы, правила и ресурсы совпадают с кандидатом. [CI ветки main](https://github.com/decorum-guy/iva-games/actions/runs/45816997101) выполнил 793 теста продукта, 5 тестов активации, сборку, HTTP smoke и 7 браузерных сценариев. [Выпуск образов](https://github.com/decorum-guy/iva-games/actions/runs/45817288842) проверил контейнеры, опубликовал их в GHCR и вернул `STAGED` с фактического VPS.
 

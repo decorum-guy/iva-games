@@ -1,5 +1,21 @@
 # Iva Games — latest project direction
 
+## Current handoff: portal, OVERDRIVE, District and deployment
+
+Start with [PROJECT_STATUS](docs/iva-games/PROJECT_STATUS.md), then the current component documents. On 26 November 2026 the owner requested a shared readiness status and Google prompts for District design and other non-chess multiplayer games. This task updates documentation; it does not implement District, change accepted chess rules or activate production.
+
+District v0.2 already defines a closed first prototype for 2–4 total human/bot seats. A document audit found no missing mandatory phase or win condition blocking implementation; it is not a balance test. There is still no District rules package, runtime, UI or bot policy. The platform lab is not District. Read [District status](games/district/STATUS.md); preserve normative v0.2 while creative revisions remain proposals. New games require bots from their first playable release, solo with bots and mixed rooms, explicit human/total-seat limits, private per-player observations and simple UI copy.
+
+The portal and OVERDRIVE are implemented and locally accepted. Preserve accepted energy v2, finale and all 20 sounds. Current production accounts use Telegram without mandatory SMTP. VPS provisioning and staging exist; current live state, public acceptance and a post-activation DEPLOYED must still be established by the local executor. Guest chess publication does not depend on the future shared-account adapter. The diagnostic Actions permission test passed; installation and a live VPS snapshot remain separate checks.
+
+Use [the District design prompt](prompts/GEMINI_DISTRICT_DESIGN_REVIEW.md) and [the new-game prompt](prompts/GEMINI_NEW_MULTIPLAYER_GAMES.md). The Google model guide is in open PR #14 at the reviewed snapshot, not yet main; the prompts link its exact revision. Do not silently merge Colossus or other concurrent work. Historical stages below preserve context and applicable data-preservation rules, but their old task lists, domains, SMTP requirements and unperformed-acceptance claims do not override this handoff or newer evidence.
+
+## Current request: server diagnostics from chat
+
+On 26 November 2026 the owner asked whether GitHub can give this chat access to the Iva Games VPS. Prepare a separate read-only `iva-ops` channel and an independent Actions snapshot workflow; preserve the existing deployment key and its fixed command. Do not turn it into an arbitrary SSH shell. See [chat server access](docs/iva-games/CHAT_SERVER_ACCESS.md). Host helper installation requires the existing local administrator once; repository code and passing tests alone are not proof of installed or working access. Do not claim a fresh VPS state from historical deployment logs.
+
+The current continuation prompt is [public acceptance](prompts/ACCEPT_PUBLIC_IVA_GAMES.md). Continue from actual live state and current `main`, preserving Telegram-only accounts and accepted games. The original VPS bootstrap prompt is historical. Keep Colossus and Gemini/AGY work separate. Publish completed milestones without force-push, and distinguish source checks, Actions permission checks and an actual server snapshot.
+
 ## Current accounts and deployment direction
 
 The owner requested Telegram-only production accounts on 26 November 2026. The portal and bot share profiles, avatars, friends and incoming decisions. New friend requests and player search stay on the portal. The owner enters the dedicated BotFather token on the Mac. See [Telegram accounts](docs/iva-games/TELEGRAM_ACCOUNTS.md). This supersedes the earlier initial-release exclusion of Telegram and mandatory SMTP; preserve the existing local demonstrations and the independent legacy invitation integration. Keep the DNS gate and distinguish CI, staged images, first HTTPS activation and real bot delivery.
@@ -20,7 +36,7 @@ The public portal now has `/` for the two collections, `/chess` for REMORSE/OVER
 
 Read `docs/iva-games/VALIDATION_PUBLICATION_READINESS_2026_11_26.md`, `docs/iva-games/RELEASE_IVA_GAMES_PRO.md`, and `docs/iva-games/TRUSTED_PROXY.md` for the latest candidate and executed checks. Release services trust only the configured exact Caddy socket IP; Caddy must overwrite `X-Iva-Client-IP`. Validate the private subnet against the actual VPS before installation. Real hosting/SSH, DNS/HTTPS, SMTP delivery, target-volume backup/restore and public acceptance remain activation work; Telegram is optional and disabled until separately configured. Current CI checks and builds the release but does not deploy on push. No merge, DNS change, real message or production restart is implied by this readiness review. Use `prompts/PUBLISH_IVA_GAMES_PRO.md` when the owner proceeds with the actual server.
 
-## Active review: OVERDRIVE energy v2 and publication
+## Historical review: OVERDRIVE energy v2 and publication
 
 On 26 November 2026 the owner supplied completed Mac acceptance reports for the portal and OVERDRIVE, explicitly requested new synthetic games to assess the changed energy balance, and purchased **iva-games.pro**. Treat the purchase as owner-provided context, not evidence of configured DNS or hosting. Review and preserve the requested two banks of three, impulse cost 3, form cost 6, capture rewards 1/2/2/3/4 and fresh-check reward 2. Old v1 saves and rooms retain their own rules. A proposed balancing change needs measured evidence; never silently change the accepted rules while calling it a packaging fix.
 
@@ -32,7 +48,7 @@ Use the real rules core and SDK for balance games; compare v1/v2 with matched op
 
 The renewed platform acceptance report records working Mac SSH to `kz-bot` and an existing SOCKS5 route from `ha-vps`. The older SSH timeout is historical. A new game bot still needs its own configuration and accepted real delivery. Do not reuse another project's bot or send real test messages without a named authorized recipient.
 
-## Active implementation: platform and District revision
+## Historical implementation: platform and District revision
 
 The owner now explicitly authorizes implementation of accounts, friends, rooms and invitations in parallel with the separate chess finishing/migration agent. Work in an isolated feature branch; the older documentation-only scope below is historical. Do not repeat the chess migration or overwrite that agent's game source. Integrate the existing chess network later through a versioned game-runtime adapter, preserving guest rooms and local saves.
 
@@ -83,7 +99,7 @@ The root package is `iva-games`; internal package names remain `@chess-2/*`. Cur
 
 Read `docs/MONOREPO.md` and `prompts/ACCEPT_OVERDRIVE_MONOREPO.md` for the current structure and local acceptance task. The fresh nested-layout report is `docs/VALIDATION_IVA_GAMES_LAYOUT.md`. Historical paths/counts/hashes in older validation reports describe their recorded revisions and are not claims about the migrated tree. Keep them intact. Record fresh migration checks separately and distinguish authored code, executed checks, browser observations, listening and activation. The older instructions below retain their behavioral requirements; translate their source paths using the migration document.
 
-# Chess 2 — active SDK and OVERDRIVE iteration
+# Chess 2 — historical SDK and OVERDRIVE iteration
 
 On 25 November 2026 the owner explicitly assigned the next agent to create and test the common engine SDK and complete the whole OVERDRIVE / Форсаж iteration: final rules, measured balance work, new models/audio/effects, an independent interface, implementation, SDK-aware AI, real networking and acceptance. This is the active scope; preserve the existing REMORSE product. Routine decisions and continued execution are authorized.
 

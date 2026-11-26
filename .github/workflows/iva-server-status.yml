@@ -1,0 +1,112 @@
+name: Iva Games server snapshot
+
+on:
+  workflow_dispatch:
+  workflow_run:
+    workflows: [Iva Games release images]
+    types: [completed]
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: iva-games-server-snapshot
+  cancel-in-progress: false
+
+# Keep this workflow independent: rerunning its only job must never deploy,
+# restart a service, run backups or trigger dependent mutation jobs.
+jobs:
+  snapshot:
+    if: >-
+      github.ref == 'refs/heads/main' &&
+      (github.event_name == 'workflow_dispatch' ||
+       (github.event_name == 'workflow_run' &&
+        github.event.workflow_run.conclusion == 'success' &&
+        github.event.workflow_run.event == 'workflow_run' &&
+        github.event.workflow_run.head_branch == 'main' &&
+        github.event.workflow_run.head_repository.full_name == github.repository))
+    name: Read server snapshot
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    environment:
+      name: production
+      # Reading state is not a deployment and must not create a release entry.
+      deployment: false
+    env:
+      OPS_ENABLED: ${{ vars.IVA_OPS_ENABLED }}
+    steps:
+      - name: Check whether access is configured
+        id: access
+        run: |
+          set -euo pipefail
+          if [[ "$OPS_ENABLED" != 'true' ]]; then
+            echo 'enabled=false' >> "$GITHUB_OUTPUT"
+            echo 'Server diagnostics is not enabled. No VPS connection was attempted.'
+            exit 0
+          fi
+          echo 'enabled=true' >> "$GITHUB_OUTPUT"
+
+      - name: Read the trusted snapshot schema
+        if: steps.access.outputs.enabled == 'true'
+        uses: actions/checkout@v6
+        with:
+          # github.sha is the original default-branch commit for workflow_run
+          # and the selected main commit for dispatch, including on a rerun.
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Collect and sanitize the snapshot
+        if: steps.access.outputs.enabled == 'true'
+        env:
+          OPS_KEY: ${{ secrets.IVA_OPS_SSH_KEY }}
+          VPS_HOST: ${{ vars.IVA_SSH_HOST }}
+          VPS_PORT: ${{ vars.IVA_SSH_PORT }}
+          VPS_HOST_KEY: ${{ vars.IVA_SSH_HOST_KEY }}
+        run: |
+          set -euo pipefail
+          umask 077
+          config_dir="$(mktemp -d "$RUNNER_TEMP/iva-ops.XXXXXX")"
+          trap 'rm -rf -- "$config_dir"' EXIT
+          if [[ -z "$OPS_KEY" || -z "$VPS_HOST_KEY" ||
+                ! "$VPS_HOST" =~ ^[A-Za-z0-9][A-Za-z0-9.-]*$ ||
+                ! "$VPS_PORT" =~ ^[0-9]{1,5}$ ]]; then
+            echo 'Enabled diagnostics is missing valid SSH configuration.' >&2
+            exit 1
+          fi
+          if (( 10#$VPS_PORT < 1 || 10#$VPS_PORT > 65535 )); then
+            echo 'Invalid diagnostics SSH port.' >&2
+            exit 1
+          fi
+          printf '%s\n' "$OPS_KEY" > "$config_dir/key"
+          printf '%s\n' "$VPS_HOST_KEY" > "$config_dir/known_hosts"
+          unset OPS_KEY VPS_HOST_KEY
+          # A size limit also bounds output from an unexpected/misconfigured
+          # remote endpoint. Raw stdout and stderr never enter Actions logs.
+          ssh_rc=0
+          (
+            ulimit -f 256
+            timeout 75 ssh -F /dev/null -T -n \
+              -i "$config_dir/key" -p "$VPS_PORT" \
+              -o BatchMode=yes -o IdentitiesOnly=yes \
+              -o IdentityAgent=none -o RequestTTY=no \
+              -o ClearAllForwardings=yes \
+              -o StrictHostKeyChecking=yes \
+              -o UserKnownHostsFile="$config_dir/known_hosts" \
+              -o GlobalKnownHostsFile=/dev/null \
+              -o ControlMaster=no -o ControlPath=none \
+              -o ConnectTimeout=10 -o ConnectionAttempts=1 \
+              -o ServerAliveInterval=10 -o ServerAliveCountMax=2 \
+              "iva-ops@$VPS_HOST" \
+              > "$config_dir/snapshot.raw" 2> "$config_dir/ssh.stderr"
+          ) || ssh_rc=$?
+          if (( ssh_rc != 0 )); then
+            echo "Server snapshot failed (SSH exit $ssh_rc). Raw server output was withheld." >&2
+            exit 1
+          fi
+          # Reconstruct allowlisted JSON locally before printing anything.
+          # Do not replace this with cat, raw journal output or an artifact.
+          python3 -I deploy/iva-games/ops-status.py --sanitize-stdin \
+            < "$config_dir/snapshot.raw" > "$config_dir/snapshot.json"
+          echo "Snapshot source: $GITHUB_SHA; run $GITHUB_RUN_ID; attempt $GITHUB_RUN_ATTEMPT."
+          cat "$config_dir/snapshot.json"
