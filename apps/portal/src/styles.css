@@ -3454,3 +3454,14 @@ button {
   .collection-card { transition: none; }
   .collection-card:hover { transform: none; }
 }
+
+.telegram-sign-in {
+  display: grid;
+  gap: 0.9rem;
+}
+.telegram-sign-in p {
+  margin: 0;
+}
+.telegram-sign-in .text-button {
+  justify-self: start;
+}

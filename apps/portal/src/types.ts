@@ -1,16 +1,22 @@
 export type Language = "ru" | "en";
+export const AVATARS = { king: "♚", queen: "♛", rook: "♜", bishop: "♝", knight: "♞", pawn: "♟" } as const;
+export type AvatarStyle = keyof typeof AVATARS;
+export interface AuthMethods { email: boolean; telegram: boolean }
 export interface PublicPlayer {
   playerId: string;
   handle: string;
   displayName: string;
+  avatar?: AvatarStyle;
 }
 export interface User extends PublicPlayer {
   email: string;
   emailVerified: boolean;
+  telegramVerified?: true;
 }
 export interface Session {
   user: User | null;
   csrfToken: string;
+  auth?: AuthMethods;
 }
 export interface Game {
   gameId: string;
@@ -39,6 +45,7 @@ export interface Member {
   playerId: string | null;
   handle: string;
   displayName: string;
+  avatar?: AvatarStyle;
   seatIndex: number;
   ready: boolean;
   controller:

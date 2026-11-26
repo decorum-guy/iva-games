@@ -88,5 +88,23 @@ export function openPlatformDatabase(path: string): Database.Database {
       PRAGMA user_version = 1;
     `);
   }).immediate();
+  // Additive authentication tables leave legacy player rows and foreign keys intact.
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS player_avatar (
+      player_id TEXT PRIMARY KEY REFERENCES players(player_id),
+      avatar TEXT NOT NULL CHECK(avatar IN ('king','queen','rook','bishop','knight','pawn'))
+    );
+    CREATE TABLE IF NOT EXISTS telegram_login_accounts (
+      bot_id TEXT NOT NULL, telegram_user_id TEXT NOT NULL, player_id TEXT NOT NULL UNIQUE REFERENCES players(player_id),
+      PRIMARY KEY(bot_id,telegram_user_id)
+    );
+    CREATE TABLE IF NOT EXISTS telegram_auth_attempts (
+      id TEXT PRIMARY KEY, session_hash TEXT NOT NULL, bot_id TEXT NOT NULL, token_hash TEXT NOT NULL UNIQUE,
+      expires_at INTEGER NOT NULL, locale TEXT NOT NULL, telegram_user_id TEXT, first_update INTEGER,
+      reply_at INTEGER, failures INTEGER NOT NULL DEFAULT 0, used_at INTEGER
+    );
+    CREATE INDEX IF NOT EXISTS telegram_auth_expiry ON telegram_auth_attempts(expires_at);
+    CREATE INDEX IF NOT EXISTS telegram_auth_recipient ON telegram_auth_attempts(bot_id,telegram_user_id,reply_at);
+  `);
   return db;
 }

@@ -3,6 +3,7 @@ import { createTelegramTransport } from '@iva-games/telegram-transport';
 import { loadPlatformConfig } from './config.js';
 import { createPlatformHttpServer } from './http.js';
 import { PlatformService } from './service.js';
+import { TelegramAuth } from './telegram/auth.js';
 import { TelegramService } from './telegram/index.js';
 
 process.umask(0o077);
@@ -20,10 +21,12 @@ const telegram = config.telegram && telegramTransport ? new TelegramService({
   proofEncryptionKey: config.telegram.proofEncryptionKey, transport: telegramTransport, sendTimeoutMs: 10_000,
 }) : undefined;
 if (telegram) platform.setInvitationDelivery(invitationId => telegram.enqueueInvitation(invitationId));
+const telegramAuth = config.telegramAuth ? new TelegramAuth(platform, config.telegramAuth) : undefined;
 const server = createPlatformHttpServer(platform, {
   publicOrigin: config.publicOrigin, allowedOrigins: config.allowedOrigins,
   trustedProxyIps: config.trustedProxyIps,
   allowedHosts: config.allowedHosts, secureCookies: config.publicOrigin.startsWith('https:'), serveDirectory: config.serveDirectory,
+  telegramAuth, telegramAuthWebhookSecret: config.telegramAuth?.webhookSecret,
   telegram, telegramWebhookSecret: config.telegram?.webhookSecret,
 });
 let telegramWork: Promise<void> | undefined;

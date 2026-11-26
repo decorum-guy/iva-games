@@ -49,7 +49,6 @@ services:
       PLATFORM_DATABASE_PATH: /data/platform.sqlite
       PLATFORM_LAB_DATABASE_PATH: /data/platform-lab.sqlite
       PORTAL_DIST_DIRECTORY: /app/dist-portal
-      MAIL_MODE: smtp
     volumes:
       - platform-data:/data
     logging: *bounded-logs

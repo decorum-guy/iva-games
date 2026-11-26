@@ -27,7 +27,7 @@ docker image inspect "$caddy" >/dev/null
 install -d -m 700 "$runtime" "$config" "$state" /srv/iva-games-backups
 # The CI wrapper is reachable by the restricted account; only root can write it.
 chmod 755 /opt/iva-games "$runtime"
-install -m 755 "$source"/{activation.py,backup.sh,ci-deploy,compose.sh,restore-check.sh} "$runtime/"
+install -m 755 "$source"/{activation.py,backup.sh,ci-deploy,compose.sh,restore-check.sh,configure-telegram-auth.py} "$runtime/"
 install -m 644 "$source"/{Caddyfile,compose.yaml} "$runtime/"
 install -m 644 "$source"/iva-games-activate.{service,timer} /etc/systemd/system/
 install -m 600 "$source/platform.env.example" "$config/platform.env"

@@ -53,11 +53,24 @@ iva-games.pro. 60 IN A 78.137.109.13"""
             self.assertEqual(activation.load(activation.STATE / 'state.json')['status'], 'WAITING_CONFIG')
             compose.assert_not_called()
 
+    def test_telegram_mode_waits_only_for_dns_before_public_start(self):
+        with tempfile.TemporaryDirectory() as work, patch.object(activation, 'STATE', pathlib.Path(work)), (
+            patch.object(activation, 'CONFIG', pathlib.Path(work))
+        ), patch.object(activation, 'dns_readiness', return_value={'consecutive': 0}), (
+            patch.object(activation, 'compose')
+        ) as compose:
+            (activation.CONFIG / 'platform.env').write_text('MAIL_MODE=disabled\nTELEGRAM_AUTH_ENABLED=false\n')
+            activation.save(activation.CONFIG / 'activation.json', {'ipv4': self.ip, 'initial_sha': 'approved'})
+            activation.save(activation.CONFIG / 'pins.json', {'sha': 'approved'})
+            activation.activate()
+            self.assertEqual(activation.load(activation.STATE / 'state.json')['status'], 'WAITING_DNS')
+            compose.assert_not_called()
+
     def test_waiting_tls_and_active_dont_restart_caddy(self):
         with tempfile.TemporaryDirectory() as work, patch.object(activation, 'STATE', pathlib.Path(work)), (
             patch.object(activation, 'CONFIG', pathlib.Path(work))
         ), patch.object(activation, 'dns_readiness', return_value={'consecutive': 2}), (
-            patch.object(activation, 'smtp_settings', return_value=())
+            patch.object(activation, 'mail_verification_settings', return_value=None)
         ), patch.object(activation, 'running', return_value=True), (
             patch.object(activation, 'public_health', side_effect=[False, True])
         ), patch.object(activation, 'command') as commands, patch.object(activation, 'up') as up:

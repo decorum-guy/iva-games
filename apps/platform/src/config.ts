@@ -1,6 +1,7 @@
 import { resolve } from 'node:path';
 import { parseTrustedProxyIps } from '@iva-games/session-kit/http';
 import { createFileMailbox, createSmtpMailbox } from './mail.js';
+import type { TelegramAuthConfig } from './telegram/auth.js';
 import type { MailTransport } from './types.js';
 
 function bool(value: string | undefined): boolean { return value === '1' || value === 'true'; }
@@ -21,8 +22,9 @@ export interface PlatformConfig {
   databasePath: string;
   runtimeDatabasePath: string;
   serveDirectory: string | undefined;
-  mail: MailTransport;
-  mailMode: 'smtp' | 'file';
+  mail?: MailTransport;
+  mailMode: 'smtp' | 'file' | 'disabled';
+  telegramAuth?: TelegramAuthConfig;
   telegram?: {
     botToken: string; botId: string; botUsername: string; webhookSecret: string;
     proofEncryptionKey: Uint8Array; proxyUrl: string;
@@ -48,7 +50,7 @@ export function loadPlatformConfig(env: NodeJS.ProcessEnv = process.env): Platfo
   const allowedHosts = (env.PLATFORM_ALLOWED_HOSTS ?? `${publicUrl.host},127.0.0.1:${configuredPort},localhost:${configuredPort}`).split(',').map(value => value.trim()).filter(Boolean);
   if (allowedHosts.some(value => value.includes('/') || value.includes('@') || /\s/.test(value) || !value)) throw new Error('Invalid allowed Host');
   const mailMode = env.MAIL_MODE ?? (production ? 'smtp' : 'file');
-  let mail: MailTransport;
+  let mail: MailTransport | undefined;
   if (mailMode === 'file') {
     if (production || !isLoopback(host) || !isLoopback(publicUrl.hostname)) throw new Error('File mailbox is permitted only in isolated loopback development');
     mail = createFileMailbox(env.MAIL_FILE_DIRECTORY ?? '.runtime/platform-mail');
@@ -57,7 +59,20 @@ export function loadPlatformConfig(env: NodeJS.ProcessEnv = process.env): Platfo
     if (env.SMTP_USER && !env.SMTP_PASSWORD) throw new Error('SMTP authentication password is required');
     const secure = env.SMTP_SECURE === undefined ? true : bool(env.SMTP_SECURE);
     mail = createSmtpMailbox({ host: env.SMTP_HOST, port: port(env.SMTP_PORT, secure ? 465 : 587), secure, user: env.SMTP_USER, password: env.SMTP_PASSWORD, from: env.SMTP_FROM });
-  } else throw new Error('MAIL_MODE must be smtp or file');
+  } else if (mailMode !== 'disabled') throw new Error('MAIL_MODE must be smtp, file or disabled');
+  let telegramAuth: TelegramAuthConfig | undefined;
+  const authFlag = env.TELEGRAM_AUTH_ENABLED;
+  if (authFlag !== undefined && !['true', 'false'].includes(authFlag)) throw new Error('Invalid TELEGRAM_AUTH_ENABLED');
+  if (authFlag === 'true') {
+    const { TELEGRAM_AUTH_BOT_ID: botId = '', TELEGRAM_AUTH_BOT_USERNAME: botUsername = '',
+      TELEGRAM_AUTH_WEBHOOK_SECRET: webhookSecret = '', TELEGRAM_AUTH_CODE_KEY_BASE64: encodedKey = '' } = env;
+    const codeKey = Buffer.from(encodedKey, 'base64');
+    if (publicUrl.protocol !== 'https:' || !/^[1-9]\d{3,18}$/.test(botId) || !/^[A-Za-z0-9_]{5,32}$/.test(botUsername) ||
+      !/^[A-Za-z0-9_-]{32,256}$/.test(webhookSecret) || codeKey.length !== 32 || codeKey.toString('base64') !== encodedKey) {
+      throw new Error('Invalid Telegram account bot configuration');
+    }
+    telegramAuth = { botId, botUsername, webhookSecret, codeKey };
+  }
   let telegram: PlatformConfig['telegram'];
   const telegramFlag = env.TELEGRAM_ENABLED;
   if (telegramFlag !== undefined && !['0', 'false', '1', 'true'].includes(telegramFlag)) throw new Error('TELEGRAM_ENABLED must be true or false');
@@ -86,6 +101,6 @@ export function loadPlatformConfig(env: NodeJS.ProcessEnv = process.env): Platfo
     databasePath: resolve(env.PLATFORM_DATABASE_PATH ?? '.runtime/platform.sqlite'),
     runtimeDatabasePath: resolve(env.PLATFORM_LAB_DATABASE_PATH ?? '.runtime/platform-lab.sqlite'),
     serveDirectory: env.PORTAL_DIST_DIRECTORY ? resolve(env.PORTAL_DIST_DIRECTORY) : undefined,
-    mail, mailMode, telegram,
+    mail, mailMode, telegram, telegramAuth,
   };
 }

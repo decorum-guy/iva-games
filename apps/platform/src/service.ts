@@ -3,8 +3,8 @@ import { chmodSync } from 'node:fs';
 import { hash, verify } from '@node-rs/argon2';
 import type Database from 'better-sqlite3';
 import { openPlatformDatabase } from './database.js';
-import { PlatformError } from './types.js';
-import type { Account, Controller, Difficulty, GameRegistration, Invitation, MailTransport, Participant, PublicPlayer, Room, SessionRecord, StartMatchCommand } from './types.js';
+import { AVATARS, PlatformError } from './types.js';
+import type { Account, AvatarStyle, Controller, Difficulty, GameRegistration, Invitation, MailTransport, Participant, PublicPlayer, Room, SessionRecord, StartMatchCommand } from './types.js';
 
 const DAY = 86_400_000;
 const INVITE_TTL = 30 * 60_000;
@@ -38,6 +38,12 @@ function displayNameField(value: unknown): string {
   if (!name) fail('INVALID_INPUT', 'Укажите имя');
   return name;
 }
+function registrationProfile(input: Record<string, unknown>): { handle: string; displayName: string } {
+  const handle = textField(input.handle, 'handle', 3, 24).toLowerCase();
+  if (!/^[a-z0-9_]{3,24}$/.test(handle)) fail('INVALID_HANDLE', 'Имя пользователя: 3–24 латинские буквы, цифры или _');
+  const displayName = displayNameField(input.displayName);
+  return { handle, displayName };
+}
 function intField(value: unknown, _name: string, min: number, max: number): number {
   if (typeof value !== 'number' || !Number.isInteger(value) || value < min || value > max) return fail('INVALID_INPUT', 'Проверьте заполненные поля');
   return value;
@@ -47,7 +53,7 @@ const pair = (a: string, b: string): [string, string] => a < b ? [a, b] : [b, a]
 export interface PlatformOptions {
   databasePath: string;
   publicOrigin: string;
-  mail: MailTransport;
+  mail?: MailTransport;
   games?: GameRegistration[];
   now?: () => number;
   runtimeTimeoutMs?: number;
@@ -89,6 +95,7 @@ export class PlatformService {
     }
     this.ready = hash(randomBytes(32).toString('hex'), PASSWORD_OPTIONS).then(value => { this.dummyHash = value; });
   }
+  get emailDeliveryEnabled(): boolean { return !!this.options.mail; }
   close(): void { this.db.close(); }
   setInvitationDelivery(handler: (invitationId: string) => unknown): void { this.invitationDelivery = handler; }
   async settle(): Promise<void> { await this.reconciliationFinished; }
@@ -129,15 +136,18 @@ export class PlatformService {
   }
   publicPlayer(playerId: string): PublicPlayer {
     const row = this.playerRow(playerId);
-    return { playerId, handle: String(row.handle), displayName: String(row.display_name) };
+    const avatar = this.row('SELECT avatar FROM player_avatar WHERE player_id=?', playerId)?.avatar as AvatarStyle | undefined;
+    return { playerId, handle: String(row.handle), displayName: String(row.display_name), ...(avatar ? { avatar } : {}) };
   }
   account(playerId: string): Account {
     const row = this.playerRow(playerId);
-    return { ...this.publicPlayer(playerId), email: String(row.email), emailVerified: !!row.email_verified };
+    const telegram = this.row('SELECT 1 FROM telegram_login_accounts WHERE player_id=?', playerId);
+    return { ...this.publicPlayer(playerId), email: telegram ? '' : String(row.email),
+      emailVerified: !!row.email_verified, ...(telegram ? { telegramVerified: true as const } : {}) };
   }
   requireVerified(playerId: string): Account {
     const user = this.account(playerId);
-    if (!user.emailVerified) fail('EMAIL_NOT_VERIFIED', 'Сначала подтвердите почту', 403);
+    if (!user.emailVerified && !user.telegramVerified) fail('EMAIL_NOT_VERIFIED', 'Сначала подтвердите почту', 403);
     return user;
   }
   private createToken(playerId: string, purpose: 'verification' | 'password_reset'): string {
@@ -150,20 +160,21 @@ export class PlatformService {
   }
   private async sendAccountMail(playerId: string, kind: 'verification' | 'password_reset'): Promise<void> {
     const account = this.account(playerId);
+    const mail = this.options.mail;
+    if (!mail || !account.email) fail('MAIL_UNAVAILABLE', 'Почта пока недоступна', 503);
     const token = this.createToken(playerId, kind);
     const path = kind === 'verification' ? '/verify' : '/reset-password';
     const url = `${this.publicOrigin}${path}?token=${encodeURIComponent(token)}`;
-    await this.options.mail.send({
+    await mail.send({
       to: account.email, kind,
       subject: kind === 'verification' ? 'Подтвердить почту — Iva Games' : 'Сбросить пароль — Iva Games',
       text: `${kind === 'verification' ? 'Подтвердить почту' : 'Сбросить пароль'}:\n\n${url}\n\nСсылка действует ${kind === 'verification' ? '24 часа' : '30 минут'}.\nЕсли вы не запрашивали это письмо, ничего не делайте.`,
     });
   }
   async register(input: Record<string, unknown>, previousSessionHash?: string): Promise<AuthenticationResult> {
+    if (!this.emailDeliveryEnabled) fail('MAIL_UNAVAILABLE', 'Почта пока недоступна', 503);
     const email = emailField(input.email);
-    const handle = textField(input.handle, 'handle', 3, 24).toLowerCase();
-    if (!/^[a-z0-9_]{3,24}$/.test(handle)) fail('INVALID_HANDLE', 'Имя пользователя: 3–24 латинские буквы, цифры или _');
-    const displayName = displayNameField(input.displayName);
+    const { handle, displayName } = registrationProfile(input);
     const password = passwordField(input.password);
     if (this.row('SELECT player_id FROM players WHERE email=? OR handle=?', email, handle)) fail('SIGNUP_UNAVAILABLE', 'Этот адрес или имя пользователя уже заняты', 409);
     const passwordHash = await this.passwordTask(() => hash(password, PASSWORD_OPTIONS));
@@ -178,13 +189,21 @@ export class PlatformService {
     catch { fail('MAIL_UNAVAILABLE', 'Аккаунт создан. Войдите и запросите письмо ещё раз', 503); }
     return { user: this.account(playerId), ...issued };
   }
+  createTelegramAccount(input: Record<string, unknown>): string {
+    const { handle, displayName } = registrationProfile(input);
+    if (this.row('SELECT 1 FROM players WHERE handle=?', handle)) fail('HANDLE_TAKEN', 'Имя пользователя уже занято', 409);
+    const playerId = randomUUID();
+    // Internal value cannot match the email address format; no password is set.
+    this.run('INSERT INTO players VALUES (?,?,?,?,?,?,?)', playerId, handle, displayName, `tg:${playerId}`, '', 0, this.now());
+    return playerId;
+  }
   async login(emailInput: unknown, passwordInput: unknown, previousSessionHash?: string): Promise<AuthenticationResult> {
     await this.ready;
     const email = typeof emailInput === 'string' ? emailInput.trim().toLowerCase().slice(0, 254) : '';
     const password = typeof passwordInput === 'string' && passwordInput.length <= 512 ? passwordInput : '';
     const row = this.row('SELECT * FROM players WHERE email=?', email);
-    const valid = await this.passwordTask(() => verify(row ? String(row.password_hash) : this.dummyHash, password));
-    if (!row || !valid) fail('INVALID_CREDENTIALS', 'Неверная почта или пароль', 401);
+    const valid = await this.passwordTask(() => verify(row?.password_hash ? String(row.password_hash) : this.dummyHash, password));
+    if (!row?.password_hash || !valid) fail('INVALID_CREDENTIALS', 'Неверная почта или пароль', 401);
     const playerId = String(row.player_id);
     // Credential recheck and session issuance share one synchronous transaction. A reset during
     // asynchronous verification cannot mint a new session from the obsolete password afterward.
@@ -195,7 +214,7 @@ export class PlatformService {
     if (!session.playerId) fail('UNAUTHENTICATED', 'Войдите в аккаунт', 401);
     const row = this.playerRow(session.playerId);
     const value = typeof password === 'string' && password.length <= 512 ? password : '';
-    if (!await this.passwordTask(() => verify(String(row.password_hash), value))) fail('INVALID_CREDENTIALS', 'Неверная почта или пароль', 401);
+    if (!row.password_hash || !await this.passwordTask(() => verify(row.password_hash ? String(row.password_hash) : this.dummyHash, value))) fail('INVALID_CREDENTIALS', 'Неверная почта или пароль', 401);
     this.db.transaction(() => {
       this.checkActiveCredential(session, String(row.password_hash));
       this.run('UPDATE web_sessions SET reauthenticated_at=? WHERE session_hash=?', this.now(), session.sessionHash);
@@ -205,7 +224,7 @@ export class PlatformService {
     if (!session.playerId) fail('UNAUTHENTICATED', 'Войдите в аккаунт', 401);
     const row = this.playerRow(session.playerId);
     const value = typeof password === 'string' && password.length <= 512 ? password : '';
-    if (!await this.passwordTask(() => verify(String(row.password_hash), value))) fail('INVALID_CREDENTIALS', 'Неверная почта или пароль', 401);
+    if (!row.password_hash || !await this.passwordTask(() => verify(row.password_hash ? String(row.password_hash) : this.dummyHash, value))) fail('INVALID_CREDENTIALS', 'Неверная почта или пароль', 401);
     this.db.transaction(() => {
       this.checkActiveCredential(session, String(row.password_hash));
       this.revokeAllSessions(session.playerId!);
@@ -229,11 +248,19 @@ export class PlatformService {
     }).immediate();
   }
   updateProfile(playerId: string, input: Record<string, unknown>): Account {
-    this.run('UPDATE players SET display_name=? WHERE player_id=?', displayNameField(input.displayName), playerId);
-    return this.account(playerId);
+    return this.db.transaction(() => {
+      this.run('UPDATE players SET display_name=? WHERE player_id=?', displayNameField(input.displayName), playerId);
+      if (input.avatar === null) this.run('DELETE FROM player_avatar WHERE player_id=?', playerId);
+      else if (input.avatar !== undefined) {
+        if (typeof input.avatar !== 'string' || !Object.hasOwn(AVATARS, input.avatar)) fail('INVALID_INPUT', 'Выберите аватар');
+        this.run('INSERT INTO player_avatar VALUES (?,?) ON CONFLICT(player_id) DO UPDATE SET avatar=excluded.avatar', playerId, input.avatar);
+      }
+      return this.account(playerId);
+    }).immediate();
   }
   async resendVerification(playerId: string): Promise<void> {
-    if (this.account(playerId).emailVerified) return;
+    const account = this.account(playerId);
+    if (account.emailVerified || account.telegramVerified) return;
     this.rateLimit(`verification:${playerId}`, 1, 60_000);
     try { await this.sendAccountMail(playerId, 'verification'); }
     catch { fail('MAIL_UNAVAILABLE', 'Не удалось отправить письмо. Попробуйте позже', 503); }
@@ -301,7 +328,7 @@ export class PlatformService {
     if (!/^[a-z0-9_]+$/.test(handle)) return [];
     this.rateLimit(`search:${actor}`, 30);
     // Literal prefix, escaping underscores rather than treating handles as SQL patterns.
-    return this.rows("SELECT player_id FROM players WHERE handle LIKE ? ESCAPE '\\' AND player_id<>? AND email_verified=1 ORDER BY handle LIMIT 12", `${handle.replaceAll('_', '\\_')}%`, actor)
+    return this.rows("SELECT player_id FROM players WHERE handle LIKE ? ESCAPE '\\' AND player_id<>? AND (email_verified=1 OR EXISTS (SELECT 1 FROM telegram_login_accounts t WHERE t.player_id=players.player_id)) ORDER BY handle LIMIT 12", `${handle.replaceAll('_', '\\_')}%`, actor)
       .filter(row => !this.blocked(actor, String(row.player_id))).map(row => this.publicPlayer(String(row.player_id)));
   }
   private blocked(a: string, b: string): boolean {
@@ -415,9 +442,10 @@ export class PlatformService {
     if (resetReady) this.run("UPDATE room_members SET ready=CASE WHEN player_id IS NULL THEN 1 ELSE 0 END WHERE room_id=?", roomId);
   }
   private participants(roomId: string): Participant[] {
-    return this.rows('SELECT m.*,p.handle,p.display_name AS account_name FROM room_members m LEFT JOIN players p ON p.player_id=m.player_id WHERE room_id=? ORDER BY seat_index', roomId).map(row => ({
+    return this.rows('SELECT m.*,p.handle,p.display_name AS account_name,a.avatar FROM room_members m LEFT JOIN players p ON p.player_id=m.player_id LEFT JOIN player_avatar a ON a.player_id=m.player_id WHERE room_id=? ORDER BY seat_index', roomId).map(row => ({
       participantId: String(row.participant_id), playerId: row.player_id ? String(row.player_id) : null,
       handle: row.handle ? String(row.handle) : '', displayName: String(row.account_name ?? row.display_name),
+      ...(row.avatar ? { avatar: row.avatar as AvatarStyle } : {}),
       seatIndex: Number(row.seat_index), ready: !!row.ready, controller: JSON.parse(String(row.controller_json)) as Controller,
     }));
   }
