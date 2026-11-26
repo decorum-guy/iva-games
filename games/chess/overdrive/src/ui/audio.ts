@@ -11,7 +11,7 @@ export interface OverdriveCue { readonly name: OverdriveCueName; readonly at: nu
 export interface OverdriveAudioOptions { readonly mute: boolean; readonly volume: number; readonly reducedMotion?: boolean }
 
 const CUE_GAIN: Record<OverdriveCueName, number> = {
-  ui: .5, move: .7, capture: .76, sweep: .8, raid: .78, battery: .8, ram: .8, rotation: .8, cover: .8,
+  ui: .5, move: .42, capture: .76, sweep: .8, raid: .78, battery: .8, ram: .8, rotation: .8, cover: .8,
   energy: .66, spend: .66, cellfull: .75, activate: .8, expire: .65, promotion: .8, check: .85, mate: .88, finish: .75, 'board-contact': .77, 'piece-contact': .59,
 }
 const CUE_PRIORITY: Record<OverdriveCueName, number> = {

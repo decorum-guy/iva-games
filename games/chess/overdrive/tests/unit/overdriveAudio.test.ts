@@ -126,6 +126,17 @@ function harness(fetcher?: typeof fetch) {
 }
 
 describe('Overdrive pre-rendered audio transport', () => {
+  it('uses the quieter move gain in play and auditions while preserving the capture level', async () => {
+    const h = harness()
+    await h.audio.unlock()
+    h.audio.playEvents([move])
+    h.audio.playCue('move')
+    h.audio.playCue('capture')
+    expect(h.context.sources.map(source => source.buffer?.name)).toEqual(['move', 'move', 'capture'])
+    expect(h.context.gains.slice(1).map(node => node.gain.value)).toEqual([.42, .42, .76])
+    h.audio.dispose()
+  })
+
   it('contacts belong to an audible visible 3D scene and are consumed once, including across mute and hiding', async () => {
     const h = harness()
     await h.audio.unlock()
