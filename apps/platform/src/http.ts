@@ -261,11 +261,11 @@ export function createPlatformHttpServer(service: PlatformService, options: Http
       } else if (route === '/blocks') result = mutate(['playerId'], () => { service.blockPlayer(actor, body.playerId); return { ok: true }; });
       else if ((groups = match(/^\/blocks\/([\w-]+)\/remove$/))) {
         const id = groups[1]; result = mutate([], () => { service.unblockPlayer(actor, id); return { ok: true }; });
-      } else if (route === '/rooms') result = mutate(['gameId', 'capacity', 'title'], () => ({ room: service.createRoom(actor, body) }));
+      } else if (route === '/rooms') result = mutate(['gameId', 'capacity', 'title', 'settings'], () => ({ room: service.createRoom(actor, body) }));
       else if ((groups = match(/^\/rooms\/([\w-]+)\/(ready|settings|transfer-host|leave|cancel|kick|bots|join|start|invitations|actions)$/))) {
         const [, id, action] = groups;
         if (action === 'ready') result = mutate(['ready', 'expectedRevision'], () => ({ room: service.setReady(actor, id, body) }));
-        else if (action === 'settings') result = mutate(['capacity', 'title', 'expectedRevision'], () => ({ room: service.changeSettings(actor, id, body) }));
+        else if (action === 'settings') result = mutate(['capacity', 'title', 'settings', 'expectedRevision'], () => ({ room: service.changeSettings(actor, id, body) }));
         else if (action === 'transfer-host') result = mutate(['playerId', 'expectedRevision'], () => ({ room: service.transferHost(actor, id, body) }));
         else if (action === 'leave') result = mutate([], () => ({ room: service.leaveRoom(actor, id) }));
         else if (action === 'cancel') result = mutate([], () => ({ room: service.cancelRoom(actor, id) }));

@@ -1,3 +1,5 @@
+export const DISTRICT_CONTENT_VERSION = 'district-maps@0.1' as const;
+
 /** Map data contains layout and presentation only. Rules remain in the versioned core. */
 export interface DistrictMap {
   $schema?: string;
@@ -19,7 +21,7 @@ function record(value: unknown): value is Record<string, unknown> {
 function localized(value: unknown, max: number): boolean {
   return record(value) && Object.keys(value).length === 2 && ['ru', 'en'].every(language =>
     typeof value[language] === 'string' && (value[language] as string).trim().length > 0 &&
-    (value[language] as string).length <= max && !/[\u0000-\u001f]/.test(value[language] as string));
+    (value[language] as string).length <= max && ![...(value[language] as string)].some(character => character.charCodeAt(0) < 32));
 }
 
 /** Returns human-readable authoring errors, never executes map-supplied code. */

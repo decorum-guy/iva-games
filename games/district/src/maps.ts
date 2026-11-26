@@ -2,7 +2,7 @@ import { validateDistrictMapCatalog } from './map-schema';
 export type { DistrictMap } from './map-schema';
 export { districtMapErrors, parseDistrictMap, validateDistrictMapCatalog } from './map-schema';
 
-export const DISTRICT_CONTENT_VERSION = 'district-maps@0.1' as const;
+export { DISTRICT_CONTENT_VERSION } from './map-schema';
 export const DEFAULT_DISTRICT_MAP_ID = 'crossroads';
 
 // Vite includes every JSON map in both the server and the client build. No hand-edited registry.

@@ -52,6 +52,8 @@ export interface GameRegistration {
   rulesVersion: string;
   contentVersion: string;
   status: 'available' | 'unavailable' | 'planned';
+  /** Validate and freeze game-owned room settings before players confirm readiness. */
+  normalizeSettings?: (input: unknown) => Record<string, unknown>;
   runtime?: GameRuntime;
 }
 export interface Room {
