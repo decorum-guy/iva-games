@@ -1345,6 +1345,9 @@ button {
 }
 .empty-state .button {
   margin-top: 22px;
+  max-width: 100%;
+  white-space: normal;
+  text-align: center;
 }
 .inline-empty {
   padding: 25px 5px;
@@ -3285,6 +3288,17 @@ button {
   }
 }
 @media (max-width: 320px) {
+  .page-heading {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .page-heading > div {
+    overflow-wrap: anywhere;
+  }
+  .page-heading > .button {
+    max-width: 100%;
+    align-self: flex-start;
+  }
   .modal {
     padding: 13px;
   }
