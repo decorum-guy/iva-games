@@ -1,0 +1,60 @@
+{
+  "source": "Original deterministic synthesis; no third-party recordings",
+  "generator": "scripts/generate-colossus-audio.py",
+  "sounds": {
+    "move": {
+      "file": "move.wav",
+      "bytes": 9644,
+      "sha256": "a5d884e5d3deac5eb157946ac9082237eb3916efab4f896067bd169adb1cc50d",
+      "seconds": 0.2
+    },
+    "stone": {
+      "file": "stone.wav",
+      "bytes": 16364,
+      "sha256": "5292da8bde779125c76ecaf2c52e4458e34be4b0310194db27038c8a205dce34",
+      "seconds": 0.34
+    },
+    "armour": {
+      "file": "armour.wav",
+      "bytes": 17324,
+      "sha256": "6c3171ecc5cf07e606c30c250f6b5e144c91aaaf20b67b55a10f1de98468b905",
+      "seconds": 0.36
+    },
+    "wound": {
+      "file": "wound.wav",
+      "bytes": 14444,
+      "sha256": "50ef80130395586bb13fe3f7af4cb5922469ced2fe41645d56b78adcc274cce0",
+      "seconds": 0.3
+    },
+    "shield": {
+      "file": "shield.wav",
+      "bytes": 20204,
+      "sha256": "b46083e403b47a16596ee778fb261a10a2ce77bca10430157772a9bdb26ea053",
+      "seconds": 0.42
+    },
+    "card": {
+      "file": "card.wav",
+      "bytes": 23084,
+      "sha256": "07cd6f03288a6c0003cc5cd5c646e1d6d625da84de4be305df76818502b4d4dc",
+      "seconds": 0.48
+    },
+    "fire": {
+      "file": "fire.wav",
+      "bytes": 31244,
+      "sha256": "8f52e609c6f3dfd34173634f7c6cd2436d5e2958868eed3f7c789b67516da09f",
+      "seconds": 0.65
+    },
+    "victory": {
+      "file": "victory.wav",
+      "bytes": 69644,
+      "sha256": "cf13317a96fa8ddf10fefa6cd948582cbd5a2e1b7a039ff21d496189e42263c0",
+      "seconds": 1.45
+    },
+    "defeat": {
+      "file": "defeat.wav",
+      "bytes": 52844,
+      "sha256": "59d77df4d75c583a83ed44e4252dd461a83b5bb2249e553fe8deccff79cb17a2",
+      "seconds": 1.1
+    }
+  }
+}
