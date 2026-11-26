@@ -1,5 +1,11 @@
 # Iva Games — latest project direction
 
+## Current request: server diagnostics from chat
+
+On 26 November 2026 the owner asked whether GitHub can give this chat access to the Iva Games VPS. Prepare a separate read-only `iva-ops` channel and an independent Actions snapshot workflow; preserve the existing deployment key and its fixed command. Do not turn it into an arbitrary SSH shell. See [chat server access](docs/iva-games/CHAT_SERVER_ACCESS.md). Host helper installation requires the existing local administrator once; repository code and passing tests alone are not proof of installed or working access. Do not claim a fresh VPS state from historical deployment logs.
+
+The current continuation prompt is [public acceptance](prompts/ACCEPT_PUBLIC_IVA_GAMES.md). Continue from actual live state and current `main`, preserving Telegram-only accounts and accepted games. The original VPS bootstrap prompt is historical. Keep Colossus and Gemini/AGY work separate. Publish completed milestones without force-push, and distinguish source checks, Actions permission checks and an actual server snapshot.
+
 ## Current accounts and deployment direction
 
 The owner requested Telegram-only production accounts on 26 November 2026. The portal and bot share profiles, avatars, friends and incoming decisions. New friend requests and player search stay on the portal. The owner enters the dedicated BotFather token on the Mac. See [Telegram accounts](docs/iva-games/TELEGRAM_ACCOUNTS.md). This supersedes the earlier initial-release exclusion of Telegram and mandatory SMTP; preserve the existing local demonstrations and the independent legacy invitation integration. Keep the DNS gate and distinguish CI, staged images, first HTTPS activation and real bot delivery.
