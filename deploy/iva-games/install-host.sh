@@ -33,7 +33,7 @@ install -m 644 "$source"/iva-games-activate.{service,timer} /etc/systemd/system/
 install -m 600 "$source/platform.env.example" "$config/platform.env"
 sed -e 's@^CHESS_IMAGE=$@CHESS_IMAGE=iva-games-unset:chess@' \
     -e 's@^PLATFORM_IMAGE=$@PLATFORM_IMAGE=iva-games-unset:platform@' \
-    -e "s@^CADDY_IMAGE=\$@CADDY_IMAGE=$caddy@" "$source/release.env.example" > "$config/release.env"
+    -e "s|^CADDY_IMAGE=\$|CADDY_IMAGE=$caddy|" "$source/release.env.example" > "$config/release.env"
 printf '{"ipv4":"%s","initial_sha":null}\n' "$ipv4" > "$config/activation.json"
 
 for name in chess-data platform-data caddy-data caddy-config; do
