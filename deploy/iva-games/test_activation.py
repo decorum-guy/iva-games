@@ -1,3 +1,4 @@
+import json
 import pathlib
 import tempfile
 import unittest
@@ -65,6 +66,33 @@ iva-games.pro. 60 IN A 78.137.109.13"""
             activation.activate()
             self.assertEqual(activation.load(activation.STATE / 'state.json')['status'], 'WAITING_DNS')
             compose.assert_not_called()
+
+    def test_registry_metadata_skips_downloading_unchanged_images(self):
+        old = {'sha': 'old', 'inputs': 'a' * 64, 'image': 'retained-chess-digest'}
+        version = 'b' * 40
+        digests = ['sha256:' + 'a' * 64, 'sha256:' + 'b' * 64]
+        pulled = []
+        def command(*args, **_options):
+            if args[1] == 'buildx':
+                chess = 'chess' in args[-1]
+                if args[-2] == '{{json .Manifest}}':
+                    return json.dumps({'digest': digests[0 if chess else 1]})
+                return json.dumps({'config': {'Labels': {
+                    'org.opencontainers.image.revision': version,
+                    'org.opencontainers.image.source': 'https://github.com/decorum-guy/iva-games',
+                    'org.iva-games.inputs': ('a' if chess else 'c') * 64,
+                    'org.iva-games.compatibility': 'f' * 64,
+                }}})
+            if args[1] == 'pull':
+                pulled.append(args[2])
+            return ''
+        temporary = tempfile.TemporaryDirectory
+        with patch.object(activation, 'command', side_effect=command), patch.object(
+            activation.tempfile, 'TemporaryDirectory', side_effect=lambda **_: temporary(),
+        ):
+            release = activation.pull_release(version, digests, 'fixture_token', {'services': {'chess': old}})
+        self.assertEqual(release['services']['chess'], old)
+        self.assertEqual(pulled, [release['services']['platform']['image']])
 
     def test_waiting_tls_and_active_dont_restart_caddy(self):
         with tempfile.TemporaryDirectory() as work, patch.object(activation, 'STATE', pathlib.Path(work)), (
