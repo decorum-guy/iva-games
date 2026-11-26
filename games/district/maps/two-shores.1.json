@@ -1,0 +1,56 @@
+{
+  "$schema": "../map-islands.schema.json",
+  "schemaVersion": 2,
+  "profile": "district@0.3",
+  "theme": "adriatic",
+  "id": "two-shores",
+  "version": "1",
+  "name": {
+    "ru": "Два берега",
+    "en": "Two Shores"
+  },
+  "description": {
+    "ru": "Узкий пролив между большим портовым берегом и жилым мысом. Торги открыты на обоих берегах.",
+    "en": "A strait divides the harbor district from a residential peninsula. You can bid on either shore."
+  },
+  "supportedPlayers": [
+    2,
+    3,
+    4
+  ],
+  "landmasses": 2,
+  "cells": [
+    {"id": "A1", "q": -3, "r": -2, "kind": "park"},
+    {"id": "A2", "q": -2, "r": -2, "kind": "lot"},
+    {"id": "A3", "q": -4, "r": -1, "kind": "lot"},
+    {"id": "A4", "q": -3, "r": -1, "kind": "lot"},
+    {"id": "A5", "q": -2, "r": -1, "kind": "neutral-house"},
+    {"id": "B1", "q": -4, "r": 0, "kind": "square"},
+    {"id": "B2", "q": -3, "r": 0, "kind": "lot"},
+    {"id": "B3", "q": -2, "r": 0, "kind": "lot"},
+    {"id": "B4", "q": -4, "r": 1, "kind": "lot"},
+    {"id": "B5", "q": -3, "r": 1, "kind": "park"},
+    {"id": "B6", "q": -2, "r": 1, "kind": "lot"},
+    {"id": "C1", "q": -4, "r": 2, "kind": "neutral-house"},
+    {"id": "C2", "q": -3, "r": 2, "kind": "lot"},
+    {"id": "C3", "q": -2, "r": 2, "kind": "lot"},
+    {"id": "C4", "q": -5, "r": 3, "kind": "lot"},
+    {"id": "D1", "q": 1, "r": -2, "kind": "lot"},
+    {"id": "D2", "q": 2, "r": -2, "kind": "lot"},
+    {"id": "D3", "q": 1, "r": -1, "kind": "neutral-house"},
+    {"id": "D4", "q": 2, "r": -1, "kind": "lot"},
+    {"id": "D5", "q": 0, "r": 0, "kind": "lot"},
+    {"id": "D6", "q": 1, "r": 0, "kind": "lot"},
+    {"id": "D7", "q": 2, "r": 0, "kind": "park"},
+    {"id": "E1", "q": 0, "r": 1, "kind": "park"},
+    {"id": "E2", "q": 1, "r": 1, "kind": "neutral-house"},
+    {"id": "E3", "q": 0, "r": 2, "kind": "lot"}
+  ],
+  "zones": [
+    {"id": "shipyard", "name": {"ru": "Верфи", "en": "Shipyards"}, "cells": ["A1", "A2", "A3", "A4", "A5"]},
+    {"id": "canal", "name": {"ru": "Канал", "en": "Canal"}, "cells": ["B1", "B2", "B3", "B4", "B5", "B6"]},
+    {"id": "headland", "name": {"ru": "Западный мыс", "en": "West Cape"}, "cells": ["C1", "C2", "C3", "C4"]},
+    {"id": "east-market", "name": {"ru": "Рынок", "en": "Market"}, "cells": ["D1", "D2", "D3", "D4", "D5", "D6", "D7"]},
+    {"id": "gardens", "name": {"ru": "Сады над проливом", "en": "Strait Gardens"}, "cells": ["E1", "E2", "E3"]}
+  ]
+}
