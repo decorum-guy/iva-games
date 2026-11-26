@@ -1,0 +1,3 @@
+# Empty quoted arguments mean *no arguments*, not arbitrary arguments.
+Defaults:iva-ops env_reset,secure_path="/usr/sbin:/usr/bin:/sbin:/bin"
+iva-ops ALL=(root) NOPASSWD: /opt/iva-games/ops/ops-status.py ""

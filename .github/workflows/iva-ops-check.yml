@@ -1,0 +1,31 @@
+name: Iva Games server access checks
+
+on:
+  pull_request:
+    paths:
+      - deploy/iva-games/ops-status
+      - deploy/iva-games/ops-status.py
+      - deploy/iva-games/install-ops.sh
+      - deploy/iva-games/iva-ops.sudoers
+      - deploy/iva-games/test_ops_status.py
+      - .github/workflows/iva-ops-check.yml
+      - .github/workflows/iva-server-status.yml
+
+permissions:
+  contents: read
+
+# Isolated, secret-free job. It can be rerun to test Actions permissions
+# without contacting production or starting a dependent deployment.
+jobs:
+  check:
+    name: Check diagnostics boundary
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Check shell entry points
+        run: bash -n deploy/iva-games/ops-status deploy/iva-games/install-ops.sh
+      - name: Test the read-only snapshot and sanitizer
+        run: python3 -B deploy/iva-games/test_ops_status.py
