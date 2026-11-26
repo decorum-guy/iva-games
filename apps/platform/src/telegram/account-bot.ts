@@ -4,13 +4,14 @@ import type { AvatarStyle, PublicPlayer } from '../types.js';
 
 const PAGE = 12;
 const COMMAND = /^\/(start|profile|friends|requests|name)(?:_(\d{1,5}))?(?:@([A-Za-z0-9_]+))?(?: (.*))?$/;
-type Button = { text: string; callback_data: string } | { text: string; url: string };
+type KeyboardButton = { text: string; style?: 'primary' | 'success' | 'danger' };
+type InlineKeyboardButton = KeyboardButton & ({ callback_data: string } | { url: string });
 type Language = (ru: string, en: string) => string;
 export type BotReply =
   | { ok: true }
   | { method: 'answerCallbackQuery'; callback_query_id: string; text: string }
   | { method: 'sendMessage'; chat_id: string; text: string; protect_content?: true;
-      reply_markup?: { inline_keyboard: Button[][] } | { keyboard: { text: string }[][]; resize_keyboard: true } };
+      reply_markup?: { inline_keyboard: InlineKeyboardButton[][] } | { keyboard: KeyboardButton[][]; resize_keyboard: true } };
 
 const label = (player: PublicPlayer): string =>
   `${player.avatar ? AVATARS[player.avatar] + ' ' : ''}${player.displayName} (@${player.handle})`;
@@ -33,15 +34,15 @@ export class TelegramAccountBot {
     if (!match || (match[3] && match[3].toLowerCase() !== this.botUsername.toLowerCase())) return { ok: true };
     const cmd = match[1];
     const playerId = this.playerId(telegramId);
-    const send = (text: string, buttons?: Button[][]): BotReply => ({
+    const send = (text: string, buttons?: InlineKeyboardButton[][]): BotReply => ({
       method: 'sendMessage', chat_id: telegramId, text,
       ...(buttons?.length ? { reply_markup: { inline_keyboard: buttons } } : {}),
     });
     if (!playerId) return send(t('Откройте Iva Games и выберите вход через Telegram.', 'Open Iva Games and choose Telegram sign-in.'),
-      [[{ text: 'Iva Games', url: `${this.platform.publicOrigin}/login` }]]);
+      [[{ text: 'Iva Games', url: `${this.platform.publicOrigin}/login`, style: 'primary' }]]);
     if (cmd === 'start') return { method: 'sendMessage', chat_id: telegramId,
       text: t('Что хотите открыть?', 'What would you like to open?'),
-      reply_markup: { keyboard: [[{ text: '/profile' }, { text: '/friends' }, { text: '/requests' }]], resize_keyboard: true } };
+      reply_markup: { keyboard: [[{ text: '/profile' }, { text: '/friends' }, { text: '/requests', style: 'primary' }]], resize_keyboard: true } };
     if (cmd === 'name') {
       if (!match[4]?.trim()) return send(t('Имя можно сменить командой /name Ваше имя', 'To change your name, use /name Your name'));
       try {
@@ -57,7 +58,7 @@ export class TelegramAccountBot {
       return send(`${label(player)}\n${t('Выберите аватар. Чтобы изменить имя, введите /name и новое имя.', 'Choose an avatar. To change your name, enter /name and your new name.')}`,
         [
           (Object.keys(AVATARS) as AvatarStyle[]).map(avatar => ({ text: AVATARS[avatar], callback_data: `avatar:${avatar}` })),
-          [{ text: t('Инициалы', 'Initials'), callback_data: 'avatar:initials' }, { text: t('Профиль на сайте', 'Profile on the website'), url: `${this.platform.publicOrigin}/profile` }],
+          [{ text: t('Инициалы', 'Initials'), callback_data: 'avatar:initials' }, { text: t('Профиль на сайте', 'Profile on the website'), url: `${this.platform.publicOrigin}/profile`, style: 'primary' }],
         ]);
     }
     const { friends, incoming } = this.platform.social(playerId);
@@ -66,14 +67,14 @@ export class TelegramAccountBot {
     const page = Math.max(1, Math.min(Number(match[2] ?? 1), Math.ceil(total / PAGE)));
     const start = (page - 1) * PAGE;
     if (total === 0) return send(isFriends ? t('Список друзей пока пуст.', 'Your friends list is empty.') : t('Входящих заявок пока нет.', 'You have no incoming requests.'),
-      [[{ text: t('Друзья на сайте', 'Friends on the website'), url: `${this.platform.publicOrigin}/friends` }]]);
+      [[{ text: t('Друзья на сайте', 'Friends on the website'), url: `${this.platform.publicOrigin}/friends`, style: 'primary' }]]);
     const rows = incoming.slice(start, start + PAGE);
     const list = isFriends ? friends.slice(start, start + PAGE).map(label) : rows.map(row => label(row.player));
     const title = isFriends ? t('Друзья', 'Friends') : t('Входящие заявки', 'Incoming requests');
     const next = start + PAGE < total ? `\n\n${t('Следующая страница', 'Next page')}: /${cmd}_${page + 1}` : '';
-    const buttons = isFriends ? [] : rows.map(row => [
-      { text: t(`Принять @${row.player.handle}`, `Accept @${row.player.handle}`), callback_data: `fr:a:${row.requestId}` },
-      { text: t('Отклонить', 'Decline'), callback_data: `fr:d:${row.requestId}` },
+    const buttons: InlineKeyboardButton[][] = isFriends ? [] : rows.map(row => [
+      { text: t(`Принять @${row.player.handle}`, `Accept @${row.player.handle}`), callback_data: `fr:a:${row.requestId}`, style: 'success' },
+      { text: t('Отклонить', 'Decline'), callback_data: `fr:d:${row.requestId}`, style: 'danger' },
     ]);
     return send(`${title} (${total})\n\n${list.join('\n')}${next}`, buttons);
   }
