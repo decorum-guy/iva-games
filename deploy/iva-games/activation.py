@@ -290,7 +290,7 @@ def verify_main(sha):
         raise RuntimeError('Successful main CI was not found')
 
 
-def pull_release(sha, digests, token):
+def pull_release(sha, digests, token, previous):
     images = {}
     with tempfile.TemporaryDirectory(prefix='iva-registry-', dir='/run') as directory:
         env = {**os.environ, 'DOCKER_CONFIG': directory}
@@ -304,8 +304,9 @@ def pull_release(sha, digests, token):
                                '{{json .Manifest}}', tag, env=env)
             if json.loads(reported)['digest'] != digest:
                 raise RuntimeError('Registry digest does not match the commit tag')
-            command('docker', 'pull', image, env=env, timeout=180)
-            fields = json.loads(command('docker', 'image', 'inspect', image, '--format', '{{json .Config.Labels}}'))
+            metadata = json.loads(command('docker', 'buildx', 'imagetools', 'inspect', '--format',
+                                          '{{json .Image}}', image, env=env))
+            fields = (metadata.get('config') or metadata.get('linux/amd64', {}).get('config', {})).get('Labels', {})
             if fields.get('org.opencontainers.image.revision') != sha or (
                 fields.get('org.opencontainers.image.source') != f'https://github.com/{REPOSITORY}'
             ):
@@ -314,22 +315,24 @@ def pull_release(sha, digests, token):
             compatibility = fields['org.iva-games.compatibility']
             if not re.fullmatch('[0-9a-f]{64}', fingerprint) or not re.fullmatch('[0-9a-f]{64}', compatibility):
                 raise RuntimeError('Missing build input or compatibility fingerprint')
+            existing = previous.get('services', {}).get(service)
+            if existing and existing['inputs'] == fingerprint:
+                try:
+                    command('docker', 'image', 'inspect', existing['image'], '--format', '{{.Id}}')
+                except RuntimeError:
+                    pass  # Redownload by the new digest if the old image was pruned.
+                else:
+                    images[service] = existing
+                    continue
+            command('docker', 'pull', image, env=env, timeout=180)
             images[service] = {'image': image, 'sha': sha, 'inputs': fingerprint, 'compatibility': compatibility}
     return {'sha': sha, 'services': images}
 
 
-def keep_unchanged_images(candidate, previous):
-    sources = previous.get('services', {})
-    unchanged = [name for name in SERVICES if name in sources
-                 and candidate['services'][name]['inputs'] == sources[name]['inputs']]
-    for name in unchanged:
-        candidate['services'][name] = sources[name]
-    return [name for name in SERVICES if name not in unchanged]
-
-
 def promote(candidate, previous):
     path = CONFIG / 'pins.json'
-    changed = keep_unchanged_images(candidate, previous)
+    changed = [name for name in SERVICES
+               if candidate['services'][name]['image'] != previous['services'][name]['image']]
     # Capture both databases for each changed service before replacing anything.
     stamp = time.strftime('%Y%m%dT%H%M%SZ', time.gmtime())
     for service in changed:
@@ -382,11 +385,10 @@ def deploy():
         print('UNCHANGED release already current')
         return
     verify_main(sha)
-    candidate = pull_release(sha, digests, token)
+    candidate = pull_release(sha, digests, token, pins)
     compose(candidate, 'config', '--quiet')
     verify_main(sha)
     if not active:
-        keep_unchanged_images(candidate, pins)
         save(CONFIG / 'pins.json', candidate)
         print(f'STAGED {sha}')
     else:
