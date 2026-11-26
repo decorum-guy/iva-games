@@ -14,6 +14,7 @@ services:
       HOST: 0.0.0.0
       PORT: "4173"
       PUBLIC_ORIGIN: https://chess.iva-games.pro
+      TRUSTED_PROXY_IPS: ${CADDY_PROXY_IP:-172.30.239.2}
       DATABASE_PATH: /data/remorse.sqlite
       OVERDRIVE_DATABASE_PATH: /data/overdrive.sqlite
       STATIC_DIR: /app/dist
@@ -42,6 +43,7 @@ services:
       PLATFORM_HOST: 0.0.0.0
       PLATFORM_PORT: "4310"
       PORTAL_ORIGIN: https://iva-games.pro
+      TRUSTED_PROXY_IPS: ${CADDY_PROXY_IP:-172.30.239.2}
       PLATFORM_ALLOWED_ORIGINS: https://iva-games.pro
       PLATFORM_ALLOWED_HOSTS: iva-games.pro,127.0.0.1:4310,localhost:4310
       PLATFORM_DATABASE_PATH: /data/platform.sqlite
@@ -55,6 +57,9 @@ services:
   caddy:
     image: ${CADDY_IMAGE:?Set a reviewed Caddy image digest in release.env}
     restart: unless-stopped
+    networks:
+      default:
+        ipv4_address: ${CADDY_PROXY_IP:-172.30.239.2}
     ports:
       - "80:80"
       - "443:443"
@@ -64,6 +69,16 @@ services:
       - caddy-data:/data
       - caddy-config:/config
     logging: *bounded-logs
+
+# Caddy's exact socket address is the sole trusted header source. Choose a subnet
+# that does not overlap existing Docker/VPN networks; keep upstream ports private.
+networks:
+  default:
+    ipam:
+      config:
+        - subnet: ${IVA_NETWORK_SUBNET:-172.30.239.0/24}
+          # Automatic service addresses cannot consume Caddy's reserved static IP.
+          ip_range: ${IVA_NETWORK_DYNAMIC_RANGE:-172.30.239.128/25}
 
 # Explicit external volumes make a typo fail instead of creating an empty DB.
 # Create these once; application updates do not recreate or delete them.

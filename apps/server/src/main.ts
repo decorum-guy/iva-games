@@ -1,4 +1,5 @@
 import { resolve } from 'node:path'
+import { parseTrustedProxyIps } from '@iva-games/session-kit/http'
 import { createOnlineServer } from './http'
 
 function positive(value: string | undefined, fallback: number) {
@@ -14,6 +15,7 @@ const app = createOnlineServer({
   overdriveDatabasePath: process.env.OVERDRIVE_DATABASE_PATH ? resolve(process.env.OVERDRIVE_DATABASE_PATH) : undefined,
   staticDir: resolve(process.env.STATIC_DIR ?? 'dist'),
   publicOrigin,
+  trustedProxyIps: parseTrustedProxyIps(process.env.TRUSTED_PROXY_IPS),
   allowedOrigins: process.env.DEV_ORIGINS?.split(',').map(value => value.trim()).filter(Boolean),
   inactiveMs: positive(process.env.ROOM_INACTIVE_MS, 86_400_000),
   finishedMs: positive(process.env.FINISHED_ROOM_MS, 7 * 86_400_000),

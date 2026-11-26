@@ -17,6 +17,7 @@ interface GatewayOptions extends RoomOptions {
   databasePath: string
   secureCookies: boolean
   validOrigin(request: IncomingMessage): boolean
+  clientAddress(request: IncomingMessage): string
   heartbeatMs?: number
 }
 
@@ -82,7 +83,7 @@ export function createOverdriveGateway(options: GatewayOptions) {
     if (pathname !== '/api/overdrive' && !pathname.startsWith('/api/overdrive/')) return false
     try {
       if (closing) throw new OnlineError('serverError', 503)
-      if (!limits.allow('http/' + (request.socket.remoteAddress ?? 'unknown'), 180)) throw new OnlineError('rateLimited', 429)
+      if (!limits.allow('http/' + options.clientAddress(request), 180)) throw new OnlineError('rateLimited', 429)
       if (pathname === '/api/overdrive/health' && request.method === 'GET') {
         store.health()
         json(response, 200, { ok: true, protocol: ONLINE_PROTOCOL, rulesVersion: RULES_VERSION })
@@ -125,7 +126,7 @@ export function createOverdriveGateway(options: GatewayOptions) {
   function upgrade(request: IncomingMessage, socket: Duplex, head: Buffer) {
     try {
       if (closing || !options.validOrigin(request)) throw new OnlineError('notYourSeat', 403)
-      if (sockets.clients.size >= 1000 || !limits.allow('upgrade/' + request.socket.remoteAddress, 60)) throw new OnlineError('rateLimited', 429)
+      if (sockets.clients.size >= 1000 || !limits.allow('upgrade/' + options.clientAddress(request), 60)) throw new OnlineError('rateLimited', 429)
       const identity = guest(request)
       sockets.handleUpgrade(request, socket, head, ws => {
         identities.set(ws, identity)

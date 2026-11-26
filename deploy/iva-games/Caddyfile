@@ -2,10 +2,15 @@
 # No path rewriting: the applications retain their existing API and asset URLs.
 iva-games.pro {
 	encode zstd gzip
-	reverse_proxy platform:4310
+	reverse_proxy platform:4310 {
+		# Overwrite even a supplied header; only the TCP peer is authoritative.
+		header_up X-Iva-Client-IP {remote_host}
+	}
 }
 
 chess.iva-games.pro {
 	encode zstd gzip
-	reverse_proxy chess:4173
+	reverse_proxy chess:4173 {
+		header_up X-Iva-Client-IP {remote_host}
+	}
 }

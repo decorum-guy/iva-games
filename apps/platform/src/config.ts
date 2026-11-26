@@ -1,4 +1,5 @@
 import { resolve } from 'node:path';
+import { parseTrustedProxyIps } from '@iva-games/session-kit/http';
 import { createFileMailbox, createSmtpMailbox } from './mail.js';
 import type { MailTransport } from './types.js';
 
@@ -16,6 +17,7 @@ export interface PlatformConfig {
   publicOrigin: string;
   allowedOrigins: string[];
   allowedHosts: string[];
+  trustedProxyIps: string[];
   databasePath: string;
   runtimeDatabasePath: string;
   serveDirectory: string | undefined;
@@ -80,6 +82,7 @@ export function loadPlatformConfig(env: NodeJS.ProcessEnv = process.env): Platfo
   }
   return {
     production, host, port: configuredPort, publicOrigin, allowedOrigins, allowedHosts,
+    trustedProxyIps: parseTrustedProxyIps(env.TRUSTED_PROXY_IPS),
     databasePath: resolve(env.PLATFORM_DATABASE_PATH ?? '.runtime/platform.sqlite'),
     runtimeDatabasePath: resolve(env.PLATFORM_LAB_DATABASE_PATH ?? '.runtime/platform-lab.sqlite'),
     serveDirectory: env.PORTAL_DIST_DIRECTORY ? resolve(env.PORTAL_DIST_DIRECTORY) : undefined,
