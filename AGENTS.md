@@ -1,5 +1,13 @@
 # Iva Games — latest project direction
 
+## Current task: COLOSSUS implementation
+
+On 26 November 2026 the owner explicitly requested code implementation of the complete COLOSSUS proposal. The game must have attractive cards whose whole background clearly expresses rarity, and exactly three memorable special cards per boss, drawn less often than player cards. Read `docs/chess-2/COLOSSUS_RULES.md`, `docs/colossus/CARDS_AND_PRESENTATION.md`, and `docs/colossus/BUILD_STATUS.md` before continuing this task. The latter records actual completed checks; design arithmetic is not evidence of full-game balance.
+
+Implement in `games/chess/colossus` on temporary branch `feat/colossus-v1`, based on the actual integrated platform/OVERDRIVE source `8d8556d`. Preserve accepted work in the other games and the existing platform. Independent original models, audio, card artwork, pure rules, real cooperative transport, RU/EN, 3D and 2D, teaching, persistence, modes and meaningful verification belong to this implementation. Keep future deck contents and seeds off network player views. Publish completed milestones without force-push; no merge, DNS change or production activation follows from this request.
+
+COLOSSUS is first and WILDCARD/Joker second in the selected future-game queue. REMORSE is complete by the owner's report. ORBIT remains a table-card effect in Joker, including its circular-board transformation; standalone ORBIT and BASALT stay removed. Historical instructions below do not restart old tasks or change this scope.
+
 ## Current priority: local OVERDRIVE finale and audio polish
 
 On 26 November 2026 the owner deferred VPS purchase/public deployment and requested local polish before release. Follow `prompts/POLISH_OVERDRIVE_FINALE_AND_AUDIO.md`: an auditor delegates implementation to GPT-6.2 Astra at Extra High, then independently accepts it. A checkmated king should fall intact with convincing weight; pieces it actually touches should wobble and stay standing. Review and improve OVERDRIVE check, checkmate and capture sounds; use one shared attractive sound for every promotion, and coordinate soft physical contact sounds with the fall. This is authorization for those OVERDRIVE audio changes, not for replacing REMORSE's selected sound bank. Preserve accepted rules and energy balance. This paragraph and the prompt record the requested work, not completed implementation or acceptance. Public deployment is a later task.
