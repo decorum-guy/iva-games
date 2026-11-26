@@ -13,6 +13,7 @@ if (process.env.NODE_ENV === 'production' && !publicOrigin) throw new Error('PUB
 const app = createOnlineServer({
   databasePath: resolve(process.env.DATABASE_PATH ?? 'data/remorse.sqlite'),
   overdriveDatabasePath: process.env.OVERDRIVE_DATABASE_PATH ? resolve(process.env.OVERDRIVE_DATABASE_PATH) : undefined,
+  colossusDatabasePath: process.env.COLOSSUS_DATABASE_PATH ? resolve(process.env.COLOSSUS_DATABASE_PATH) : undefined,
   staticDir: resolve(process.env.STATIC_DIR ?? 'dist'),
   publicOrigin,
   trustedProxyIps: parseTrustedProxyIps(process.env.TRUSTED_PROXY_IPS),
@@ -21,7 +22,7 @@ const app = createOnlineServer({
   finishedMs: positive(process.env.FINISHED_ROOM_MS, 7 * 86_400_000),
 })
 const address = await app.listen(positive(process.env.PORT, 4173), process.env.HOST ?? '0.0.0.0')
-console.log('REMORSE HTTP/WebSocket listening on ' + address.host + ':' + address.port)
+console.log('Iva Games chess HTTP/WebSocket listening on ' + address.host + ':' + address.port)
 for (const signal of ['SIGINT', 'SIGTERM'] as const) process.once(signal, () => {
   void app.close().then(() => process.exit(0), () => process.exit(1))
 })

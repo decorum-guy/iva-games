@@ -57,13 +57,15 @@ docker cp "$container_id:/data/." "$destination/data/"
 docker run --rm --interactive --network none --user 0:0 \
   --mount "type=bind,src=$destination/data,dst=/backup,readonly" \
   --entrypoint node "$image_id" --input-type=module - "$service" <<'NODE'
-import { cpSync, mkdtempSync } from 'node:fs';
+import { cpSync, existsSync, mkdtempSync } from 'node:fs';
 import Database from 'better-sqlite3';
 const directory = mkdtempSync('/tmp/iva-backup-check-');
 cpSync('/backup', directory, { recursive: true });
 const names = process.argv[2] === 'chess'
   ? ['remorse.sqlite', 'overdrive.sqlite']
   : ['platform.sqlite', 'platform-lab.sqlite'];
+// Keep older two-game images backup-compatible; copy/verify Colossus when present.
+if (process.argv[2] === 'chess' && existsSync(`${directory}/colossus.sqlite`)) names.push('colossus.sqlite');
 for (const name of names) {
   const database = new Database(`${directory}/${name}`, { fileMustExist: true });
   try {
@@ -71,7 +73,7 @@ for (const name of names) {
     if (rows.length !== 1 || rows[0].quick_check !== 'ok') throw new Error(`Invalid SQLite backup: ${name}`);
   } finally { database.close(); }
 }
-console.log('Both SQLite databases passed quick_check.');
+console.log(`${names.length} SQLite databases passed quick_check.`);
 NODE
 
 rm "$destination/INCOMPLETE"

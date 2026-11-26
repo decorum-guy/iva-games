@@ -14,6 +14,7 @@ import type { RoomOptions } from './rooms'
 import { RoomStore } from './store'
 import { clientMessage, createRequest, emptyRequest, identifier, joinRequest, OnlineError } from './validation'
 import { createOverdriveGateway } from './overdrive/http'
+import { createColossusGateway } from './colossus/http'
 
 const MAX_BODY = 16_384
 const COOKIE = 'remorse_guest'
@@ -27,6 +28,8 @@ export interface OnlineServerOptions extends RoomOptions {
   trustedProxyIps?: readonly string[]
   heartbeatMs?: number
   overdriveDatabasePath?: string
+  colossusDatabasePath?: string
+  colossusPresenceTimeoutMs?: number
 }
 
 class RateLimit {
@@ -106,6 +109,11 @@ export function createOnlineServer(options: OnlineServerOptions) {
     secureCookies: secure, validOrigin, clientAddress, heartbeatMs: options.heartbeatMs,
     now: options.now, inactiveMs: options.inactiveMs, finishedMs: options.finishedMs,
   })
+  const colossus = createColossusGateway({
+    databasePath: options.colossusDatabasePath ?? (options.databasePath === ':memory:' ? ':memory:' : options.databasePath + '.colossus.sqlite'),
+    secureCookies: secure, validOrigin, clientAddress, now: options.now, inactiveMs: options.inactiveMs, finishedMs: options.finishedMs,
+    presenceTimeoutMs: options.colossusPresenceTimeoutMs,
+  })
 
   const server = createServer(async (request, response) => {
     response.setHeader('X-Content-Type-Options', 'nosniff')
@@ -115,6 +123,7 @@ export function createOnlineServer(options: OnlineServerOptions) {
       if (closing) throw new OnlineError('serverError', 503)
       const pathname = new URL(request.url ?? '/', 'http://localhost').pathname
       if (await overdrive.handle(request, response, pathname)) return
+      if (await colossus.handle(request, response, pathname)) return
       if (pathname === '/api/health' && request.method === 'GET') {
         store.health()
         json(response, 200, { ok: true, protocol: ONLINE_PROTOCOL, rulesVersion: RULES_VERSION })
@@ -166,13 +175,14 @@ export function createOnlineServer(options: OnlineServerOptions) {
       if (file !== root && !file.startsWith(root + sep)) throw new OnlineError('notYourSeat', 403)
       let info = await stat(file).catch(() => null)
       if (!info?.isFile()) {
-        if (extname(decoded) || decoded.startsWith('/assets/')) { json(response, 404, { error: 'roomMissing' }); return }
+        if (extname(decoded) || decoded.startsWith('/assets/') || decoded.startsWith('/colossus/assets/')) { json(response, 404, { error: 'roomMissing' }); return }
         const overdriveRoute = decoded === '/overdrive' || decoded.startsWith('/overdrive/')
-        file = resolve(root, overdriveRoute ? 'overdrive/index.html' : 'index.html')
+        const colossusRoute = decoded === '/colossus' || decoded.startsWith('/colossus/')
+        file = resolve(root, colossusRoute ? 'colossus/index.html' : overdriveRoute ? 'overdrive/index.html' : 'index.html')
         info = await stat(file).catch(() => null)
         // A separately built game has its entry at the static root. The combined
-        // build retains the dedicated /overdrive/ entry, which takes precedence.
-        if (overdriveRoute && !info?.isFile()) {
+        // build retains the dedicated game entries, which take precedence.
+        if ((overdriveRoute || colossusRoute) && !info?.isFile()) {
           file = resolve(root, 'index.html')
           info = await stat(file).catch(() => null)
         }
@@ -276,7 +286,7 @@ export function createOnlineServer(options: OnlineServerOptions) {
   cleanup.unref()
 
   return {
-    server, service, store, overdrive,
+    server, service, store, overdrive, colossus,
     async listen(port = 4173, host = '127.0.0.1') {
       await new Promise<void>((resolveListen, reject) => {
         server.once('error', reject)
@@ -294,6 +304,7 @@ export function createOnlineServer(options: OnlineServerOptions) {
       for (const ws of sockets.clients) ws.terminate()
       await new Promise<void>(resolveClose => sockets.close(() => resolveClose()))
       await overdrive.close()
+      await colossus.close()
       if (server.listening) await new Promise<void>((resolveClose, reject) => server.close(error => error ? reject(error) : resolveClose()))
       service.close()
     },

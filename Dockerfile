@@ -4,6 +4,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends python3 make g+
 COPY package.json package-lock.json ./
 COPY games/chess/remorse/package.json ./games/chess/remorse/package.json
 COPY games/chess/overdrive/package.json ./games/chess/overdrive/package.json
+COPY games/chess/colossus/package.json ./games/chess/colossus/package.json
 COPY packages/engine-sdk/package.json ./packages/engine-sdk/package.json
 COPY apps/server/package.json ./apps/server/package.json
 COPY apps/platform/package.json ./apps/platform/package.json
@@ -27,5 +28,5 @@ COPY apps/server/scripts/backup.mjs ./apps/server/scripts/backup.mjs
 RUN mkdir -p /data && chown node:node /data
 USER node
 EXPOSE 4173
-HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 CMD node -e "Promise.all(['/api/health','/api/overdrive/health'].map(p=>fetch('http://127.0.0.1:4173'+p,{signal:AbortSignal.timeout(3000)}))).then(rs=>{if(rs.some(r=>!r.ok))process.exit(1)}).catch(()=>process.exit(1))"
+HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 CMD node -e "Promise.all(['/api/health','/api/overdrive/health','/api/colossus/health'].map(p=>fetch('http://127.0.0.1:4173'+p,{signal:AbortSignal.timeout(3000)}))).then(rs=>{if(rs.some(r=>!r.ok))process.exit(1)}).catch(()=>process.exit(1))"
 CMD ["node", "dist-server/main.js"]

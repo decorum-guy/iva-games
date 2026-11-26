@@ -15,6 +15,7 @@
     "@chess-2/remorse": "1.0.0",
     "@chess-2/overdrive": "1.0.0",
     "better-sqlite3": "13.2.0",
-    "ws": "8.23.0"
+    "ws": "8.23.0",
+    "@chess-2/colossus": "1.0.0"
   }
 }
