@@ -1,4 +1,7 @@
 import { AVATARS } from "./types";
+import { DISTRICT_MAPS } from "@iva-games/district";
+import { DistrictPanel } from "./District";
+import { DistrictMapSelect, DistrictLobbyMap } from "./DistrictMap";
 import type { AvatarStyle } from "./types";
 import { friendRequestFeedback } from "./socialFeedback";
 import { Catalogue } from "./Catalogue";
@@ -236,6 +239,22 @@ const errorCopy: Record<string, [string, string]> = {
     "You have already picked a number.",
   ],
   MATCH_FINISHED: ["Партия уже завершена.", "The game has finished."],
+  STALE_PHASE: ["Этап уже сменился. Выберите действие снова.", "The phase has changed. Choose another action."],
+  INSUFFICIENT_RESOURCES: ["Не хватает свободных ресурсов.", "Not enough available resources."],
+  ASSET_UNAVAILABLE: ["Это имущество уже обещано в другом предложении.", "This property is held for another offer."],
+  EMPTY_LOT_LIMIT: ["Можно владеть только одним пустым участком.", "You can own only one empty lot."],
+  INVALID_BID: ["Проверьте участок и сумму ставки.", "Check the lot and bid amount."],
+  INVALID_TRADE: ["Обе стороны должны что-то отдать. Проверьте условия.", "Both sides must give something. Check the terms."],
+  INVALID_PARK: ["На парк нужно ровно 4 монеты, 1 материал и 1 бригада.", "A park needs exactly 4 coins, 1 material and 1 crew."],
+  OFFER_CHANGED: ["Предложение уже изменилось или закрылось.", "This offer has changed or closed."],
+  OFFER_LIMIT: ["У вас уже три открытых предложения. Закройте одно.", "You already have three open offers. Close one first."],
+  PARK_UNAVAILABLE: ["На этом месте парк уже построен.", "A park has already been built here."],
+  NOT_YOUR_TURN: ["Сейчас ход другого игрока.", "It is another player's turn."],
+  WRONG_PHASE: ["Сейчас это действие недоступно.", "This action is not available in this phase."],
+  INVALID_LOT: ["Выберите подходящий участок.", "Choose a suitable lot."],
+  PLAYER_LEFT: ["Этот игрок вышел из партии.", "This player has left the game."],
+  INVALID_MAP: ["Выберите другую карту.", "Choose another map."],
+  INVALID_SETTINGS: ["Проверьте настройки комнаты.", "Check the room settings."],
   INVALID_INPUT: ["Проверьте заполненные поля.", "Check the form fields."],
   INTERNAL_ERROR: [
     "Не получилось. Попробуйте ещё раз.",
@@ -1334,6 +1353,7 @@ function CreateRoom({
     gameId: string;
     capacity: number;
     title: string;
+    settings?: Record<string, unknown>;
   }) => Promise<boolean>;
 }) {
   const { t, lang } = useLanguage();
@@ -1341,6 +1361,7 @@ function CreateRoom({
   const game = games.find((item) => item.gameId === gameId);
   const [capacity, setCapacity] = useState(Math.min(game?.maxPlayers || 4, 4));
   const [title, setTitle] = useState("");
+  const [districtMap, setDistrictMap] = useState(DISTRICT_MAPS[0]);
   return (
     <Modal title={t("Новая комната", "New room")} onClose={close}>
       <form
@@ -1350,6 +1371,7 @@ function CreateRoom({
             gameId,
             capacity,
             title: title.trim() || t("Играем вместе", "Playing together"),
+            ...(gameId === "district" ? { settings: { mapId: districtMap.id, mapVersion: districtMap.version } } : {}),
           });
         }}
       >
@@ -1400,6 +1422,7 @@ function CreateRoom({
             ))}
           </select>
         </label>
+        {gameId === "district" && <DistrictMapSelect value={districtMap.id} version={districtMap.version} onChange={setDistrictMap} />}
         <p className="form-note">
           <Icon name="lock" size={17} />
           {t(
@@ -1491,7 +1514,8 @@ function RoomDetail({
           </button>
         )}
       </div>
-      <div className="room-columns">
+      {lobby && room.gameId === "district" && <DistrictLobbyMap mapId={room.settings.mapId} mapVersion={room.settings.mapVersion} />}
+      <div className={`room-columns ${room.gameId === "district" && !lobby ? "district-playing-seats" : ""}`}>
         <div className="seats-panel">
           <div className="section-title">
             <h3>{t("За столом", "At the table")}</h3>
@@ -1522,7 +1546,7 @@ function RoomDetail({
                 </strong>
                 <small>
                   {member.controller.kind === "bot"
-                    ? `${t("Бот", "Bot")} / ${difficultyLabel(member.controller.difficulty, lang)}`
+                    ? `${t("Бот", "Bot")} / ${difficultyLabel(member.controller.difficulty, lang, room.gameId)}`
                     : member.playerId === room.hostPlayerId
                       ? t("Хозяин комнаты", "Room host")
                       : `@${member.handle}`}
@@ -1628,7 +1652,7 @@ function RoomDetail({
               >
                 {(["easy", "normal", "hard"] as const).map((level) => (
                   <option key={level} value={level}>
-                    {difficultyLabel(level, lang)}
+                    {difficultyLabel(level, lang, room.gameId)}
                   </option>
                 ))}
               </select>
@@ -1754,12 +1778,7 @@ function RoomDetail({
         </aside>
       </div>
       {["playing", "finished"].includes(room.state) && room.matchId && (
-        <MatchPanel
-          room={room}
-          busy={busy}
-          perform={perform}
-          refresh={refresh}
-        />
+        room.gameId === "district" ? <DistrictPanel key={room.matchId} room={room} busy={busy} perform={perform} refresh={refresh} /> : <MatchPanel room={room} busy={busy} perform={perform} refresh={refresh} />
       )}{" "}
       {host && lobby && roomInvites.length > 0 && (
         <section className="list-section room-invite-list">
@@ -1869,7 +1888,8 @@ function RoomDetail({
   );
 }
 
-function difficultyLabel(value: BotDifficulty, lang: Language) {
+function difficultyLabel(value: BotDifficulty, lang: Language, gameId?: string) {
+  if (gameId === "district") return { easy: ["Новичок", "Beginner"], normal: ["Обычный", "Normal"], hard: ["Опытный", "Experienced"] }[value][lang === "ru" ? 0 : 1];
   return {
     easy: ["Лёгкий", "Easy"],
     normal: ["Обычный", "Normal"],
@@ -1892,12 +1912,13 @@ function RoomSettings({
   const { t } = useLanguage();
   const [title, setTitle] = useState(room.title);
   const [capacity, setCapacity] = useState(room.capacity);
+  const [districtMap, setDistrictMap] = useState(DISTRICT_MAPS.find(map => map.id === room.settings.mapId && (room.settings.mapVersion === undefined || map.version === room.settings.mapVersion)) ?? DISTRICT_MAPS[0]);
   return (
     <Modal title={t("Настройки комнаты", "Room settings")} onClose={close}>
       <form
         onSubmit={(event) => {
           event.preventDefault();
-          void save({ title, capacity, expectedRevision: room.revision });
+          void save({ title, capacity, expectedRevision: room.revision, ...(room.gameId === "district" ? { settings: { mapId: districtMap.id, mapVersion: districtMap.version } } : {}) });
         }}
       >
         <label>
@@ -1929,6 +1950,7 @@ function RoomSettings({
             ))}
           </select>
         </label>
+        {room.gameId === "district" && <DistrictMapSelect value={districtMap.id} version={districtMap.version} onChange={setDistrictMap} />}
         <p className="form-note">
           {t(
             "После сохранения снова нажмите «Я готов».",

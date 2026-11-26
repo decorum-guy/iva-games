@@ -56,9 +56,13 @@
     "check:kz-bot": "node scripts/check-kz-bot.mjs",
     "platform:smoke": "node scripts/platform-smoke.mjs",
     "start:platform": "node --env-file-if-exists=.env dist-platform/main.js",
-    "lint:platform": "eslint apps/platform apps/portal/src packages/session-kit packages/telegram-transport scripts/check-kz-bot.mjs vite.platform.config.ts vitest.platform.config.ts",
+    "lint:platform": "eslint apps/platform apps/portal/src games/district packages/session-kit packages/telegram-transport scripts/check-kz-bot.mjs vite.platform.config.ts vitest.platform.config.ts",
     "build:all": "npm run build && npm run build:foundation",
-    "portal:e2e": "playwright test --config apps/portal/playwright.config.ts"
+    "portal:e2e": "playwright test --config apps/portal/playwright.config.ts",
+    "district:test": "vitest run --project district",
+    "district:maps": "node --experimental-strip-types games/district/scripts/check-maps.mjs",
+    "district:simulate": "vite build --config games/district/vite.simulation.config.ts && node .qa/district-simulation-runner/simulate.mjs",
+    "district:browser": "node scripts/district-browser-smoke.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

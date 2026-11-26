@@ -319,8 +319,13 @@ export class PlatformService {
   }
   revokeSession(sessionHash: string): void { this.run('DELETE FROM web_sessions WHERE session_hash=?', sessionHash); }
   revokeAllSessions(playerId: string): void { this.run('DELETE FROM web_sessions WHERE player_id=?', playerId); }
-  catalogue(): Omit<GameRegistration, 'runtime'>[] {
-    return [...this.games.values()].map(({ runtime: _runtime, ...game }) => ({ ...game, status: game.status === 'available' && !_runtime ? 'unavailable' : game.status }));
+  catalogue(): Omit<GameRegistration, 'runtime' | 'normalizeSettings'>[] {
+    return [...this.games.values()].map(game => ({
+      gameId: game.gameId, collectionId: game.collectionId, title: game.title,
+      minPlayers: game.minPlayers, maxPlayers: game.maxPlayers, supportsBots: game.supportsBots,
+      rulesVersion: game.rulesVersion, contentVersion: game.contentVersion,
+      status: game.status === 'available' && !game.runtime ? 'unavailable' : game.status,
+    }));
   }
   searchPlayers(actor: string, query: unknown): PublicPlayer[] {
     this.requireVerified(actor);
@@ -475,6 +480,13 @@ export class PlatformService {
     const history = this.rows("SELECT r.room_id FROM rooms r JOIN room_members m ON m.room_id=r.room_id WHERE m.player_id=? AND r.state IN ('finished','cancelled') ORDER BY r.created_at DESC,r.room_id DESC LIMIT 50", actor);
     return [...active, ...history].map(row => this.roomView(String(row.room_id)));
   }
+  private gameSettings(game: GameRegistration, input: unknown): Record<string, unknown> {
+    if (game.normalizeSettings) return game.normalizeSettings(input);
+    if (input !== undefined && (!input || typeof input !== 'object' || Array.isArray(input) || Object.keys(input).length)) {
+      fail('INVALID_SETTINGS', 'Проверьте настройки игры');
+    }
+    return {};
+  }
   createRoom(actor: string, input: Record<string, unknown>): Room {
     this.requireVerified(actor);
     const gameId = textField(input.gameId, 'gameId', 1, 64);
@@ -485,8 +497,9 @@ export class PlatformService {
     if (count >= 5) fail('ROOM_LIMIT', 'Сначала закройте одну из ваших активных комнат', 409);
     const title = input.title === undefined ? `Комната ${this.publicPlayer(actor).displayName}` : textField(input.title, 'title', 1, 60).trim();
     if (!title) fail('INVALID_INPUT', 'Укажите название комнаты');
+    const settings = this.gameSettings(game, input.settings);
     const roomId = randomUUID();
-    this.run("INSERT INTO rooms VALUES (?,?,?,?,'lobby',?,?,?,1,'{}',?,NULL,NULL)", roomId, gameId, title, actor, capacity, game.rulesVersion, game.contentVersion, this.now());
+    this.run("INSERT INTO rooms VALUES (?,?,?,?,'lobby',?,?,?,1,?,?,NULL,NULL)", roomId, gameId, title, actor, capacity, game.rulesVersion, game.contentVersion, JSON.stringify(settings), this.now());
     this.run('INSERT INTO room_members VALUES (?,?,?,?,0,?,?)', randomUUID(), roomId, actor, 0, JSON.stringify({ kind: 'human', playerId: actor }), this.publicPlayer(actor).displayName);
     return this.roomView(roomId);
   }
@@ -504,7 +517,8 @@ export class PlatformService {
     if (capacity < this.occupancy(roomId) || this.participants(roomId).some(p => p.seatIndex >= capacity)) fail('ROOM_FULL', 'Сначала освободите занятые места', 409);
     const title = input.title === undefined ? String(row.title) : textField(input.title, 'title', 1, 60).trim();
     if (!title) fail('INVALID_INPUT', 'Укажите название комнаты');
-    this.run('UPDATE rooms SET capacity=?,title=? WHERE room_id=?', capacity, title, roomId); this.bump(roomId, true);
+    const settings = this.gameSettings(game, input.settings === undefined ? JSON.parse(String(row.settings_json)) : input.settings);
+    this.run('UPDATE rooms SET capacity=?,title=?,settings_json=? WHERE room_id=?', capacity, title, JSON.stringify(settings), roomId); this.bump(roomId, true);
     return this.roomView(roomId);
   }
   transferHost(actor: string, roomId: string, input: Record<string, unknown>): Room {

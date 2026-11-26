@@ -57,11 +57,11 @@ Members contain `participantId,playerId,handle,displayName,seatIndex,ready,contr
 | Method and path | JSON body | Result |
 |---|---|---|
 | GET `/rooms` | — | `{rooms:Room[]}`; own memberships, all active first followed by up to 50 terminal rooms |
-| POST `/rooms` | `{gameId,capacity,title?}` | `{room}` |
+| POST `/rooms` | `{gameId,capacity,title?,settings?}` | `{room}` |
 | GET `/rooms/:roomId` | — | `{room}`; membership required |
 | POST `/rooms/:roomId/join` | `{}` | `{room}`; accepted unexpired reservation or existing membership |
 | POST `/rooms/:roomId/ready` | `{ready,expectedRevision}` | `{room}`; own flag only |
-| POST `/rooms/:roomId/settings` | `{capacity?,title?,expectedRevision}` | `{room}`; host only |
+| POST `/rooms/:roomId/settings` | `{capacity?,title?,settings?,expectedRevision}` | `{room}`; host only |
 | POST `/rooms/:roomId/transfer-host` | `{playerId,expectedRevision}` | `{room}`; target already joined human |
 | POST `/rooms/:roomId/kick` | `{participantId,expectedRevision}` | `{room}`; host, lobby only |
 | POST `/rooms/:roomId/bots` | `{difficulty,expectedRevision}` | `{room}`; host and game capability required |
@@ -95,7 +95,11 @@ Canonical link: `${PORTAL_ORIGIN}/invitations/:invitationId`. ID is routing data
 
 GET `/rooms/:roomId/match` returns `{view}` through `runtime.viewForPlayer(matchId, authenticatedPlayerId)`. POST `/rooms/:roomId/actions` accepts `{actionId,expectedRevision,payload}` and returns `{view}`. Actor always comes from the validated session, never from body. Game-specific `SessionError` codes/statuses are preserved. Requests have bounded runtime deadlines; an unknown action result may be retried with the same action ID.
 
-Registration interface lives in `src/types.ts`. `createMatch` receives immutable command ID, room ID, version pair, participants and settings. The current runtime is in `packages/session-kit`; cross-domain chess handoff is a later adapter, not a currently active route.
+Registration interface lives in `src/types.ts`. `createMatch` receives immutable command ID, room ID, version pair, participants and settings. The lab runtime is in `packages/session-kit`; District is in `games/district/src/runtime.ts`. Cross-domain chess handoff is a later adapter, not a currently active route.
+
+District uses 2–4 total seats, at least one human, rules `district@0.2`, content `district-maps@0.1`, and bot version `1`. Room settings are `{mapId,mapVersion}`; the registration normalizes defaults, rejects unsupported fields/versions and freezes the selected full map snapshot at match creation. Changing maps in a lobby resets readiness. Other games reject nonempty unsupported settings.
+
+District action payloads include `{phaseId,...action}` from the current private view, in addition to the envelope actionId/expectedRevision. View includes serverNow, map snapshot, public economy/history and only the requesting seat’s goals, pending offers, bid and reserves. A duplicate returns the stored response. A late/stale action persists the elapsed deadline transition before returning an error. Public catalog responses never include runtime or normalizeSettings callbacks.
 
 ## Telegram linking and delivery
 

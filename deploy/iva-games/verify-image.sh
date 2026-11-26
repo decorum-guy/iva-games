@@ -115,6 +115,7 @@ if (kind === 'platform') {
   assert.equal(process.env.TELEGRAM_ENABLED, 'false');
   const catalogue = await (await get('/api/platform/v1/games')).json();
   assert.ok(catalogue.games.some(game => game.gameId === 'platform-lab' && game.status === 'available'));
+  assert.ok(catalogue.games.some(game => game.gameId === 'district' && game.status === 'available' && game.supportsBots && game.maxPlayers === 4));
   if (phase === 'initial') {
     const response = await get('/api/platform/v1/session');
     assert.match(response.headers.get('set-cookie') ?? '', /__Host-iva_session=/);
@@ -145,7 +146,7 @@ const databases = kind === 'chess'
     ]
   : [
       ['platform.sqlite', ['players', 'web_sessions', 'rooms', 'invitations'], 'web_sessions'],
-      ['platform-lab.sqlite', ['matches', 'action_receipts'], 'matches'],
+      ['platform-lab.sqlite', ['matches', 'action_receipts', 'district_schema', 'district_matches', 'district_action_receipts'], 'matches'],
     ];
 const counts = {};
 for (const [file, expectedTables, countTable] of databases) {
