@@ -1,3 +1,5 @@
+import { AVATARS } from "./types";
+import type { AvatarStyle } from "./types";
 import { friendRequestFeedback } from "./socialFeedback";
 import { Catalogue } from "./Catalogue";
 import { gameDescription, gameTitle } from "./gameCopy";
@@ -157,6 +159,10 @@ const errorCopy: Record<string, [string, string]> = {
     "Этот адрес или имя пользователя уже заняты. Выберите другое имя или войдите.",
     "This email or username is taken. Choose another name or sign in.",
   ],
+  TELEGRAM_AUTH_PENDING: ["Откройте бота и нажмите «Старт».", "Open the bot and press Start."],
+  TELEGRAM_AUTH_INVALID: ["Проверьте код.", "Check the code."],
+  TELEGRAM_AUTH_EXPIRED: ["Запросите новый код.", "Request another code."],
+  AUTH_ALREADY_SIGNED_IN: ["Вы уже вошли.", "You are already signed in."],
   AUTH_BUSY: [
     "Не получилось войти. Попробуйте ещё раз.",
     "Could not sign in. Try again.",
@@ -272,6 +278,7 @@ export default function App() {
     null,
   );
   const user = session?.user ?? null;
+  const verified = Boolean(user?.emailVerified || user?.telegramVerified);
   const cataloguePage = route.page === "home" || route.page === "chess" || route.page === "games" ? route.page : null;
 
   useEffect(() => {
@@ -310,7 +317,7 @@ export default function App() {
       let invitationData: { invitations: Invitation[] } = { invitations: [] };
       let telegramData: TelegramStatus | null = null;
       let nextRoom: Room | null = null;
-      if (nextSession.user?.emailVerified) {
+      if (nextSession.user?.emailVerified || nextSession.user?.telegramVerified) {
         [friendData, roomData, invitationData, telegramData] =
           await Promise.all([
             request<Social>("/friends"),
@@ -642,7 +649,7 @@ export default function App() {
             retry={() => void perform(refresh)}
             onPlay={(game) => {
               if (!user) go("rooms");
-              else if (!user.emailVerified) go("profile");
+              else if (!verified) go("profile");
               else setCreateGame(game.gameId);
             }}
             onAbout={setGameInfo}
@@ -655,6 +662,7 @@ export default function App() {
               await refresh();
               if (readRoute().page === "login" && !entrance) go("home", undefined, true);
             }}
+            auth={session?.auth}
             entrance={entrance}
             clearEntrance={() => {
               setEntrance(null);
@@ -730,7 +738,7 @@ export default function App() {
                   </p>
                   <h1>{title}</h1>
                 </div>
-                {user.emailVerified && route.page !== "profile" && (
+                {verified && route.page !== "profile" && (
                   <button
                     className="button primary"
                     disabled={busy || !availableGames.length}
@@ -760,7 +768,7 @@ export default function App() {
                   </button>
                 </div>
               )}
-              {!user.emailVerified && (
+              {!verified && (
                 <section className="verification-banner">
                   <span className="verification-icon">
                     <Icon name="mail" size={30} />
@@ -794,7 +802,7 @@ export default function App() {
                   </button>
                 </section>
               )}
-              {user.emailVerified && route.page === "friends" && (
+              {verified && route.page === "friends" && (
                 <>
                   <section className="search-section">
                     <div>
@@ -1029,7 +1037,7 @@ export default function App() {
                   )}
                 </>
               )}
-              {user.emailVerified &&
+              {verified &&
                 route.page === "rooms" &&
                 (route.roomId ? (
                   selectedRoom ? (
@@ -1121,7 +1129,7 @@ export default function App() {
                     )}
                   </section>
                 ))}
-              {user.emailVerified && route.page === "invitations" && (
+              {verified && route.page === "invitations" && (
                 <Invitations
                   user={user}
                   invitations={invitations}
@@ -1144,7 +1152,7 @@ export default function App() {
                   refresh={refresh}
                 />
               )}
-              {!user.emailVerified &&
+              {!verified &&
                 !cataloguePage &&
                 route.page !== "profile" && (
                   <Empty
@@ -2144,12 +2152,17 @@ function Profile({
 }) {
   const { t } = useLanguage();
   const [name, setName] = useState(user.displayName);
+  const [avatar, setAvatar] = useState<AvatarStyle | "">(user.avatar ?? "");
+  const avatarLabel: Record<AvatarStyle, string> = {
+    king: t("Король", "King"), queen: t("Ферзь", "Queen"), rook: t("Ладья", "Rook"),
+    bishop: t("Слон", "Bishop"), knight: t("Конь", "Knight"), pawn: t("Пешка", "Pawn"),
+  };
   const [password, setPassword] = useState("");
   return (
     <div className="profile-grid">
       <section className="profile-card">
         <div className="profile-identity">
-          <Avatar player={user} large />
+          <Avatar player={{ ...user, avatar: avatar || undefined }} large />
           <div>
             <h2>{user.displayName}</h2>
             <p>@{user.handle}</p>
@@ -2160,8 +2173,8 @@ function Profile({
             event.preventDefault();
             void mutate(
               "/profile",
-              { displayName: name },
-              t("Имя сохранено.", "Name saved."),
+              { displayName: name, avatar: avatar || null },
+              t("Профиль сохранён.", "Profile saved."),
             );
           }}
         >
@@ -2174,7 +2187,21 @@ function Profile({
               required
             />
           </label>
-          <div className="profile-email">
+          <label>
+            {t("Аватар", "Avatar")}
+            <select value={avatar} onChange={(event) => setAvatar(event.target.value as AvatarStyle | "")}>
+              <option value="">{t("Инициалы", "Initials")}</option>
+              {(Object.keys(AVATARS) as AvatarStyle[]).map(style => (
+                <option key={style} value={style}>{AVATARS[style]} {avatarLabel[style]}</option>
+              ))}
+            </select>
+          </label>
+          {user.telegramVerified ? (
+            <div className="profile-email">
+              <span>Telegram</span>
+              <span className="tag success">{t("Подтверждён", "Verified")}</span>
+            </div>
+          ) : <div className="profile-email">
             <span>{t("Почта", "Email")}</span>
             <strong>{user.email}</strong>
             <span className={`tag ${user.emailVerified ? "success" : ""}`}>
@@ -2182,24 +2209,25 @@ function Profile({
                 ? t("Подтверждена", "Confirmed")
                 : t("Ждёт подтверждения", "Awaiting confirmation")}
             </span>
-          </div>
+          </div>}
           <button
             className="button primary"
-            disabled={busy || name.trim() === user.displayName}
+            disabled={busy || (name.trim() === user.displayName && avatar === (user.avatar ?? ""))}
           >
-            {t("Сохранить имя", "Save name")}
+            {t("Сохранить профиль", "Save profile")}
           </button>
         </form>
       </section>
-      <TelegramPanel
+      {!user.telegramVerified && <TelegramPanel
         status={telegram}
         verified={user.emailVerified}
         busy={busy}
         perform={perform}
         onStatusChange={onTelegramChange}
-      />
+      />}
       <section className="profile-card security-card">
         <h2>{t("Доступ к аккаунту", "Account access")}</h2>
+        {user.telegramVerified ? <p>{t("Для входа на другом устройстве запросите новый код в Telegram.", "Request a new Telegram code to sign in on another device.")}</p> : <>
         <p>
           {t(
             "Можно сменить пароль через письмо или завершить вход на всех устройствах.",
@@ -2250,7 +2278,7 @@ function Profile({
           <button className="button secondary danger-text" disabled={busy}>
             {t("Выйти на всех устройствах", "Sign out everywhere")}
           </button>
-        </form>
+        </form></>}
         <button
           className="text-button profile-signout"
           disabled={busy}

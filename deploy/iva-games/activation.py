@@ -157,7 +157,7 @@ def dns_readiness(expected_ipv4):
     return {'consecutive': count, 'answers': report}
 
 
-def smtp_settings(path=None):
+def platform_environment(path=None):
     values = {}
     for line in (path or CONFIG / 'platform.env').read_text().splitlines():
         if line and not line.startswith('#'):
@@ -165,6 +165,15 @@ def smtp_settings(path=None):
             if key in values:
                 raise ValueError('Duplicate platform setting')
             values[key] = value
+    return values
+
+
+def mail_verification_settings():
+    values = platform_environment()
+    if values.get('MAIL_MODE') == 'disabled':
+        return None
+    if values.get('MAIL_MODE', 'smtp') != 'smtp':
+        raise ValueError('Invalid production mail mode')
     host = values.get('SMTP_HOST', '')
     sender = values.get('SMTP_FROM', '')
     user = values.get('SMTP_USER', '')
@@ -236,7 +245,7 @@ def activate():
     dns = dns_readiness(cfg['ipv4'])
     release = load(CONFIG / 'pins.json', {})
     try:
-        settings = smtp_settings()
+        settings = mail_verification_settings()
     except (OSError, ValueError):
         write_state('WAITING_CONFIG', 'production SMTP settings are required', dns, release)
         return
@@ -248,7 +257,8 @@ def activate():
         return
     if not running(release, 'caddy'):
         try:
-            verify_smtp(settings)
+            if settings:
+                verify_smtp(settings)
         except (OSError, smtplib.SMTPException):
             write_state('WAITING_CONFIG', 'SMTP TLS connection or authentication failed', dns, release)
             return
@@ -308,13 +318,18 @@ def pull_release(sha, digests, token):
     return {'sha': sha, 'services': images}
 
 
+def keep_unchanged_images(candidate, previous):
+    sources = previous.get('services', {})
+    unchanged = [name for name in SERVICES if name in sources
+                 and candidate['services'][name]['inputs'] == sources[name]['inputs']]
+    for name in unchanged:
+        candidate['services'][name] = sources[name]
+    return [name for name in SERVICES if name not in unchanged]
+
+
 def promote(candidate, previous):
     path = CONFIG / 'pins.json'
-    changed = [name for name in SERVICES
-               if candidate['services'][name]['inputs'] != previous['services'][name]['inputs']]
-    for name in SERVICES:
-        if name not in changed:
-            candidate['services'][name] = previous['services'][name]
+    changed = keep_unchanged_images(candidate, previous)
     # Capture both databases for each changed service before replacing anything.
     stamp = time.strftime('%Y%m%dT%H%M%SZ', time.gmtime())
     for service in changed:
@@ -358,7 +373,7 @@ def deploy():
     state = load(STATE / 'state.json', {})
     pins = load(CONFIG / 'pins.json', {})
     active = state.get('status') == 'ACTIVE'
-    if not active and (cfg.get('initial_sha') != sha or pins.get('sha')):
+    if not active and cfg.get('initial_sha') != sha:
         print('DEFERRED initial activation is gated')
         return
     if (STATE / 'pending.json').exists():
@@ -371,6 +386,7 @@ def deploy():
     compose(candidate, 'config', '--quiet')
     verify_main(sha)
     if not active:
+        keep_unchanged_images(candidate, pins)
         save(CONFIG / 'pins.json', candidate)
         print(f'STAGED {sha}')
     else:

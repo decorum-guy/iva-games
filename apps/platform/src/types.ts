@@ -3,20 +3,25 @@ export type Controller =
   | { kind: 'human'; playerId: string }
   | { kind: 'bot'; botProfileId: string; botVersion: string; difficulty: Difficulty };
 
+export const AVATARS = { king: '♚', queen: '♛', rook: '♜', bishop: '♝', knight: '♞', pawn: '♟' } as const;
+export type AvatarStyle = keyof typeof AVATARS;
 export interface PublicPlayer {
   playerId: string;
   handle: string;
   displayName: string;
+  avatar?: AvatarStyle;
 }
 export interface Account extends PublicPlayer {
   email: string;
   emailVerified: boolean;
+  telegramVerified?: true;
 }
 export interface Participant {
   participantId: string;
   playerId: string | null;
   handle: string;
   displayName: string;
+  avatar?: AvatarStyle;
   seatIndex: number;
   ready: boolean;
   controller: Controller;

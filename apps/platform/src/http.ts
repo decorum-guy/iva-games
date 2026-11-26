@@ -6,6 +6,7 @@ import { extname, resolve, sep } from 'node:path';
 import { createClientAddressReader } from '@iva-games/session-kit/http';
 import { PlatformError } from './types.js';
 import type { SessionRecord, TelegramIntegration } from './types.js';
+import type { TelegramAuth } from './telegram/auth.js';
 import { PlatformService, textField } from './service.js';
 
 const PREFIX = '/api/platform/v1';
@@ -19,6 +20,8 @@ export interface HttpOptions {
   serveDirectory?: string;
   telegram?: TelegramIntegration;
   telegramWebhookSecret?: string;
+  telegramAuth?: TelegramAuth;
+  telegramAuthWebhookSecret?: string;
 }
 function error(code: string, message: string, status = 400): never { throw new PlatformError(code, message, status); }
 function only(body: Record<string, unknown>, fields: string[]): void {
@@ -90,6 +93,16 @@ export function createPlatformHttpServer(service: PlatformService, options: Http
       if (method === 'GET' && (path === '/health/live' || path === '/health/ready')) {
         await service.ready; send(response, 200, { ok: true, service: 'iva-platform' }); return;
       }
+      if (path === '/integrations/telegram/auth-webhook') {
+        if (method !== 'POST') error('METHOD_NOT_ALLOWED', 'Действие недоступно', 405);
+        const expected = options.telegramAuthWebhookSecret;
+        if (!options.telegramAuth || !expected) error('NOT_FOUND', 'Telegram пока недоступен', 404);
+        const supplied = request.headers['x-telegram-bot-api-secret-token'];
+        if (typeof supplied !== 'string' || Buffer.byteLength(supplied) !== Buffer.byteLength(expected) ||
+          !timingSafeEqual(Buffer.from(supplied), Buffer.from(expected))) error('WEBHOOK_UNAUTHORIZED', 'Доступ запрещён', 401);
+        send(response, 200, options.telegramAuth.webhook(await jsonBody(request, 64 * 1024)));
+        return;
+      }
       if (path === '/integrations/telegram/webhook') {
         if (method !== 'POST') error('METHOD_NOT_ALLOWED', 'Действие недоступно', 405);
         if (!options.telegram || !options.telegramWebhookSecret) error('NOT_FOUND', 'Telegram пока недоступен', 404);
@@ -120,7 +133,8 @@ export function createPlatformHttpServer(service: PlatformService, options: Http
       if (method === 'GET' && route === '/session') {
         if (!session) { service.rateLimit(`bootstrap:${client}`, 60); session = replacementSession(response, null, null); }
         service.rateLimit(`read:${session.sessionHash}`, 300);
-        send(response, 200, { user: session.playerId ? service.account(session.playerId) : null, csrfToken: session.csrfToken }); return;
+        send(response, 200, { user: session.playerId ? service.account(session.playerId) : null, csrfToken: session.csrfToken,
+          auth: { email: service.emailDeliveryEnabled, telegram: !!options.telegramAuth } }); return;
       }
       if (method === 'GET' && route === '/games') { send(response, 200, { games: service.catalogue() }); return; }
       if (!['GET', 'POST'].includes(method)) error('METHOD_NOT_ALLOWED', 'Действие недоступно', 405);
@@ -138,6 +152,25 @@ export function createPlatformHttpServer(service: PlatformService, options: Http
       }
       if (method === 'POST' && route.startsWith('/auth/')) {
         service.rateLimit(`auth:${client}`, 30);
+        if (route === '/auth/telegram/start' || route === '/auth/telegram/finish') {
+          if (!options.telegramAuth) error('TELEGRAM_NOT_CONFIGURED', 'Telegram пока недоступен', 503);
+          const current = session!;
+          if (route.endsWith('/start')) {
+            only(body, ['locale']);
+            service.rateLimit(`telegram-signin:${client}`, 20, 10 * 60_000);
+            send(response, 201, options.telegramAuth.start(current, body.locale));
+          } else {
+            only(body, ['attemptId', 'code', 'handle', 'displayName']);
+            const result = options.telegramAuth.finish(current, body);
+            if ('token' in result) {
+              setCookie(response, result.token, result.session.expiresAt);
+              send(response, 200, { user: result.user });
+            } else send(response, 200, result);
+          }
+          return;
+        }
+        if (!service.emailDeliveryEnabled && ['/auth/register', '/auth/login', '/auth/verify', '/auth/forgot-password', '/auth/reset-password'].includes(route))
+          error('MAIL_UNAVAILABLE', 'Войдите через Telegram', 503);
         if (route === '/auth/register') {
           only(body, ['email', 'password', 'handle', 'displayName']);
           service.rateLimit(`signup:${client}`, 10, 60 * 60_000);
@@ -219,7 +252,7 @@ export function createPlatformHttpServer(service: PlatformService, options: Http
       };
       let result: unknown;
       let groups: RegExpMatchArray | null;
-      if (route === '/profile') result = mutate(['displayName'], () => ({ user: service.updateProfile(actor, body) }));
+      if (route === '/profile') result = mutate(['displayName', 'avatar'], () => ({ user: service.updateProfile(actor, body) }));
       else if (route === '/friend-requests') result = mutate(['playerId'], () => service.requestFriend(actor, body.playerId));
       else if ((groups = match(/^\/friend-requests\/([\w-]+)\/(accept|decline|cancel)$/))) {
         const [, id, action] = groups; result = mutate([], () => { service.respondFriend(actor, id, action as 'accept' | 'decline' | 'cancel'); return { ok: true }; });

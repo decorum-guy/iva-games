@@ -1,3 +1,4 @@
+import { AVATARS } from "./types";
 import { createContext, useContext, useEffect, useRef } from "react";
 import type { ReactNode } from "react";
 import type { Language, PublicPlayer } from "./types";
@@ -134,7 +135,7 @@ export function Avatar({
   bot = false,
   large = false,
 }: {
-  player: Pick<PublicPlayer, "displayName" | "handle">;
+  player: Pick<PublicPlayer, "displayName" | "handle" | "avatar">;
   bot?: boolean;
   large?: boolean;
 }) {
@@ -148,7 +149,7 @@ export function Avatar({
       {bot ? (
         <Icon name="robot" />
       ) : (
-        (player.displayName || player.handle).slice(0, 2).toLocaleUpperCase()
+        (player.avatar && AVATARS[player.avatar]) || (player.displayName || player.handle).slice(0, 2).toLocaleUpperCase()
       )}
     </span>
   );

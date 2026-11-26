@@ -1,6 +1,10 @@
 # Iva Games — latest project direction
 
-## Current activation: new VPS, SSH and owner-managed DNS
+## Current accounts and deployment direction
+
+The owner requested Telegram-only production accounts on 26 November 2026. The portal and bot share profiles, avatars, friends and incoming decisions. New friend requests and player search stay on the portal. The owner enters the dedicated BotFather token on the Mac. See [Telegram accounts](docs/iva-games/TELEGRAM_ACCOUNTS.md). This supersedes the earlier initial-release exclusion of Telegram and mandatory SMTP; preserve the existing local demonstrations and the independent legacy invitation integration. Keep the DNS gate and distinguish CI, staged images, first HTTPS activation and real bot delivery.
+
+## Previous activation: new VPS, SSH and owner-managed DNS
 
 On 26 November 2026 the owner requested the local activation prompt with placeholders for the new VPS IP and initial root password. The local executor is authorized to configure the supplied VPS, project-specific SSH keys and Apple Keychain, move SSH from 22 to **2233** (the support-recommended example), verify an independent connection, then disable password/keyboard-interactive access and close 22. Prepare rollback and preserve the old live session until replacement access is verified. Account for ssh.socket, effective sshd configuration, persistent firewall rules and fail2ban on the selected port. Use a separate tested sudo administrator before disabling SSH root login; rotate the initial root password and store recovery credentials in Keychain. The Mac private key remains a protected file; Keychain stores its passphrase.
 

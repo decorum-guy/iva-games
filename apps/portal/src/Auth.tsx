@@ -2,6 +2,9 @@ import { useState } from "react";
 import type { FormEvent } from "react";
 import { Brand, GameArt, Icon, useLanguage } from "./ui";
 import { PlatformError, request } from "./api";
+import { PortalLink } from "./navigation";
+import { TelegramSignIn } from "./TelegramSignIn";
+import type { AuthMethods } from "./types";
 
 export type Entrance = { kind: "verify" | "reset"; token: string } | null;
 export function readEntrance(): Entrance {
@@ -27,16 +30,19 @@ export function Auth({
   busy,
   perform,
   onAuthenticated,
-  entrance,
+  entrance: requestedEntrance,
   clearEntrance,
+  auth,
 }: {
   busy: boolean;
   perform: Perform;
   onAuthenticated: () => Promise<void>;
   entrance: Entrance;
+  auth?: AuthMethods;
   clearEntrance: () => void;
 }) {
   const { t } = useLanguage();
+  const entrance = auth?.email === false ? null : requestedEntrance;
   const [mode, setMode] = useState<"login" | "register" | "forgot">("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -141,7 +147,14 @@ export function Auth({
       <section className="auth-form-wrap">
         <div className="auth-card">
           <h2>{title}</h2>
-          {entrance?.kind === "verify" ? (
+          {!entrance && auth?.telegram ? (
+            <TelegramSignIn busy={busy} perform={perform} onAuthenticated={onAuthenticated} />
+          ) : !entrance && auth?.email === false ? (
+            <div className="telegram-sign-in">
+              <p>{t("Вход через Telegram пока недоступен. Гостевые шахматы уже можно открыть.", "Telegram sign-in is currently unavailable. You can still play chess as a guest.")}</p>
+              <PortalLink href="/chess" className="button secondary wide">{t("К шахматам", "Go to chess")}</PortalLink>
+            </div>
+          ) : entrance?.kind === "verify" ? (
             <>
               <button
                 className="button primary wide"

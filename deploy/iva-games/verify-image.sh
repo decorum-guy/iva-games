@@ -29,16 +29,11 @@ start_runtime() {
       --env OVERDRIVE_DATABASE_PATH=/data/overdrive.sqlite
     )
   else
-    # These are CI-only non-delivering placeholders, not an SMTP server.
-    # The container has loopback only; no real credentials or recipients.
-    # Production still requires SMTP configuration. No mail action is run.
+    # Loopback only, without registration delivery channels or recipients.
     args+=(
       --env PORTAL_ORIGIN=https://iva-games.pro
-      --env MAIL_MODE=smtp
-      --env SMTP_HOST=mail.invalid
-      --env SMTP_PORT=465
-      --env SMTP_SECURE=true
-      --env SMTP_FROM=ci@example.invalid
+      --env MAIL_MODE=disabled
+      --env TELEGRAM_AUTH_ENABLED=false
       --env TELEGRAM_ENABLED=false
     )
   fi
@@ -115,8 +110,8 @@ for (const path of kind === 'chess' ? ['/', '/overdrive/'] : ['/']) {
 }
 
 if (kind === 'platform') {
-  assert.equal(process.env.MAIL_MODE, 'smtp');
-  assert.equal(process.env.SMTP_HOST, 'mail.invalid');
+  assert.equal(process.env.MAIL_MODE, 'disabled');
+  assert.equal(process.env.TELEGRAM_AUTH_ENABLED, 'false');
   assert.equal(process.env.TELEGRAM_ENABLED, 'false');
   const catalogue = await (await get('/api/platform/v1/games')).json();
   assert.ok(catalogue.games.some(game => game.gameId === 'platform-lab' && game.status === 'available'));
@@ -127,6 +122,7 @@ if (kind === 'platform') {
     assert.match(response.headers.get('set-cookie') ?? '', /Secure/);
     const session = await response.json();
     assert.equal(session.user, null);
+    assert.deepEqual(session.auth, { email: false, telegram: false });
     assert.equal(typeof session.csrfToken, 'string');
     assert.ok(session.csrfToken.length > 20);
   }
