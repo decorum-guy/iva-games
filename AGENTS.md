@@ -1,8 +1,18 @@
 # Iva Games — latest project direction
 
+## Current owner request: implement District, selectable maps and project leadership
+
+On 26 November 2026 the owner authorized starting the actual District game now while Gemini separately reviews its creative direction. Implement the closed v0.2 prototype on 2–4 total seats with mandatory bots, solo with bots and mixed rooms. Preserve v0.2 economics; evaluate Gemini's future answer as a separate proposal before adopting a new rules revision. The previous documentation-only scope is superseded by this request.
+
+Maps must be selectable in a room and easy to add from the owner's natural-language brief. Use versioned data files under `games/district/maps`, automatic discovery, validation and frozen map snapshots in matches. Read [map authoring](games/district/MAPS.md) and [the map-addition prompt](prompts/ADD_DISTRICT_MAP.md). A new layout must not require a hand-maintained UI registry or rewriting the engine. The initial 5×5 profile keeps 16 lots, four neutral houses, four park sites, one square and 2–4 seats; a larger board or new terrain needs a separately specified rules/profile change. Do not call structural validation a balance test.
+
+**The primary web chat (including a new GPT‑6 Pro chat) is the project lead and a working engineer, not only a prompt writer.** Read [AGENT_ROLES](docs/iva-games/AGENT_ROLES.md), [PROJECT_STATUS](docs/iva-games/PROJECT_STATUS.md) and [District status](games/district/STATUS.md), then inspect actual branch heads and working files. Answer the owner's questions, make and explain routine decisions, research when needed, design, write/review code, coordinate agents, prepare concrete local execution/acceptance prompts, verify evidence and maintain the handoff. Do the authorized work through the tools actually available; never imply access inherited from another chat. Preserve pending branches and accepted games. Keep completed milestones published without force-push. Main merges, live deployment and real external delivery remain distinct from a draft PR.
+
+This development starts on `feat/district-first-playable`, based on `feat/iva-chat-ops` at `2e23f92`; it is stacked on that still-open review, not an implicit merge of PR #15, PR #14 or Colossus. Keep the status record explicit about the tested source and what is actually running. 3D assets and final art are later polish; begin with a complete, legible 2D game and report the remaining art and acceptance work.
+
 ## Current handoff: portal, OVERDRIVE, District and deployment
 
-Start with [PROJECT_STATUS](docs/iva-games/PROJECT_STATUS.md), then the current component documents. On 26 November 2026 the owner requested a shared readiness status and Google prompts for District design and other non-chess multiplayer games. This task updates documentation; it does not implement District, change accepted chess rules or activate production.
+Start with [PROJECT_STATUS](docs/iva-games/PROJECT_STATUS.md), then the current component documents. The earlier 26 November status/prompt task was documentation only. The newer owner request above starts District implementation; accepted chess rules and production activation remain separate.
 
 District v0.2 already defines a closed first prototype for 2–4 total human/bot seats. A document audit found no missing mandatory phase or win condition blocking implementation; it is not a balance test. There is still no District rules package, runtime, UI or bot policy. The platform lab is not District. Read [District status](games/district/STATUS.md); preserve normative v0.2 while creative revisions remain proposals. New games require bots from their first playable release, solo with bots and mixed rooms, explicit human/total-seat limits, private per-player observations and simple UI copy.
 
