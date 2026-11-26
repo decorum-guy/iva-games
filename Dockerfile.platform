@@ -4,6 +4,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends python3 make g+
 COPY package.json package-lock.json ./
 COPY games/chess/remorse/package.json ./games/chess/remorse/package.json
 COPY games/chess/overdrive/package.json ./games/chess/overdrive/package.json
+COPY games/chess/colossus/package.json ./games/chess/colossus/package.json
 COPY packages/engine-sdk/package.json ./packages/engine-sdk/package.json
 COPY apps/server/package.json ./apps/server/package.json
 COPY apps/platform/package.json ./apps/platform/package.json
@@ -14,6 +15,7 @@ RUN npm ci
 COPY . .
 ARG VITE_REMORSE_URL=https://chess.iva-games.pro/
 ARG VITE_OVERDRIVE_URL=https://chess.iva-games.pro/overdrive/
+ARG VITE_COLOSSUS_URL=https://chess.iva-games.pro/colossus/
 RUN npm run build:foundation && npm prune --omit=dev --ignore-scripts
 
 FROM node:24-bookworm-slim AS runtime
