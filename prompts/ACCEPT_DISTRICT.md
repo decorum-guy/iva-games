@@ -4,7 +4,7 @@
 
 ## Источник и ограничения
 
-Репозиторий `decorum-guy/iva-games`. Рабочая ветка `feat/district-first-playable`, [PR №16](https://github.com/decorum-guy/iva-games/pull/16), первоначально поверх `feat/iva-chat-ops` / PR №15. Получи актуальные refs и запиши точный SHA. Не считай старую сводку доказательством текущего main. Если PR уже принят, используй проверенного потомка с тем же функционалом; не откатывай на старый head.
+Репозиторий `decorum-guy/iva-games`. Рабочая ветка `feat/district-first-playable`, [PR №16](https://github.com/decorum-guy/iva-games/pull/16), первоначально поверх `feat/iva-chat-ops` / PR №15. Получи актуальные refs и запиши точный SHA. Исполняемый контрольный снимок — `085f78a74e2a3957d1f3780eb87d7c1f218b5862`; более поздние коммиты могут уточнять передачу или содержать отдельные исправления. Не считай старую сводку доказательством текущего main. Если PR уже принят, используй проверенного потомка с тем же функционалом; не откатывай на старый head.
 
 Прочитай `AGENTS.md`, `docs/iva-games/AGENT_ROLES.md`, `docs/iva-games/PROJECT_STATUS.md`, `games/district/STATUS.md`, `RULES_V0_2.md`, `MAPS.md`, `VALIDATION_V0_2.md` и фактический код. Gemini отдельно готовит идеи: не заменяй ими v0.2, пока владелец не выбрал следующую редакцию.
 

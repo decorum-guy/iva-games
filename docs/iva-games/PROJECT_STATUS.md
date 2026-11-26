@@ -20,7 +20,7 @@
 
 | Значение | Подтверждённое состояние |
 |---|---|
-| Текущая разработка District | `feat/district-first-playable`, [PR №16](https://github.com/decorum-guy/iva-games/pull/16), поверх PR №15; опубликованные проверки не являются production-активацией |
+| Текущая разработка District | [`085f78a`](https://github.com/decorum-guy/iva-games/commit/085f78a74e2a3957d1f3780eb87d7c1f218b5862), `feat/district-first-playable`, [PR №16](https://github.com/decorum-guy/iva-games/pull/16), поверх PR №15; [platform CI](https://github.com/decorum-guy/iva-games/actions/runs/45863694676) и [оба образа](https://github.com/decorum-guy/iva-games/actions/runs/45863694775) прошли; deployment на PR не выполнялся |
 | Удалённый `main` при проверке | [`eeb886a5eaae1823716f0f9d3505350d37ecb346`](https://github.com/decorum-guy/iva-games/commit/eeb886a5eaae1823716f0f9d3505350d37ecb346) |
 | Последняя опубликованная доставка на VPS | `STAGED eeb886a5eaae1823716f0f9d3505350d37ecb346` — [deploy job](https://github.com/decorum-guy/iva-games/actions/runs/45832999610/job/139955793159) |
 | Фактически работающие сейчас контейнеры | В этом проходе не прочитаны; SHA `STAGED` не заменяет их идентификаторы и образы |
