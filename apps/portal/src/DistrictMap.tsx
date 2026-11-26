@@ -1,5 +1,7 @@
-import { DISTRICT_MAPS } from "@iva-games/district";
+import { useId, useState } from "react";
+import { DISTRICT_ISLAND_MAPS, DISTRICT_MAP_CATALOG, DISTRICT_MAPS } from "@iva-games/district";
 import type { DistrictMap } from "@iva-games/district";
+import { DistrictIslandScene } from "./DistrictIslandScene";
 import { useLanguage } from "./ui";
 import "./district.css";
 
@@ -33,33 +35,54 @@ export function DistrictGlyph({ kind }: { kind: string }) {
 }
 
 export function DistrictMapMini({ map }: { map: DistrictMap }) {
+  if (map.schemaVersion === 2) return <DistrictIslandScene map={map} mini />;
   return <div className="district-map-mini" style={{ gridTemplateColumns: `repeat(${map.width}, 1fr)` }} aria-hidden="true">
     {map.rows.flatMap((row, y) => [...row].map((kind, x) => <span key={`${x}:${y}`} className={`mini-${kind === "." ? "lot" : kind}`} />))}
   </div>;
 }
 
+const mapKey = (map: DistrictMap) => `${map.id}@${map.version}`;
+
 export function DistrictMapSelect({ value, version, onChange }: { value: string; version?: string; onChange: (map: DistrictMap) => void }) {
   const { t, lang } = useLanguage();
-  const selected = DISTRICT_MAPS.find(map => map.id === value && (version === undefined || map.version === version)) ?? DISTRICT_MAPS[0];
-  const maps = DISTRICT_MAPS.filter((map, index) => DISTRICT_MAPS.findIndex(item => item.id === map.id) === index);
-  const pinned = !maps.some(map => map.id === selected.id && map.version === selected.version);
-  const mapKey = (map: DistrictMap) => `${map.id}@${map.version}`;
-  return <div className="district-map-picker">
+  const group = useId();
+  const [search, setSearch] = useState("");
+  const selected = DISTRICT_MAP_CATALOG.find(map => map.id === value && (version === undefined || map.version === version)) ?? DISTRICT_ISLAND_MAPS[0];
+  const catalog = selected.schemaVersion === 1 ? DISTRICT_MAPS : DISTRICT_ISLAND_MAPS;
+  const latest = catalog.filter((map, index) => catalog.findIndex(item => item.id === map.id) === index);
+  const maps = latest.some(map => mapKey(map) === mapKey(selected)) ? latest : [selected, ...latest];
+  if (selected.schemaVersion === 1) return <div className="district-map-picker">
     <label>{t("Карта района", "District map")}
       <select aria-label={t("Карта района", "District map")} value={mapKey(selected)} onChange={event => {
-        const map = DISTRICT_MAPS.find(item => mapKey(item) === event.target.value);
+        const map = maps.find(item => mapKey(item) === event.target.value);
         if (map) onChange(map);
       }}>
-        {pinned && <option value={mapKey(selected)}>{selected.name[lang]} · {t("в этой комнате", "in this room")}</option>}
         {maps.map(map => <option value={mapKey(map)} key={mapKey(map)}>{map.name[lang]}</option>)}
       </select>
     </label>
     <div className="district-map-preview"><DistrictMapMini map={selected} /><p>{selected.description[lang]}</p></div>
   </div>;
+  const visible = maps.filter(map => map.name[lang].toLocaleLowerCase(lang).includes(search.trim().toLocaleLowerCase(lang)));
+  return <fieldset className="district-map-picker island-picker">
+    <legend>{t("Карта района", "District map")}</legend>
+    {maps.length > 6 && <input type="search" value={search} onChange={event => setSearch(event.target.value)}
+      aria-label={t("Найти карту", "Find a map")} placeholder={t("Поиск по картам", "Search maps")} />}
+    {visible.length === 0 && <p>{t("Карты не найдены", "No maps found")}</p>}
+    <div className="district-map-cards">
+      {visible.map(map => <label className="district-map-card" key={mapKey(map)}>
+        <input type="radio" name={group} checked={mapKey(map) === mapKey(selected)} onChange={() => onChange(map)} aria-label={map.name[lang]} />
+        <div className="district-map-card-image"><DistrictMapMini map={map} /></div>
+        <strong>{map.name[lang]}</strong>
+        <small>{t("2–4 игрока", "2–4 players")}</small>
+      </label>)}
+    </div>
+    <p>{selected.description[lang]}</p>
+  </fieldset>;
 }
 
-export function DistrictLobbyMap({ mapId, mapVersion }: { mapId?: unknown; mapVersion?: unknown }) {
+export function DistrictLobbyMap({ mapId, mapVersion, rulesVersion }: { mapId?: unknown; mapVersion?: unknown; rulesVersion?: string }) {
   const { lang, t } = useLanguage();
-  const map = DISTRICT_MAPS.find(item => item.id === mapId && (mapVersion === undefined || item.version === mapVersion)) ?? DISTRICT_MAPS[0];
+  const map = DISTRICT_MAP_CATALOG.find(item => item.id === mapId && (mapVersion === undefined || item.version === mapVersion)) ??
+    (rulesVersion === "district@0.2" ? DISTRICT_MAPS[0] : DISTRICT_ISLAND_MAPS[0]);
   return <div className="district-lobby-map"><DistrictMapMini map={map} /><div><small>{t("Карта", "Map")}</small><strong>{map.name[lang]}</strong><p>{map.description[lang]}</p></div></div>;
 }

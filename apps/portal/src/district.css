@@ -183,3 +183,46 @@ button.district-goal:hover:not(:disabled), button.district-goal[aria-pressed="tr
   .district-phase-title time { display: none; }
   .district-decisions { scroll-margin-top: 52px; }
 }
+
+.district-island-panel .district-layout { grid-template-columns: minmax(0, 1fr) minmax(255px, 31%); gap: clamp(14px, 2vw, 24px); }
+.district-island-panel .district-map-surface { position: relative; padding: 0; background: #337e88; border-color: #2f696c; border-radius: 15px; }
+.district-island-panel .district-heading { padding-bottom: 13px; }
+.district-island-panel .district-heading h3 { font-size: 28px; }
+.district-island-panel .district-players { margin-bottom: 14px; }
+.district-map-tooltip { position: absolute; bottom: 10px; left: 10px; max-width: calc(100% - 100px); z-index: 2; padding: 0 12px; border: 1px solid #cbbfa0; border-radius: 10px; background: #fffaf0; box-shadow: 0 5px 16px #123f4766; pointer-events: none; }
+.district-map-tooltip .district-cell-detail { border: 0; }
+.district-cell-prices { display: grid; gap: 3px; }
+.district-cell-prices > div { display: flex; flex-wrap: wrap; gap: 5px 13px; align-items: center; }
+.district-build-choice { width: 100%; }
+.district-construction-income { display: flex; flex-wrap: wrap; align-items: center; gap: 3px 9px; }
+.island-picker { min-width: 0; border: 0; padding: 0; margin: 0; }
+.island-picker legend { font-size: 13px; font-weight: 750; margin-bottom: 8px; }
+.island-picker p { font-size: 12px; min-height: 2.8em; }
+.district-map-cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; max-height: 330px; overflow: auto; padding: 2px; }
+.district-map-cards .district-map-card { position: relative; display: grid; justify-content: stretch; gap: 3px; padding: 5px; color: #26473e; border: 1px solid #d5e0d5; background: #f8f7ec; border-radius: 10px; cursor: pointer; }
+.district-map-card:has(:checked) { border-color: #247f78; box-shadow: inset 0 0 0 1px #247f78; background: #e6f3e9; }
+.district-map-card:focus-within { outline: 2px solid #245854; outline-offset: 1px; }
+.district-map-card input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.district-map-card-image { border-radius: 6px; overflow: hidden; }
+.district-map-card-image .di-map { aspect-ratio: 1.5; }
+.district-map-card strong { font-size: 12px; line-height: 1.2; }
+.district-map-card small { font-size: 10px; color: #587268; }
+.district-lobby-map .di-mini { flex: 0 0 min(34%, 168px); }
+@media (max-width: 850px) {
+  .district-island-panel .district-layout { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 440px) {
+  .district-map-cards { gap: 5px; }
+  .district-map-card strong { font-size: 10px; }
+}
+.district-match-workspace > .room-detail > .room-heading { margin-bottom: 8px; }
+.district-match-workspace .district-island-panel { margin-top: 10px; }
+.district-island-panel .district-map-column { display: block; }
+@media (max-width: 700px) {
+  .district-match-workspace { padding-top: 53px; }
+  .district-match-workspace .room-heading h2 { font-size: 21px; }
+  .district-island-panel .district-heading h3 { font-size: 20px; }
+  .district-island-panel .district-player { padding: 6px 7px; }
+  .district-island-panel .district-player > div { margin-bottom: 3px; }
+  .district-island-panel .district-player-state { min-height: 0; margin-top: 2px; }
+}
