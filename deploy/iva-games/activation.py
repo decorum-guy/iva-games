@@ -292,11 +292,13 @@ def verify_main(sha):
 
 def pull_release(sha, digests, token, previous):
     images = {}
+    if len(digests) != len(SERVICES):
+        raise RuntimeError('Release must contain both image digests')
     with tempfile.TemporaryDirectory(prefix='iva-registry-', dir='/run') as directory:
         env = {**os.environ, 'DOCKER_CONFIG': directory}
         command('docker', 'login', 'ghcr.io', '-u', 'decorum-guy', '--password-stdin',
                 env=env, data=token + '\n')
-        for service, digest in zip(SERVICES, digests, strict=True):
+        for service, digest in zip(SERVICES, digests):
             repository = f'ghcr.io/{REPOSITORY}-{service}'
             image = f'{repository}@{digest}'
             tag = f'{repository}:{sha}'
