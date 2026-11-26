@@ -8,8 +8,8 @@ import type { ActionEnvelope, GameRegistration, GameRuntime, Participant, StartM
 import { advanceDistrictTime, applyDistrictAction, createDistrictState, parseDistrictAction } from './core';
 import { viewDistrict } from './view';
 import { chooseDistrictBotAction } from './bot';
-import { DISTRICT_CONTENT_VERSION, getDistrictMap, resolveDistrictMapSettings } from './maps';
-import { DISTRICT_BOT_VERSION, DISTRICT_RULES_VERSION, DistrictError } from './types';
+import { getDistrictMap, resolveDistrictMapSettings } from './maps';
+import { districtProfileForMap, districtProfileForVersion, DistrictError } from './types';
 import type { DistrictAction, DistrictState, DistrictView } from './types';
 
 interface MatchRow { match_id: string; request_hash: string; state: string; bot_seed: string }
@@ -19,14 +19,21 @@ const MAX_BOT_ACTIONS_PER_PASS = 24;
 const BOT_PASS_BUDGET_MS = 40;
 const identifier = (value: unknown): value is string => typeof value === 'string' && /^[A-Za-z0-9:_-]{1,128}$/.test(value);
 
-function normalizeSettings(input: unknown): { mapId: string; mapVersion: string } {
-  try { return resolveDistrictMapSettings(input); }
+function normalizeSettings(input: unknown, schemaVersion: 1 | 2): { mapId: string; mapVersion: string } {
+  try { return resolveDistrictMapSettings(input, schemaVersion); }
   catch { throw new SessionError('INVALID_SETTINGS', 'Выберите доступную карту.'); }
 }
 
-function validateStart(input: StartMatchRequest): void {
+function resolveRoomVersion(rulesVersion: string, contentVersion: string) {
+  const profile = districtProfileForVersion(rulesVersion, contentVersion);
+  if (!profile) return undefined;
+  return { normalizeSettings: (input: unknown) => normalizeSettings(input, profile.schemaVersion), botVersion: profile.botVersion };
+}
+
+function validateStart(input: StartMatchRequest) {
   if (!input || !identifier(input.startCommandId) || !identifier(input.roomId)) throw new SessionError('INVALID_ROSTER', 'Проверьте участников комнаты.');
-  if (input.rulesVersion !== DISTRICT_RULES_VERSION || input.contentVersion !== DISTRICT_CONTENT_VERSION) {
+  const version = resolveRoomVersion(input.rulesVersion, input.contentVersion);
+  if (!version) {
     throw new SessionError('INCOMPATIBLE_VERSION', 'Игра обновилась. Создайте новую комнату.', 409);
   }
   if (!Array.isArray(input.participants) || input.participants.length < 2 || input.participants.length > 4) {
@@ -44,12 +51,13 @@ function validateStart(input: StartMatchRequest): void {
       if (!identifier(p.playerId) || p.playerId !== p.controller.playerId || humans.has(p.playerId)) throw new SessionError('INVALID_ROSTER', 'У каждого игрока должно быть одно место.');
       humans.add(p.playerId);
     } else if (p.controller?.kind === 'bot') {
-      if (p.playerId !== null || !['easy', 'normal', 'hard'].includes(p.controller.difficulty) || p.controller.botVersion !== DISTRICT_BOT_VERSION || p.controller.botProfileId !== `district:${p.controller.difficulty}`) {
+      if (p.playerId !== null || !['easy', 'normal', 'hard'].includes(p.controller.difficulty) || p.controller.botVersion !== version.botVersion || p.controller.botProfileId !== `district:${p.controller.difficulty}`) {
         throw new SessionError('INCOMPATIBLE_VERSION', 'Добавьте бота заново.', 409);
       }
     } else throw new SessionError('INVALID_ROSTER', 'Проверьте участников комнаты.');
   }
   if (!humans.size) throw new SessionError('INVALID_ROSTER', 'В комнате должен быть хотя бы один человек.');
+  return version;
 }
 
 function fallback(view: DistrictView): DistrictAction | null {
@@ -104,15 +112,16 @@ export class DistrictRuntime implements GameRuntime {
   }
 
   registration(): GameRegistration {
+    const { rulesVersion, contentVersion } = districtProfileForMap(2);
     return { gameId: 'district', collectionId: 'other', title: 'Район', minPlayers: 2, maxPlayers: 4,
-      supportsBots: true, rulesVersion: DISTRICT_RULES_VERSION, contentVersion: DISTRICT_CONTENT_VERSION,
-      status: 'available', runtime: this, normalizeSettings };
+      supportsBots: true, rulesVersion, contentVersion,
+      status: 'available', runtime: this, normalizeSettings: input => normalizeSettings(input, 2), resolveRoomVersion };
   }
 
   close(): void { this.db.close(); }
 
   async createMatch(input: StartMatchRequest): Promise<{ matchId: string }> {
-    validateStart(input);
+    const version = validateStart(input);
     const hash = digest(input);
     const result = this.db.transaction(() => {
       const previous = this.db.prepare('SELECT * FROM district_matches WHERE start_command_id=? OR room_id=?').get(input.startCommandId, input.roomId) as MatchRow | undefined;
@@ -120,7 +129,7 @@ export class DistrictRuntime implements GameRuntime {
         if (previous.request_hash !== hash) throw new SessionError('START_CONFLICT', 'Партия уже началась.', 409);
         return { matchId: previous.match_id };
       }
-      const settings = normalizeSettings(input.settings);
+      const settings = version.normalizeSettings(input.settings);
       const map = getDistrictMap(settings.mapId, settings.mapVersion);
       if (!map.supportedPlayers.includes(input.participants.length)) throw new SessionError('INVALID_ROSTER', 'Выберите другое число участников.');
       const matchId = randomUUID();
@@ -137,7 +146,7 @@ export class DistrictRuntime implements GameRuntime {
     const row = this.db.prepare('SELECT state,bot_seed FROM district_matches WHERE match_id=?').get(matchId) as { state: string; bot_seed: string } | undefined;
     if (!row) throw new SessionError('MATCH_NOT_FOUND', 'Партия не найдена.', 404);
     const state = JSON.parse(row.state) as DistrictState;
-    if (state.schemaVersion !== 1 || state.rulesVersion !== DISTRICT_RULES_VERSION || state.contentVersion !== DISTRICT_CONTENT_VERSION) {
+    if (districtProfileForVersion(state.rulesVersion, state.contentVersion)?.schemaVersion !== state.schemaVersion || state.map.schemaVersion !== state.schemaVersion) {
       throw new SessionError('INCOMPATIBLE_VERSION', 'Не удалось открыть эту партию.', 409);
     }
     return { state, botSeed: row.bot_seed };

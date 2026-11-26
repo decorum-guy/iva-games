@@ -1,5 +1,6 @@
+import type { DistrictMap } from "@iva-games/district";
 import { AVATARS } from "./types";
-import { DISTRICT_MAPS } from "@iva-games/district";
+import { DISTRICT_ISLAND_MAPS, DISTRICT_MAP_CATALOG, DISTRICT_MAPS, DISTRICT_RULES_VERSION } from "@iva-games/district";
 import { DistrictPanel } from "./District";
 import { districtBotName } from "./districtCopy";
 import { DistrictMapSelect, DistrictLobbyMap } from "./DistrictMap";
@@ -488,6 +489,8 @@ export default function App() {
       !joinedInvitation(i),
   ).length;
   const friendCount = social.incoming.length;
+  const islandMatch = route.page === "rooms" && !!route.roomId && selectedRoom?.gameId === "district" &&
+    (selectedRoom.state === "playing" || selectedRoom.state === "finished") && selectedRoom.rulesVersion !== DISTRICT_RULES_VERSION;
   const title = {
     home: "Iva Games",
     chess: t("Шахматы", "Chess"),
@@ -750,8 +753,8 @@ export default function App() {
                 </button>
               </div>
             </aside>
-            <main className="workspace">
-              <header className="page-heading">
+            <main className={`workspace ${islandMatch ? "district-match-workspace" : ""}`}>
+              {!islandMatch && <header className="page-heading">
                 <div>
                   <p className="greeting">
                     {t("Рады видеть,", "Welcome,")} {user.displayName}
@@ -770,7 +773,7 @@ export default function App() {
                     <span>{t("Создать комнату", "Create room")}</span>
                   </button>
                 )}
-              </header>
+              </header>}
               {offline && (
                 <div className="connection-banner" role="status">
                   <span>
@@ -1362,7 +1365,7 @@ function CreateRoom({
   const game = games.find((item) => item.gameId === gameId);
   const [capacity, setCapacity] = useState(Math.min(game?.maxPlayers || 4, 4));
   const [title, setTitle] = useState("");
-  const [districtMap, setDistrictMap] = useState(DISTRICT_MAPS[0]);
+  const [districtMap, setDistrictMap] = useState<DistrictMap>(DISTRICT_ISLAND_MAPS[0]);
   return (
     <Modal title={t("Новая комната", "New room")} onClose={close}>
       <form
@@ -1515,7 +1518,7 @@ function RoomDetail({
           </button>
         )}
       </div>
-      {lobby && room.gameId === "district" && <DistrictLobbyMap mapId={room.settings.mapId} mapVersion={room.settings.mapVersion} />}
+      {lobby && room.gameId === "district" && <DistrictLobbyMap rulesVersion={room.rulesVersion} mapId={room.settings.mapId} mapVersion={room.settings.mapVersion} />}
       <div className={`room-columns ${room.gameId === "district" && !lobby ? "district-playing-seats" : ""}`}>
         <div className="seats-panel">
           <div className="section-title">
@@ -1913,7 +1916,7 @@ function RoomSettings({
   const { t } = useLanguage();
   const [title, setTitle] = useState(room.title);
   const [capacity, setCapacity] = useState(room.capacity);
-  const [districtMap, setDistrictMap] = useState(DISTRICT_MAPS.find(map => map.id === room.settings.mapId && (room.settings.mapVersion === undefined || map.version === room.settings.mapVersion)) ?? DISTRICT_MAPS[0]);
+  const [districtMap, setDistrictMap] = useState(DISTRICT_MAP_CATALOG.find(map => map.id === room.settings.mapId && (room.settings.mapVersion === undefined || map.version === room.settings.mapVersion)) ?? (room.rulesVersion === DISTRICT_RULES_VERSION ? DISTRICT_MAPS[0] : DISTRICT_ISLAND_MAPS[0]));
   return (
     <Modal title={t("Настройки комнаты", "Room settings")} onClose={close}>
       <form

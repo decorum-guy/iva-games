@@ -1,0 +1,56 @@
+{
+  "$schema": "../map-islands.schema.json",
+  "schemaVersion": 2,
+  "profile": "district@0.3",
+  "theme": "adriatic",
+  "id": "azure-bay",
+  "version": "1",
+  "name": {
+    "ru": "Лазурная бухта",
+    "en": "Azure Bay"
+  },
+  "description": {
+    "ru": "Один город вокруг глубокой бухты. Плотные кварталы и свободные участки у воды.",
+    "en": "One city around a deep bay. Dense neighborhoods and open waterfront lots."
+  },
+  "supportedPlayers": [
+    2,
+    3,
+    4
+  ],
+  "landmasses": 1,
+  "cells": [
+    {"id": "A1", "q": 0, "r": 0, "kind": "lot"},
+    {"id": "A2", "q": 1, "r": 0, "kind": "lot"},
+    {"id": "A3", "q": 2, "r": 0, "kind": "neutral-house"},
+    {"id": "A4", "q": 3, "r": 0, "kind": "lot"},
+    {"id": "A5", "q": 4, "r": 0, "kind": "lot"},
+    {"id": "A6", "q": 5, "r": 0, "kind": "park"},
+    {"id": "B1", "q": -1, "r": 1, "kind": "park"},
+    {"id": "B2", "q": 0, "r": 1, "kind": "neutral-house"},
+    {"id": "B3", "q": 1, "r": 1, "kind": "lot"},
+    {"id": "B4", "q": 2, "r": 1, "kind": "square"},
+    {"id": "B5", "q": 3, "r": 1, "kind": "lot"},
+    {"id": "C1", "q": -1, "r": 2, "kind": "lot"},
+    {"id": "C2", "q": 0, "r": 2, "kind": "lot"},
+    {"id": "C3", "q": 1, "r": 2, "kind": "lot"},
+    {"id": "D1", "q": -2, "r": 3, "kind": "lot"},
+    {"id": "D2", "q": -1, "r": 3, "kind": "lot"},
+    {"id": "D3", "q": 0, "r": 3, "kind": "neutral-house"},
+    {"id": "D4", "q": 1, "r": 3, "kind": "lot"},
+    {"id": "D5", "q": 2, "r": 3, "kind": "park"},
+    {"id": "E1", "q": -2, "r": 4, "kind": "park"},
+    {"id": "E2", "q": -1, "r": 4, "kind": "lot"},
+    {"id": "E3", "q": 0, "r": 4, "kind": "lot"},
+    {"id": "E4", "q": 1, "r": 4, "kind": "lot"},
+    {"id": "E5", "q": 2, "r": 4, "kind": "neutral-house"},
+    {"id": "E6", "q": 3, "r": 4, "kind": "lot"}
+  ],
+  "zones": [
+    {"id": "breakwater", "name": {"ru": "Мол", "en": "Breakwater"}, "cells": ["A1", "A2", "A3", "A4", "A5", "A6"]},
+    {"id": "terraces", "name": {"ru": "Террасы", "en": "Terraces"}, "cells": ["B1", "B2", "B3", "B4", "B5"]},
+    {"id": "old-town", "name": {"ru": "Старый город", "en": "Old Town"}, "cells": ["C1", "C2", "C3"]},
+    {"id": "quay", "name": {"ru": "Набережная", "en": "Quay"}, "cells": ["D1", "D2", "D3", "D4", "D5"]},
+    {"id": "promenade", "name": {"ru": "Променад", "en": "Promenade"}, "cells": ["E1", "E2", "E3", "E4", "E5", "E6"]}
+  ]
+}

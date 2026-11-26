@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { CSSProperties } from "react";
-import { BUILD_COSTS, UPGRADE_COST } from "@iva-games/district";
+import { BUILD_COSTS, incomeForCell, PARK_COST, UPGRADE_COST } from "@iva-games/district";
 import type { Bundle, BuildingKind, DistrictAction, DistrictCell, DistrictOffer, DistrictView, GoalId, ParkOffer, ResourceKind, Resources, TradeOffer } from "@iva-games/district";
 import { PlatformError, request } from "./api";
 import type { Perform } from "./Auth";
 import type { Language, Room } from "./types";
 import { Modal, useLanguage } from "./ui";
+import { DistrictIslandScene } from "./DistrictIslandScene";
+import type { DistrictMapArtKind } from "./DistrictMapArt";
 import { DistrictGlyph } from "./DistrictMap";
 import { buildActionCopy, buildingCopy, districtBotName, eventCopy, goalCopy, localized, phaseCopy, resourceCopy } from "./districtCopy";
 import "./district.css";
@@ -14,8 +16,6 @@ const resourceKinds: ResourceKind[] = ["coins", "materials", "crews"];
 const blankBundle = (): Bundle => ({ coins: 0, materials: 0, crews: 0, lots: [] });
 const blankResources = (): Resources => ({ coins: 0, materials: 0, crews: 0 });
 const COLORS = ["#247f78", "#bd572f", "#7560a5", "#5779a8"];
-const buildCosts = BUILD_COSTS;
-const upgradeCost = UPGRADE_COST;
 const canPay = (resources: Resources, cost: Resources) => resourceKinds.every(key => resources[key] >= cost[key]);
 const displayName = (player: DistrictView["players"][number], lang: Language) =>
   player.isBot ? districtBotName(player.seatIndex, lang) : player.displayName;
@@ -24,6 +24,9 @@ const playerName = (view: DistrictView, lang: Language, id: string) => {
   return player ? displayName(player, lang) : "—";
 };
 const playerColor = (view: DistrictView, id: string | null) => COLORS[(view.players.find(player => player.participantId === id)?.seatIndex ?? 0) % COLORS.length];
+type BuildingPreview = { id: string; kind: DistrictMapArtKind };
+const zoneName = (map: DistrictView["map"], event: NonNullable<DistrictView["event"]>, lang: Language) =>
+  map.schemaVersion === 2 ? map.zones.find(zone => zone.id === event.zoneId)?.name[lang] : undefined;
 type Act = (action: DistrictAction) => Promise<boolean>;
 type Pending = { actionId: string; expectedRevision: number; payload: DistrictAction & { phaseId: string } };
 
@@ -55,6 +58,9 @@ export function DistrictPanel({ room, busy, perform, refresh }: { room: Room; bu
   const [loadError, setLoadError] = useState(false);
   const [clock, setClock] = useState(Date.now());
   const [selected, setSelected] = useState<string | null>(null);
+  const [inspected, setInspected] = useState<string | null>(null);
+  const [preview, setPreview] = useState<BuildingPreview | null>(null);
+  const selectLot = useCallback((id: string | null) => { setPreview(null); setSelected(id); }, []);
   const [pending, setPending] = useState<Pending | null>(null);
   const pendingRef = useRef<Pending | null>(null);
   const [sending, setSending] = useState(false);
@@ -118,11 +124,13 @@ export function DistrictPanel({ room, busy, perform, refresh }: { room: Room; bu
   if (!view) return <section className="district-panel"><h3>{t("Район", "District")}</h3>{loadError ? <button className="button secondary" onClick={() => void load()}>{t("Загрузить игру", "Load game")}</button> : <span className="spinner" />}</section>;
   const locked = busy || sending || pending !== null;
   const currentCell = view.cells.find(cell => cell.id === selected) ?? null;
+  const hoveredCell = view.cells.find(cell => cell.id === inspected && cell.id !== selected);
   const self = view.players.find(player => player.participantId === view.you.participantId)!;
   const seconds = Math.max(0, Math.ceil(((view.deadlineAt ?? clock) - clock) / 1000));
   const countdown = `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
-  const news = view.event ? eventCopy(view.event, lang) : null;
-  return <section className="district-panel" aria-label={t("Игра Район", "District game")}>
+  const news = view.event ? eventCopy(view.event, lang, zoneName(view.map, view.event, lang)) : null;
+  const island = view.map.schemaVersion === 2;
+  return <section className={`district-panel ${island ? "district-island-panel" : ""}`} aria-label={t("Игра Район", "District game")}>
     <header className="district-heading">
       <div><span className="district-eyebrow">{view.map.name[lang]}</span><h3>{t("Район", "District")}</h3></div>
       <div className="district-heading-actions"><span className="district-round">{view.round === 0 ? t("Новый район", "A new district") : <>{t("Раунд", "Round")} <b>{view.round}/{view.totalRounds}</b></>}</span><button className="button small secondary" onClick={() => setHelp(true)}>{t("Как играть", "How to play")}</button></div>
@@ -140,7 +148,8 @@ export function DistrictPanel({ room, busy, perform, refresh }: { room: Room; bu
     <div className="district-layout">
       <div className="district-map-column">
         <div className="district-map-surface">
-          <div className="district-board" role="group" aria-label={t("Карта района", "District map")} style={{ gridTemplateColumns: `repeat(${view.map.width}, minmax(0, 1fr))` }}>
+          {view.map.schemaVersion === 2 ? <DistrictIslandScene map={view.map} view={view} selected={selected} onSelect={selectLot}
+            onInspect={setInspected} preview={view.legal.develop && !sending ? preview : null} /> : <div className="district-board" role="group" aria-label={t("Карта района", "District map")} style={{ gridTemplateColumns: `repeat(${view.map.width}, minmax(0, 1fr))` }}>
             {view.cells.map(cell => {
               const kind = cell.building?.kind ?? cell.kind;
               const name = cell.building ? localized(buildingCopy[cell.building.kind], lang) : cell.kind === "park" ? t(cell.completed ? "Парк" : "Место для парка", cell.completed ? "Park" : "Park site") : cell.kind === "neutral-house" ? t("Нейтральный дом", "Neutral house") : cell.kind === "square" ? t("Площадь", "Square") : t("Участок", "Lot");
@@ -154,8 +163,9 @@ export function DistrictPanel({ room, busy, perform, refresh }: { room: Room; bu
                 {cell.building?.level === 2 && <span className="district-level" aria-label={t("Уровень 2", "Level 2")}>II</span>}
               </button>;
             })}
-          </div>
-          <p className="district-map-hint">{t("Нажмите на участок, чтобы посмотреть его подробнее.", "Select a lot to take a closer look.")}</p>
+          </div>}
+          {hoveredCell && <div className="district-map-tooltip"><CellDetail cell={hoveredCell} view={view} /></div>}
+          {!island && <p className="district-map-hint">{t("Нажмите на участок, чтобы посмотреть его подробнее.", "Select a lot to take a closer look.")}</p>}
         </div>
         {currentCell && <CellDetail cell={currentCell} view={view} />}
         {news && <aside className="district-news"><span aria-hidden="true">☀</span><div><small>{t("Сегодня в районе", "In the district today")}</small><strong>{news.title}</strong><p>{news.description}</p></div></aside>}
@@ -163,7 +173,7 @@ export function DistrictPanel({ room, busy, perform, refresh }: { room: Room; bu
       </div>
       <div className="district-decisions" ref={decisions} tabIndex={-1}>
         <div className="district-phase-title"><h4>{localized(phaseCopy[view.phase], lang)}</h4>{view.deadlineAt !== null && <time aria-label={t("Осталось времени", "Time left")} className={seconds <= 10 ? "urgent" : ""}>{countdown}</time>}</div>
-        {view.you.left && view.phase !== "finished" ? <div className="district-away"><p>{t("Вы вышли из партии. Можно вернуться к следующим решениям.", "You left the game. You can return for the next decisions.")}</p><button className="button primary" disabled={locked || !view.legal.return} onClick={() => void act({ type: "return" })}>{t("Вернуться в игру", "Return to game")}</button></div> : view.phase === "goals" ? <div className="district-goal-choices"><p>{t("Выберите цель. В конце она принесёт ещё 5 очков.", "Choose a goal. It can earn 5 extra points at the end.")}</p>{view.you.goalOptions.map(goal => <GoalCard key={goal} goal={goal} selected={view.you.goal === goal} onClick={() => void act({ type: "choose-goal", goal })} disabled={locked || !view.legal.chooseGoal} />)}{view.you.goal && <p role="status">{t("План выбран. Ждём остальных.", "Plan chosen. Waiting for the others.")}</p>}</div> : view.phase === "negotiation" ? <Negotiation key={`${view.round}:negotiation`} view={view} selected={selected} locked={locked} act={act} /> : view.phase === "auction" ? <Auction key={`${view.round}:auction`} view={view} selected={selected} locked={locked} act={act} /> : view.phase === "development" ? <Development key={`${view.round}:${view.activeParticipantId}`} view={view} selected={selected} locked={locked} act={act} /> : <Results view={view} />}
+        {view.you.left && view.phase !== "finished" ? <div className="district-away"><p>{t("Вы вышли из партии. Можно вернуться к следующим решениям.", "You left the game. You can return for the next decisions.")}</p><button className="button primary" disabled={locked || !view.legal.return} onClick={() => void act({ type: "return" })}>{t("Вернуться в игру", "Return to game")}</button></div> : view.phase === "goals" ? <div className="district-goal-choices"><p>{t("Выберите цель. В конце она принесёт ещё 5 очков.", "Choose a goal. It can earn 5 extra points at the end.")}</p>{view.you.goalOptions.map(goal => <GoalCard key={goal} goal={goal} selected={view.you.goal === goal} onClick={() => void act({ type: "choose-goal", goal })} disabled={locked || !view.legal.chooseGoal} />)}{view.you.goal && <p role="status">{t("План выбран. Ждём остальных.", "Plan chosen. Waiting for the others.")}</p>}</div> : view.phase === "negotiation" ? <Negotiation key={`${view.round}:negotiation`} view={view} selected={selected} locked={locked} act={act} /> : view.phase === "auction" ? <Auction key={`${view.round}:auction`} view={view} selected={selected} locked={locked} act={act} /> : view.phase === "development" ? <Development key={`${view.round}:${view.activeParticipantId}`} view={view} selected={selected} locked={locked} act={act} onPreview={island ? setPreview : undefined} /> : <Results view={view} />}
         {view.phase !== "finished" && <div className="district-wallet"><small>{t("Можно потратить", "Available to spend")}</small><ResourcesLine value={view.you.available} />{resourceKinds.some(key => view.you.reserved[key] > 0) && <p>{t("В предложениях", "Held for offers")}: <ResourcesLine value={view.you.reserved} compact /></p>}</div>}
         {view.legal.leave && <button className="text-button district-leave" disabled={locked} onClick={() => setLeaving(true)}>{t("Выйти из партии", "Leave game")}</button>}
       </div>
@@ -178,7 +188,33 @@ export function DistrictPanel({ room, busy, perform, refresh }: { room: Room; bu
 function CellDetail({ cell, view }: { cell: DistrictCell; view: DistrictView }) {
   const { lang, t } = useLanguage();
   const line = view.incomePreview.find(item => item.lotId === cell.id);
-  return <div className="district-cell-detail"><div><strong>{cell.id} · {cell.building ? localized(buildingCopy[cell.building.kind], lang) : cell.kind === "park" ? t("Парк", "Park") : cell.kind === "neutral-house" ? t("Нейтральный дом", "Neutral house") : cell.kind === "square" ? t("Площадь", "Square") : t("Участок", "Lot")}</strong><p>{cell.ownerId ? playerName(view, lang, cell.ownerId) : cell.kind === "lot" ? t("Продаётся на торгах", "Available at auction") : cell.kind === "neutral-house" ? t("Даёт спрос соседним кафе", "Creates demand for nearby cafes") : cell.kind === "park" ? (cell.completed ? t("Помогает соседним домам и кафе", "Helps nearby houses and cafes") : t("4 монеты + 1 материал + 1 бригада", "4 coins + 1 material + 1 crew")) : t("Общее место для прогулок", "A shared public square")}</p></div>{line && <div><small>{t("Доход в этом раунде", "Income this round")}</small><ResourcesLine value={line} compact /><p className="district-income-formula">{t("Соседи", "Neighbours")}: {t("дома", "houses")} {line.neighbors.houses}, {t("парки", "parks")} {line.neighbors.parks}, {t("мастерские", "workshops")} {line.neighbors.workshops}. {t("Событие", "Event")}: {line.eventCoins > 0 ? "+" : ""}{line.eventCoins}.</p></div>}</div>;
+  const own = cell.ownerId === view.you.participantId;
+  const canBuildHere = own && view.legal.develop && cell.building?.level !== 2;
+  const reserved = view.you.reservedLots.includes(cell.id);
+  const prices = [];
+  if (cell.kind === "park" && !cell.completed) prices.push({ name: t("Разбить парк", "Build park"), cost: PARK_COST });
+  if (canBuildHere && cell.building) prices.push({ name: t("Улучшить", "Upgrade"), cost: UPGRADE_COST });
+  if (canBuildHere && !cell.building) for (const kind of Object.keys(BUILD_COSTS) as BuildingKind[]) {
+    prices.push({ name: localized(buildingCopy[kind], lang), cost: BUILD_COSTS[kind] });
+  }
+  const title = cell.building ? `${localized(buildingCopy[cell.building.kind], lang)} ${cell.building.level === 2 ? "II" : "I"}`
+    : cell.kind === "park" ? (cell.completed ? t("Парк", "Park") : t("Площадка парка", "Park site"))
+      : cell.kind === "neutral-house" ? t("Нейтральный дом", "Neutral house") : cell.kind === "square" ? t("Площадь", "Square") : t("Участок", "Lot");
+  return <div className="district-cell-detail">
+    <div><strong>{cell.id} · {title}</strong>
+      {cell.ownerId && <p>{playerName(view, lang, cell.ownerId)}{reserved && ` · ${t("В предложении", "In an offer")}`}</p>}
+      {cell.kind === "lot" && !cell.ownerId && <p>{view.legal.bid ? t("Торги от 1 монеты", "Bids from 1 coin") : t("Свободный участок", "Unowned lot")}</p>}
+      {cell.kind === "neutral-house" && <p>{t("Даёт спрос соседним кафе", "Creates demand for nearby cafes")}</p>}
+      {cell.kind === "park" && <p>{t("Помогает соседним домам и кафе", "Helps nearby houses and cafes")}</p>}
+      {cell.zoneId && <p>{zoneName(view.map, { kind: "roadworks", row: null, zoneId: cell.zoneId }, lang)}</p>}
+    </div>
+    {prices.length > 0 && <div className="district-cell-prices">{prices.map(({ name, cost }) => <div key={name}>
+      <small>{name}</small><ResourcesLine value={cost} compact />
+    </div>)}</div>}
+    {line && <div><small>{t("Доход в этом раунде", "Income this round")}</small><ResourcesLine value={line} compact />
+      <p className="district-income-formula">{t("Дома", "Houses")} {line.neighbors.houses} · {t("Парки", "Parks")} {line.neighbors.parks} · {t("Мастерские", "Workshops")} {line.neighbors.workshops}{line.eventCoins !== 0 && ` · ${t("Событие", "Event")} ${line.eventCoins > 0 ? "+" : ""}${line.eventCoins}`}</p>
+    </div>}
+  </div>;
 }
 
 function Negotiation({ view, selected, locked, act }: { view: DistrictView; selected: string | null; locked: boolean; act: Act }) {
@@ -262,9 +298,9 @@ function ParkForm({ view, offer, selected, act, locked, done }: { view: District
   const { t, lang } = useLanguage();
   const parks = view.cells.filter(cell => cell.kind === "park" && !cell.completed);
   const [parkId, setParkId] = useState(offer?.parkId ?? (parks.some(cell => cell.id === selected) ? selected! : parks[0]?.id ?? ""));
-  const [contributions, setContributions] = useState(offer?.contributions.map(item => structuredClone(item)) ?? [{ participantId: view.you.participantId, resources: { coins: 4, materials: 1, crews: 1 } }]);
+  const [contributions, setContributions] = useState(offer?.contributions.map(item => structuredClone(item)) ?? [{ participantId: view.you.participantId, resources: { ...PARK_COST } }]);
   const totals = contributions.reduce((total, item) => ({ coins: total.coins + item.resources.coins, materials: total.materials + item.resources.materials, crews: total.crews + item.resources.crews }), blankResources());
-  const valid = totals.coins === 4 && totals.materials === 1 && totals.crews === 1 && contributions.every(item => resourceKinds.some(key => item.resources[key] > 0));
+  const valid = resourceKinds.every(key => totals[key] === PARK_COST[key]) && contributions.every(item => resourceKinds.some(key => item.resources[key] > 0));
   if (!parks.length) return <p>{t("Все парки уже построены.", "All parks are already built.")}</p>;
   return <form className="district-park-form" onSubmit={event => { event.preventDefault(); void act(offer ? { type: "replace-park", offerId: offer.id, version: offer.version, parkId, contributions } : { type: "offer-park", parkId, contributions }).then(ok => { if (ok) done(); }); }}>
     <p>{t("Парк помогает всем соседним домам и кафе. Можно оплатить одному или поделить цену.", "A park helps every nearby house and cafe. Pay alone or share the cost.")}</p>
@@ -309,7 +345,7 @@ function Auction({ view, selected, act, locked }: { view: DistrictView; selected
   </div>;
 }
 
-function Development({ view, selected, act, locked }: { view: DistrictView; selected: string | null; act: Act; locked: boolean }) {
+function Development({ view, selected, act, locked, onPreview }: { view: DistrictView; selected: string | null; act: Act; locked: boolean; onPreview?: (preview: BuildingPreview | null) => void }) {
   const { t, lang } = useLanguage();
   const owned = view.cells.filter(cell => cell.ownerId === view.you.participantId && (!cell.building || cell.building.level === 1));
   const [choice, setChoice] = useState(owned.some(cell => cell.id === selected) ? selected! : owned[0]?.id ?? "");
@@ -320,7 +356,33 @@ function Development({ view, selected, act, locked }: { view: DistrictView; sele
   }, [selected, owned]);
   const cell = owned.find(item => item.id === choice);
   if (!view.legal.develop) return <div className="district-waiting"><DistrictGlyph kind="house" /><strong>{playerName(view, lang, view.activeParticipantId ?? "")}</strong><p>{t("Сейчас строит. Ваш ход ещё впереди или уже завершён.", "Is taking a building turn. Your turn is coming or has already finished.")}</p></div>;
-  return <div className="district-development"><p>{t("Одно действие: стройте, улучшайте или работайте за 2 монеты.", "Take one action: build, upgrade or work for 2 coins.")}</p>{owned.length > 0 && <label>{t("Ваша недвижимость", "Your property")}<select aria-label={t("Ваша недвижимость", "Your property")} value={choice} onChange={event => setChoice(event.target.value)}>{owned.map(item => <option value={item.id} key={item.id}>{item.id} · {item.building ? localized(buildingCopy[item.building.kind], lang) : t("Пустой участок", "Empty lot")}</option>)}</select></label>}{cell && !cell.building ? <div className="district-build-choices">{(["house", "cafe", "workshop"] as const).map(kind => <button className="district-build-choice" key={kind} disabled={locked || !canPay(view.you.available, buildCosts[kind])} onClick={() => void act({ type: "build", lotId: cell.id, building: kind })}><DistrictGlyph kind={kind} /><span><strong>{localized(buildActionCopy[kind], lang)}</strong><small>{kind === "house" ? t("Даёт монеты и бригаду", "Produces coins and a crew") : kind === "cafe" ? t("Больше дохода рядом с домами", "Earns more beside houses") : t("Даёт материалы, мешает соседям", "Produces materials, affects neighbours")}</small><ResourcesLine value={buildCosts[kind]} compact /></span></button>)}</div> : cell?.building && <button className="district-build-choice" disabled={locked || !canPay(view.you.available, upgradeCost)} onClick={() => void act({ type: "upgrade", lotId: cell.id })}><DistrictGlyph kind={cell.building.kind} /><span><strong>{t("Улучшить до уровня 2", "Upgrade to level 2")}</strong><small>{t("Ещё 1 монета дохода каждый раунд", "Earn 1 extra coin each round")}</small><ResourcesLine value={upgradeCost} compact /></span></button>}
+  function construction(kind: BuildingKind, level: 1 | 2, lot: DistrictCell) {
+    const cost = level === 1 ? BUILD_COSTS[kind] : UPGRADE_COST;
+    const projected = incomeForCell(view.cells, { ...lot, building: { kind, level } }, view.event);
+    const action: DistrictAction = level === 1 ? { type: "build", lotId: lot.id, building: kind } : { type: "upgrade", lotId: lot.id };
+    const affordable = canPay(view.you.available, cost);
+    const preview = () => onPreview?.({ id: lot.id, kind: `${kind}${level}` });
+    return <div key={kind} onPointerEnter={preview} onPointerLeave={() => onPreview?.(null)}>
+      <button className="district-build-choice" disabled={locked || !affordable} onFocus={preview} onBlur={() => onPreview?.(null)}
+        onClick={() => { onPreview?.(null); void act(action); }}>
+        <DistrictGlyph kind={kind} />
+        <span><strong>{level === 1 ? localized(buildActionCopy[kind], lang) : t("Улучшить до уровня 2", "Upgrade to level 2")}</strong>
+          <ResourcesLine value={cost} compact />
+          {projected && <small className="district-construction-income">{t("Доход в этом раунде", "Income this round")} <ResourcesLine value={projected} compact /></small>}
+          {!affordable && <small>{t("Не хватает ресурсов", "Not enough resources")}</small>}
+        </span>
+      </button>
+    </div>;
+  }
+  return <div className="district-development">
+    <p>{t("Одно действие: стройте, улучшайте или работайте за 2 монеты.", "Take one action: build, upgrade or work for 2 coins.")}</p>
+    {owned.length > 0 && <label>{t("Ваша недвижимость", "Your property")}
+      <select aria-label={t("Ваша недвижимость", "Your property")} value={choice} onChange={event => { onPreview?.(null); setChoice(event.target.value); }}>
+        {owned.map(item => <option value={item.id} key={item.id}>{item.id} · {item.building ? localized(buildingCopy[item.building.kind], lang) : t("Пустой участок", "Empty lot")}</option>)}
+      </select>
+    </label>}
+    {cell && <div className="district-build-choices">{cell.building ? construction(cell.building.kind, 2, cell)
+      : (["house", "cafe", "workshop"] as const).map(kind => construction(kind, 1, cell))}</div>}
     <button className="button secondary wide" disabled={locked} onClick={() => void act({ type: "work" })}>{t("Поработать · +2 монеты", "Work · +2 coins")}</button>
   </div>;
 }
@@ -341,7 +403,7 @@ function History({ view }: { view: DistrictView }) {
 
 function HistoryDetail({ view, type, data }: { view: DistrictView; type: string; data: Record<string, unknown> }) {
   const { t, lang } = useLanguage();
-  if (type === "event" && data.event) { const copy = eventCopy(data.event as NonNullable<DistrictView["event"]>, lang); return <p>{copy.title} · {copy.description}</p>; }
+  if (type === "event" && data.event) { const event = data.event as NonNullable<DistrictView["event"]>; const copy = eventCopy(event, lang, zoneName(view.map, event, lang)); return <p>{copy.title} · {copy.description}</p>; }
   if (type === "bank") return <p>{data.direction === "buy" ? t("Покупка", "Bought") : t("Продажа", "Sold")} · {String(data.quantity ?? "")} {typeof data.resource === "string" && data.resource in resourceCopy ? localized(resourceCopy[data.resource as ResourceKind], lang).toLocaleLowerCase(lang) : ""}</p>;
   if (type === "build" || type === "upgrade") { const building = data.building as { kind?: BuildingKind; level?: number } | undefined; return <p>{typeof data.lotId === "string" ? data.lotId : ""}{building?.kind && building.kind in buildingCopy ? ` · ${localized(buildingCopy[building.kind], lang)} ${building.level}` : ""}</p>; }
   if (type === "park") return <div><strong>{typeof data.parkId === "string" ? data.parkId : ""}</strong>{Array.isArray(data.contributions) && (data.contributions as Array<{ participantId: string; resources: Resources }>).map(item => <p key={item.participantId}>{playerName(view, lang, item.participantId)}: <ResourcesLine value={item.resources} compact /></p>)}</div>;

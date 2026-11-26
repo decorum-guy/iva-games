@@ -5,14 +5,17 @@ import { createHash } from 'node:crypto';
 import { performance } from 'node:perf_hooks';
 import { applyDistrictAction, assertDistrictInvariants, advanceDistrictTime, createDistrictState, parkIntentSignature, tradeIntentSignature } from '../src/core';
 import { chooseDistrictBotAction } from '../src/bot';
-import { DISTRICT_MAPS } from '../src/maps';
+import { DISTRICT_ISLAND_MAPS, DISTRICT_MAPS } from '../src/maps';
 import { viewDistrict } from '../src/view';
 import { runParkProbe } from './park-probe';
+import { districtProfileForMap } from '../src/types';
 import type { BotNegotiationMemory, DistrictAction, DistrictState, DistrictView } from '../src/types';
 import type { BotDifficulty, Participant } from '@iva-games/session-kit';
 
 type Step = { now: number; participantId?: string; action?: DistrictAction; hash: string };
-const output = resolve('.qa/district-simulation');
+const islands = process.argv.includes('--islands');
+const catalog = islands ? DISTRICT_ISLAND_MAPS : DISTRICT_MAPS;
+const output = islands ? resolve('.qa/district-simulation/islands') : resolve('.qa/district-simulation');
 mkdirSync(output, { recursive: true });
 const hash = (state: DistrictState): string => createHash('sha256').update(JSON.stringify(state)).digest('hex');
 const samples: number[] = [];
@@ -59,12 +62,12 @@ function synchronizeDriver(book: BotNegotiationMemory, view: DistrictView, obser
   return book;
 }
 
-for (const map of DISTRICT_MAPS) for (const seats of [2, 3, 4]) for (const group of groups) for (let seedIndex = 0; seedIndex < 4; seedIndex++) {
+for (const map of catalog) for (const seats of [2, 3, 4]) for (const group of groups) for (let seedIndex = 0; seedIndex < 4; seedIndex++) {
   const difficulties = Array.from({ length: seats }, (_, i): BotDifficulty => group === 'mixed' ? kinds[(seedIndex + i) % 3] : group);
   const participants: Participant[] = difficulties.map((difficulty, i) => ({
     participantId: `seat-${i}`, playerId: i === 0 ? 'synthetic-human' : null,
     displayName: i === 0 ? 'Scripted human seat' : `Bot ${i}`, seatIndex: i,
-    controller: i === 0 ? { kind: 'human', playerId: 'synthetic-human' } : { kind: 'bot', botProfileId: `district:${difficulty}`, botVersion: '1', difficulty },
+    controller: i === 0 ? { kind: 'human', playerId: 'synthetic-human' } : { kind: 'bot', botProfileId: `district:${difficulty}`, botVersion: districtProfileForMap(map.schemaVersion).botVersion, difficulty },
   }));
   const identity = `${map.id}-${seats}-${group}-${seedIndex}`;
   // Same rule seed and decision streams across maps permit matched comparisons.
@@ -126,6 +129,8 @@ for (const map of DISTRICT_MAPS) for (const seats of [2, 3, 4]) for (const group
     completedTrades: state.history.filter(entry => entry.type === 'trade').length,
     parks: state.history.filter(entry => entry.type === 'park').length,
     buildings: Object.fromEntries(['house', 'cafe', 'workshop'].map(kind => [kind, state.cells.filter(cell => cell.building?.kind === kind).length])),
+    incomeCoins: state.history.filter(entry => entry.type === 'income').reduce((total, entry) =>
+      total + Object.values(entry.data.totals as Record<string, { coins: number }>).reduce((coins, resources) => coins + resources.coins, 0), 0),
     finalHash: hash(state), simulatedSeconds: (now - input.now) / 1_000,
   };
   gameResults.push(result); transitions += tape.length;
@@ -134,10 +139,15 @@ for (const map of DISTRICT_MAPS) for (const seats of [2, 3, 4]) for (const group
 samples.sort((a, b) => a - b);
 const summary = {
   schema: 'district-simulation-v1', policySeedDomain: POLICY_SEED_DOMAIN, games: gameResults.length, transitions, replayedTransitions: transitions,
-  maps: DISTRICT_MAPS.map(map => `${map.id}@${map.version}`), seats: [2, 3, 4], groups, seedsPerGroup: 4,
+  maps: catalog.map(map => `${map.id}@${map.version}`),
+  degrees: Object.fromEntries(catalog.map(map => [
+    map.id, map.schemaVersion === 2 ? map.geometry.hexes.map(hex => hex.neighborIds.length)
+      : Array.from({ length: 25 }, (_, i) => 4 - Number(i % 5 === 0 || i % 5 === 4) - Number(i < 5 || i >= 20)),
+  ])),
+  unfinished: 0, errors: 0, seats: [2, 3, 4], groups, seedsPerGroup: 4,
   policyCalls: samples.length, policyP50Ms: samples[Math.floor(samples.length * .5)], policyP95Ms: samples[Math.floor(samples.length * .95)], policyMaxMs: samples.at(-1),
   limits: 'Pure-core synthetic matches: one scripted human seat plus ordinary bots, simulated clock, JSON restart and exact replay. Not a browser/network test, human playtest, rating calibration or proof of balance.',
   results: gameResults,
 };
 writeFileSync(resolve(output, 'summary.json'), JSON.stringify(summary, null, 2));
-console.info(JSON.stringify({ ...summary, results: `${gameResults.length} per-match records in ignored .qa/district-simulation/summary.json` }, null, 2));
+console.info(JSON.stringify({ ...summary, results: `${gameResults.length} per-match records in ${output}/summary.json` }, null, 2));

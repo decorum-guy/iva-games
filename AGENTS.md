@@ -1,12 +1,12 @@
 # Iva Games — latest project direction
 
-## Current owner request: replace District's map with rich 2.5D geography
+## Current District stage: local 2.5D implementation ready for owner review
 
 On 26 November 2026, after PR #17's technical Mac acceptance, the owner personally opened the District map and rejected its simple square-grid appearance. He has not yet reviewed the rest of the game. The next priority is a complete Colonist-inspired 2.5D city scene, three genuinely different land shapes (one coastal landmass, two shores, four islands), and a data-driven path to dozens of maps. **No full 3D or Blender in this task.** The main web agent has inspected the owner's live Colonist tab, action-cost hovers and road placement; this is a visual reference, not a complete Colonist rules/catalogue audit.
 
 The main web agent prepares the concrete direction and executor prompt; **the implementation belongs to the local GPT-6.2 Sol agent**. Sol may use actual GPT-6.2 Astra subagents with `reasoning_effort=low` for bounded implementation tasks under explicit contracts, and owns architecture, integration and verification. Never claim an unavailable model was run or equate low effort with no reasoning.
 
-Read [MAP_ART_DIRECTION](games/district/MAP_ART_DIRECTION.md) and execute [IMPLEMENT_DISTRICT_25D_MAPS](prompts/IMPLEMENT_DISTRICT_25D_MAPS.md). The instruction package is in `docs/district-25d-map-direction`, based on accepted technical source `337d418a4670f767618131a4612dd26eff04a7b4` / `codex/district-acceptance-20261126` / PR #17. Check current refs and integrated descendants before starting. This package is documentation only: new geography and rendering have not yet been implemented.
+Read [MAP_ART_DIRECTION](games/district/MAP_ART_DIRECTION.md) and execute [IMPLEMENT_DISTRICT_25D_MAPS](prompts/IMPLEMENT_DISTRICT_25D_MAPS.md). The instruction package is in `docs/district-25d-map-direction`, based on accepted technical source `337d418a4670f767618131a4612dd26eff04a7b4` / `codex/district-acceptance-20261126` / PR #17. Check current refs and integrated descendants before starting. PR #18 contains the instruction package. Implementation and isolated Mac verification are in PR #19. See [District status](games/district/STATUS.md) and [v0.3 Mac validation](games/district/VALIDATION_25D_MAC_2026_11_26.md).
 
 The initial 5×5 limitation below is now the **legacy v0.2 compatibility contract**, not a reason to refuse the new map request. Introduce an explicit new profile/schema for hex neighbourhoods, real water-separated islands and event zones; preserve old matches, lobbies, snapshots and receipts. Retain global auctions/trades, current prices/timers as a control, mandatory bots and 2–4 seats. Do not silently import Colonist's roads, ships, dice or development-card economy. Gemini's pending ideas remain separate.
 

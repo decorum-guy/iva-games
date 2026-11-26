@@ -1,3 +1,5 @@
+import type { GameRegistration as SessionRegistration } from '@iva-games/session-kit';
+
 export type Difficulty = 'easy' | 'normal' | 'hard';
 export type Controller =
   | { kind: 'human'; playerId: string }
@@ -42,7 +44,7 @@ export interface GameRuntime {
   }): Promise<unknown>;
   status?(matchId: string): Promise<{ finished: boolean; outcome?: unknown }>;
 }
-export interface GameRegistration {
+export interface GameRegistration extends Pick<SessionRegistration, 'resolveRoomVersion'> {
   gameId: string;
   collectionId?: 'chess' | 'other';
   title: string;
