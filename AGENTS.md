@@ -1,6 +1,12 @@
 # Iva Games — latest project direction
 
-## Active task: independent District audit and authorized main release — 27 November 2026
+## Active release policy: game updates follow main — 28 November 2026
+
+The owner explicitly requested that an ordinary accepted `main` update deliver the current game version through the existing CI/image/deploy pipeline, without a separate manual activation flag. For District, new rooms use the current shipped profile (`district@0.4`); the obsolete `DISTRICT_TERRITORIAL_ENABLED` setting, including an existing `false`, must not select an older profile. This instruction supersedes the previous separate host-activation requirement below. Existing lobbies and matches retain their pinned versions; keep the v0.2/v0.3/v0.4 readers and accepted game rules intact.
+
+Continue authorized development, fixes, checks and routine main releases. Preserve the existing release lock, backup, provenance checks and selective service update. Confirm the exact `DEPLOYED <sha>` record, public catalogue and actual game behavior; publication of code alone is not proof of delivery. Removing the obsolete key from the private host configuration is optional housekeeping through existing administrative access, not an activation prerequisite. Do not broaden CI credentials or repeat SSH/DNS/host setup. See [the current release contract](docs/iva-games/DISTRICT_TERRITORIAL_RELEASE.md) and [the local acceptance task](prompts/ACCEPT_AUTOMATIC_DISTRICT_RELEASE.md). Recorded rollout results belong at the top of [BUILD_STATUS](docs/iva-games/BUILD_STATUS.md).
+
+## Previous task: independent District audit and authorized main release — 27 November 2026
 
 The owner transferred the top-level role to this chat, supplied the implementation and Terra reports, and explicitly requested: independently audit the game, fix demonstrated problems, test again, and publish completed work to `main` so the existing automatic deployment updates the site. This instruction supersedes the earlier requirement to wait for a joint owner/girlfriend playtest before release. Preserve the accepted game rules, old saves, hidden information, chess sources/assets and unrelated demonstrations. Continue the existing candidate; do not start a competing implementation.
 
@@ -12,7 +18,7 @@ The short course is implemented in `QuickTutorial`, with ten real player actions
 
 Main updates use the established CI/image/deploy pipeline. A successful image build is not proof of delivery: verify the exact `DEPLOYED <sha>` record and live health/catalogue. New v0.4 room creation separately depends on the private host's `DISTRICT_TERRITORIAL_ENABLED` setting. Do not infer or change that setting through a broader CI SSH capability or by changing its default merely to get around missing administrative access. Use the existing release lock, backups and compatible-reader rules for any authorized host activation.
 
-## Active task: District interface rework — owner rejection, 27 November 2026
+## Previous task: District interface rework — owner rejection, 27 November 2026
 
 The owner has completed a gameplay review and **rejected the District v0.4 interface**. Technical acceptance does not authorize its release. Continue the existing candidate from `c37cc1ccfe08c91e5a19ad3c11e6871e597a6904`; preserve its rules, large 2.5D map, house art, v0.2/v0.3/v0.4 saves, news privacy and chess isolation. Read [the supplied playtest and implementation contract](games/district/INTERFACE_REWORK_2026_11_27.md). Fix persistent dice/production/blockade explanation, durable trade drafts/status, readable scrollable news, illustrated resources, action pricing/coupons, tactical cards, settings, result/history and meaningful licensed placeholder audio. Bot pacing is real server scheduling, not a frozen client animation. Do not replace confirmed sector pricing with a guessed gameplay fix.
 

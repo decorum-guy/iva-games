@@ -1,14 +1,15 @@
-/** Build and render a deliberately varied town through ordinary HTTP match actions. */
+/** Build a varied town in a saved v0.3 lobby through ordinary HTTP match actions. */
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { join } from 'node:path';
 import { expect } from '@playwright/test';
 
-export async function runDistrictShowcase({ origin, makePlayers, output }) {
+export async function runDistrictShowcase({ origin, makePlayers, createLegacyLobby, output }) {
+  assert.equal(typeof createLegacyLobby, 'function', 'Showcase needs explicit saved-lobby setup');
   const people = await makePlayers(4);
   const [host, ...guests] = people;
-  const { room: created } = await host.client.request('/rooms', {
-    gameId: 'district', capacity: 4, title: 'Лазурная бухта · застроенный город', settings: { mapId: 'azure-bay' },
+  const created = await createLegacyLobby(host, {
+    capacity: 4, title: 'Лазурная бухта · застроенный город', mapId: 'azure-bay',
   });
   const path = '/rooms/' + created.roomId;
   const read = async player => (await player.client.request(path + '/match')).view;

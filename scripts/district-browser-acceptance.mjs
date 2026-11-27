@@ -1,4 +1,4 @@
-/** Full District room playthroughs against isolated built services. */
+/** Full saved-v0.3 room playthroughs against the current isolated built service. */
 import assert from 'node:assert/strict';
 import { expect } from '@playwright/test';
 import { join } from 'node:path';
@@ -14,15 +14,18 @@ const changed = (view, type) => view.history.filter(entry => entry.type === type
 const mapNames = { 'azure-bay': 'Лазурная бухта', 'two-shores': 'Два берега', 'four-islands': 'Четыре острова' };
 const resources = (coins = 0, materials = 0, crews = 0) => ({ coins, materials, crews });
 
-async function createRoom(origin, players, { title, map, bots = [], changeFrom, output }) {
+async function createRoom(origin, players, { title, map, bots = [], changeFrom, output, createLegacyLobby }) {
   const [host, ...guests] = players;
   const { page, client } = host;
-  await page.goto(origin + '/rooms');
-  await button(page, 'Создать комнату').first().click();
+  // Current creation UI correctly offers v0.4. Seed an explicitly historical
+  // lobby, then exercise its actual settings, roster and game through that UI.
+  const created = await createLegacyLobby(host, { title, capacity: players.length + bots.length,
+    mapId: changeFrom ?? map });
+  const roomId = created.roomId;
+  await page.goto(`${origin}/rooms/${roomId}`);
+  await expect(page.getByRole('heading', { name: title, exact: true })).toBeVisible();
+  await button(page, 'Настройки комнаты').click();
   const dialog = page.getByRole('dialog');
-  await dialog.getByLabel('Игра', { exact: false }).first().selectOption('district');
-  await label(dialog, 'Название комнаты').fill(title);
-  await dialog.getByLabel('Мест за столом').selectOption(String(players.length + bots.length));
   const cards = dialog.locator('.district-map-card');
   await expect(cards).toHaveCount(3);
   const previews = [];
@@ -33,11 +36,10 @@ async function createRoom(origin, players, { title, map, bots = [], changeFrom, 
     previews.push(await polygons.evaluateAll(nodes => nodes.map(node => node.getAttribute('points')).join('|')));
   }
   assert.equal(new Set(previews).size, 3);
-  await dialog.getByRole('radio', { name: new RegExp(mapNames[changeFrom ?? map]) }).check();
+  await expect(dialog.getByRole('radio', { name: new RegExp(mapNames[changeFrom ?? map]) })).toBeChecked();
   if (output) await dialog.screenshot({ path: join(output, 'map-catalog.png') });
-  await button(dialog, 'Создать комнату').click();
-  await expect(page.getByRole('heading', { name: title, exact: true })).toBeVisible();
-  const roomId = new URL(page.url()).pathname.split('/').pop();
+  await page.keyboard.press('Escape');
+  await expect(dialog).toBeHidden();
   assert.equal((await roomInfo(host, roomId)).settings.mapId, changeFrom ?? map);
   for (const guest of guests) {
     const invitation = (await client.request(`/rooms/${roomId}/invitations`, { playerId: guest.id })).invitation;
@@ -362,9 +364,9 @@ function leaveGame(page, click) {
   });
 }
 
-async function expireAndLeave({ origin, players, count }) {
+async function expireAndLeave({ origin, players, count, createLegacyLobby }) {
   const [host, guest] = players;
-  const roomId = await createRoom(origin, players, { title: 'Район · время и выход', map: 'two-shores', bots: ['normal'] });
+  const roomId = await createRoom(origin, players, { title: 'Район · время и выход', map: 'two-shores', bots: ['normal'], createLegacyLobby });
   const click = clickAction(roomId, count);
   await click(host.page, host.page.locator('.district-goal-choices button').first());
   const before = await read(guest, roomId);
@@ -397,7 +399,8 @@ async function expireAndLeave({ origin, players, count }) {
   await expect(host.page.getByRole('heading', { name: 'Район опустел' })).toBeVisible();
 }
 
-export async function runDistrictAcceptance({ origin, makePlayers, stop, start, output }) {
+export async function runDistrictAcceptance({ origin, makePlayers, createLegacyLobby, stop, start, output }) {
+  assert.equal(typeof createLegacyLobby, 'function', 'Acceptance needs explicit saved-lobby setup');
   const count = { actions: 0, stale: 0 };
   const matches = [];
   const photographed = new Set();
@@ -410,7 +413,7 @@ export async function runDistrictAcceptance({ origin, makePlayers, stop, start, 
     const people = await makePlayers(fixture.humans);
     const [a, b, c] = people;
     console.info(`Accepting ${fixture.map}: ${fixture.humans} human slots, ${fixture.bots.length} bots`);
-    const roomId = await createRoom(origin, people, { ...fixture, output });
+    const roomId = await createRoom(origin, people, { ...fixture, output, createLegacyLobby });
     const click = clickAction(roomId, count);
     const visited = new Set();
     const result = await finish(people, roomId, click, async view => {
@@ -492,6 +495,6 @@ export async function runDistrictAcceptance({ origin, makePlayers, stop, start, 
   }
   console.info('Accepting real goal deadline, offline recovery, and abandonment');
   const people = await makePlayers(2);
-  await expireAndLeave({ origin, players: people, count });
+  await expireAndLeave({ origin, players: people, count, createLegacyLobby });
   return { matches, photographedBuildings: [...photographed].sort(), acceptedUiActions: count.actions, staleUiActionsRetried: count.stale, mobileWebKitEmulation: 'passed', realGoalDeadlineAndAbandonment: 'passed' };
 }

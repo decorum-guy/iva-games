@@ -3,6 +3,10 @@
 set -euo pipefail
 umask 077
 script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+read -r district_rules district_content < <(
+  cd "$script_dir/../.."
+  node --experimental-strip-types --input-type=module -e 'import { expectedDistrictProfile as profile } from "./scripts/check-live-catalogue.mjs"; console.log(profile.rulesVersion, profile.contentVersion);'
+)
 fixture="$(mktemp)"
 cleanup() {
   local result=$?
@@ -36,6 +40,8 @@ start_runtime() {
       --env MAIL_MODE=disabled
       --env TELEGRAM_AUTH_ENABLED=false
       --env TELEGRAM_ENABLED=false
+      # Existing hosts may retain the retired gate; it must not select old rules.
+      --env DISTRICT_TERRITORIAL_ENABLED=false
     )
   fi
   docker run "${args[@]}" "$IMAGE_TAG" >/dev/null
@@ -63,7 +69,7 @@ import assert from 'node:assert/strict';
 import { accessSync, constants, readFileSync, writeFileSync } from 'node:fs';
 import Database from 'better-sqlite3';
 
-const [kind, phase] = process.argv.slice(2);
+const [kind, phase, districtRules, districtContent] = process.argv.slice(2);
 assert.ok(['chess', 'platform'].includes(kind));
 assert.ok(['initial', 'restored'].includes(phase));
 assert.equal(process.env.NODE_ENV, 'production');
@@ -117,6 +123,9 @@ if (kind === 'platform') {
   const catalogue = await (await get('/api/platform/v1/games')).json();
   assert.ok(catalogue.games.some(game => game.gameId === 'platform-lab' && game.status === 'available'));
   assert.ok(catalogue.games.some(game => game.gameId === 'district' && game.status === 'available' && game.supportsBots && game.maxPlayers === 4));
+  const district = catalogue.games.find(game => game.gameId === 'district');
+  assert.equal(district.rulesVersion, districtRules, 'The production image must serve the current District rules despite a stale false flag');
+  assert.equal(district.contentVersion, districtContent);
   if (phase === 'initial') {
     const response = await get('/api/platform/v1/session');
     assert.match(response.headers.get('set-cookie') ?? '', /__Host-iva_session=/);
@@ -188,7 +197,7 @@ for attempt in {1..30}; do
   sleep 0.1
 done
 test "$client_ready" = true
-docker exec --interactive "$SMOKE_CONTAINER" node --input-type=module - "$IMAGE_KIND" initial < "$fixture"
+docker exec --interactive "$SMOKE_CONTAINER" node --input-type=module - "$IMAGE_KIND" initial "$district_rules" "$district_content" < "$fixture"
 # The client removes this marker on any response, close, error or exit. Check
 # again after the API/static/SQLite fixture, immediately before sending SIGTERM.
 docker exec "$SMOKE_CONTAINER" test -f /tmp/iva-shutdown-client.ready
@@ -199,6 +208,6 @@ docker rm "$SMOKE_CONTAINER" >/dev/null
 # A new container uses the same named volume; no fixture DB is imported.
 start_runtime
 wait_healthy
-docker exec --interactive "$SMOKE_CONTAINER" node --input-type=module - "$IMAGE_KIND" restored < "$fixture"
+docker exec --interactive "$SMOKE_CONTAINER" node --input-type=module - "$IMAGE_KIND" restored "$district_rules" "$district_content" < "$fixture"
 docker stop --timeout 60 "$SMOKE_CONTAINER" >/dev/null
 test "$(docker inspect --format '{{.State.ExitCode}}' "$SMOKE_CONTAINER")" = 0
