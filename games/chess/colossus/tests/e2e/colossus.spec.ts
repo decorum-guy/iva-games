@@ -70,7 +70,7 @@ test('practice editing and an interrupted lesson preserve the ordinary hunt', as
   await expect(page.getByRole('meter', { name: 'Armor', exact: true })).toHaveAttribute('aria-valuenow', '12');
   await openTutorial(page);
   await expect(lesson(page)).toContainText('Read the intention');
-  await expect(board(page).locator('[data-boss="sentinel"]')).toHaveCount(1);
+  await expect(board(page).locator('.flat-boss-footprint[data-boss="sentinel"]')).toBeVisible();
   await menu(page);
   await continueLocal(page);
   await expect(cell(page, 'a4')).toHaveAttribute('aria-label', /^a4, Rook /);

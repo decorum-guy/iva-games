@@ -61,7 +61,19 @@ export async function strike(page: Page, from: string, target: string) {
 export async function playCard(page: Page, id: string, target: string) {
   await mobileIntent(page, false);
   await activate(page.locator(`.hand-cards [data-card="${id}"]`));
-  await activate(cell(page, target));
+  const targetCell = cell(page, target);
+  await expect(targetCell).toBeVisible();
+  await expect.poll(() => targetCell.evaluate(element => {
+    const rect = element.getBoundingClientRect();
+    const hit = document.elementFromPoint(rect.x + rect.width / 2, rect.y + rect.height / 2);
+    return {
+      receivesPointer: hit !== null && element.contains(hit),
+      hitElement: hit?.tagName.toLowerCase() ?? 'outside viewport',
+      hitClass: hit?.getAttribute('class') ?? '',
+    };
+  }), { message: `Card ${id}: target ${target} must remain reachable without an overlapping panel` })
+    .toMatchObject({ receivesPointer: true });
+  await activate(targetCell);
   await activate(page.locator('.card-target-panel').getByRole('button', { name: 'Apply', exact: true }));
 }
 export async function menu(page: Page) {

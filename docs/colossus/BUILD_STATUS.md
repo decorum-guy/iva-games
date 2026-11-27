@@ -27,6 +27,16 @@ The first published checkpoint is [`243ca456`](https://github.com/decorum-guy/iv
 
 The authored `Colossus review` CI runs the browser suite with software WebGL on desktop and two mobile viewports. Actual CI and container results must be attached to the published SHA; authored tests alone are not a pass. The review branch is not merged into main and no production deployment is part of this task.
 
+### CI findings and review fixes
+
+The integrated checkpoint `b13aff44441a22146a491f29bea00ccf4c58094f` was actually run in GitHub Actions:
+
+- [Release images](https://github.com/decorum-guy/iva-games/actions/runs/46064511697) passed both real Docker builds and isolated runtime checks. The chess image served HTML, JS/CSS and API sessions with three SQLite databases; all passed again after replacing the container against the persistent volume. The platform image passed its equivalent two-database checks. Publishing and deployment were skipped for this review branch.
+- [Platform checks](https://github.com/decorum-guy/iva-games/actions/runs/46064511733) passed the root check, infrastructure tests, complete build, platform smoke, portal browser suite and the District interface, trade and audio steps. The territorial browser step was still running when this entry was written; do not infer its result from earlier steps.
+- [Colossus browser review](https://github.com/decorum-guy/iva-games/actions/runs/46064511747) passed 12 of 20 scenarios. This exposed real mobile card-panel overlap, 3D HTML cleanup errors on leaving a scene, and a focused accessible grid covering the view toggle. It also exposed a tutorial assertion matching both the boss wrapper and its SVG. Actual software WebGL context creation, framebuffer pixels and loading ordinary boss GLBs had passed before the teardown failure; that partial evidence is not full 3D acceptance.
+
+This revision resets inherited mobile card-panel offsets, gives every Drei HTML label a stable dedicated portal whose children are owned only by Drei, and reserves space below the focused keyboard grid. The tutorial assertion now selects the unique visible boss wrapper. The card helper additionally checks that the target cell owns the actual pointer hit before tapping; clicks are not forced. Root directly applied Stone Skin to the king at 390×600 after the fix, observing shield 2 and focus reduced from 3 to 2. Targeted TypeScript, ESLint and diff checks passed. The new full browser result belongs to the resulting commit and is recorded in [PR #29](https://github.com/decorum-guy/iva-games/pull/29) and its checks; this entry does not predeclare a pass.
+
 ## Historical implementation — 26 November 2026
 
 Date: 26 November 2026 (Moscow). Rules version: `colossus-v1`.

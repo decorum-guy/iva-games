@@ -1,4 +1,4 @@
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import { Canvas, useFrame, useThree, type ThreeEvent } from '@react-three/fiber';
 import { Html, useGLTF } from '@react-three/drei';
 import * as T from 'three';
@@ -73,9 +73,9 @@ function useOwnedModel(scene: T.Group) {
   return model;
 }
 
-function Figure({ unit, selected, reduced, theme, reaction, onSquare, disabled }: {
+function Figure({ unit, selected, reduced, theme, reaction, onSquare, disabled, htmlPortal }: {
   unit: Unit; selected: boolean; reduced: boolean; theme: string; reaction?: UnitFeedback;
-  onSquare: BoardProps['onSquare']; disabled?: boolean;
+  onSquare: BoardProps['onSquare']; disabled?: boolean; htmlPortal: RefObject<HTMLElement>;
 }) {
   const { scene } = useGLTF(`/assets/colossus/models/${names[unit.type]}.glb`);
   const model = useOwnedModel(scene);
@@ -165,17 +165,17 @@ function Figure({ unit, selected, reduced, theme, reaction, onSquare, disabled }
       <mesh rotation={[-Math.PI / 2, 0, 0]} raycast={noRaycast}><ringGeometry args={[.35, .39, 40]}/><meshBasicMaterial color="#ffe1a0" transparent opacity={.75} depthWrite={false}/></mesh>
       <mesh rotation={[-Math.PI / 2, 0, Math.PI / 4]} raycast={noRaycast}><ringGeometry args={[.49, .52, 4]}/><meshBasicMaterial color="#c3e1c9" transparent opacity={.6} depthWrite={false}/></mesh>
     </group>
-    {reaction && (reaction.damage > 0 || reaction.absorbed > 0 || reaction.invulnerable || reaction.promotion) && <Html position={[0, 2.05, 0]} center zIndexRange={[4, 0]} style={{ pointerEvents: 'none' }}><span className={`scene-impact ${reaction.promotion ? 'promotion' : reaction.damage ? 'wound' : 'ward'}`} ref={floating}>{reaction.promotion ? '✦' : <>{reaction.damage ? `−${reaction.damage}` : ''}{reaction.absorbed ? ` ⬡${reaction.absorbed}` : ''}{reaction.invulnerable ? '◇' : ''}</>}</span></Html>}
+    {reaction && (reaction.damage > 0 || reaction.absorbed > 0 || reaction.invulnerable || reaction.promotion) && <Html portal={htmlPortal} position={[0, 2.05, 0]} center zIndexRange={[4, 0]} style={{ pointerEvents: 'none' }}><span className={`scene-impact ${reaction.promotion ? 'promotion' : reaction.damage ? 'wound' : 'ward'}`} ref={floating}>{reaction.promotion ? '✦' : <>{reaction.damage ? `−${reaction.damage}` : ''}{reaction.absorbed ? ` ⬡${reaction.absorbed}` : ''}{reaction.invulnerable ? '◇' : ''}</>}</span></Html>}
     {unit.hp > 0 && <>
-      <Html position={[0, 1.62, 0]} center zIndexRange={[3, 0]} className="scene-hp-wrap" style={{ pointerEvents: 'none' }}><span className={`scene-hp ${unit.activated ? 'spent' : ''}`}><b>{unit.hp}</b>{unit.shield > 0 && <em>⬡{unit.shield}</em>}{unit.invulnerable > 0 && <em>◇{unit.invulnerable}</em>}{unit.attackBonus > 0 && <em>+{unit.attackBonus}</em>}{unit.armorTip && <em>⌁</em>}{unit.activated && <i>✓</i>}</span></Html>
+      <Html portal={htmlPortal} position={[0, 1.62, 0]} center zIndexRange={[3, 0]} className="scene-hp-wrap" style={{ pointerEvents: 'none' }}><span className={`scene-hp ${unit.activated ? 'spent' : ''}`}><b>{unit.hp}</b>{unit.shield > 0 && <em>⬡{unit.shield}</em>}{unit.invulnerable > 0 && <em>◇{unit.invulnerable}</em>}{unit.attackBonus > 0 && <em>+{unit.attackBonus}</em>}{unit.armorTip && <em>⌁</em>}{unit.activated && <i>✓</i>}</span></Html>
       {(selected || unit.shield > 0 || unit.invulnerable > 0) && <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, .015, 0]} raycast={noRaycast}><ringGeometry args={[.38, .42, 32]}/><meshBasicMaterial color={unit.invulnerable ? '#a4e6e4' : unit.shield ? '#b4d7b2' : '#f1d393'} transparent opacity={.9}/></mesh>}
     </>}
   </group>;
 }
 
-function Enemy({ boss, reduced, rest, feedback, onSquare, targets, disabled }: {
+function Enemy({ boss, reduced, rest, feedback, onSquare, targets, disabled, htmlPortal }: {
   boss: Boss; reduced: boolean; rest: boolean; feedback: BattleFeedback | null;
-  onSquare: BoardProps['onSquare']; targets: number[]; disabled?: boolean;
+  onSquare: BoardProps['onSquare']; targets: number[]; disabled?: boolean; htmlPortal: RefObject<HTMLElement>;
 }) {
   const { scene } = useGLTF(`/assets/colossus/models/${boss.id}.glb`);
   const model = useOwnedModel(scene);
@@ -235,7 +235,7 @@ function Enemy({ boss, reduced, rest, feedback, onSquare, targets, disabled }: {
   };
   return <group ref={group} position={initial.current} onClick={click} onPointerOver={event => { event.stopPropagation(); if (!disabled) document.body.style.cursor = 'pointer'; }} onPointerOut={() => { document.body.style.cursor = ''; }}>
     <group ref={motion}><primitive object={model}/></group>
-    {feedback && (feedback.bossArmor > 0 || feedback.bossDamage > 0) && <Html position={[0, 2.75, 0]} center zIndexRange={[4, 0]} style={{ pointerEvents: 'none' }}><span className="scene-impact boss-impact" ref={floating}>{feedback.bossArmor > 0 ? `⬡ −${feedback.bossArmor}` : ''}{feedback.bossDamage > 0 ? ` ♥ −${feedback.bossDamage}` : ''}</span></Html>}
+    {feedback && (feedback.bossArmor > 0 || feedback.bossDamage > 0) && <Html portal={htmlPortal} position={[0, 2.75, 0]} center zIndexRange={[4, 0]} style={{ pointerEvents: 'none' }}><span className="scene-impact boss-impact" ref={floating}>{feedback.bossArmor > 0 ? `⬡ −${feedback.bossArmor}` : ''}{feedback.bossDamage > 0 ? ` ♥ −${feedback.bossDamage}` : ''}</span></Html>}
   </group>;
 }
 
@@ -295,7 +295,8 @@ function Arena({ palette }: { palette: typeof materials.ivory }) {
   </group>;
 }
 
-function Scene(p: BoardProps) {
+function Scene(p: BoardProps & { htmlPortal: RefObject<HTMLElement> }) {
+  const htmlPortal = p.htmlPortal;
   const body = bossCells(p.state.boss), threats = new Set(p.preview?.threatenedCells ?? []), palette = materials[p.theme ?? 'ivory'];
   const previous = useRef(p.state);
   const feedback = useMemo(() => battleFeedback(previous.current, p.state), [p.state]);
@@ -322,12 +323,12 @@ function Scene(p: BoardProps) {
         {p.guideSquares?.includes(square) && <GuideMarker reduced={!!p.reducedMotion}/>}
       </group>;
     })}
-    {Array.from({ length: 8 }, (_, i) => <group key={`coords${i}`}><Html position={[i - 3.5, .13, 4.18]} center zIndexRange={[1, 0]} style={{ pointerEvents: 'none' }}><span className="scene-coordinate">{String.fromCharCode(97 + i)}</span></Html><Html position={[-4.19, .13, 3.5 - i]} center zIndexRange={[1, 0]} style={{ pointerEvents: 'none' }}><span className="scene-coordinate">{i + 1}</span></Html></group>)}
+    {Array.from({ length: 8 }, (_, i) => <group key={`coords${i}`}><Html portal={htmlPortal} position={[i - 3.5, .13, 4.18]} center zIndexRange={[1, 0]} style={{ pointerEvents: 'none' }}><span className="scene-coordinate">{String.fromCharCode(97 + i)}</span></Html><Html portal={htmlPortal} position={[-4.19, .13, 3.5 - i]} center zIndexRange={[1, 0]} style={{ pointerEvents: 'none' }}><span className="scene-coordinate">{i + 1}</span></Html></group>)}
     {p.state.fire.map(square => <FireCell key={square} square={square} reduced={!!p.reducedMotion}/>)}
     <ResponseEffects feedback={feedback} reduced={!!p.reducedMotion} boss={p.state.boss}/>
     <Suspense fallback={null}>
-      <Enemy key={p.state.boss.id} boss={p.state.boss} reduced={!!p.reducedMotion} rest={p.state.intent.rest} feedback={feedback} onSquare={p.onSquare} targets={p.attackTargets} disabled={p.disabled}/>
-      {p.state.units.map(unit => <Figure key={unit.id} unit={unit} selected={unit.id === p.selected} reduced={!!p.reducedMotion} theme={p.theme ?? 'ivory'} reaction={feedback?.units[unit.id]} onSquare={p.onSquare} disabled={p.disabled}/>)}
+      <Enemy htmlPortal={htmlPortal} key={p.state.boss.id} boss={p.state.boss} reduced={!!p.reducedMotion} rest={p.state.intent.rest} feedback={feedback} onSquare={p.onSquare} targets={p.attackTargets} disabled={p.disabled}/>
+      {p.state.units.map(unit => <Figure htmlPortal={htmlPortal} key={unit.id} unit={unit} selected={unit.id === p.selected} reduced={!!p.reducedMotion} theme={p.theme ?? 'ivory'} reaction={feedback?.units[unit.id]} onSquare={p.onSquare} disabled={p.disabled}/>)}
     </Suspense>
   </>;
 }
@@ -335,12 +336,19 @@ function Scene(p: BoardProps) {
 export function Board3D(p: BoardProps) {
   const [lost, setLost] = useState(false), [focus, setFocus] = useState(4);
   const keyboard = useRef<HTMLDivElement>(null);
+  const [htmlPortal, setHtmlPortal] = useState<RefObject<HTMLElement> | null>(null);
+  const attachHtmlPortal = useCallback((element: HTMLDivElement | null) => {
+    // Retain the target even after its DOM wrapper detaches: R3F can finish its
+    // own teardown later. React owns this empty layer; only Drei owns its children.
+    if (element) setHtmlPortal(current => current?.current === element ? current : { current: element });
+  }, []);
   const onLost = useCallback(() => setLost(true), []);
   if (lost) return <><div className="board-scene-fallback-note" role="status">{copy[p.lang].fallback3d}</div><Board2D {...p}/></>;
   return <div className="board-scene" data-testid="board-3d">
-    <Canvas orthographic shadows dpr={[1, 1.5]} camera={{ position: [0, 11.8, 10.4], zoom: 45, near: .1, far: 80 }} gl={{ antialias: true, alpha: true, powerPreference: 'high-performance' }} onCreated={({ gl }) => { gl.toneMapping = T.ACESFilmicToneMapping; gl.toneMappingExposure = 1.12; }}>
-      <ContextWatch onLost={onLost}/><Scene {...p}/>
-    </Canvas>
+    <div ref={attachHtmlPortal} className="scene-html-layer" data-testid="board-3d-labels" aria-hidden="true"/>
+    {htmlPortal && <Canvas orthographic shadows dpr={[1, 1.5]} camera={{ position: [0, 11.8, 10.4], zoom: 45, near: .1, far: 80 }} gl={{ antialias: true, alpha: true, powerPreference: 'high-performance' }} onCreated={({ gl }) => { gl.toneMapping = T.ACESFilmicToneMapping; gl.toneMappingExposure = 1.12; }}>
+      <ContextWatch onLost={onLost}/><Scene {...p} htmlPortal={htmlPortal}/>
+    </Canvas>}
     <div ref={keyboard} className="sr-only scene-keyboard-grid" role="grid" aria-label={p.lang === 'ru' ? 'Доступная доска' : 'Accessible board'} aria-disabled={!!p.disabled}>
       {Array.from({ length: 8 }, (_, row) => <div key={row} role="row">{Array.from({ length: 8 }, (_, file) => {
         const square = (7 - row) * 8 + file, unit = p.state.units.find(item => item.square === square);
