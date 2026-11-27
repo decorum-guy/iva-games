@@ -308,7 +308,7 @@ describe('SQLite replay and paced bots', () => {
       writeFileSync(process.env.DISTRICT_PACING_REPORT_PATH, JSON.stringify({
         schema: 'district-table-pacing-measurements@1', measuredThrough: 'TerritoryRuntime + SQLite, controlled clock, 32 fixed bot seeds per category',
         wallClockGameDurationMeasured: false, browserAccepted: false,
-        command: 'DISTRICT_PACING_REPORT_PATH=games/district/VALIDATION_TABLE_FEEDBACK_2026_11_27.json npx vitest run --project district games/district/tests/territorial-table-feedback.test.ts',
+        command: 'DISTRICT_PACING_REPORT_PATH=.qa/district/table-feedback.json npx vitest run --project district games/district/tests/territorial-table-feedback.test.ts',
         sourceHashes: Object.fromEntries(files.map(file => [file, createHash('sha256').update(readFileSync(file)).digest('hex')])),
         previous: { actionLoopMaximum: 32, computeBudgetMs: 65, perActionDelayMs: 0, humanResponseWindowMs: 8_000 },
         current: { attemptsPerPollMaximum: 4, setupMs: [650, 1_200], importantMs: [1_000, 4_000], rareImportantMs: [4_200, 4_900],

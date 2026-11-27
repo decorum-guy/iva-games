@@ -599,7 +599,9 @@ export function viewTerritory(s: TerritoryState, id: string, now: number, clone 
       canAccept: offer.targetId === id && phase === 'play' && !s.left.includes(id) &&
         covers(s.players[offer.authorId].hand, offer.give) && covers(s.players[offer.targetId].hand, offer.receive),
       ...(!covers(s.players[offer.authorId].hand, offer.give) ? { unavailableReason: 'author-resources' as const } :
-        !covers(s.players[offer.targetId].hand, offer.receive) ? { unavailableReason: 'target-resources' as const } : {}),
+        // Only the recipient can inspect their own shortage. Publishing it to the
+        // sender would turn unanswered proposals into probes of a hidden hand.
+        offer.targetId === id && !covers(s.players[id].hand, offer.receive) ? { unavailableReason: 'target-resources' as const } : {}),
     })),
     offerHistory: (s.offerHistory ?? []).filter(offer => offer.targetId === id || offer.authorId === id),
     history, historyComplete: s.revision === 0 || s.history?.[0]?.revision === 1, latestRoll: s.latestRoll ?? null,

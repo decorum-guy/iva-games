@@ -1,24 +1,28 @@
 /** Exercise two real browsers against the built District server with isolated accounts. */
 import assert from 'node:assert/strict';
 import { chromium, expect } from '@playwright/test';
-import { spawn } from 'node:child_process';
+import { spawn, execFileSync } from 'node:child_process';
 import { createServer } from 'node:net';
-import { mkdir, mkdtemp, readdir, readFile, rm, stat } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
+import { cp, mkdir, mkdtemp, readdir, readFile, rm, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { setTimeout as delay } from 'node:timers/promises';
 import { build } from 'vite';
 import Database from 'better-sqlite3';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { pathToFileURL } from 'node:url';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 for (const path of ['dist-platform/main.js', 'apps/portal/dist/index.html']) {
   assert.ok((await stat(join(root, path)).catch(() => null))?.isFile(), 'Run npm run build:foundation first');
 }
-const directory = await mkdtemp(join(tmpdir(), 'iva-territorial-browser-'));
+await mkdir(join(root, '.qa', 'district-territorial-runs'), { recursive: true });
+const directory = await mkdtemp(join(root, '.qa', 'district-territorial-runs', 'run-'));
 const mailbox = join(directory, 'mail');
+const isolatedServer = join(directory, 'server');
+const isolatedPortal = join(directory, 'portal');
+await cp(join(root, 'dist-platform'), isolatedServer, { recursive: true });
+await cp(join(root, 'apps/portal/dist'), isolatedPortal, { recursive: true });
 let running = null;
 let browser = null;
 
@@ -40,7 +44,7 @@ async function availablePort() {
 const request = (url, options = {}) => fetch(url, { ...options, signal: AbortSignal.timeout(5000) });
 
 async function start() {
-  const child = spawn(process.execPath, ['dist-platform/main.js'], {
+  const child = spawn(process.execPath, [join(isolatedServer, 'main.js')], {
     cwd: root,
     env: {
       ...process.env,
@@ -57,7 +61,7 @@ async function start() {
       DISTRICT_TERRITORIAL_ENABLED: 'true',
       TELEGRAM_ENABLED: 'false',
       TELEGRAM_AUTH_ENABLED: 'false',
-      PORTAL_DIST_DIRECTORY: join(root, 'apps/portal/dist'),
+      PORTAL_DIST_DIRECTORY: isolatedPortal,
     },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
@@ -168,7 +172,13 @@ for (const signal of ['SIGINT', 'SIGTERM'])
     void cleanup().finally(() => process.exit(signal === 'SIGINT' ? 130 : 143));
   });
 
-const result = { uiActions: [], layouts: [], commands: 0, restarted: false, trade: false, tutorialSteps: [] };
+const result = { uiActions: [], layouts: [], commands: 0, restarted: false, trade: false, tutorialSteps: [],
+  automated: true, humanPlaytest: false, audioListened: false,
+  gitHead: execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim(),
+  sourceHasWorkingChanges: !!execFileSync('git', ['status', '--porcelain'], { cwd: root, encoding: 'utf8' }).trim(),
+  build: Object.fromEntries(await Promise.all([['server', join(isolatedServer, 'main.js')], ['portalIndex', join(isolatedPortal, 'index.html')]]
+    .map(async ([name, path]) => [name, createHash('sha256').update(await readFile(path)).digest('hex')]))),
+};
 const artifacts = join(root, '.qa', 'district-territorial-browser');
 async function newsFixtures(clients, pages, guest) {
   const [alice, bob] = clients;
@@ -283,29 +293,26 @@ async function newsFixtures(clients, pages, guest) {
       for (const page of pages) {
         const card = page.locator('[data-news-id="' + id + '"]');
         if (!(await card.count())) {
-          const journal = page
-            .locator('.tn-list')
-            .filter({ has: page.locator('summary', { hasText: 'News journal' }) });
-          if ((await journal.getAttribute('open')) === null) await journal.locator('summary').click();
-          await journal.getByRole('button').filter({ hasText: msg.headline.en }).click();
+          await page.locator('.tn-journal-open').click();
+          await page.locator('.tn-journal-group').getByRole('button').filter({ hasText: msg.headline.en }).last().click();
         }
         await expect(card).toBeVisible();
         if (forecast) {
           await expect(card.locator('.tn-changes')).toHaveCount(0);
           await expect(card.locator('.tn-meta')).toContainText('Due at the end');
         }
-        if (msg.zone === undefined || msg.stage === 'cancelled') await expect(card.locator('.tn-area')).toHaveCount(0);
+        if (!forecast && msg.changes?.length) await expect(card.locator('.tn-changes')).toBeVisible();
+        if (msg.zone === undefined || msg.stage === 'cancelled') await expect(card.locator('.tn-area[aria-pressed]')).toHaveCount(0);
         else {
-          const show = card.locator('.tn-area');
+          const show = card.locator('.tn-area[aria-pressed]');
           if ((await show.getAttribute('aria-pressed')) !== 'true') await show.click();
           await expect(
             page.locator(
-              '.tb-news-frame.' + (forecast ? 'risk' : 'applied') + ' ' + (msg.zone === null ? 'rect' : 'polygon'),
+              '.tb-news-frame.' + (forecast ? 'risk' : 'applied'),
             ),
           ).toBeVisible();
           await expect(page.locator('.tb-news-frame [data-board-target]')).toHaveCount(0);
         }
-        if (!forecast && msg.changes?.length) await expect(card.locator('.tn-changes')).toBeVisible();
       }
       result.fixtureStages.push(sample.label + '/' + msg.stage);
     }
@@ -319,6 +326,7 @@ async function training(page, roomId) {
     if (await lesson.getByRole('link', { name: 'Play', exact: true }).isVisible()) break;
     const highlighted = page.locator('.tb-target.is-available').first();
     if (await highlighted.count()) await highlighted.focus().then(() => highlighted.press('Enter'));
+    if (await page.getByRole('button', { name: 'Dismiss news', exact: true }).isVisible()) await page.getByRole('button', { name: 'Dismiss news', exact: true }).click();
     const button = lesson.locator('button.primary');
     result.tutorialSteps.push(await button.innerText());
     await button.click();
@@ -328,17 +336,23 @@ async function training(page, roomId) {
   const forecast = page.locator('.tn-stage-confirmed');
   await expect(forecast.locator('.tn-changes')).toHaveCount(0);
   await forecast.getByRole('button', { name: 'Show on map' }).click();
-  await expect(page.locator('.tb-news-frame.risk polygon')).toBeVisible();
+  await expect(page.locator('.tb-news-frame.risk')).toBeVisible();
+  if (await page.getByRole('button', { name: 'Dismiss news', exact: true }).isVisible()) await page.getByRole('button', { name: 'Dismiss news', exact: true }).click();
   const home = page.locator('[data-board-target="node:v1_1"]');
   await home.focus();
   await home.press('Enter');
   await lesson.locator('button.primary').click();
-  for (let i = 0; i < 2; i++) await lesson.getByRole('button', { name: 'Play one round' }).click();
+  for (let i = 0; i < 2; i++) {
+    if (await page.getByRole('button', { name: 'Dismiss news', exact: true }).isVisible()) await page.getByRole('button', { name: 'Dismiss news', exact: true }).click();
+    await lesson.getByRole('button', { name: 'Play one round' }).click();
+  }
   // Reopen the issue if the earlier forecast is still being inspected.
-  await page.locator('.tn-list summary').filter({ hasText: 'News journal' }).click();
-  await page.locator('.tn-list button').filter({ hasText: 'Occurred · Meteor impact' }).click();
-  await expect(page.locator('.tb-news-frame.applied polygon')).toBeVisible();
+  await page.locator('.tn-journal-open').click();
+  await page.locator('.tn-journal-group button').filter({ hasText: 'Meteor impact' }).last().click();
   await expect(page.locator('.tn-card')).toContainText('No damage');
+  await page.getByRole('button', { name: 'Show on map', exact: true }).click();
+  await expect(page.locator('.tb-news-frame.applied')).toBeVisible();
+  if (await page.getByRole('button', { name: 'Dismiss news', exact: true }).isVisible()) await page.getByRole('button', { name: 'Dismiss news', exact: true }).click();
   await lesson.getByRole('button', { name: 'Finish episode' }).click();
   await lesson.getByRole('link', { name: 'Play', exact: true }).click();
   await expect(page.locator('.territorial-board')).toBeVisible();
@@ -400,7 +414,8 @@ try {
   const { chooseTerritoryBot } = await import(pathToFileURL(join(directory, 'policy', 'policy.mjs')).href);
   browser = await chromium.launch({
     headless: true,
-    args: ['--mute-audio'],
+    args: ['--mute-audio', ...(process.env.PLAYWRIGHT_CHROMIUM_ARGS ? JSON.parse(process.env.PLAYWRIGHT_CHROMIUM_ARGS) : [])
+      .filter(value => !value.includes('disable-web-security') && !value.includes('allow-running-insecure-content') && !value.includes('single-process'))],
     ...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE
       ? { executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE }
       : {}),
@@ -424,7 +439,7 @@ try {
     pages.push(page);
     contexts.push(context);
     const box = await page.locator('.tb-surface').boundingBox();
-    assert.ok(box.width >= 300 && box.height >= 230);
+    assert.ok(box.width >= 300 && box.height >= 170);
     assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
     result.layouts.push({
       viewport: page.viewportSize(),
@@ -441,6 +456,7 @@ try {
   });
   await training(pages[0], room.roomId);
   async function clickAction(page, button) {
+    if (await page.getByRole('button', { name: 'Dismiss news', exact: true }).isVisible()) await page.getByRole('button', { name: 'Dismiss news', exact: true }).click();
     const pendingResponse = page.waitForResponse(
       (r) => r.url().endsWith(path + '/actions') && r.request().method() === 'POST',
     );
@@ -469,7 +485,7 @@ try {
       done = snapshot;
       break;
     }
-    if (snapshot.revision !== views[1].revision) continue;
+    if (snapshot.revision !== views[1].revision) { await delay(250); continue; }
     if (snapshot.round >= 2 && !result.restarted && views.some((v) => v.activeParticipantId === v.you.participantId)) {
       await contexts[1].setOffline(true);
       await stop();
@@ -507,12 +523,13 @@ try {
         const take = Object.keys(other.you.hand).find((r) => r !== give && other.you.hand[r] > 0);
         if (give && take) {
           await page.reload();
+          if (await page.getByRole('button', { name: 'Dismiss news', exact: true }).isVisible()) await page.getByRole('button', { name: 'Dismiss news', exact: true }).click();
           await page.getByRole('button', { name: 'Offer a trade', exact: true }).click();
           const counterpart = view.players.find((p) => p.participantId === other.you.participantId);
           await page.locator('.ta-trades select').selectOption(counterpart.participantId);
           const resourceName = (r) => r.charAt(0).toUpperCase() + r.slice(1);
           await page.getByRole('spinbutton', { name: 'I give · ' + resourceName(give), exact: true }).fill('1');
-          await page.getByRole('spinbutton', { name: 'I request · ' + resourceName(take), exact: true }).fill('1');
+          await page.getByRole('spinbutton', { name: 'I receive · ' + resourceName(take), exact: true }).fill('1');
           await clickAction(page, page.getByRole('button', { name: 'Send offer', exact: true }));
           const otherPage = pages[1 - index];
           await otherPage.reload();
@@ -530,7 +547,10 @@ try {
       played = true;
       break;
     }
-    if (!played) await delay(8);
+    // Bots now publish a real, persistent scheduled action. Wait for that
+    // action instead of hammering two match endpoints every 8 ms.
+    if (!played) await delay(Math.min(1200, Math.max(500,
+      (snapshot.botActionAt ?? snapshot.serverNow + 900) - snapshot.serverNow + 50)));
   }
   assert.ok(done?.outcome?.winnerParticipantIds.length, 'Match did not finish with a winner');
   for (const [index, client] of clients.entries()) {

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 import type { AppliedChange, PublicNews, TerritoryView } from '@iva-games/district/territorial';
 import './territorial-news.css';
 
@@ -8,6 +8,8 @@ interface NewsProps {
   lang: Language;
   selectedId: string | null;
   onSelect: (id: string | null) => void;
+  autoOpen?: boolean;
+  onShowCouponRoutes?: (couponId: string) => void;
 }
 
 const resourceNames = {
@@ -55,7 +57,7 @@ function changeText(change: AppliedChange, view: TerritoryView, lang: Language) 
   }
 }
 
-function NewsArticle({ item, view, lang, selectedId, onSelect }: NewsProps & { item: PublicNews }) {
+function NewsArticle({ item, view, lang, selectedId, onSelect, onShowCouponRoutes }: NewsProps & { item: PublicNews }) {
   const ru = lang === 'ru';
   const forecast = 'dueRound' in item;
   const scope = item.zone === null ? (ru ? 'Весь район' : 'Whole district') :
@@ -77,100 +79,46 @@ function NewsArticle({ item, view, lang, selectedId, onSelect }: NewsProps & { i
       {forecast && <span>{ru ? 'Срок — конец круга ' : 'Due at the end of round '}{item.dueRound}</span>}
       {'endsAfterRound' in item && item.endsAfterRound !== undefined && <span>{ru ? 'До конца круга ' : 'Through round '}{item.endsAfterRound}</span>}
     </div>
-    {'description' in item && item.description && <p>{item.description[lang]}</p>}
+    {'description' in item && item.description && item.description[lang].split(/\n\n+/).map((paragraph,index) => <p key={index}>{paragraph}</p>)}
     {byOwner.size > 0 && <dl className="tn-changes">{[...byOwner].map(([owner, rows]) =>
       <div key={owner}><dt>{view.players.find(p => p.participantId === owner)?.displayName ?? (ru ? 'Игрок' : 'Player')}</dt>
         <dd>{rows.join(' · ')}</dd></div>)}</dl>}
     {item.stage === 'applied' && item.templateId.startsWith('H') && !changes.some(change => change.kind === 'level' && change.after < change.before) &&
       <p className="tn-no-damage">{ru ? 'Ущерба нет.' : 'No damage.'}</p>}
+    {!forecast && view.you.coupons.filter(coupon => coupon.eventInstanceId === item.eventInstanceId && coupon.kind === 'free-road').map(coupon => <div className="tn-coupon" key={coupon.id}>
+      <strong>{ru ? 'Ваш дорожный купон' : 'Your road coupon'}</strong>
+      <p>{coupon.zone === null ? (ru ? 'Весь район' : 'Whole district') : view.map.sectors.find(sector => sector.id === coupon.zone)?.name[lang]} · {ru ? 'до конца круга ' : 'through round '}{coupon.endsAfterRound}</p>
+      <p>{ru ? 'Одна наземная дорога в указанной зоне. Доплата по другой новости сохраняется.' : 'One land road in this area. Other news surcharges still apply.'}</p>
+      <button type="button" className="tn-area" onClick={() => onShowCouponRoutes?.(coupon.id)}>{ru ? 'Показать подходящие дороги' : 'Show eligible roads'}</button>
+    </div>)}
     {area && <button type="button" className="tn-area" aria-pressed={selected} onClick={() => onSelect(selected ? null : item.messageId)}>
       {selected ? (ru ? 'Скрыть рамку' : 'Hide outline') : (ru ? 'Показать на карте' : 'Show on map')}
     </button>}
   </article>;
 }
 
-const soundKey = 'iva.district.territorial.news.sound';
-function useNewsSound(view: TerritoryView) {
-  const [enabled, setEnabled] = useState(() => { try { return localStorage.getItem(soundKey) === 'on'; } catch { return false; } });
-  const audio = useRef<AudioContext | null>(null);
-  const last = useRef<{ matchId: string; ids: Set<string>; time: number; revision: number } | null>(null);
-  useEffect(() => {
-    const reset = () => { last.current = null; };
-    window.addEventListener('online', reset);
-    window.addEventListener('offline', reset);
-    document.addEventListener('visibilitychange', reset);
-    return () => {
-      window.removeEventListener('online', reset);
-      window.removeEventListener('offline', reset);
-      document.removeEventListener('visibilitychange', reset);
-      if (audio.current) void audio.current.close().catch(() => {});
-      audio.current = null;
-      reset();
-    };
-  }, []);
-  useEffect(() => {
-    const previous = last.current;
-    const sameMatch = previous?.matchId === view.matchId;
-    if (sameMatch && view.revision < previous.revision) return;
-    const seen = sameMatch ? previous.ids : new Set<string>();
-    const fresh = view.news.filter(n => !seen.has(n.messageId));
-    for (const message of fresh) seen.add(message.messageId);
-    const now = Date.now();
-    last.current = { matchId: view.matchId, revision: view.revision, ids: seen, time: now };
-    const context = audio.current;
-    if (!enabled || !sameMatch || view.revision !== previous.revision + 1 ||
-      now - previous.time > 8000 || document.hidden || !navigator.onLine || context?.state !== 'running') return;
-    const kind = view.activity?.revision === view.revision ? view.activity.kind : undefined;
-    if (!fresh.length && !kind) return;
-    // One cue for a committed action or issue. Reopening a card does not replay it.
-    const pitch = { roll: [320, 430], build: [260, 440], deal: [465, 580], tactic: [560, 730], win: [608, 910] };
-    const [from, to] = kind === 'win' ? pitch.win : fresh.length ?
-      (fresh.some(n => 'dueRound' in n) ? [490, 390] : [660, 770]) : pitch[kind!];
-    const tone = context.createOscillator(), envelope = context.createGain();
-    tone.type = 'sine';
-    tone.frequency.setValueAtTime(from, context.currentTime);
-    tone.frequency.exponentialRampToValueAtTime(to, context.currentTime + .11);
-    envelope.gain.setValueAtTime(.0001, context.currentTime);
-    envelope.gain.exponentialRampToValueAtTime(.05, context.currentTime + .014);
-    envelope.gain.exponentialRampToValueAtTime(.0001, context.currentTime + .15);
-    tone.connect(envelope).connect(context.destination);
-    tone.start(); tone.stop(context.currentTime + .16);
-    tone.onended = () => { tone.disconnect(); envelope.disconnect(); };
-  }, [enabled, view.matchId, view.revision, view.news, view.activity]);
-  function toggle() {
-    const next = !enabled;
-    if (next && typeof AudioContext !== 'undefined') {
-      audio.current ??= new AudioContext();
-      void audio.current.resume().catch(() => {});
-    }
-    try { localStorage.setItem(soundKey, next ? 'on' : 'off'); } catch { /* Local preference lasts this session. */ }
-    setEnabled(next);
-  }
-  // A stored preference may resume only after this page receives a user gesture.
-  useEffect(() => {
-    if (!enabled || typeof AudioContext === 'undefined') return;
-    const unlock = () => {
-      audio.current ??= new AudioContext();
-      void audio.current.resume().catch(() => {});
-    };
-    window.addEventListener('pointerdown', unlock, { once: true });
-    window.addEventListener('keydown', unlock, { once: true });
-    return () => { window.removeEventListener('pointerdown', unlock); window.removeEventListener('keydown', unlock); };
-  }, [enabled]);
-  return { enabled, toggle };
+function urgency(item: PublicNews | undefined) {
+  if (!item || (!item.templateId.startsWith('H') && item.templateId !== 'E01') || item.stage === 'cancelled') return 'ordinary';
+  return item.stage === 'forecast' || item.stage === 'update' ? 'warning' : 'urgent';
 }
 
 export function TerritorialNews(props: NewsProps) {
-  const { view, lang, selectedId, onSelect } = props;
+  const { view, lang, onSelect, autoOpen = true, onShowCouponRoutes } = props;
   const ru = lang === 'ru';
   const [dismissed, setDismissed] = useState('');
-  const sound = useNewsSound(view);
+  const [mode, setMode] = useState<'latest' | 'journal' | null>(null);
+  const [articleId, setArticleId] = useState<string | null>(null);
+  const opener = useRef<HTMLButtonElement>(null);
+  const panel = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    if (mode) panel.current?.querySelector<HTMLElement>('button')?.focus();
+  }, [mode, articleId]);
   const all = new Map(view.news.map(item => [item.messageId, item]));
   for (const threat of view.threats) all.set(threat.messageId, threat);
-  const selected = selectedId ? all.get(selectedId) : undefined;
+  const selected = mode === 'latest' && articleId ? all.get(articleId) : undefined;
   const latest = view.news.at(-1);
   const issueKey = latest ? view.matchId + ':' + latest.messageId : '';
-  const cards = selected ? [selected] : latest && dismissed !== issueKey ? view.news.filter(n => n.round === latest.round) : [];
+  const cards = selected ? [selected] : latest ? view.news.filter(item => item.round === latest.round) : [];
   const activeIds = new Set(view.threats.map(item => item.messageId));
   const ordered = [...cards].sort((a, b) => Number(activeIds.has(b.messageId)) - Number(activeIds.has(a.messageId)));
   const issues = new Map<number, PublicNews[]>();
@@ -178,24 +126,56 @@ export function TerritorialNews(props: NewsProps) {
     const group = issues.get(item.round) ?? [];
     group.push(item); issues.set(item.round, group);
   }
+  const visible = mode === 'journal' || (cards.length > 0 && (mode === 'latest' || autoOpen && dismissed !== issueKey));
+  const severities = ordered.map(urgency);
+  const level = selected ? urgency(selected) : severities.includes('urgent') ? 'urgent' : severities.includes('warning') ? 'warning' : 'ordinary';
+  function close() {
+    const restoreFocus = panel.current?.contains(document.activeElement);
+    setMode(null); setDismissed(issueKey);
+    if (restoreFocus) opener.current?.focus();
+  }
+  function open(next: 'latest' | 'journal') {
+    panel.current?.querySelector<HTMLElement>('button')?.focus();
+    setMode(next);
+    setArticleId(null);
+  }
+  function read(id: string) { setArticleId(id); setMode('latest'); }
   return <section className="territorial-news" aria-label={ru ? 'Новости района' : 'District news'}>
-    <header className="tn-header"><h3>{ru ? 'Новости района' : 'District news'}</h3>
-      <button type="button" className="tn-sound" onClick={sound.toggle} aria-pressed={sound.enabled}
-        aria-label={ru ? 'Звук игры' : 'Game sound'} title={ru ? 'Звук игры' : 'Game sound'}>
-        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
-          <path d="M3 9h4l5-4v14l-5-4H3z"/>{sound.enabled ? <path d="M15 8q4 4 0 8m3-11q7 7 0 14"/> : <path d="m16 9 6 6m0-6-6 6"/>}
-        </svg>
+    <header className="tn-header">
+      <button ref={opener} type="button" className="tn-open" onClick={() => open('latest')} aria-expanded={visible && mode !== 'journal'}>
+        <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true"><path d="M5 4h15v16H5a2 2 0 0 1-2-2V8h2m0-4v14m3-10h9m-9 4h3m3 0h3m-9 4h9"/></svg>
+        <strong>{ru ? 'Новости' : 'News'}</strong>{view.threats.length > 0 && <span className="tn-count">{view.threats.length}</span>}
       </button>
+      <button type="button" className="tn-journal-open" onClick={() => open('journal')}>{ru ? 'Журнал' : 'Journal'} <small>{view.news.length}</small></button>
     </header>
-    {ordered.length > 0 && <div className="tn-issue"><div className="tn-issue-label"><span>{ru ? 'Круг ' : 'Round '}{ordered[0].round}</span>
-      <button type="button" onClick={() => { setDismissed(issueKey); onSelect(null); }}>{ru ? 'Свернуть' : 'Dismiss'}</button></div>
-      <div className="tn-issue-cards">{ordered.map(item => <NewsArticle key={item.messageId} {...props} item={item}/>)}</div>
+    {visible && <div ref={panel} className={'tn-issue tn-urgency-' + (mode === 'journal' ? 'ordinary' : level)} role="region"
+      aria-label={mode === 'journal' ? (ru ? 'Журнал новостей' : 'News journal') : (ru ? 'Выпуск новостей' : 'News issue')}
+      onKeyDown={event => { if (event.key === 'Escape') { event.stopPropagation(); close(); } }}>
+      <div className="tn-issue-label"><div><strong>{mode === 'journal' ? (ru ? 'Журнал новостей' : 'News journal') :
+        level === 'urgent' ? (ru ? 'Срочно' : 'Urgent') : level === 'warning' ? (ru ? 'Внимание' : 'Attention') : (ru ? 'Новости района' : 'District news')}</strong>
+        {mode !== 'journal' && ordered[0] && <span>{ru ? 'Круг ' : 'Round '}{ordered[0].round}</span>}</div>
+        <button type="button" onClick={close} aria-label={ru ? 'Свернуть новости' : 'Dismiss news'}>{ru ? 'Свернуть' : 'Dismiss'} <span aria-hidden="true">×</span></button>
+      </div>
+      <div className="tn-issue-cards" tabIndex={0} aria-label={ru ? 'Текст новостей, можно прокрутить' : 'Scrollable news text'}
+        onKeyDown={event => {
+          if (event.target !== event.currentTarget) return;
+          const element = event.currentTarget;
+          const top = event.key === 'Home' ? 0 : event.key === 'End' ? element.scrollHeight :
+            event.key === 'PageDown' ? element.scrollTop + element.clientHeight * .85 :
+              event.key === 'PageUp' ? element.scrollTop - element.clientHeight * .85 : null;
+          if (top !== null) { event.preventDefault(); element.scrollTo({ top }); }
+        }}>
+        {mode === 'journal' ? <>
+          {view.threats.length > 0 && <section className="tn-journal-group"><h4>{ru ? 'Активные угрозы' : 'Active threats'}</h4>
+            {view.threats.map(item => <button type="button" key={item.messageId} onClick={() => read(item.messageId)}><span>{stageLabel(item, lang)}</span><strong>{item.headline[lang]}</strong></button>)}</section>}
+          {[...issues].reverse().map(([round, entries]) => <section className="tn-journal-group" key={round}><h4>{ru ? 'Круг ' : 'Round '}{round}</h4>
+            {entries.map(item => <button type="button" key={item.messageId} onClick={() => read(item.messageId)}><span>{stageLabel(item,lang)}</span><strong>{item.headline[lang]}</strong></button>)}</section>)}
+        </> : ordered.map(item => <NewsArticle key={item.messageId} {...props} item={item} onSelect={id => { onSelect(id); if (id) close(); }} onShowCouponRoutes={id => { close(); onShowCouponRoutes?.(id); }}/>) }
+        {(!latest || mode === 'journal' && !issues.size) && <p className="tn-empty">{ru ? 'Пока новостей нет.' : 'No news yet.'}</p>}
+      </div>
+      <footer className="tn-footer"><span>{mode === 'journal' ? (ru ? 'Выберите выпуск, чтобы прочитать его снова.' : 'Choose an issue to read it again.') : (ru ? 'Прокрутите выпуск, чтобы увидеть все последствия.' : 'Scroll the issue to see all the effects.')}</span>
+        {mode !== 'journal' && <button type="button" onClick={() => open('journal')}>{ru ? 'Журнал новостей' : 'News journal'}</button>}
+      </footer>
     </div>}
-    {view.threats.length > 0 && <details className="tn-list"><summary>{ru ? 'Активные угрозы' : 'Active threats'} · {view.threats.length}</summary>
-      <div>{view.threats.map(item => <button key={item.messageId} type="button" onClick={() => onSelect(item.messageId)}>{stageLabel(item, lang)} · {item.headline[lang]}</button>)}</div></details>}
-    {issues.size > 0 ? <details className="tn-list"><summary>{ru ? 'Журнал новостей' : 'News journal'} · {view.news.length}</summary>
-      <div>{[...issues].reverse().map(([round, entries]) => <section key={round}><h4>{ru ? 'Круг ' : 'Round '}{round}</h4>
-        {entries.map(item => <button key={item.messageId} type="button" onClick={() => onSelect(item.messageId)}>{stageLabel(item, lang)} · {item.headline[lang]}</button>)}</section>)}</div>
-    </details> : <p className="tn-empty">{ru ? 'Пока новостей нет.' : 'No news yet.'}</p>}
   </section>;
 }

@@ -1,0 +1,1238 @@
+{
+  "bankVersion": "district-audio@1",
+  "purpose": "Licensed placeholders pending human auditory acceptance",
+  "license": "CC0-1.0",
+  "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+  "verifiedOn": "2026-11-27",
+  "generator": "scripts/build-district-audio.py",
+  "runtimeFetchesExternalSources": false,
+  "sources": {
+    "whisper.mp3": {
+      "author": "LisadiKaprio",
+      "title": "Short Whisper",
+      "page": "https://freesound.org/people/LisadiKaprio/sounds/584650/",
+      "download": "https://cdn.freesound.org/previews/584/584650_5571497-hq.mp3",
+      "license": "CC0-1.0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "sha256": "c2fcd0d95d06e00388eb4fe363eff2b9df6e55fe7f7dc52a8f54e8bcfa34cc69"
+    },
+    "cough.mp3": {
+      "author": "OwlStorm / Ashe Kirk",
+      "title": "Cough (2)",
+      "page": "https://freesound.org/people/OwlStorm/sounds/151212/",
+      "download": "https://cdn.freesound.org/previews/151/151212_140737-hq.mp3",
+      "license": "CC0-1.0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "sha256": "134c8c26e219a78e875255e9f3de6b85c2a2055737dd608ccf06ab047527d7cb"
+    },
+    "cough-female.mp3": {
+      "author": "OwlStorm / Ashe Kirk",
+      "title": "Cough Female",
+      "page": "https://freesound.org/people/OwlStorm/sounds/151213/",
+      "download": "https://cdn.freesound.org/previews/151/151213_140737-hq.mp3",
+      "license": "CC0-1.0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "sha256": "8e019dfb7af6e4441c8304c0e705ef61e6610a8bcaf50d5230e2404c2adc6703"
+    },
+    "footstep_concrete_000.ogg": {
+      "author": "Kenney",
+      "title": "Impact Sounds 1.0 / footstep_concrete_000.ogg",
+      "page": "https://kenney.nl/assets/impact-sounds",
+      "archivePath": "Audio/footstep_concrete_000.ogg",
+      "license": "CC0-1.0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "sha256": "d7267e183067757c92c169de2a379abea592cfca6b39bb2e8feea15221ad79fe"
+    },
+    "impactBell_heavy_000.ogg": {
+      "author": "Kenney",
+      "title": "Impact Sounds 1.0 / impactBell_heavy_000.ogg",
+      "page": "https://kenney.nl/assets/impact-sounds",
+      "archivePath": "Audio/impactBell_heavy_000.ogg",
+      "license": "CC0-1.0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "sha256": "94b8bb5f2d43ab65e4bcc32b28562416e9bc2c51d9fd4be1e333660ee52f977f"
+    },
+    "impactGlass_light_000.ogg": {
+      "author": "Kenney",
+      "title": "Impact Sounds 1.0 / impactGlass_light_000.ogg",
+      "page": "https://kenney.nl/assets/impact-sounds",
+      "archivePath": "Audio/impactGlass_light_000.ogg",
+      "license": "CC0-1.0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "sha256": "d750cf88097d0c3e69920e6e14496e1444e1a9da01aa4cca8f5ec8cb44c57b4f"
+    },
+    "impactMetal_light_000.ogg": {
+      "author": "Kenney",
+      "title": "Impact Sounds 1.0 / impactMetal_light_000.ogg",
+      "page": "https://kenney.nl/assets/impact-sounds",
+      "archivePath": "Audio/impactMetal_light_000.ogg",
+      "license": "CC0-1.0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "sha256": "33b5e6e37c6e9d54e07bf5a89b12c76e879f40c1ea83cdd82714df1d6f9fec6d"
+    },
+    "impactMining_000.ogg": {
+      "author": "Kenney",
+      "title": "Impact Sounds 1.0 / impactMining_000.ogg",
+      "page": "https://kenney.nl/assets/impact-sounds",
+      "archivePath": "Audio/impactMining_000.ogg",
+      "license": "CC0-1.0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "sha256": "36b4ea107222d073c67ca64dde26944975609202d5090b2f2021213c1a7e35cd"
+    },
+    "impactPlank_medium_000.ogg": {
+      "author": "Kenney",
+      "title": "Impact Sounds 1.0 / impactPlank_medium_000.ogg",
+      "page": "https://kenney.nl/assets/impact-sounds",
+      "archivePath": "Audio/impactPlank_medium_000.ogg",
+      "license": "CC0-1.0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "sha256": "8403cd7a043f0391574c88c55dd205743725b5363d2407f6de145f201690b68f"
+    },
+    "impactTin_medium_000.ogg": {
+      "author": "Kenney",
+      "title": "Impact Sounds 1.0 / impactTin_medium_000.ogg",
+      "page": "https://kenney.nl/assets/impact-sounds",
+      "archivePath": "Audio/impactTin_medium_000.ogg",
+      "license": "CC0-1.0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "sha256": "f4bbee66ca191ec744b84fc07ac9ed2a6fda955d51cfed8360f12b62815d3cbd"
+    },
+    "impactWood_light_000.ogg": {
+      "author": "Kenney",
+      "title": "Impact Sounds 1.0 / impactWood_light_000.ogg",
+      "page": "https://kenney.nl/assets/impact-sounds",
+      "archivePath": "Audio/impactWood_light_000.ogg",
+      "license": "CC0-1.0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "sha256": "eb45e35b4bed784d3f120de4afec4b0d6ac09d9e143cce8cfcb7d739e1b1f3c3"
+    },
+    "impactWood_medium_000.ogg": {
+      "author": "Kenney",
+      "title": "Impact Sounds 1.0 / impactWood_medium_000.ogg",
+      "page": "https://kenney.nl/assets/impact-sounds",
+      "archivePath": "Audio/impactWood_medium_000.ogg",
+      "license": "CC0-1.0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "sha256": "1723a9fd25103ed41af06054814e84e65f4a772bac86ab2dc927da93d9592ff5"
+    }
+  },
+  "families": {
+    "G01": {
+      "label": "Ore discovery",
+      "stages": {
+        "applied": "G01-applied"
+      }
+    },
+    "G02": {
+      "label": "Supply trucks",
+      "stages": {
+        "applied": "G02-applied"
+      }
+    },
+    "G03": {
+      "label": "Harvest",
+      "stages": {
+        "applied": "G03-applied"
+      }
+    },
+    "G04": {
+      "label": "Renovation",
+      "stages": {
+        "applied": "G04-applied"
+      }
+    },
+    "G05": {
+      "label": "Port trade fair",
+      "stages": {
+        "applied": "G05-applied"
+      }
+    },
+    "G06": {
+      "label": "Funded roads",
+      "stages": {
+        "applied": "G06-applied"
+      }
+    },
+    "G07": {
+      "label": "Building subsidy",
+      "stages": {
+        "applied": "G07-applied"
+      }
+    },
+    "G08": {
+      "label": "University grant",
+      "stages": {
+        "applied": "G08-applied"
+      }
+    },
+    "G09": {
+      "label": "Exchange fair",
+      "stages": {
+        "applied": "G09-applied"
+      }
+    },
+    "G10": {
+      "label": "Repair fund",
+      "stages": {
+        "applied": "G10-applied"
+      }
+    },
+    "B01": {
+      "label": "Street dogs",
+      "stages": {
+        "applied": "B01-applied"
+      }
+    },
+    "B02": {
+      "label": "Work crews sick",
+      "stages": {
+        "applied": "B02-applied"
+      }
+    },
+    "B03": {
+      "label": "Granary pests",
+      "stages": {
+        "applied": "B03-applied"
+      }
+    },
+    "B04": {
+      "label": "Port storm",
+      "stages": {
+        "applied": "B04-applied"
+      }
+    },
+    "B05": {
+      "label": "Rain on building sites",
+      "stages": {
+        "applied": "B05-applied"
+      }
+    },
+    "B06": {
+      "label": "Delayed roadworks",
+      "stages": {
+        "applied": "B06-applied"
+      }
+    },
+    "B07": {
+      "label": "Cranes stopped by wind",
+      "stages": {
+        "applied": "B07-applied"
+      }
+    },
+    "B08": {
+      "label": "Harbour fog",
+      "stages": {
+        "applied": "B08-applied"
+      }
+    },
+    "H01": {
+      "label": "Wildfire",
+      "stages": {
+        "forecast": "H01-forecast",
+        "confirmed": "H01-confirmed",
+        "applied": "H01-applied",
+        "cancelled": "H01-cancelled"
+      }
+    },
+    "H02": {
+      "label": "River flood",
+      "stages": {
+        "forecast": "H02-forecast",
+        "confirmed": "H02-confirmed",
+        "applied": "H02-applied",
+        "cancelled": "H02-cancelled"
+      }
+    },
+    "H03": {
+      "label": "Tsunami",
+      "stages": {
+        "forecast": "H03-forecast",
+        "confirmed": "H03-confirmed",
+        "applied": "H03-applied",
+        "cancelled": "H03-cancelled"
+      }
+    },
+    "H04": {
+      "label": "Meteor",
+      "stages": {
+        "forecast": "H04-forecast",
+        "confirmed": "H04-confirmed",
+        "applied": "H04-applied",
+        "cancelled": "H04-cancelled"
+      }
+    },
+    "P01": {
+      "label": "Oil exploration",
+      "stages": {
+        "applied": "P01-applied",
+        "success": "P01-success",
+        "cancelled": "P01-cancelled"
+      }
+    },
+    "P02": {
+      "label": "City funding",
+      "stages": {
+        "applied": "P02-applied",
+        "success": "P02-success",
+        "cancelled": "P02-cancelled"
+      }
+    },
+    "E01": {
+      "label": "Fictional epidemic",
+      "stages": {
+        "applied": "E01-applied",
+        "forecast": "E01-forecast",
+        "update": "E01-update",
+        "success": "E01-success",
+        "cancelled": "E01-cancelled"
+      }
+    }
+  },
+  "clips": [
+    {
+      "id": "house",
+      "path": "house.wav",
+      "category": "effects",
+      "description": "Wooden house placed: rounded contact and a light roof tap.",
+      "seconds": 0.46,
+      "sampleRate": 22050,
+      "channels": 1,
+      "peak": 0.21161,
+      "rms": 0.02247,
+      "sha256": "e2d43341052faae619d53e264d93801975d994e261ffe0f3d43817a62bf4139b",
+      "sources": [
+        "impactWood_light_000.ogg",
+        "impactWood_medium_000.ogg"
+      ],
+      "originalProceduralLayers": false,
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "road",
+      "path": "road.wav",
+      "category": "effects",
+      "description": "Two stone-and-gravel taps lay a short road.",
+      "seconds": 0.4,
+      "sampleRate": 22050,
+      "channels": 1,
+      "peak": 0.25819,
+      "rms": 0.03693,
+      "sha256": "0e8ea14782df747d86fbd4147fc3e20de821a8a5471c959e5014f5b378f0dbf2",
+      "sources": [
+        "footstep_concrete_000.ogg"
+      ],
+      "originalProceduralLayers": true,
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "upgrade",
+      "path": "upgrade.wav",
+      "category": "effects",
+      "description": "Three construction contacts rise into a small metal finish.",
+      "seconds": 0.66,
+      "sampleRate": 22050,
+      "channels": 1,
+      "peak": 0.28583,
+      "rms": 0.03457,
+      "sha256": "a50d75ace0e1169e372868293dc56e26233070c560039c2e5566ca48e87d968e",
+      "sources": [
+        "impactMetal_light_000.ogg",
+        "impactMining_000.ogg",
+        "impactPlank_medium_000.ogg"
+      ],
+      "originalProceduralLayers": false,
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "roll",
+      "path": "roll.wav",
+      "category": "effects",
+      "description": "Five wooden dice contacts slow down into a settled pair.",
+      "seconds": 0.68,
+      "sampleRate": 22050,
+      "channels": 1,
+      "peak": 0.31792,
+      "rms": 0.02396,
+      "sha256": "49d615048b4805e89b46c44fb014dcf7533a8578b18c5b2067f629cc63b32183",
+      "sources": [
+        "impactWood_light_000.ogg",
+        "impactWood_medium_000.ogg"
+      ],
+      "originalProceduralLayers": false,
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "production",
+      "path": "production.wav",
+      "category": "effects",
+      "description": "Resources arrive as soft card rustles and two small glass contacts.",
+      "seconds": 0.5,
+      "sampleRate": 22050,
+      "channels": 1,
+      "peak": 0.25965,
+      "rms": 0.02728,
+      "sha256": "66c80cc667a176c0f98b3d0df31a6d1cd8578efb76ed99a0bb8b4d7b6eb240b1",
+      "sources": [
+        "impactGlass_light_000.ogg"
+      ],
+      "originalProceduralLayers": true,
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "trade",
+      "path": "trade.wav",
+      "category": "effects",
+      "description": "An agreed exchange: two metal clicks and a wooden completion tap.",
+      "seconds": 0.6,
+      "sampleRate": 22050,
+      "channels": 1,
+      "peak": 0.24973,
+      "rms": 0.01979,
+      "sha256": "c4fd1f58d880c45312443c61e7249b3e694e0d765a713a22d00ca31f3af51690",
+      "sources": [
+        "impactMetal_light_000.ogg",
+        "impactWood_medium_000.ogg"
+      ],
+      "originalProceduralLayers": false,
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "card",
+      "path": "card.wav",
+      "category": "effects",
+      "description": "A card slides onto the table and settles.",
+      "seconds": 0.45,
+      "sampleRate": 22050,
+      "channels": 1,
+      "peak": 0.25699,
+      "rms": 0.05344,
+      "sha256": "4244d527ea3b23f930281b5970f0d5417461132024cf1b33b3c4bfdcb476ecf6",
+      "sources": [
+        "impactWood_light_000.ogg"
+      ],
+      "originalProceduralLayers": true,
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "blockade",
+      "path": "blockade.wav",
+      "category": "effects",
+      "description": "A low gate-like metal contact marks the blockade move.",
+      "seconds": 0.55,
+      "sampleRate": 22050,
+      "channels": 1,
+      "peak": 0.21547,
+      "rms": 0.01906,
+      "sha256": "8ee1ea4ee884cdd683303d0b684ce117bd9f81675d1dd929a686256efd77f6d5",
+      "sources": [
+        "impactTin_medium_000.ogg",
+        "impactWood_medium_000.ogg"
+      ],
+      "originalProceduralLayers": false,
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "win",
+      "path": "win.wav",
+      "category": "effects",
+      "description": "A brief three-note glass finish for the result.",
+      "seconds": 1.15,
+      "sampleRate": 22050,
+      "channels": 1,
+      "peak": 0.19602,
+      "rms": 0.03175,
+      "sha256": "5ef33e0f129fc41fd5389857a35baef530ba9968cf2ebcc1d24eb0959c9134b3",
+      "sources": [
+        "impactGlass_light_000.ogg"
+      ],
+      "originalProceduralLayers": true,
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "turn",
+      "path": "turn.wav",
+      "category": "effects",
+      "description": "Two quiet wooden notes announce a new own turn.",
+      "seconds": 0.43,
+      "sampleRate": 22050,
+      "channels": 1,
+      "peak": 0.25626,
+      "rms": 0.01399,
+      "sha256": "fba19e1a1779593731fd46ede48f6522920d7e30ce24cdb9a0e6e29e524bd926",
+      "sources": [
+        "impactWood_light_000.ogg"
+      ],
+      "originalProceduralLayers": false,
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "offer",
+      "path": "offer.wav",
+      "category": "effects",
+      "description": "Paper rustle and a soft tap for a new incoming offer.",
+      "seconds": 0.47,
+      "sampleRate": 22050,
+      "channels": 1,
+      "peak": 0.2056,
+      "rms": 0.04278,
+      "sha256": "58f320cd1d392c23976971e38485e86d09a665e32a93891512bae8befde61229",
+      "sources": [
+        "impactWood_light_000.ogg"
+      ],
+      "originalProceduralLayers": true,
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "G01-applied",
+      "path": "G01-applied.wav",
+      "category": "news",
+      "description": "Ore discovery: applied. Mining strike and small ore chinks.",
+      "seconds": 0.95,
+      "sampleRate": 22050,
+      "channels": 1,
+      "peak": 0.34,
+      "rms": 0.03566,
+      "sha256": "6fa9ee47bd51514f5a601b34e651f9e748f5208edf9bc051dd2454ca060bc7d0",
+      "sources": [
+        "impactGlass_light_000.ogg",
+        "impactMetal_light_000.ogg",
+        "impactMining_000.ogg"
+      ],
+      "originalProceduralLayers": false,
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "G02-applied",
+      "path": "G02-applied.wav",
+      "category": "news",
+      "description": "Supply trucks: applied. Short truck rumble and crates set down.",
+      "seconds": 0.95,
+      "sampleRate": 22050,
+      "channels": 1,
+      "peak": 0.29283,
+      "rms": 0.03395,
+      "sha256": "a4284b54d9cf9f7f9fb4c261ddc53d1d54a99c6f0222ab7538543e477bc0fd6a",
+      "sources": [
+        "impactPlank_medium_000.ogg"
+      ],
+      "originalProceduralLayers": true,
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "G03-applied",
+      "path": "G03-applied.wav",
+      "category": "news",
+      "description": "Harvest: applied. Dry stalk rustle and seed grains.",
+      "seconds": 0.95,
+      "sampleRate": 22050,
+      "channels": 1,
+      "peak": 0.35086,
+      "rms": 0.05539,
+      "sha256": "cfa481104b9cb1964bbf037450cef39a2fb541d9e433b2e5ceed1b7c1b377c8c",
+      "sources": [],
+      "originalProceduralLayers": true,
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "G04-applied",
+      "path": "G04-applied.wav",
+      "category": "news",
+      "description": "Renovation: applied. Construction taps and the town stamp.",
+      "seconds": 0.95,
+      "sampleRate": 22050,
+      "channels": 1,
+      "peak": 0.30327,
+      "rms": 0.02621,
+      "sha256": "c7ca1e79b976d742dc23cc70863179efdc20e4e6c994478fc2f503045554c181",
+      "sources": [
+        "impactMining_000.ogg",
+        "impactPlank_medium_000.ogg",
+        "impactWood_medium_000.ogg"
+      ],
+      "originalProceduralLayers": false,
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "G05-applied",
+      "path": "G05-applied.wav",
+      "category": "news",
+      "description": "Port trade fair: applied. Water brush and trading bell.",
+      "seconds": 0.95,
+      "sampleRate": 22050,
+      "channels": 1,
+      "peak": 0.19492,
+      "rms": 0.01928,
+      "sha256": "3d564de8b7de66b90b23125344c56dc52fe76e47abb828b577b22e27c1dc2bcb",
+      "sources": [
+        "impactBell_heavy_000.ogg"
+      ],
+      "originalProceduralLayers": true,
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "G06-applied",
+      "path": "G06-applied.wav",
+      "category": "news",
+      "description": "Funded roads: applied. Three paving contacts and a stamp.",
+      "seconds": 0.95,
+      "sampleRate": 22050,
+      "channels": 1,
+      "peak": 0.24933,
+      "rms": 0.01313,
+      "sha256": "747babd1f89f0c0ebd98fc5e37feda4c2c1adff9b4b2c25ce0d73c41ab3ee67a",
+      "sources": [
+        "footstep_concrete_000.ogg",
+        "impactWood_medium_000.ogg"
+      ],
+      "originalProceduralLayers": false,
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "G07-applied",
+      "path": "G07-applied.wav",
+      "category": "news",
+      "description": "Building subsidy: applied. Paper approval and a metal contact.",
+      "seconds": 0.95,
+      "sampleRate": 22050,
+      "channels": 1,
+      "peak": 0.29871,
+      "rms": 0.03352,
+      "sha256": "d20e1b966b376b4cc00df89264bf387f9109b02fd677e1c270d344eec6223b75",
+      "sources": [
+        "impactMetal_light_000.ogg",
+        "impactWood_medium_000.ogg"
+      ],
+      "originalProceduralLayers": true,
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "G08-applied",
+      "path": "G08-applied.wav",
+      "category": "news",
+      "description": "University grant: applied. Page turn and two small bell notes.",
+      "seconds": 0.95,
+      "sampleRate": 22050,
+      "channels": 1,
+      "peak": 0.23242,
+      "rms": 0.03552,
+      "sha256": "46a4234cdd2b840d687734660c0d4bc005571096e52c7ca6254b8bbe4465f57d",
+      "sources": [],
+      "originalProceduralLayers": true,
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "G09-applied",
+      "path": "G09-applied.wav",
+      "category": "news",
+      "description": "Exchange fair: applied. Paired trading contacts, alternate rhythm.",
+      "seconds": 0.95,
+      "sampleRate": 22050,
+      "channels": 1,
+      "peak": 0.18,
+      "rms": 0.01247,
+      "sha256": "f90e8bbbfc07c4799a1c8f2f0beeddf1ade2b7221c68c55d6c86a237e9a6a58c",
+      "sources": [
+        "impactGlass_light_000.ogg",
+        "impactMetal_light_000.ogg"
+      ],
+      "originalProceduralLayers": false,
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "G10-applied",
+      "path": "G10-applied.wav",
+      "category": "news",
+      "description": "Repair fund: applied. Gentle repair taps and a shared finish.",
+      "seconds": 0.95,
+      "sampleRate": 22050,
+      "channels": 1,
+      "peak": 0.22,
+      "rms": 0.01874,
+      "sha256": "4dc9836a6697e5145c98429e0061e4934927f88d94de9548135b4a19630c9730",
+      "sources": [
+        "impactPlank_medium_000.ogg",
+        "impactWood_light_000.ogg"
+      ],
+      "originalProceduralLayers": true,
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "B01-applied",
+      "path": "B01-applied.wav",
+      "category": "news",
+      "description": "Street dogs: applied. Two stylised synthesised barks; not dog recordings.",
+      "seconds": 0.95,
+      "sampleRate": 22050,
+      "channels": 1,
+      "peak": 0.19949,
+      "rms": 0.03293,
+      "sha256": "f1a7188cebec992b308f078c218aaafb743bae6e0314c1366d566c39adcd3329",
+      "sources": [],
+      "originalProceduralLayers": true,
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "B02-applied",
+      "path": "B02-applied.wav",
+      "category": "news",
+      "description": "Work crews sick: applied. A short recorded cough and an idle work-tool contact.",
+      "seconds": 1.1,
+      "sampleRate": 22050,
+      "channels": 1,
+      "peak": 0.24595,
+      "rms": 0.02498,
+      "sha256": "0bdb016b5df57aa36f4446e65f7854a9501be5ed39d46ee24d05ae04d7280a3f",
+      "sources": [
+        "cough.mp3",
+        "impactTin_medium_000.ogg"
+      ],
+      "originalProceduralLayers": false,
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "B03-applied",
+      "path": "B03-applied.wav",
+      "category": "news",
+      "description": "Granary pests: applied. Small scratches, skittering and dry grain rustle.",
+      "seconds": 0.95,
+      "sampleRate": 22050,
+      "channels": 1,
+      "peak": 0.34796,
+      "rms": 0.06177,
+      "sha256": "c13cdddebee2a12017bc85212141274a6076ec39e0f00fb66d0d7cb7dcf4ec54",
+      "sources": [],
+      "originalProceduralLayers": true,
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "B04-applied",
+      "path": "B04-applied.wav",
+      "category": "news",
+      "description": "Port storm: applied. A compact gust and a low harbour bell.",
+      "seconds": 0.95,
+      "sampleRate": 22050,
+      "channels": 1,
+      "peak": 0.1757,
+      "rms": 0.02611,
+      "sha256": "c356d9583b2ab7a333709f53fd14091fc83f28642a260a6fa6d93c3daa36cc60",
+      "sources": [
+        "impactBell_heavy_000.ogg"
+      ],
+      "originalProceduralLayers": true,
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "B05-applied",
+      "path": "B05-applied.wav",
+      "category": "news",
+      "description": "Rain on building sites: applied. Rain drops over a soft wet splash.",
+      "seconds": 0.95,
+      "sampleRate": 22050,
+      "channels": 1,
+      "peak": 0.42434,
+      "rms": 0.08134,
+      "sha256": "c058a874f92d406425d844217fa07e57fc183deed4b157292f3ef60f9ab2b5b7",
+      "sources": [],
+      "originalProceduralLayers": true,
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "B06-applied",
+      "path": "B06-applied.wav",
+      "category": "news",
+      "description": "Delayed roadworks: applied. An interrupted paving rhythm.",
+      "seconds": 0.95,
+      "sampleRate": 22050,
+      "channels": 1,
+      "peak": 0.24,
+      "rms": 0.01235,
+      "sha256": "481d86c02052849dcf0e22e4b1ead751b4e112d766b917631f37879bd36b44b8",
+      "sources": [
+        "footstep_concrete_000.ogg",
+        "impactTin_medium_000.ogg"
+      ],
+      "originalProceduralLayers": false,
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "B07-applied",
+      "path": "B07-applied.wav",
+      "category": "news",
+      "description": "Cranes stopped by wind: applied. Wind against a metal cable.",
+      "seconds": 0.95,
+      "sampleRate": 22050,
+      "channels": 1,
+      "peak": 0.1533,
+      "rms": 0.02822,
+      "sha256": "d43c92f81fc27e409f1a677449d559d6afc4e4c071b81e844915cb5a8939bbc2",
+      "sources": [],
+      "originalProceduralLayers": true,
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "B08-applied",
+      "path": "B08-applied.wav",
+      "category": "news",
+      "description": "Harbour fog: applied. A short low foghorn and water brush.",
+      "seconds": 0.95,
+      "sampleRate": 22050,
+      "channels": 1,
+      "peak": 0.20633,
+      "rms": 0.04011,
+      "sha256": "3db105cf598ddadad9cd8be9a73c6830c94eb161d98b13416dd2b7bbb1717ebf",
+      "sources": [],
+      "originalProceduralLayers": true,
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "H01-forecast",
+      "path": "H01-forecast.wav",
+      "category": "news",
+      "description": "Wildfire: forecast. Dry crackle: distant risk, approaching fire, brief burn, extinguishing.",
+      "seconds": 1.25,
+      "sampleRate": 22050,
+      "channels": 1,
+      "peak": 0.18847,
+      "rms": 0.03393,
+      "sha256": "b4dda2032433804bcc65c97d0e1f6190b63d282472450d9867d56d72c161d1da",
+      "sources": [],
+      "originalProceduralLayers": true,
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "H01-confirmed",
+      "path": "H01-confirmed.wav",
+      "category": "news",
+      "description": "Wildfire: confirmed. Dry crackle: distant risk, approaching fire, brief burn, extinguishing.",
+      "seconds": 1.25,
+      "sampleRate": 22050,
+      "channels": 1,
+      "peak": 0.36084,
+      "rms": 0.06536,
+      "sha256": "ce2813a712eec4bd1a980885e90d56dcb0c7d7354635f2ef04ed48512bd511a6",
+      "sources": [
+        "impactWood_light_000.ogg"
+      ],
+      "originalProceduralLayers": true,
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "H01-applied",
+      "path": "H01-applied.wav",
+      "category": "news",
+      "description": "Wildfire: applied. Dry crackle: distant risk, approaching fire, brief burn, extinguishing.",
+      "seconds": 1.25,
+      "sampleRate": 22050,
+      "channels": 1,
+      "peak": 0.49869,
+      "rms": 0.0931,
+      "sha256": "6a9d2b54bd6f51862f908d93951afa18add82ecb9f96e96b8e658d274c2a3789",
+      "sources": [
+        "impactPlank_medium_000.ogg"
+      ],
+      "originalProceduralLayers": true,
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "H01-cancelled",
+      "path": "H01-cancelled.wav",
+      "category": "news",
+      "description": "Wildfire: cancelled. Dry crackle: distant risk, approaching fire, brief burn, extinguishing.",
+      "seconds": 1.25,
+      "sampleRate": 22050,
+      "channels": 1,
+      "peak": 0.21912,
+      "rms": 0.0364,
+      "sha256": "e2b47330eecd53db331490cda979da59559e4358fa0439a4310a02555fb1ed8f",
+      "sources": [],
+      "originalProceduralLayers": true,
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "H02-forecast",
+      "path": "H02-forecast.wav",
+      "category": "news",
+      "description": "River flood: forecast. Water: ripple, rising current, broad splash, receding flow.",
+      "seconds": 1.25,
+      "sampleRate": 22050,
+      "channels": 1,
+      "peak": 0.16138,
+      "rms": 0.02615,
+      "sha256": "dd9f9cfe74c5eecd4e44ea872341860b6157862069fa4035d9a8d7a152678b7e",
+      "sources": [],
+      "originalProceduralLayers": true,
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "H02-confirmed",
+      "path": "H02-confirmed.wav",
+      "category": "news",
+      "description": "River flood: confirmed. Water: ripple, rising current, broad splash, receding flow.",
+      "seconds": 1.25,
+      "sampleRate": 22050,
+      "channels": 1,
+      "peak": 0.28248,
+      "rms": 0.04297,
+      "sha256": "b31ccd19a07545eee9232d20833be8ea54bafdba125fcaf96f44e769a03de81c",
+      "sources": [
+        "impactWood_light_000.ogg"
+      ],
+      "originalProceduralLayers": true,
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "H02-applied",
+      "path": "H02-applied.wav",
+      "category": "news",
+      "description": "River flood: applied. Water: ripple, rising current, broad splash, receding flow.",
+      "seconds": 1.25,
+      "sampleRate": 22050,
+      "channels": 1,
+      "peak": 0.37658,
+      "rms": 0.05584,
+      "sha256": "7368535d02e7d523c86f78ccd15328e749a8a5c0f42c25e0c547621b3d69ff5a",
+      "sources": [],
+      "originalProceduralLayers": true,
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "H02-cancelled",
+      "path": "H02-cancelled.wav",
+      "category": "news",
+      "description": "River flood: cancelled. Water: ripple, rising current, broad splash, receding flow.",
+      "seconds": 1.25,
+      "sampleRate": 22050,
+      "channels": 1,
+      "peak": 0.14676,
+      "rms": 0.0219,
+      "sha256": "b780819acadd8566ec5f933140995730d5f0c0ac66e7e7a7386f448bdbf08935",
+      "sources": [],
+      "originalProceduralLayers": true,
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "H03-forecast",
+      "path": "H03-forecast.wav",
+      "category": "news",
+      "description": "Tsunami: forecast. Sea: low swell, approaching surge, compact wave impact, receding wave.",
+      "seconds": 1.25,
+      "sampleRate": 22050,
+      "channels": 1,
+      "peak": 0.07876,
+      "rms": 0.01673,
+      "sha256": "a07917343e31615d1511042f0721c703ed2635c29f1cc3ebc4cfeb9292fc743c",
+      "sources": [],
+      "originalProceduralLayers": true,
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "H03-confirmed",
+      "path": "H03-confirmed.wav",
+      "category": "news",
+      "description": "Tsunami: confirmed. Sea: low swell, approaching surge, compact wave impact, receding wave.",
+      "seconds": 1.25,
+      "sampleRate": 22050,
+      "channels": 1,
+      "peak": 0.19733,
+      "rms": 0.02729,
+      "sha256": "41137ad914d14f42351574f91722e3d6295e0dbcf243ed1a2f3c89129713a292",
+      "sources": [
+        "impactWood_light_000.ogg"
+      ],
+      "originalProceduralLayers": true,
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "H03-applied",
+      "path": "H03-applied.wav",
+      "category": "news",
+      "description": "Tsunami: applied. Sea: low swell, approaching surge, compact wave impact, receding wave.",
+      "seconds": 1.25,
+      "sampleRate": 22050,
+      "channels": 1,
+      "peak": 0.52,
+      "rms": 0.09423,
+      "sha256": "c243b96cffabe96109c6d1fcf2d1b8eace4175e1a36a378a8fe3d0d497ca6baa",
+      "sources": [],
+      "originalProceduralLayers": true,
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "H03-cancelled",
+      "path": "H03-cancelled.wav",
+      "category": "news",
+      "description": "Tsunami: cancelled. Sea: low swell, approaching surge, compact wave impact, receding wave.",
+      "seconds": 1.25,
+      "sampleRate": 22050,
+      "channels": 1,
+      "peak": 0.13028,
+      "rms": 0.02398,
+      "sha256": "cdaa33c32268e38da982a40091ba932956f5ad4aa047182de1bcabfa9e8957e5",
+      "sources": [],
+      "originalProceduralLayers": true,
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "H04-forecast",
+      "path": "H04-forecast.wav",
+      "category": "news",
+      "description": "Meteor: forecast. Recorded quiet nonverbal whisper, confirmed trajectory, short impact, pass-by.",
+      "seconds": 1.25,
+      "sampleRate": 22050,
+      "channels": 1,
+      "peak": 0.19086,
+      "rms": 0.02654,
+      "sha256": "bd386e50ad4ce7cd44529d44e352ec30db2b6a5ab4a986051f706813ef5a37a2",
+      "sources": [
+        "whisper.mp3"
+      ],
+      "originalProceduralLayers": true,
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "H04-confirmed",
+      "path": "H04-confirmed.wav",
+      "category": "news",
+      "description": "Meteor: confirmed. Recorded quiet nonverbal whisper, confirmed trajectory, short impact, pass-by.",
+      "seconds": 1.25,
+      "sampleRate": 22050,
+      "channels": 1,
+      "peak": 0.25878,
+      "rms": 0.03188,
+      "sha256": "56f40ec353048694b2c8b21871c8eb5dddead084ead9bd2fce5e9414fb45d7f1",
+      "sources": [
+        "impactTin_medium_000.ogg",
+        "impactWood_light_000.ogg",
+        "whisper.mp3"
+      ],
+      "originalProceduralLayers": true,
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "H04-applied",
+      "path": "H04-applied.wav",
+      "category": "news",
+      "description": "Meteor: applied. Recorded quiet nonverbal whisper, confirmed trajectory, short impact, pass-by.",
+      "seconds": 1.25,
+      "sampleRate": 22050,
+      "channels": 1,
+      "peak": 0.45309,
+      "rms": 0.07001,
+      "sha256": "9ea510ab074e455d045c645c5bc5fbc4a1a48d1b3f7fa881b732fcd845815a0f",
+      "sources": [
+        "impactMining_000.ogg"
+      ],
+      "originalProceduralLayers": true,
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "H04-cancelled",
+      "path": "H04-cancelled.wav",
+      "category": "news",
+      "description": "Meteor: cancelled. Recorded quiet nonverbal whisper, confirmed trajectory, short impact, pass-by.",
+      "seconds": 1.25,
+      "sampleRate": 22050,
+      "channels": 1,
+      "peak": 0.13755,
+      "rms": 0.02914,
+      "sha256": "d01881105375edc407d785f7bd0d850cfe66845e937d8a2701cf488420ca7002",
+      "sources": [],
+      "originalProceduralLayers": true,
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "P01-applied",
+      "path": "P01-applied.wav",
+      "category": "news",
+      "description": "Oil exploration: applied. A mechanical drilling rhythm; discovery adds a fluid release, no find winds down.",
+      "seconds": 1.1,
+      "sampleRate": 22050,
+      "channels": 1,
+      "peak": 0.24382,
+      "rms": 0.03609,
+      "sha256": "14f3e20361dbb526fe3ae944d28d2347b9fccd0521993db465b41a1348c6b188",
+      "sources": [
+        "impactMetal_light_000.ogg"
+      ],
+      "originalProceduralLayers": true,
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "P01-success",
+      "path": "P01-success.wav",
+      "category": "news",
+      "description": "Oil exploration: success. A mechanical drilling rhythm; discovery adds a fluid release, no find winds down.",
+      "seconds": 1.1,
+      "sampleRate": 22050,
+      "channels": 1,
+      "peak": 0.2848,
+      "rms": 0.03707,
+      "sha256": "fbacdb2cf782b2c37190c5220fec7f995c75caf3e71f65ba97308c934e6894af",
+      "sources": [
+        "impactGlass_light_000.ogg",
+        "impactMining_000.ogg"
+      ],
+      "originalProceduralLayers": true,
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "P01-cancelled",
+      "path": "P01-cancelled.wav",
+      "category": "news",
+      "description": "Oil exploration: cancelled. A mechanical drilling rhythm; discovery adds a fluid release, no find winds down.",
+      "seconds": 1.1,
+      "sampleRate": 22050,
+      "channels": 1,
+      "peak": 0.15543,
+      "rms": 0.03196,
+      "sha256": "b8a6f9ed3730edad29d03529a609ada9aac1997b8ff8fe7832b317ccc203c0e4",
+      "sources": [
+        "impactMetal_light_000.ogg"
+      ],
+      "originalProceduralLayers": true,
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "P02-applied",
+      "path": "P02-applied.wav",
+      "category": "news",
+      "description": "City funding: applied. Paper and stamp; approval adds a flourish, postponement folds the paper.",
+      "seconds": 1.1,
+      "sampleRate": 22050,
+      "channels": 1,
+      "peak": 0.43276,
+      "rms": 0.04013,
+      "sha256": "d8c1e0e23ba65425607966b508279348aebdffc9b09f201bdb60a6dc1931cffb",
+      "sources": [
+        "impactMetal_light_000.ogg",
+        "impactWood_medium_000.ogg"
+      ],
+      "originalProceduralLayers": true,
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "P02-success",
+      "path": "P02-success.wav",
+      "category": "news",
+      "description": "City funding: success. Paper and stamp; approval adds a flourish, postponement folds the paper.",
+      "seconds": 1.1,
+      "sampleRate": 22050,
+      "channels": 1,
+      "peak": 0.3521,
+      "rms": 0.0438,
+      "sha256": "9009f365457132bbc25f3b9aaef85ec86b28d2ca9a12ffd4d6a9ce03197c7000",
+      "sources": [
+        "impactWood_medium_000.ogg"
+      ],
+      "originalProceduralLayers": true,
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "P02-cancelled",
+      "path": "P02-cancelled.wav",
+      "category": "news",
+      "description": "City funding: cancelled. Paper and stamp; approval adds a flourish, postponement folds the paper.",
+      "seconds": 1.1,
+      "sampleRate": 22050,
+      "channels": 1,
+      "peak": 0.40377,
+      "rms": 0.05153,
+      "sha256": "2b7ebe1b8718df5e81f99a83b02c07de2969652d5ea8e569832d32a94e825ad1",
+      "sources": [
+        "impactWood_medium_000.ogg"
+      ],
+      "originalProceduralLayers": true,
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "E01-applied",
+      "path": "E01-applied.wav",
+      "category": "news",
+      "description": "Fictional epidemic: applied. Recorded cough collage; sparse risk, wider layered outbreak, short containment release.",
+      "seconds": 1.65,
+      "sampleRate": 22050,
+      "channels": 1,
+      "peak": 0.23985,
+      "rms": 0.02514,
+      "sha256": "8742a2d849593d7dbc5667510903f8a4bd1dd2c2f588469b5baeb98a9039a6f6",
+      "sources": [
+        "cough-female.mp3",
+        "cough.mp3"
+      ],
+      "originalProceduralLayers": false,
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "E01-forecast",
+      "path": "E01-forecast.wav",
+      "category": "news",
+      "description": "Fictional epidemic: forecast. Recorded cough collage; sparse risk, wider layered outbreak, short containment release.",
+      "seconds": 1.65,
+      "sampleRate": 22050,
+      "channels": 1,
+      "peak": 0.13811,
+      "rms": 0.00948,
+      "sha256": "08d17487474e87d8b8a5488da05fa7acd22837dfbb689605b6b72a9fdf60164b",
+      "sources": [
+        "cough-female.mp3",
+        "impactWood_light_000.ogg"
+      ],
+      "originalProceduralLayers": false,
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "E01-update",
+      "path": "E01-update.wav",
+      "category": "news",
+      "description": "Fictional epidemic: update. Recorded cough collage; sparse risk, wider layered outbreak, short containment release.",
+      "seconds": 1.65,
+      "sampleRate": 22050,
+      "channels": 1,
+      "peak": 0.13204,
+      "rms": 0.01356,
+      "sha256": "a6c51429babf17e10796be2769ecc88a9b818ac43bfa8926f4823e36bf23d8ef",
+      "sources": [
+        "cough-female.mp3",
+        "cough.mp3",
+        "impactWood_light_000.ogg"
+      ],
+      "originalProceduralLayers": false,
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "E01-success",
+      "path": "E01-success.wav",
+      "category": "news",
+      "description": "Fictional epidemic: success. Recorded cough collage; sparse risk, wider layered outbreak, short containment release.",
+      "seconds": 1.65,
+      "sampleRate": 22050,
+      "channels": 1,
+      "peak": 0.22661,
+      "rms": 0.02684,
+      "sha256": "1bf7b380de892d27bf6e07c92b0aaaa086511d51ce93d67309606b292c3c6980",
+      "sources": [
+        "cough-female.mp3",
+        "cough.mp3"
+      ],
+      "originalProceduralLayers": false,
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "E01-cancelled",
+      "path": "E01-cancelled.wav",
+      "category": "news",
+      "description": "Fictional epidemic: cancelled. Recorded cough collage; sparse risk, wider layered outbreak, short containment release.",
+      "seconds": 1.65,
+      "sampleRate": 22050,
+      "channels": 1,
+      "peak": 0.09753,
+      "rms": 0.01162,
+      "sha256": "fab866b010fb524061357b4017f70c3fe760778b93fd216ff03c132a18b3200c",
+      "sources": [
+        "cough-female.mp3"
+      ],
+      "originalProceduralLayers": true,
+      "license": "CC0-1.0"
+    }
+  ]
+}

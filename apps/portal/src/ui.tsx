@@ -7,6 +7,7 @@ import { PortalLink } from "./navigation";
 export const LanguageContext = createContext<{
   lang: Language;
   t: (ru: string, en: string) => string;
+  setLanguage?: (language: Language) => void;
 }>({ lang: "ru", t: (ru) => ru });
 export const useLanguage = () => useContext(LanguageContext);
 

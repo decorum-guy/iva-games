@@ -1,0 +1,17 @@
+District audio placeholders, bank version district-audio@1
+
+All sound sources in this folder are CC0-1.0. Their creators, source pages,
+original filenames and SHA-256 digests are listed in manifest.json and
+CREDITS.md. The original Kenney license is preserved in sources/KENNEY_LICENSE.txt.
+
+Original procedural compositions and arrangements generated for Iva Games
+by scripts/build-district-audio.py are dedicated to the public domain under
+CC0 1.0 Universal, to the extent copyright or related rights apply.
+
+CC0 1.0 Universal:
+https://creativecommons.org/publicdomain/zero/1.0/
+Legal code:
+https://creativecommons.org/publicdomain/zero/1.0/legalcode
+
+No endorsement by the recording authors is implied. This notice concerns
+only these audio assets and does not change the license of the application.
