@@ -1,5 +1,13 @@
 # COLOSSUS — implementation state
 
+## Current-main integration after UI acceptance — 28 November 2026
+
+UI revision `7f0af70d8db13a66b1c4c7b7e5445060651f5a05` passed all three PR workflows: [Colossus](https://github.com/decorum-guy/iva-games/actions/runs/46076270720) (138 game tests, 83 server tests, 27 browser cases; two mobile animation-observer duplicates intentionally skipped), [platform](https://github.com/decorum-guy/iva-games/actions/runs/46076270743) (1190 tests / 93 files, 47 infrastructure tests and all browser jobs), and [both release images](https://github.com/decorum-guy/iva-games/actions/runs/46076270721) with persisted-volume replacement. This confirms the repeated UI browser run described below.
+
+Main subsequently advanced to `d243c5881b5511f01132aa601827a841e63d2f9b`. This review branch integrates that actual head, retaining its current District profile, compatible historical readers and public-catalogue release checks. The image-verification conflict is resolved by retaining both the registered-chess catalogue assertions and District profile assertions; both handoff histories are retained. No Colossus source changed during this integration. Current-head CI belongs to the resulting merge commit and is recorded in [PR #29](https://github.com/decorum-guy/iva-games/pull/29); earlier successful runs are not relabelled as that new commit's results. No merge into main or production deployment is part of this task.
+
+The integrated local tree passed `npm run check`: **1196 tests / 94 files**, TypeScript, ESLint, registry and package boundaries. All **47 infrastructure tests** and `bash -n deploy/iva-games/verify-image.sh` passed. A separate source review confirmed the combined image assertions and profile arguments for both initial and restored containers.
+
 ## Menu, copy and Fast Refresh review — 28 November 2026
 
 Source: the owner's difficulty-select screenshot, pasted Vite log and direct review of the checkout. This revision follows `b8738a7fbab65ed006f4e9197493c716e410b2fe` on the same review branch / [PR #29](https://github.com/decorum-guy/iva-games/pull/29). The complete-game baseline passed [Colossus review](https://github.com/decorum-guy/iva-games/actions/runs/46066814583), [platform checks](https://github.com/decorum-guy/iva-games/actions/runs/46066814600) and [release image checks](https://github.com/decorum-guy/iva-games/actions/runs/46066815194); those results belong to that baseline.

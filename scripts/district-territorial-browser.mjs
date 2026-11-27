@@ -58,7 +58,6 @@ async function start() {
       PLATFORM_LAB_DATABASE_PATH: join(directory, 'lab.sqlite'),
       MAIL_MODE: 'file',
       MAIL_FILE_DIRECTORY: mailbox,
-      DISTRICT_TERRITORIAL_ENABLED: 'true',
       TELEGRAM_ENABLED: 'false',
       TELEGRAM_AUTH_ENABLED: 'false',
       PORTAL_DIST_DIRECTORY: isolatedPortal,

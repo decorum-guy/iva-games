@@ -52,6 +52,22 @@ function envelope(view: { revision: number; phaseId: string }, actionId: string,
 }
 
 describe('Territorial SQLite registration and compatibility', () => {
+  it('advertises the current profile while resolving the settings and bot policy of every supported room version', () => {
+    const f = registrationFixture();
+    expect(f.registration).toMatchObject({ rulesVersion: TERRITORY_RULES, contentVersion: TERRITORY_CONTENT });
+    expect(f.registration.normalizeSettings?.(undefined)).toMatchObject({ mapVersion: '2', newsPreset: 'medium' });
+    expect(f.registration.resolveRoomVersion?.(TERRITORY_RULES, TERRITORY_CONTENT)?.botVersion).toBe(TERRITORY_BOT);
+    for (const [rules, content, botVersion, mapId] of [
+      ['district@0.2', 'district-maps@0.1', '1', 'crossroads'],
+      ['district@0.3', 'district-maps@0.2', '2', 'azure-bay'],
+    ]) {
+      const version = f.registration.resolveRoomVersion?.(rules, content);
+      expect(version?.botVersion).toBe(botVersion);
+      expect(version?.normalizeSettings({ mapId })).toEqual({ mapId, mapVersion: '1' });
+    }
+    expect(f.registration.resolveRoomVersion?.('district@0.5', TERRITORY_CONTENT)).toBeUndefined();
+  });
+
   it('reads real v0.2/v0.3 records and saved receipts before and after v0.4 activity in the same database', async () => {
     const f = registrationFixture();
     const legacy = new DistrictRuntime({ databasePath: f.databasePath, now: () => f.clock.now });

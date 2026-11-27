@@ -7,6 +7,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { setTimeout as delay } from 'node:timers/promises';
+import { checkLiveCatalogue } from './check-live-catalogue.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 for (const path of ['dist-platform/main.js', 'apps/portal/dist/index.html']) {
@@ -40,6 +41,8 @@ async function start() {
       PORTAL_ORIGIN: origin, PLATFORM_ALLOWED_HOSTS: `127.0.0.1:${port}`, PLATFORM_ALLOWED_ORIGINS: origin,
       PLATFORM_DATABASE_PATH: join(directory, 'platform.sqlite'), PLATFORM_LAB_DATABASE_PATH: join(directory, 'lab.sqlite'),
       MAIL_MODE: 'file', MAIL_FILE_DIRECTORY: mailbox, TELEGRAM_ENABLED: 'false',
+      // A leftover value on an existing host must not pin new rooms to the old game.
+      DISTRICT_TERRITORIAL_ENABLED: 'false',
       PORTAL_DIST_DIRECTORY: join(root, 'apps/portal/dist'),
     },
     stdio: ['ignore', 'pipe', 'pipe'],
@@ -154,6 +157,7 @@ try {
   assert.equal(colossus.maxPlayers, 2);
   assert.ok(publicGames.some(game => game.gameId === 'platform-lab' && game.collectionId === 'other'));
   assert.ok(publicGames.filter(game => game.collectionId === 'chess').every(game => game.status === 'unavailable'));
+  await checkLiveCatalogue(origin);
   const asset = html.match(/src="(\/assets\/[^"]+\.js)"/)?.[1];
   assert.ok(asset, 'Built portal must have a module entry');
   const assetResponse = await request(origin + asset);

@@ -84,6 +84,7 @@ async function measure(compiled) {
       PORTAL_ORIGIN: origin, PLATFORM_ALLOWED_HOSTS: `127.0.0.1:${port}`, PLATFORM_ALLOWED_ORIGINS: origin,
       PLATFORM_DATABASE_PATH: join(own, 'platform.sqlite'), PLATFORM_LAB_DATABASE_PATH: runtimePath,
       PORTAL_DIST_DIRECTORY: join(own, 'no-portal'), MAIL_MODE: 'file', MAIL_FILE_DIRECTORY: mail,
+      // Historical before-revisions still require this; current releases ignore it.
       DISTRICT_TERRITORIAL_ENABLED: 'true', TELEGRAM_ENABLED: 'false', TELEGRAM_AUTH_ENABLED: 'false',
     }, stdio: ['ignore', 'pipe', 'pipe'] });
     running = child; let startup = '', spawnError;

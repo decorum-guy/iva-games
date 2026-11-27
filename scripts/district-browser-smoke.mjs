@@ -1,4 +1,5 @@
-/** Exercise two real browsers against the built District server with isolated accounts. */
+/** Resume a synthetic saved v0.3 lobby through two real browsers and the current
+ * built server. New rooms must use the current v0.4 profile independently. */
 import assert from 'node:assert/strict';
 import { chromium, devices, expect, webkit } from '@playwright/test';
 import { spawn } from 'node:child_process';
@@ -6,8 +7,9 @@ import { createServer } from 'node:net';
 import { mkdir, mkdtemp, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { setTimeout as delay } from 'node:timers/promises';
+import { build } from 'vite';
 import { runDistrictAcceptance } from './district-browser-acceptance.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
@@ -21,6 +23,9 @@ let browser = null;
 let mobileBrowser = null;
 let origin = '';
 let port = 0;
+let legacyFixture;
+let fixtureDirectory;
+let savedLegacyLobbies = 0;
 
 async function availablePort() {
   const probe = createServer();
@@ -129,6 +134,29 @@ class Client {
   }
 }
 
+async function createLegacyLobby(host, { title, capacity, mapId }) {
+  // Only setup uses the historical registration. No game transition, live DTO
+  // or route is replaced: the normal built server resumes this stored lobby.
+  await stop();
+  let saved;
+  try {
+    saved = await legacyFixture.createSavedLegacyLobby({
+      databasePath: join(directory, 'platform.sqlite'), runtimeDatabasePath: join(directory, 'lab.sqlite'),
+      publicOrigin: origin, playerId: host.id, title, capacity, mapId,
+    });
+  } finally { await start(); }
+  assert.equal(saved.rulesVersion, 'district@0.3');
+  assert.equal(saved.contentVersion, 'district-maps@0.2');
+  assert.deepEqual(saved.settings, { mapId, mapVersion: '1' });
+  const restored = (await host.client.request(`/rooms/${saved.roomId}`)).room;
+  assert.deepEqual(restored, saved, 'The current server must preserve the saved v0.3 lobby');
+  const catalogue = (await host.client.request('/games')).games.find(game => game.gameId === 'district');
+  assert.equal(catalogue.rulesVersion, legacyFixture.latestDistrictProfile.rulesVersion);
+  assert.equal(catalogue.contentVersion, legacyFixture.latestDistrictProfile.contentVersion);
+  savedLegacyLobbies++;
+  return restored;
+}
+
 let cleanupPromise;
 function cleanup() {
   cleanupPromise ??= (async () => {
@@ -137,6 +165,7 @@ function cleanup() {
       await stop();
     } finally {
       await rm(directory, { recursive: true, force: true });
+      if (fixtureDirectory) await rm(fixtureDirectory, { recursive: true, force: true });
     }
   })();
   return cleanupPromise;
@@ -147,13 +176,29 @@ for (const signal of ['SIGINT', 'SIGTERM']) process.once(signal, () => {
 
 try {
   port = await availablePort(); origin = `http://127.0.0.1:${port}`;
+  await mkdir(join(root, '.qa'), { recursive: true });
+  // Keep the compiled fixture under the repo so its external runtime packages
+  // resolve from the same node_modules as the checked application.
+  fixtureDirectory = await mkdtemp(join(root, '.qa', 'district-legacy-fixture-'));
+  await build({ root, configFile: join(root, 'vite.platform.config.ts'), logLevel: 'error',
+    build: { ssr: 'scripts/district-legacy-lobby-fixture.ts', outDir: fixtureDirectory, emptyOutDir: true,
+      rollupOptions: { output: { entryFileNames: 'legacy-lobby.mjs' } } } });
+  legacyFixture = await import(pathToFileURL(join(fixtureDirectory, 'legacy-lobby.mjs')).href);
   await start();
   const alice = new Client(), bob = new Client();
-  await alice.register('district_qa_a');
+  const a = await alice.register('district_qa_a');
   const b = await bob.register('district_qa_b');
   const friendship = await alice.request('/friend-requests', { playerId: b.playerId }, 'district-live-friend');
   await bob.request(`/friend-requests/${friendship.requestId}/accept`, {}, 'district-live-accept-friend');
-  let room = (await alice.request('/rooms', { gameId: 'district', capacity: 2, title: 'District browser verification', settings: { mapId: 'azure-bay', mapVersion: '1' } }, 'district-live-create')).room;
+  const latest = (await alice.request('/rooms', { gameId: 'district', capacity: 2,
+    title: 'Current District default verification' }, 'district-current-default')).room;
+  assert.equal(latest.rulesVersion, legacyFixture.latestDistrictProfile.rulesVersion);
+  assert.equal(latest.contentVersion, legacyFixture.latestDistrictProfile.contentVersion);
+  assert.deepEqual(latest.settings, { mapId: 'azure-bay', mapVersion: '2', newsPreset: 'medium' });
+  await alice.request(`/rooms/${latest.roomId}/cancel`, {}, 'district-current-default-close');
+  let room = await createLegacyLobby({ client: alice, id: a.playerId }, {
+    title: 'District saved v0.3 browser verification', capacity: 2, mapId: 'azure-bay',
+  });
   const roomId = room.roomId;
   const invitation = (await alice.request(`/rooms/${roomId}/invitations`, { playerId: b.playerId }, 'district-live-invite')).invitation;
   await bob.request(`/invitations/${invitation.invitationId}/accept`, {}, 'district-live-accept');
@@ -290,14 +335,17 @@ try {
       }
       return players;
     }
-    if (accept) acceptance = await runDistrictAcceptance({ origin, makePlayers, stop, start, output });
+    if (accept) acceptance = await runDistrictAcceptance({ origin, makePlayers, createLegacyLobby, stop, start, output });
     if (show) {
       const { runDistrictShowcase } = await import('./district-browser-showcase.mjs');
-      showcase = await runDistrictShowcase({ origin, makePlayers, output });
+      showcase = await runDistrictShowcase({ origin, makePlayers, createLegacyLobby, output });
     }
     assert.deepEqual(browserErrors, []);
   }
   const report = { builtDistrictBrowser: 'passed', independentBrowsers: 2, realHttp: true, mockedGameApi: false, acceptedUiActions, rounds: 6,
+    currentDefaultRoom: { rulesVersion: latest.rulesVersion, contentVersion: latest.contentVersion, settings: latest.settings },
+    savedLegacyLobbySetup: { synthetic: true, registration: 'DistrictRuntime.registration', count: savedLegacyLobbies,
+      rulesVersion: 'district@0.3', resumedByCurrentBuiltServer: true, subsequentGameplay: 'real HTTP/UI' },
     map: 'azure-bay@1', selectionToSecondAnimationFrameMs: selectionFrameMs, keyboardEscapeAndZoomPanWithoutGameplay: true, builtHouses: 2, upgrades: 2, offlineAndServerRestart: 'passed', resultAfterReload: 'passed', narrowEnglish: 'passed', browserErrors: 0,
     humanPlaytest: false, externalMessages: 0, browserVersion: browser.version(), ...(acceptance ? { acceptance } : {}), ...(showcase ? { showcase } : {}) };
   await writeFile(join(output, 'report.json'), JSON.stringify(report, null, 2)); console.info(JSON.stringify(report));

@@ -22,7 +22,7 @@ case "${1:-status}" in
         NODE_ENV=development PLATFORM_HOST=127.0.0.1 PLATFORM_PORT="$port" PORTAL_ORIGIN="$origin" \
         PLATFORM_DATABASE_PATH="$state/platform.sqlite" PLATFORM_LAB_DATABASE_PATH="$state/runtime.sqlite" \
         PORTAL_DIST_DIRECTORY="$root/apps/portal/dist" MAIL_MODE=file MAIL_FILE_DIRECTORY="$state/mail" \
-        TELEGRAM_ENABLED=false TELEGRAM_AUTH_ENABLED=false DISTRICT_TERRITORIAL_ENABLED=true \
+        TELEGRAM_ENABLED=false TELEGRAM_AUTH_ENABLED=false \
         "$node" "$root/dist-platform/main.js"
     fi
     for attempt in {1..20}; do
