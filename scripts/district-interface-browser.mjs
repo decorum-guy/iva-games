@@ -98,6 +98,29 @@ async function readNewsByInput(page, input) {
   } finally { await touch?.detach(); }
 }
 try {
+  // Real production receipt and original resource flight, followed by a non-replaying reload.
+  {
+    const entry=await harness.reset('production-flight'); await open(entry);
+    const page=pages[entry.hostIndex]; await page.emulateMedia({reducedMotion:'no-preference'});
+    const before=await view(entry);
+    const after=await action(page,page.getByRole('button',{name:'Roll dice',exact:true}));
+    const own=after.latestRoll.sources.filter(source=>source.ownerId===after.you.participantId);
+    assert.ok(own.some(source=>source.tileId===entry.expected.tileId&&source.resource===entry.expected.resource));
+    assert.ok(after.you.hand[entry.expected.resource]>before.you.hand[entry.expected.resource]);
+    const flight=page.locator('.territory-income-flight[data-source-tile="'+entry.expected.tileId+'"][data-resource="'+entry.expected.resource+'"]').first();
+    await expect(flight).toBeVisible();
+    await page.reload(); await expect(page.locator('.territory-match')).toBeVisible();
+    await expect(page.locator('.territory-income-flight')).toHaveCount(0);
+    results.scenarios.push({name:'production-flight',actualSource:true,handCredited:true,noReplay:true});
+  }
+  {
+    const entry=await harness.reset('atmosphere-expiry'); await open(entry);
+    const page=pages[entry.guestIndex];
+    await expect(page.locator('.tb-atmosphere-illness.is-live').first()).toBeVisible();
+    await action(page,page.getByRole('button',{name:'End turn',exact:true}));
+    await expect(page.locator('.tb-atmosphere-illness.is-live')).toHaveCount(0);
+    results.scenarios.push({name:'atmosphere-expiry',activeVisible:true,expiredRemoved:true});
+  }
   // A seven, both independent discards, actual blockade and persistence after a new turn.
   let entry = await harness.reset('seven-discard'); await open(entry);
   let page = pages[entry.hostIndex], other = pages[entry.guestIndex];

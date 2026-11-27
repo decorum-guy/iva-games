@@ -44,7 +44,7 @@ async function open(entry) {
   await Promise.all(pages.map(async page => {
     await page.goto(fresh.url);
     await expect(page.locator('.territory-match')).toBeVisible();
-    await expect(page.locator('.territorial-actions')).toBeVisible();
+    await expect(page.locator('.territory-inspector .territorial-actions')).toBeVisible();
   }));
   return fresh;
 }
@@ -110,6 +110,16 @@ try {
   }
 
   let entry = await open('trade-draft');
+  const handPage=pages[entry.hostIndex];
+  await handPage.locator('.territory-hand').getByRole('button',{name:'Give Wood',exact:true}).click();
+  const handEditor=handPage.locator('.ta-trade-editor');
+  await expect(handEditor.getByRole('spinbutton',{name:'I give · Wood',exact:true})).toHaveValue('1');
+  await handPage.locator('.territory-hand').getByRole('button',{name:'Give Wood',exact:true}).click();
+  await expect(handEditor.getByRole('spinbutton',{name:'I give · Wood',exact:true})).toHaveValue('2');
+  await handEditor.getByRole('button',{name:'I give − Wood',exact:true}).click();
+  await expect(handEditor.getByRole('spinbutton',{name:'I give · Wood',exact:true})).toHaveValue('1');
+  await handEditor.getByRole('button',{name:'Collapse',exact:true}).click();
+  passed('clicking the real hand adds resources; clicking the selected resource removes one unit');
   const authorIndex = entry.hostIndex, receiverIndex = entry.guestIndex;
   const author = pages[authorIndex], receiver = pages[receiverIndex];
   await receiver.getByRole('button', { name: 'Counteroffer', exact: true }).click();
@@ -295,6 +305,7 @@ try {
 
   entry = await open('patrol');
   cardPage = pages[entry.hostIndex];
+  await cardPage.locator('.ta-cards > summary').click();
   const supply = cardPage.locator('[data-card-id="fixture-card-2"]');
   await supply.getByLabel('First resource', { exact: true }).selectOption('grain');
   await supply.getByLabel('Second resource', { exact: true }).selectOption('grain');
@@ -307,6 +318,7 @@ try {
 
   entry = await open('patrol');
   cardPage = pages[entry.hostIndex];
+  await cardPage.locator('.ta-cards > summary').click();
   const survey = cardPage.locator('[data-card-id="fixture-card-1"]');
   await survey.getByRole('button', { name: 'Play card', exact: true }).click();
   let routes = await action(cardPage, survey.getByRole('button', { name: 'Confirm', exact: true }));
@@ -330,6 +342,7 @@ try {
 
   entry = await open('patrol');
   cardPage = pages[entry.hostIndex];
+  await cardPage.locator('.ta-cards > summary').click();
   let bought;
   for (let index = 0; index < 3; index++) {
     const beforeBuy = await view(entry, entry.hostIndex);

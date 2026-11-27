@@ -137,7 +137,7 @@ export function chooseTerritoryBot(view: TerritoryView, difficulty: BotDifficult
       },0):0),0);
     const partner = players.filter(p => p.participantId !== id && !p.left && p.handCount >= 1 &&
       (p.isBot || difficulty !== 'easy') && (p.points < view.goal-1 || you.points >= view.goal-1))
-      .sort((a,b)=>visibleSupply(b)-visibleSupply(a)||a.points-b.points||b.handCount-a.handCount)[0];
+      .sort((a,b)=>visibleSupply(b.participantId)-visibleSupply(a.participantId)||a.points-b.points||b.handCount-a.handCount)[0];
     if (receive && give && partner) return { type: 'offer', targetId: partner.participantId,
       give: { ...emptyStock(), [give]: 1 }, receive: { ...emptyStock(), [receive]: 1 } };
   }

@@ -126,3 +126,21 @@
  .territory-map-first .territory-map-tools .ta-map-required { max-height:min(300px,calc(100dvh - 210px)); }
  .territory-map-first .territory-map-tools .ta-offer-stack { top:50px;max-height:calc(100% - 53px); }
 }
+
+.territory-map-first .ta-offer-group { display:grid;gap:5px;border:1px solid #b1bca6;background:#f7f5e8;box-shadow:0 4px 14px #123d4740;border-radius:12px;padding:8px;animation:td-open .24s ease-out both; }
+.territory-map-first .ta-offer-group>strong { font-size:12px;color:#46635b; }
+.territory-map-first .ta-offer-group .ta-offer { box-shadow:none;padding:5px; }
+.territory-map-first .ta-offer-group .ta-offer header { gap:2px; }
+.territory-map-first .ta-offer-group .ta-offer h4 { margin:0;font-size:12px; }
+.territory-map-first .ta-offer-group .ta-buttons button { min-height:29px; }
+.territory-map-first .ta-offer-group .ta-exchange .ta-resource-name { display:none; }
+.territory-map-first .ta-trade-window .ta-select select { min-height:34px;padding:4px 6px; }
+.territory-map-first .ta-trade-window .ta-draft-sides { gap:5px; }
+.territory-map-first .ta-trade-window .ta-draft-heading { font-size:12px; }
+.territory-map-first .ta-trade-window .ta-amounts { gap:3px; }
+.territory-map-first .ta-trade-window .ta-pick-add .ta-resource-art { width:27px;height:25px; }
+.territory-map-first .ta-trade-window .ta-picked-stock button { min-height:25px; }
+.territory-map-first .ta-trade-window .ta-buttons>button { min-height:34px;padding:5px 8px; }
+.territory-map-first .ta-trade-window .ta-buttons { gap:4px; }
+.territory-map-first .ta-map-required .ta-mandatory h4 { margin:0; }
+.territory-map-first .ta-map-required .ta-mandatory { background:#fff7df; }

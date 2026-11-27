@@ -185,7 +185,7 @@ function BankTrade({ view, lang, busy, onAction, handPick, active }: Props & { a
   useEffect(() => {
     if (!handPick || picked.current === handPick.serial) return;
     picked.current = handPick.serial;
-    if (active && !busy) setGive(handPick.resource);
+    if (active && !busy) { setGive(handPick.resource); setReceipt(null); }
   }, [handPick, active, busy]);
   const [sending, setSending] = useState(false);
   const [receipt, setReceipt] = useState<{ give: Resource; receive: Resource; rate: number } | null>(null);
@@ -240,9 +240,9 @@ function BankTrade({ view, lang, busy, onAction, handPick, active }: Props & { a
   </section>;
 }
 
-function OfferCard({ offer, closed, view, lang, busy, onAction, onCounter, onResponse }: {
+function OfferCard({ offer, closed, view, lang, busy, onAction, onCounter, onResponse, compact = false }: {
   offer: TerritoryOffer; closed?: TerritoryClosedOffer; view: TerritoryView; lang: Lang; busy: boolean;
-  onAction: Props['onAction']; onCounter: (offer: TerritoryOffer) => void; onResponse?: () => void;
+  onAction: Props['onAction']; onCounter: (offer: TerritoryOffer) => void; onResponse?: () => void; compact?: boolean;
 }) {
   const mine = offer.authorId === view.you.participantId;
   const other = mine ? offer.targetId : offer.authorId;
@@ -256,7 +256,7 @@ function OfferCard({ offer, closed, view, lang, busy, onAction, onCounter, onRes
   const canChoose = mine && agreed && !!offer.groupId;
   const activeBot = view.players.some(p => p.participantId === offer.authorId && p.isBot) && view.activeParticipantId === offer.authorId;
   const expiresAt = activeBot && offer.offeredAt !== undefined ? Math.min(view.deadlineAt ?? Infinity, offer.offeredAt + 40_000) : view.deadlineAt;
-  const seconds = expiresAt === null ? null : Math.max(0, Math.ceil((expiresAt-view.serverNow)/1000));
+  const seconds = expiresAt === null || !Number.isFinite(expiresAt) || expiresAt <= view.serverNow ? null : Math.ceil((expiresAt-view.serverNow)/1000);
   const canAccept = offer.canAccept ?? (stockTotal(shortage) === 0 && offer.unavailableReason !== 'author-resources');
   async function respond(type: 'accept' | 'decline' | 'cancel') {
     setSending(true); setFailed(false);
@@ -268,9 +268,9 @@ function OfferCard({ offer, closed, view, lang, busy, onAction, onCounter, onRes
   }
   return <article className={`ta-offer${mine ? ' is-outgoing' : ''}${closed ? ' is-closed' : ''}`} data-offer-id={offer.id} data-offer-status={closed?.status ?? (agreed ? 'agreed' : 'waiting')}>
     <header><h4>{word(lang, mine ? 'Вы → ' : 'Вам от ', mine ? 'You → ' : 'To you from ')}{nameOf(view, other)}</h4>
-      <span className="ta-offer-status"><i aria-hidden="true">{closed?.status === 'accepted' || !closed && agreed ? '✓' : closed ? '×' : '·'}</i>{closed ? offerStatusNames[closed.status][lang === 'ru' ? 0 : 1] : sending ? word(lang, 'Отправляем ответ…', 'Sending response…') : agreed ? word(lang, mine ? 'Согласен · выберите игрока' : 'Вы согласились · ждём выбора', mine ? 'Agreed · choose player' : 'Agreed · awaiting selection') : word(lang, mine ? 'Отправлено · ждём ответа' : 'Ждёт вашего ответа', mine ? 'Sent · awaiting response' : 'Awaiting your response')}{!closed && seconds !== null && <small> · {seconds}{word(lang,' с','s')}</small>}</span></header>
-    <div className="ta-exchange"><div><small>{word(lang, 'Отдаёте', 'You give')}</small><ResourceStock stock={give} lang={lang}/></div>
-      <span className="ta-exchange-sign" aria-hidden="true">⇄</span><div><small>{word(lang, 'Получаете', 'You receive')}</small><ResourceStock stock={receive} lang={lang}/></div></div>
+      <span className="ta-offer-status"><i aria-hidden="true">{closed?.status === 'accepted' || !closed && agreed ? '✓' : closed ? '×' : '·'}</i>{closed ? offerStatusNames[closed.status][lang === 'ru' ? 0 : 1] : sending ? word(lang, 'Отправляем ответ…', 'Sending response…') : agreed ? word(lang, mine ? 'Согласен · выберите игрока' : 'Вы согласились · ждём выбора', mine ? 'Agreed · choose player' : 'Agreed · awaiting selection') : word(lang, mine ? 'Отправлено · ждём ответа' : 'Ждёт вашего ответа', mine ? 'Sent · awaiting response' : 'Awaiting your response')}{!closed && seconds !== null && <small title={activeBot ? word(lang,'Ориентир окна ответа бота','Estimated bot reply window') : word(lang,'Остаток хода','Turn remaining')}> · {activeBot?'≈':''}{seconds}{word(lang,' с','s')}</small>}</span></header>
+    {!compact && <div className="ta-exchange"><div><small>{word(lang, 'Отдаёте', 'You give')}</small><ResourceStock stock={give} lang={lang}/></div>
+      <span className="ta-exchange-sign" aria-hidden="true">⇄</span><div><small>{word(lang, 'Получаете', 'You receive')}</small><ResourceStock stock={receive} lang={lang}/></div></div>}
     {!closed && stockTotal(shortage) > 0 && <p className="ta-short">{word(lang, 'В вашей руке не хватает', 'Your hand is missing')} <ResourceStock stock={shortage} lang={lang}/></p>}
     {!closed && offer.unavailableReason === 'author-resources' && !mine && <p className="ta-short">{word(lang, 'У автора уже нет нужных ресурсов. Попросите другие условия.', 'The sender no longer has the required resources. Ask for different terms.')}</p>}
     {!closed && <div className="ta-buttons">{canChoose && <button type="button" className="ta-primary" disabled={!actionable || !canAccept} onClick={() => void respond('accept')}>{word(lang,'Обменяться','Trade with')} {nameOf(view,other)}</button>}{!mine && <><button type="button" className="ta-primary" disabled={!actionable || !canAccept || agreed} onClick={() => void respond('accept')}>{word(lang, 'Принять', 'Accept')}</button>
@@ -373,7 +373,7 @@ function PlayerTrade({ view, lang, busy, onAction, handPick }: Props) {
   useLayoutEffect(() => {
     const next = new Map<string, number>();
     for (const card of Array.from(stack.current?.querySelectorAll<HTMLElement>('[data-offer-id]') ?? [])) {
-      const id = card.dataset.offerId!, top = card.offsetTop;
+      const id = card.dataset.offerId!, top = card.getBoundingClientRect().top - (stack.current?.getBoundingClientRect().top ?? 0) + (stack.current?.scrollTop ?? 0);
       const old = previousPositions.current.get(id);
       if (old !== undefined && old !== top && !stack.current?.closest('.territory-reduce-motion') && !window.matchMedia('(prefers-reduced-motion: reduce)').matches)
         card.animate([{ transform: 'translateY(' + (old-top) + 'px)' }, { transform: 'translateY(0)' }], { duration: 240, easing: 'ease-out' });
@@ -384,11 +384,29 @@ function PlayerTrade({ view, lang, busy, onAction, handPick }: Props) {
   const [dismissed, setDismissed] = useState<string[]>([]);
   const latestGroup = [...view.offers].reverse().find(offer => offer.groupId)?.groupId ?? latestClosed?.groupId;
   const visibleClosed = recent.filter(offer => !dismissed.includes(offer.id) && (offer.id === latestClosed?.id || latestGroup && offer.groupId === latestGroup));
+  const bundles = new Map<string,{offer:TerritoryOffer;closed?:TerritoryClosedOffer}[]>();
+  const rows = [...[...view.offers].reverse().map(offer=>({offer,closed:undefined})),...visibleClosed.map(offer=>({offer,closed:offer}))];
+  for(const row of rows) {
+    const key=row.offer.authorId===own && row.offer.groupId ? row.offer.groupId : row.offer.id;
+    bundles.set(key,[...(bundles.get(key)??[]),row]);
+  }
   return <section className="ta-trades territory-trade-dock" aria-label={word(lang, 'Сделки с игроками', 'Player trades')}>
     <header className="ta-section-heading territory-sr-only"><h4 ref={tradeHeading} tabIndex={-1}>{word(lang, 'Сделки с игроками', 'Player trades')}</h4></header>
     <div className="ta-offer-stack" ref={stack} aria-live="polite">
-      {[...view.offers].reverse().map(offer => <OfferCard key={offer.id} offer={offer} view={view} lang={lang} busy={busy || sending} onAction={onAction} onCounter={edit} onResponse={() => tradeHeading.current?.focus()}/>)}
-      {visibleClosed.map(offer => <div className="ta-latest-deal" key={offer.id}><button type="button" className="ta-dismiss-receipt" aria-label={word(lang,"Скрыть результат сделки","Dismiss trade result")} onClick={()=>setDismissed(previous=>[...previous,offer.id])}>×</button><OfferCard offer={offer} closed={offer} view={view} lang={lang} busy={busy} onAction={onAction} onCounter={edit}/></div>)}
+      {[...bundles].map(([key,items])=>{
+        const grouped=items[0].offer.authorId===own&&!!items[0].offer.groupId;
+        const render=({offer,closed}:{offer:TerritoryOffer;closed?:TerritoryClosedOffer})=><div className={closed?'ta-latest-deal':'ta-live-deal'} key={offer.id}>
+          {closed&&<button type="button" className="ta-dismiss-receipt" aria-label={word(lang,"Скрыть результат сделки","Dismiss trade result")} onClick={()=>setDismissed(previous=>[...previous,offer.id])}>×</button>}
+          <OfferCard offer={offer} closed={closed} compact={grouped} view={view} lang={lang} busy={busy||sending} onAction={onAction} onCounter={edit} onResponse={()=>tradeHeading.current?.focus()}/>
+        </div>;
+        if(!grouped)return render(items[0]);
+        const terms=items[0].offer;
+        return <section key={key} className="ta-offer-group" data-group-id={key}>
+          <strong>{word(lang,'Ваше предложение игрокам','Your offer to players')}</strong>
+          <div className="ta-exchange"><div><small>{word(lang,'Отдаёте','You give')}</small><ResourceStock stock={terms.give} lang={lang}/></div><span className="ta-exchange-sign">⇄</span><div><small>{word(lang,'Получаете','You receive')}</small><ResourceStock stock={terms.receive} lang={lang}/></div></div>
+          {items.map(render)}
+        </section>;
+      })}
     </div>
     <button type="button" ref={newButton} className="ta-trade-open" disabled={sending || !!view.outcome} aria-expanded={draft.editing || bankOpen}
       aria-label={word(lang, hasContent ? 'Продолжить сохранённые условия' : 'Предложить обмен', hasContent ? 'Continue saved terms' : 'Offer a trade')}
@@ -443,6 +461,7 @@ function TacticalCards({ view, lang, busy, onAction }: Props) {
   const [confirm, setConfirm] = useState<string | null>(null), [sending, setSending] = useState(false);
   const [feedback, setFeedback] = useState<CardKind | 'bought' | 'unconfirmed' | null>(null);
   const heading = useRef<HTMLElement>(null);
+  const details = useRef<HTMLDetailsElement>(null);
   const cost = view.legal.buyCard, index = lang === 'ru' ? 0 : 1;
   const shownCost = cost ?? view.legal.buyCardPricing?.total;
   const supplyReady = view.bank[first] > 0 && view.bank[second] > 0 && (first !== second || view.bank[first] >= 2);
@@ -452,6 +471,7 @@ function TacticalCards({ view, lang, busy, onAction }: Props) {
       if (await onAction({ type: 'play-card', cardId, ...(kind === 'supply' ? { resources: [first, second] } : {}) }) === true) {
         setConfirm(null);
         setFeedback(kind);
+        if (kind === 'survey' && details.current) details.current.open = false;
         heading.current?.focus();
       } else setFeedback('unconfirmed');
     } catch { setFeedback('unconfirmed'); }
@@ -466,7 +486,7 @@ function TacticalCards({ view, lang, busy, onAction }: Props) {
     if (view.phase !== 'play') return word(lang, 'После броска и обязательных действий', 'After rolling and required actions');
     return word(lang, 'В этот ход карта уже сыграна', 'A card was already played this turn');
   }
-  return <details className="ta-section ta-cards">
+  return <details ref={details} className="ta-section ta-cards">
     <summary ref={heading} tabIndex={0} title={word(lang,'Карты развития','Development cards')} aria-label={word(lang,'Карты развития','Development cards')}><svg width="28" height="28" viewBox="0 0 32 32" fill="none" aria-hidden="true"><rect x="5" y="5" width="16" height="23" rx="3" transform="rotate(-13 13 16)" fill="#9fb9b2" stroke="#47747b" strokeWidth="1.5"/><rect x="12" y="3" width="16" height="24" rx="3" fill="#f1d698" stroke="#936f3e" strokeWidth="1.5"/><path d="m20 8 2 4 4 1-3 3 .5 4-3.5-2-3.5 2 .5-4-3-3 4-1z" fill="#537f83"/><path d="M16 23h8" stroke="#936f3e" strokeWidth="1.5"/></svg><span>{view.you.cards.length}</span></summary>
     <div className="ta-form ta-card-panel">
       <h4>{word(lang,'Карты развития','Development cards')}</h4><p className="ta-muted">{word(lang, 'Одна активная карта за ход; купленную можно сыграть со следующего своего хода.', 'Play one active card per turn; a purchased card becomes playable on your next turn.')}</p>

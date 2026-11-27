@@ -15,6 +15,8 @@ export const feedbackScenarios = [
   { id: 'long-news', title: 'ТЕСТ · Длинный выпуск', checks: ['Открыть тестовую длинную новость, прокрутить до последнего абзаца и кнопок.', 'Выбрать дом: новость остаётся доступной.', 'Свернуть, вернуться из журнала; проверить клавиатуру, касание, короткое окно и увеличение.'] },
   { id: 'epidemic-risk', title: 'ТЕСТ · Эпидемия: риск', checks: ['Локальное событие уже произошло, отдельно есть прогноз риска для всей карты.', 'У прогноза нет будущих пострадавших, домов или количества ущерба.', 'Риск охватывает всю карту пунктиром, факт локального события — свой сектор.'] },
   { id: 'epidemic-applied', title: 'ТЕСТ · Эпидемия: факт', checks: ['Факт распространения показан отдельно от старого прогноза.', 'Общегородская рамка сплошная; последствия только у применившейся стадии.'] },
+  { id: 'production-flight', title: 'ТЕСТ · Доход с клетки', checks: ['Полететь из фактической клетки в руку; не повторять после reload.'] },
+  { id: 'atmosphere-expiry', title: 'ТЕСТ · Эффект района', checks: ['Применённый эффект виден до окончания срока.'] },
   { id: 'trade-draft', title: 'ТЕСТ · Встречная сделка', checks: ['Второй аккаунт редактирует встречные условия входящего предложения.', 'Первый завершает ход: сервер закрывает предложение как expired.', 'Второй сохраняет черновик и может вручную использовать его в новом законном контексте.'] },
 ] as const;
 export type FeedbackScenarioId = typeof feedbackScenarios[number]['id'];
@@ -113,6 +115,15 @@ export function prepareFeedbackFixture(baseline: TerritoryState, scenario: Feedb
       s.turn = s.round * s.participants.length + 1;
     }
     metadata.publicMessages = s.news.messages;
+  } else if (scenario === 'production-flight') {
+    const house=s.map.nodes.find(node=>node.id===board.house)!;
+    const tile=house.tileIds.map(id=>s.map.tiles.find(t=>t.id===id)!).find(t=>t.resource&&t.number!==null)!;
+    ensure(tile,'producing tile adjacent to owned house');
+    s.blockedTileId=null; s.phase='roll';
+    metadata.dice=setDice(s,tile.number!); metadata.tileId=tile.id; metadata.resource=tile.resource;
+  } else if (scenario === 'atmosphere-expiry') {
+    news('B02');
+    s.activeIndex=s.participants.length-1; s.turn=10;
   } else if (scenario === 'trade-draft') {
     apply(board.ownerId, { type: 'offer', targetId: board.otherId, give: stock({ wood: 1 }), receive: stock({ brick: 1 }) });
     metadata.offerId = s.offers[0].id;

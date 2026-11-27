@@ -175,7 +175,7 @@ export function TerritorialBoard({ map, lang, buildings, routes, players, blocke
     for(const target of targets){
       const dx=target.x-origin.x,dy=target.y-origin.y,along=dx*direction[0]+dy*direction[1];
       const side=Math.abs(dx*direction[1]-dy*direction[0]);
-      if(along<=.01||side>along) continue;
+      if(along<=.01||side>along||blockMode&&(target.kind!=='tile'||!available.has(target.id))) continue;
       const cost=along+side*2;
       if(cost<best){best=cost;nearest=target;}
     }
