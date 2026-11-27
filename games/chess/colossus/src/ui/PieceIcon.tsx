@@ -1,8 +1,6 @@
 import { useId, type CSSProperties, type ReactNode } from 'react';
 import type { BossId, UnitType } from '../core/types';
 
-export const pieceSymbols: Record<UnitType, string> = { K: '♔', Q: '♕', R: '♖', B: '♗', N: '♘', P: '♙' };
-
 const figures: Record<UnitType, ReactNode> = {
   P: <><path d="M28 56 34 34h12l6 22-4 5H32Z"/><circle cx="40" cy="24" r="12"/><path d="M29 37h22v5H29Z" className="icon-brass"/><path d="m40 19 4 5-4 5-4-5Z" className="icon-gem"/><path d="m35 45-3 11M44 46l3 10" className="icon-engraving"/></>,
   R: <><path d="M26 59 29 30h22l3 29ZM24 15h9v8h5v-8h5v8h5v-8h9v20H24Z"/><path d="M26 33h28v5H26Z" className="icon-brass"/><path d="M36 57V45a4 4 0 0 1 8 0v12Z" className="icon-recess"/><path d="M31 42v11M49 42v11" className="icon-engraving"/></>,

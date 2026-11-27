@@ -1,0 +1,210 @@
+.colossus-modal.bestiary-dialog {
+  width: 100%;
+  max-width: 850px;
+  height: min(780px, calc(100svh - 48px));
+  max-height: calc(100svh - 48px);
+  background: radial-gradient(ellipse at 50% 0, #35433f 0, transparent 54%), #18282d;
+  border-color: #a8986e88;
+}
+
+.bestiary-dialog > header {
+  min-height: 64px;
+  padding: 10px 20px;
+  border-bottom-color: #a8986e38;
+}
+
+.bestiary-dialog > header h2 { font-size: 1.5rem; }
+.bestiary-dialog > header .icon-button { min-width: 44px; min-height: 44px; }
+
+.bestiary-dialog > .modal-body {
+  flex: 1;
+  display: block;
+  min-height: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+.bestiary-browser {
+  --bestiary-enter-x: 65%;
+  --bestiary-exit-x: -65%;
+  --bestiary-detail-x: 18px;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.bestiary-browser[data-direction="previous"] {
+  --bestiary-enter-x: -65%;
+  --bestiary-exit-x: 65%;
+  --bestiary-detail-x: -18px;
+}
+
+.bestiary-selector {
+  --bestiary-portrait-size: 116px;
+  --bestiary-name-size: 1.5625rem;
+  --bestiary-name-height: 3.5rem;
+  --bestiary-spacing: 48px;
+  position: relative;
+  flex: 0 0 calc(var(--bestiary-portrait-size) + var(--bestiary-name-height) + var(--bestiary-spacing));
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr) 48px;
+  gap: 16px;
+  align-items: center;
+  padding: 12px 26px 10px;
+  border-bottom: 1px solid #a8986e42;
+  background: radial-gradient(ellipse at 50% 54%, #a9b69910, transparent 65%);
+}
+
+.bestiary-arrow {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  padding: 0;
+  border: 1px solid #a5946877;
+  border-radius: 50%;
+  background: #182a2e99;
+  color: #ddc994;
+  box-shadow: inset 0 0 0 4px #b9a27708;
+  transition: border-color 140ms, background-color 140ms, color 140ms;
+}
+
+.bestiary-arrow:hover:not(:disabled) { border-color: #d7bb79; background: #3c4d43; color: #fff0c8; }
+.bestiary-arrow:active:not(:disabled) { background: #53604a; }
+.bestiary-arrow:focus-visible { outline: 2px solid #f4d69a; outline-offset: 4px; }
+.bestiary-arrow svg { width: 25px; height: 25px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+
+.bestiary-stage {
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  text-align: center;
+}
+
+.bestiary-portrait-window { position: relative; flex: 1; min-height: 0; overflow: hidden; }
+.bestiary-portrait {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 0 4px;
+}
+
+.bestiary-effigy { position: relative; flex: 0 0 var(--bestiary-portrait-size); width: var(--bestiary-portrait-size); height: var(--bestiary-portrait-size); }
+.bestiary-effigy::before {
+  content: "";
+  position: absolute;
+  inset: 9%;
+  border: 1px solid #c5ab672e;
+  border-radius: 50%;
+  box-shadow: 0 0 0 7px #d1b57005, 0 0 0 8px #d1b57012;
+}
+.bestiary-effigy .boss-icon { position: relative; width: 100%; height: 100%; color: #b4bdb0; filter: drop-shadow(0 7px 7px #05121599); }
+.bestiary-boss-name {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 var(--bestiary-name-height);
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+  font: 400 var(--bestiary-name-size)/1.1 Georgia, "Times New Roman", serif;
+  color: #eee0bd;
+  overflow-wrap: anywhere;
+}
+.bestiary-position { display: flex; align-items: center; justify-content: center; gap: 8px; flex: 0 0 17px; font: .75rem/1 "Trebuchet MS", sans-serif; font-variant-numeric: tabular-nums; color: #bfc5af; }
+.bestiary-position > span { color: #7c8d82; }
+.bestiary-portrait-in { animation: bestiary-enter 260ms cubic-bezier(.2,.65,.3,1) both; }
+.bestiary-portrait-out { pointer-events: none; animation: bestiary-exit 260ms cubic-bezier(.2,.65,.3,1) both; }
+
+.bestiary-details {
+  flex: 1;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: #8b936f #192c31;
+}
+.bestiary-details:focus-visible { outline: 2px solid #cfb778; outline-offset: -3px; }
+.bestiary-detail-content { display: flex; flex-direction: column; gap: 20px; padding: 20px 26px 28px; }
+.bestiary-detail-in { animation: bestiary-details-enter 220ms ease-out both; }
+.bestiary-description { color: #d2dbc9; font-size: .9375rem; line-height: 1.55; }
+.bestiary-stats { display: grid; grid-template-columns: 1.4fr 1fr 1fr 1fr; gap: 12px; margin: 0; padding: 0 0 18px; border-bottom: 1px solid #a8986e32; }
+.bestiary-stats > div { min-width: 0; }
+.bestiary-stats dt { margin: 0 0 5px; color: #a9b7ac; font-size: .75rem; }
+.bestiary-stats dd { margin: 0; color: #e1cea0; font-size: 1.0625rem; line-height: 1.3; }
+.bestiary-stats dd small { font-size: .6875rem; color: #b4bca8; }
+.bestiary-victories > h3, .bestiary-card-section > h3 { font-size: 1.25rem; color: #e6d8b8; }
+.bestiary-achievements { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin: 12px 0 0; padding: 0; list-style: none; }
+.bestiary-achievements > li { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 9px 6px; border: 1px solid #70857955; border-radius: 5px; color: #a4b4aa; background: #152a2d66; font-size: .8125rem; }
+.bestiary-achievements > li.earned { border-color: #bba36899; color: #f0dca4; background: #56644855; }
+.bestiary-medal { font-size: 1.25rem; line-height: 1; color: #829d90; }
+.earned > .bestiary-medal { color: #ebce81; }
+.bestiary-card-section > p { margin-top: 8px; color: #b8c6b9; font-size: .875rem; line-height: 1.5; }
+.bestiary-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr)); gap: 16px; margin-top: 16px; padding: 3px 2px 8px; }
+.bestiary-cards .relic-card { width: 100%; min-width: 0; min-height: 275px; }
+.bestiary-cards .card-name { min-height: 38px; font-size: 1.0625rem; line-height: 1.2; }
+.bestiary-cards .card-description { font-size: .8125rem; line-height: 1.45; }
+.bestiary-cards .card-rarity { font-size: .625rem; }
+.bestiary-announcement { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
+
+@keyframes bestiary-enter {
+  from { opacity: 0; transform: translateX(var(--bestiary-enter-x)); }
+  to { opacity: 1; transform: translateX(0); }
+}
+@keyframes bestiary-exit {
+  from { opacity: 1; transform: translateX(0); }
+  to { opacity: 0; transform: translateX(var(--bestiary-exit-x)); }
+}
+@keyframes bestiary-details-enter {
+  from { opacity: .35; transform: translateX(var(--bestiary-detail-x)); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@media (max-width: 760px) {
+  .colossus-modal.bestiary-dialog { height: min(780px, calc(100svh - 24px)); max-height: calc(100svh - 24px); }
+  .bestiary-dialog > header { padding-inline: 14px; }
+  .bestiary-selector { --bestiary-portrait-size: 96px; --bestiary-name-size: 1.375rem; --bestiary-name-height: 3.125rem; --bestiary-spacing: 44px; padding: 8px 14px; gap: 8px; }
+  .bestiary-detail-content { padding: 18px 18px 24px; gap: 18px; }
+}
+
+@media (max-width: 560px) {
+  .bestiary-selector { grid-template-columns: 44px minmax(0, 1fr) 44px; padding-inline: 10px; gap: 5px; }
+  .bestiary-arrow { width: 44px; height: 44px; }
+  .bestiary-boss-name { --bestiary-name-size: 1.3125rem; }
+  .bestiary-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 20px; padding-bottom: 16px; }
+  .bestiary-achievements { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .bestiary-achievements > li { justify-content: flex-start; padding-inline: 12px; }
+  .bestiary-cards { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  .bestiary-cards .relic-card { display: grid; grid-template-columns: 88px minmax(0, 1fr); grid-template-rows: auto auto 1fr; gap: 6px 10px; align-items: start; min-height: 170px; padding: 14px 12px; text-align: left; }
+  .bestiary-cards .card-illustration { grid-column: 1; grid-row: 1 / 4; align-self: center; width: 88px; height: 116px; padding: 0; }
+  .bestiary-cards .card-name { grid-column: 2; justify-content: flex-start; min-height: 0; padding: 0; font-size: 1rem; }
+  .bestiary-cards .card-rarity { grid-column: 2; justify-content: flex-start; margin: 0; font-size: .5625rem; }
+  .bestiary-cards .card-description { grid-column: 2; margin: 0; font-size: .75rem; line-height: 1.45; }
+}
+
+@media (max-height: 600px) {
+  .bestiary-dialog > header { min-height: 54px; padding-block: 5px; }
+  .bestiary-selector { --bestiary-portrait-size: 72px; --bestiary-name-size: 1.25rem; --bestiary-name-height: 2.75rem; --bestiary-spacing: 39px; padding-block: 6px; }
+  .bestiary-boss-name { font-size: 1.25rem; }
+}
+
+.bestiary-browser[data-reduced-motion="true"] .bestiary-portrait-in,
+.bestiary-browser[data-reduced-motion="true"] .bestiary-detail-in { animation: none; }
+.bestiary-browser[data-reduced-motion="true"] .bestiary-portrait-out { display: none; animation: none; }
+.bestiary-browser[data-reduced-motion="true"] .bestiary-arrow { transition: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .bestiary-portrait-in, .bestiary-detail-in { animation: none; }
+  .bestiary-portrait-out { display: none; animation: none; }
+  .bestiary-arrow { transition: none; }
+}

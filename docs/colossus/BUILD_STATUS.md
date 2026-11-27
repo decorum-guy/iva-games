@@ -1,5 +1,27 @@
 # COLOSSUS — implementation state
 
+## Menu, copy and Fast Refresh review — 28 November 2026
+
+Source: the owner's difficulty-select screenshot, pasted Vite log and direct review of the checkout. This revision follows `b8738a7fbab65ed006f4e9197493c716e410b2fe` on the same review branch / [PR #29](https://github.com/decorum-guy/iva-games/pull/29). The complete-game baseline passed [Colossus review](https://github.com/decorum-guy/iva-games/actions/runs/46066814583), [platform checks](https://github.com/decorum-guy/iva-games/actions/runs/46066814600) and [release image checks](https://github.com/decorum-guy/iva-games/actions/runs/46066815194); those results belong to that baseline.
+
+### Changes in this revision
+
+- `Board2D.tsx` exported ordinary functions alongside its component. Re-evaluation changed those function identities, which the installed React Refresh validator rejected. `nextBoardSquare`, `squareLabel` and `BoardProps` now live in `boardHelpers.ts`; the board module has only a component runtime export. The similarly mixed, unused `pieceSymbols` export was removed from `PieceIcon.tsx` after a repository-wide reference search. No watcher, HMR or error handling was disabled.
+- The difficulty caption inherited a negative top margin underneath an outside focus outline. It now occupies its own grid row with an 8px gap. Pointer selection keeps the native control focused without a lingering keyboard ring; Tab navigation has an inset 2px outline. The field is connected to its description using `aria-describedby`.
+- Menu sections have explicit selection marks, distinct selected/hover treatments and mode-specific launch actions. The initiation caption correctly shows four commands. The mobile boss header is more compact so the four modes and launch controls are visible earlier; desktop artwork is retained.
+- The bestiary has a fixed top selector, centered figure/name, previous/next arrows, wrapping navigation and left/right keyboard shortcuts. Incoming and outgoing portraits slide in the chosen direction. Details scroll independently and reset on a boss change. Navigation derives its count from `HUNT_BOSSES`; the training boss remains excluded. Application/system reduced motion and enlarged text are supported.
+- RU/EN descriptions state effects and relevant targets/durations without repeated unrelated exceptions. The copy was independently compared with the current engine for card costs, armor order, shields, immunity, camps, fire and tutorial outcomes. Gameplay rules and numbers are unchanged.
+- [Terra Max acceptance prompt](../../prompts/ACCEPT_COLOSSUS_TERRA_MAX.md) defines the independent gameplay/UI audit, including 24 hunt attempts for the current roster, both views, all cards, seven lessons, cooperation and detailed defect evidence. This is an audit assignment, not a claim that Terra has performed it.
+
+### Checks actually performed before publishing this revision
+
+- All **138 Colossus tests / 8 files** passed. Two regressions start real Vite servers against disposable source copies outside the watched checkout, save the board/icon modules, observe actual WebSocket HMR and validate freshly loaded exports using the installed React Refresh runtime. The mixed board export failed before extraction and passed afterward.
+- Package boundaries, registry validation, root TypeScript and ESLint passed. The broad root test run passed 1,188 tests and hit a 5-second timeout in an unchanged REMORSE king-fracture test; its isolated rerun passed all four cases. This local broad run is recorded as a timeout, not an all-green result. The final published candidate's full CI is recorded in PR #29.
+- The Colossus production build passed. Browser-driven E2E execution is assigned to the existing GitHub Actions job, including seven new menu/bestiary cases in addition to the previous 20 cases. Two additional entries intentionally skip the desktop animation observer on mobile projects; authored cases are not recorded as passed before execution.
+- Direct browser interaction verified pointer/keyboard difficulty focus, 8px caption clearance, mode actions, all three bestiary bosses, wrapping, keyboard navigation, independently scrolling details and fixed selector geometry. At a **390×600 iframe viewport with 130% root text (20.8px)** the caption retained its gap, the page stayed 390px wide and the long Archivist title fit without clipping. This is viewport QA, not physical-device acceptance.
+
+The pasted log also contains actual file-change events for `index.html`, `main.tsx`, `tsconfig.json` and `vite.config.ts`. The mixed-export fix addresses the confirmed Fast Refresh invalidation; it does not identify which process repeatedly wrote those files on the owner's Mac. HMR state preservation in that environment and a sustained idle reproduction remain explicit items for Terra's acceptance. The branch remains unmerged and production deployment is outside this review.
+
 ## Current review candidate — 27 November 2026
 
 The owner's current request is a complete third chess game in a separate review branch, including a training-only boss, original 2D/3D assets, sounds and future boss/game registration. Source: the attached project entry file, current main and the existing PR #10 implementation. Branch: `feat/colossus-complete-20261127`, combining main `d397460689b717cbcb892d993dd33aa4d4631c49` and the prior Colossus branch `5597e7ac9582595e87066bd0116c3ed553db98e6`.

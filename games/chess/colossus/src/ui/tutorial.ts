@@ -9,38 +9,38 @@ const text = (ru: string, en: string): Localized => ({ ru, en });
 export const LESSONS: Lesson[] = [
   {
     title: text('Прочитай замысел', 'Read the intention'),
-    text: text('Смотритель уже нацелил луч на e1. Выбери короля и уйди на подсвеченную клетку.', 'The Warden has aimed a ray at e1. Choose your king and move to a highlighted square.'),
-    done: text('Луч прошёл мимо. Босс не меняет цель после твоего хода. У короля есть здоровье: шаха и мата здесь нет.', 'The ray missed. The boss never changes its target after your move. Your king has health; there is no check or checkmate.'),
+    text: text('Луч Смотрителя нацелен на e1. Уведи короля на подсвеченную клетку.', 'The Warden’s ray targets e1. Move your king to a highlighted square.'),
+    done: text('Луч прошёл мимо. Босс следует показанному плану. Король жив, пока у него есть HP.', 'The ray missed. The boss follows its announced plan. Your king survives while it has HP.'),
   },
   {
     title: text('Сначала броня', 'Break the armor'),
-    text: text('Новая позиция. Выбери ладью на a6 и ударь Смотрителя: ладья снимает дополнительную броню.', 'A new position. Choose the rook on a6 and strike the Warden: rooks remove extra armor.'),
-    done: text('Ладья сняла броню, ферзь — здоровье. Атакующие фигуры остаются на своих клетках.', 'The rook removed armor; the queen removed health. Attacking pieces stay on their squares.'),
+    text: text('Новая позиция. Ударь ладьёй с a6: она снимает 1 броню перед уроном.', 'New position. Strike with the rook on a6: it removes 1 armor before dealing damage.'),
+    done: text('Ладья разрушила броню, ферзь снял HP. Обе фигуры остались на месте.', 'The rook broke the armor; the queen dealt HP damage. Both pieces stayed in place.'),
   },
   {
     title: text('Удар и отход', 'Strike and retreat'),
-    text: text('Выбери коня на f5, затем клетку Смотрителя. После удара выбери подсвеченную клетку отхода.', 'Choose the knight on f5, then a Warden square. After the strike, choose a highlighted retreat square.'),
-    done: text('Удар и отход стоили одну команду. Каждая фигура действует один раз за раунд; отход не даёт неуязвимость.', 'The strike and retreat cost one command. Each piece acts once per round; retreat does not grant invulnerability.'),
+    text: text('Выбери коня на f5, цель на Смотрителе и подсвеченную клетку отхода.', 'Choose the knight on f5, a Warden square, then a highlighted retreat square.'),
+    done: text('Удар и отход — одна команда. Конь будет снова готов в следующем раунде.', 'Strike and retreat used one command. The knight will be ready next round.'),
   },
   {
     title: text('Луч или огонь', 'Ray or fire'),
     text: text('Пешка на e2 прикрывает короля от луча на 2 урона. Нажми «Ответ босса».', 'The pawn on e2 covers the king from a 2-damage ray. Press Boss response.'),
-    done: text('Луч остановился на пешке. Огонь прошёл через обе фигуры: против него нужно уйти с линии или защититься.', 'The ray stopped at the pawn. Fire hit both pieces: leave its line or use protection.'),
+    done: text('Пешка остановила луч. Огонь задел обе фигуры. Уходи с горящих клеток или готовь защиту.', 'The pawn stopped the ray. Fire hit both pieces. Move off burning squares or prepare protection.'),
   },
   {
     title: text('Щит расходуется', 'A shield is consumed'),
-    text: text('Смотритель готовит два удара по 1. Выбери пешку на e2 и нажми «Оборона».', 'The Warden is preparing two hits of 1. Choose the pawn on e2 and press Guard.'),
-    done: text('Щит поглотил первый удар. Второй снял 1 HP — пешка выжила. Щит расходуется, а не уменьшает каждый удар.', 'The shield absorbed the first hit. The second dealt 1 HP; the pawn survived. A shield is consumed, rather than reducing every hit.'),
+    text: text('Два удара по 1. Выбери пешку на e2 и нажми «Оборона».', 'Two hits of 1. Choose the pawn on e2 and press Guard.'),
+    done: text('Щит поглотил 1 урон и закончился. Второй удар снял 1 HP. Пешка выжила.', 'The shield absorbed 1 damage and ran out. The second hit cost 1 HP. The pawn survived.'),
   },
   {
     title: text('Карта защиты', 'A protective card'),
-    text: text('Открой «Мраморный обет» и выбери короля. Карта стоит 5 фокуса и защищает на два ответа босса.', 'Open Marble Vow and choose the king. It costs 5 focus and protects through two boss responses.'),
-    done: text('Король не получил урона. Остался ещё один ответ под защитой. Карты тратят фокус, команды армии сохраняются.', 'The king took no damage. Protection remains for one more response. Cards spend focus, leaving army commands available.'),
+    text: text('«Мраморный обет»: 5 фокуса, неуязвимость на два ответа босса. Примени карту к королю.', 'Marble Vow: 5 focus, invulnerable for two boss responses. Play it on the king.'),
+    done: text('Король сохранил HP. Защиты хватит ещё на один ответ. Карта стоила 0 команд.', 'The king kept all its HP. Protection lasts one more response. The card cost 0 commands.'),
   },
   {
     title: text('Превращение и победа', 'Promotion and victory'),
-    text: text('Последняя позиция. Проведи пешку с c7 на c8 и выбери ферзя.', 'The final position. Move the pawn from c7 to c8 and choose the queen.'),
-    done: text('Победа! На восстановлении атаки сильнее на 1. Разрушай броню, береги короля и используй такие окна для удара.', 'Victory! Attacks gain +1 during recovery. Break armor, protect your king and use these openings to strike.'),
+    text: text('Последняя позиция. Проведи пешку c7 → c8 и выбери ферзя.', 'Final position. Move the pawn c7 → c8 and choose the queen.'),
+    done: text('Победа! Ферзь нанёс 4 урона: 3 за удар и 1 за восстановление босса.', 'Victory! The queen dealt 4 damage: 3 for the strike and +1 during boss recovery.'),
   },
 ];
 
@@ -95,25 +95,25 @@ export function lessonGuidance(index: number, state: GameState, fireComparison =
   if (state.phase !== 'finished' && state.mode === 'tutorial') {
     if (index === 0) {
       if (!unit(state, 'king').activated) keep = action => action.type === 'move' && action.unitId === 'king' && !previewResponse(applyAction(state, action)).damage.king;
-      else { message = text('Король вне луча. Нажми «Ответ босса» и проверь результат.', 'Your king is outside the ray. Press Boss response to see the result.'); keep = action => action.type === 'end'; }
+      else { message = text('Король вне луча. Нажми «Ответ босса».', 'Your king is outside the ray. Press Boss response.'); keep = action => action.type === 'end'; }
     } else if (index === 1) {
       const attacker = state.boss.armor > 0 ? 'rook' : 'queen';
-      if (attacker === 'queen') message = text('Брони больше нет. Выбери ферзя на c5 и ударь по здоровью Смотрителя.', 'The armor is gone. Choose the queen on c5 and strike the Warden’s health.');
+      if (attacker === 'queen') message = text('Броня разрушена. Ударь ферзём с c5 по HP Смотрителя.', 'Armor broken. Strike the Warden’s HP with the queen on c5.');
       keep = action => action.type === 'attack' && action.unitId === attacker;
     } else if (index === 2) keep = action => action.type === 'attack' && action.unitId === 'knight' && action.retreat !== 37;
     else if (index === 3) {
-      if (fireComparison) message = text('Та же позиция, но теперь огонь проходит через обе фигуры. Нажми «Ответ босса».', 'The same position, but fire now reaches both pieces. Press Boss response.');
+      if (fireComparison) message = text('Та же позиция с огнём на вертикали e. Нажми «Ответ босса».', 'The same position with fire on the e-file. Press Boss response.');
       keep = action => action.type === 'end';
     } else if (index === 4) {
       if (!unit(state, 'pawn-e').activated) keep = action => action.type === 'guard' && action.unitId === 'pawn-e';
-      else { message = text('У пешки щит 1. Нажми «Ответ босса»: он выполнит два отдельных удара.', 'The pawn has a shield of 1. Press Boss response: it will make two separate hits.'); keep = action => action.type === 'end'; }
+      else { message = text('Щит пешки поглотит 1 урон. Нажми «Ответ босса».', 'The pawn’s shield will absorb 1 damage. Press Boss response.'); keep = action => action.type === 'end'; }
     } else if (index === 5) {
       if (!state.cardPlayed) keep = action => action.type === 'card' && action.cardId === 'marble-vow' && action.targets?.[0] === 'king';
-      else { message = text('Защита на два ответа уже действует. Нажми «Ответ босса».', 'Protection is active for two responses. Press Boss response.'); keep = action => action.type === 'end'; }
+      else { message = text('Король неуязвим на два ответа. Нажми «Ответ босса».', 'The king is invulnerable for two responses. Press Boss response.'); keep = action => action.type === 'end'; }
     } else if (index === 6) {
       if (unit(state, 'pawn-c').type === 'P') keep = action => action.type === 'move' && action.unitId === 'pawn-c' && action.to === 58 && action.promotion === 'Q';
-      else if (!state.intent.rest) { message = text('Пешка стала ферзём, сохранив свои 2 HP. Нажми «Ответ босса»: после третьего ответа он откроется.', 'The pawn became a queen and kept its 2 HP. Press Boss response: after the third response the Warden will open up.'); keep = action => action.type === 'end'; }
-      else { message = text('Смотритель восстанавливается. Выбери нового ферзя на c8 и нанеси последний удар: 3 + 1 урона.', 'The Warden is recovering. Choose your new queen on c8 and land the final strike: 3 + 1 damage.'); keep = action => action.type === 'attack' && action.unitId === 'pawn-c'; }
+      else if (!state.intent.rest) { message = text('Ферзь сохранил 2 HP пешки. Нажми «Ответ босса»: после третьего боевого ответа начнётся восстановление.', 'The queen kept the pawn’s 2 HP. Press Boss response: the Warden recovers after this third combat response.'); keep = action => action.type === 'end'; }
+      else { message = text('Смотритель восстанавливается. Ударь ферзём с c8: 3 + 1 урона.', 'The Warden is recovering. Strike with the queen on c8 for 3 + 1 damage.'); keep = action => action.type === 'attack' && action.unitId === 'pawn-c'; }
     }
   }
   const actions = legal.filter(keep);

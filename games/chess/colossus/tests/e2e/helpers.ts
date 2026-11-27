@@ -34,7 +34,7 @@ export async function openEnglish(page: Page, view: '2d' | '3d' = '2d') {
   await activate(dialog.getByRole('button', { name: 'Close / Закрыть', exact: true }));
 }
 export async function beginHunt(page: Page, view: '2d' | '3d' = '2d') {
-  await activate(page.locator('.start-actions').getByRole('button', { name: 'Begin hunt', exact: true }));
+  await activate(page.getByTestId('start-game'));
   await expect(page.getByTestId('board-' + view)).toBeVisible();
 }
 export async function move(page: Page, from: string, to: string) {
