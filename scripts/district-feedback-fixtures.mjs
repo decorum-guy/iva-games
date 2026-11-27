@@ -167,9 +167,12 @@ export async function createFeedbackHarness({ scenarioIds } = {}) {
     for (const [index, client] of clients.entries()) await client.register(index);
     const friendship = await clients[0].request('/friend-requests', { playerId: clients[1].user.playerId });
     await clients[1].request(`/friend-requests/${friendship.requestId}/accept`, {});
-    for (const scenario of fixture.feedbackScenarios) {
+    for (const [index, scenario] of fixture.feedbackScenarios.entries()) {
       if (!chosen.includes(scenario.id)) continue;
-      const hostIndex = manifest.scenarios.length % 2, guestIndex = 1 - hostIndex, host = clients[hostIndex], guest = clients[guestIndex];
+      // Preserve the designated touch/mouse host for each fixture whenever capacity permits.
+      const preferred = index % 2;
+      const hostIndex = manifest.scenarios.filter(item => item.hostIndex === preferred).length < 5 ? preferred : 1 - preferred;
+      const guestIndex = 1 - hostIndex, host = clients[hostIndex], guest = clients[guestIndex];
       let room = (await host.request('/rooms', { gameId: 'district', capacity: 2, title: scenario.title,
         settings: { mapId: 'two-shores', mapVersion: '2', newsPreset: 'medium' } })).room;
       const path = '/rooms/' + room.roomId;
