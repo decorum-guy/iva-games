@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { commandKey, legalCommands, transition, validateState } from '../../src/core'
-import { ABILITY_PRACTICE, QUICK_LESSONS } from '../../src/core/quickTeaching'
+import { ABILITY_PRACTICE, QUICK_LESSONS } from '../../src/tutorial/quickTeaching'
 
 describe('short native tutorial positions', () => {
   it('offers one legal action for each ordinary piece, with the actual capture reward', () => {

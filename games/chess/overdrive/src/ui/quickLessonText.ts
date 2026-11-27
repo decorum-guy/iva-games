@@ -1,4 +1,4 @@
-import type { QuickLessonId } from '../core/quickTeaching'
+import type { QuickLessonId } from '../tutorial/quickTeaching'
 import type { Language } from './i18n'
 
 export const quickLessonText: Record<QuickLessonId, Record<Language, readonly [string, string, string]>> = {

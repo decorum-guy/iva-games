@@ -1,7 +1,7 @@
-import { createPosition } from './state'
-import { transition } from './rules'
-import type { Action, GameState, PieceInput } from './types'
-import { TEACHING_FIXTURES } from './teaching'
+import { createPosition } from '../core/state'
+import { transition } from '../core/rules'
+import type { Action, GameState, PieceInput } from '../core/types'
+import { TEACHING_FIXTURES } from '../core/teaching'
 
 export type QuickLessonId = 'pawn' | 'knight' | 'bishop' | 'rook' | 'queen' | 'king' | 'impulse' | 'activate' | 'free' | 'expire'
 export interface QuickLesson {

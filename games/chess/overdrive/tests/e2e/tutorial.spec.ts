@@ -1,5 +1,5 @@
 import { expect, test, type BrowserContext, type Page } from '@playwright/test'
-import { ABILITY_PRACTICE, QUICK_LESSONS } from '../../src/core/quickTeaching'
+import { ABILITY_PRACTICE, QUICK_LESSONS } from '../../src/tutorial/quickTeaching'
 import { ABILITIES, type Action, type GameState } from '../../src/core'
 import { abilityName, pieceName, type Language } from '../../src/ui/i18n'
 

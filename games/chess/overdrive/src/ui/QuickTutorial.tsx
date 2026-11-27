@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { ABILITIES, commandKey, energyBankSize, legalCommands, transition, type Action, type GameState } from '../core'
-import { ABILITY_PRACTICE, QUICK_LESSONS, type QuickLesson, type QuickLessonId } from '../core/quickTeaching'
+import { ABILITY_PRACTICE, QUICK_LESSONS, type QuickLesson, type QuickLessonId } from '../tutorial/quickTeaching'
 import type { TeachingFixture } from '../core/teaching'
 import { Board2D } from './Board2D'
 import { Capacitors } from './Capacitors'
