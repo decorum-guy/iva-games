@@ -74,7 +74,7 @@ export async function createFeedbackHarness({ scenarioIds } = {}) {
         PORTAL_ORIGIN: origin, PLATFORM_ALLOWED_HOSTS: `127.0.0.1:${port}`, PLATFORM_ALLOWED_ORIGINS: origin,
         PLATFORM_DATABASE_PATH: join(directory, 'platform.sqlite'), PLATFORM_LAB_DATABASE_PATH: runtimeDatabase,
         PORTAL_DIST_DIRECTORY: portalDirectory, MAIL_MODE: 'file', MAIL_FILE_DIRECTORY: mailbox,
-        DISTRICT_TERRITORIAL_ENABLED: 'true', TELEGRAM_ENABLED: 'false', TELEGRAM_AUTH_ENABLED: 'false' },
+        TELEGRAM_ENABLED: 'false', TELEGRAM_AUTH_ENABLED: 'false' },
       stdio: ['ignore', 'pipe', 'pipe'] });
     const current = { child, output: '', error: null }; running = current;
     const collect = bytes => { current.output += String(bytes); };

@@ -49,6 +49,9 @@ jobs:
         with:
           persist-credentials: false
           ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
 
       - name: Validate deployment Compose and Caddy configuration
         if: matrix.service == 'platform'
@@ -125,6 +128,9 @@ jobs:
         with:
           ref: ${{ github.event.workflow_run.head_sha }}
           persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
       - name: Publish the reviewed main revision
         env:
           REGISTRY_TOKEN: ${{ github.token }}
@@ -174,6 +180,7 @@ jobs:
           ref: ${{ github.event.workflow_run.head_sha }}
           persist-credentials: false
       - name: Promote the reviewed image digests
+        id: promote
         env:
           DEPLOY_KEY: ${{ secrets.IVA_DEPLOY_SSH_KEY }}
           REGISTRY_TOKEN: ${{ github.token }}
@@ -207,8 +214,24 @@ jobs:
               ssh -T -p "$VPS_PORT" -i "$config/key" -o IdentitiesOnly=yes -o BatchMode=yes \
                 -o ControlMaster=no -o ControlPath=none -o ConnectTimeout=10 \
                 -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$config/known_hosts" \
-                "iva-deploy@$VPS_HOST" || status=$?
+                "iva-deploy@$VPS_HOST" | tee "$config/outcome" || status=$?
+            if [[ "$status" == 0 ]]; then
+              if grep -Fxq "DEPLOYED $RELEASE_SHA" "$config/outcome" ||
+                 grep -Fxq 'UNCHANGED release already current' "$config/outcome"; then
+                # UNCHANGED permits a retry of the public check; it alone is
+                # not a claim of first delivery or completed initial activation.
+                echo 'check_catalogue=true' >> "$GITHUB_OUTPUT"
+              fi
+              exit 0
+            fi
             if [[ "$status" != 75 ]]; then exit "$status"; fi
             sleep "$((attempt * 10))"
           done
           exit 75
+      - uses: actions/setup-node@v7
+        if: steps.promote.outputs.check_catalogue == 'true'
+        with:
+          node-version: '24'
+      - name: Verify the public game profile matches this release
+        if: steps.promote.outputs.check_catalogue == 'true'
+        run: node --experimental-strip-types scripts/check-live-catalogue.mjs https://iva-games.pro

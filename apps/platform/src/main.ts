@@ -10,7 +10,8 @@ import { TelegramService } from './telegram/index.js';
 process.umask(0o077);
 const config = loadPlatformConfig();
 const lab = createPlatformLabRegistration({ databasePath: config.runtimeDatabasePath });
-const district = createDistrictRegistration({ databasePath: config.runtimeDatabasePath, territorialDefault: config.territorialDistrict });
+// New rooms follow this deployed release; stored rooms retain their own version.
+const district = createDistrictRegistration({ databasePath: config.runtimeDatabasePath, territorialDefault: true });
 const platform = new PlatformService({ databasePath: config.databasePath, publicOrigin: config.publicOrigin, mail: config.mail, games: [lab, district] });
 await platform.ready;
 const telegramTransport = config.telegram ? createTelegramTransport({
