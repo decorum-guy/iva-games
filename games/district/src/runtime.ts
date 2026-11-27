@@ -11,6 +11,8 @@ import { chooseDistrictBotAction } from './bot';
 import { getDistrictMap, resolveDistrictMapSettings } from './maps';
 import { districtProfileForMap, districtProfileForVersion, DistrictError } from './types';
 import type { DistrictAction, DistrictState, DistrictView } from './types';
+import { TerritoryRuntime, territorySettings, territorialId } from './territorial/runtime';
+import { TERRITORY_BOT, TERRITORY_CONTENT, TERRITORY_RULES } from './territorial/types';
 
 interface MatchRow { match_id: string; request_hash: string; state: string; bot_seed: string }
 interface ReceiptRow { request_hash: string; response: string }
@@ -24,15 +26,22 @@ function normalizeSettings(input: unknown, schemaVersion: 1 | 2): { mapId: strin
   catch { throw new SessionError('INVALID_SETTINGS', 'Выберите доступную карту.'); }
 }
 
-function resolveRoomVersion(rulesVersion: string, contentVersion: string) {
+function resolveLegacyRoomVersion(rulesVersion: string, contentVersion: string) {
   const profile = districtProfileForVersion(rulesVersion, contentVersion);
   if (!profile) return undefined;
   return { normalizeSettings: (input: unknown) => normalizeSettings(input, profile.schemaVersion), botVersion: profile.botVersion };
 }
 
-function validateStart(input: StartMatchRequest) {
+function resolveRoomVersion(rulesVersion: string, contentVersion: string) {
+  if (rulesVersion === TERRITORY_RULES && contentVersion === TERRITORY_CONTENT) {
+    return { normalizeSettings: territorySettings, botVersion: TERRITORY_BOT };
+  }
+  return resolveLegacyRoomVersion(rulesVersion, contentVersion);
+}
+
+function validateStart(input: StartMatchRequest, legacy = false) {
   if (!input || !identifier(input.startCommandId) || !identifier(input.roomId)) throw new SessionError('INVALID_ROSTER', 'Проверьте участников комнаты.');
-  const version = resolveRoomVersion(input.rulesVersion, input.contentVersion);
+  const version = (legacy ? resolveLegacyRoomVersion : resolveRoomVersion)(input.rulesVersion, input.contentVersion);
   if (!version) {
     throw new SessionError('INCOMPATIBLE_VERSION', 'Игра обновилась. Создайте новую комнату.', 409);
   }
@@ -115,13 +124,13 @@ export class DistrictRuntime implements GameRuntime {
     const { rulesVersion, contentVersion } = districtProfileForMap(2);
     return { gameId: 'district', collectionId: 'other', title: 'Район', minPlayers: 2, maxPlayers: 4,
       supportsBots: true, rulesVersion, contentVersion,
-      status: 'available', runtime: this, normalizeSettings: input => normalizeSettings(input, 2), resolveRoomVersion };
+      status: 'available', runtime: this, normalizeSettings: input => normalizeSettings(input, 2), resolveRoomVersion: resolveLegacyRoomVersion };
   }
 
   close(): void { this.db.close(); }
 
   async createMatch(input: StartMatchRequest): Promise<{ matchId: string }> {
-    const version = validateStart(input);
+    const version = validateStart(input, true);
     const hash = digest(input);
     const result = this.db.transaction(() => {
       const previous = this.db.prepare('SELECT * FROM district_matches WHERE start_command_id=? OR room_id=?').get(input.startCommandId, input.roomId) as MatchRow | undefined;
@@ -276,7 +285,24 @@ export class DistrictRuntime implements GameRuntime {
   }
 }
 
-export function createDistrictRegistration(options: { databasePath: string; now?: () => number }): GameRegistration & { close: () => void } {
-  const runtime = new DistrictRuntime(options);
-  return { ...runtime.registration(), close: () => runtime.close() };
+export function createDistrictRegistration(options: { databasePath: string; now?: () => number; territorialDefault?: boolean }): GameRegistration & { close: () => void } {
+  const legacy = new DistrictRuntime(options);
+  const territory = new TerritoryRuntime(options.databasePath, options.now);
+  const game = legacy.registration();
+  const adapter = (matchId: string): GameRuntime => territorialId(matchId) ? territory : legacy;
+  const runtime: GameRuntime = {
+    createMatch: async input => {
+      if (input?.rulesVersion !== TERRITORY_RULES) return legacy.createMatch(input);
+      validateStart(input);
+      return territory.createMatch(input);
+    },
+    viewForPlayer: (matchId, playerId) => adapter(matchId).viewForPlayer(matchId, playerId),
+    applyAction: (matchId, playerId, action) => adapter(matchId).applyAction(matchId, playerId, action),
+    status: matchId => adapter(matchId).status(matchId),
+  };
+  return {
+    ...game, runtime, resolveRoomVersion, ...(options.territorialDefault ? { rulesVersion: TERRITORY_RULES,
+      contentVersion: TERRITORY_CONTENT, normalizeSettings: territorySettings } : {}),
+    close: () => { territory.close(); legacy.close(); },
+  };
 }

@@ -13,6 +13,7 @@ function port(value: string | undefined, fallback: number): number {
 function isLoopback(host: string): boolean { return ['localhost', '127.0.0.1', '[::1]', '::1'].includes(host); }
 export interface PlatformConfig {
   production: boolean;
+  territorialDistrict: boolean;
   host: string;
   port: number;
   publicOrigin: string;
@@ -96,7 +97,7 @@ export function loadPlatformConfig(env: NodeJS.ProcessEnv = process.env): Platfo
     telegram = { botToken, botId: botToken.split(':')[0], botUsername, webhookSecret, proofEncryptionKey, proxyUrl };
   }
   return {
-    production, host, port: configuredPort, publicOrigin, allowedOrigins, allowedHosts,
+    production, territorialDistrict: bool(env.DISTRICT_TERRITORIAL_ENABLED), host, port: configuredPort, publicOrigin, allowedOrigins, allowedHosts,
     trustedProxyIps: parseTrustedProxyIps(env.TRUSTED_PROXY_IPS),
     databasePath: resolve(env.PLATFORM_DATABASE_PATH ?? '.runtime/platform.sqlite'),
     runtimeDatabasePath: resolve(env.PLATFORM_LAB_DATABASE_PATH ?? '.runtime/platform-lab.sqlite'),

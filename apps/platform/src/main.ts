@@ -10,7 +10,7 @@ import { TelegramService } from './telegram/index.js';
 process.umask(0o077);
 const config = loadPlatformConfig();
 const lab = createPlatformLabRegistration({ databasePath: config.runtimeDatabasePath });
-const district = createDistrictRegistration({ databasePath: config.runtimeDatabasePath });
+const district = createDistrictRegistration({ databasePath: config.runtimeDatabasePath, territorialDefault: config.territorialDistrict });
 const platform = new PlatformService({ databasePath: config.databasePath, publicOrigin: config.publicOrigin, mail: config.mail, games: [lab, district] });
 await platform.ready;
 const telegramTransport = config.telegram ? createTelegramTransport({

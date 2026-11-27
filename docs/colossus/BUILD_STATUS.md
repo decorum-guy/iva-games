@@ -4,6 +4,8 @@
 
 The owner's current request is a complete third chess game in a separate review branch, including a training-only boss, original 2D/3D assets, sounds and future boss/game registration. Source: the attached project entry file, current main and the existing PR #10 implementation. Branch: `feat/colossus-complete-20261127`, combining main `d397460689b717cbcb892d993dd33aa4d4631c49` and the prior Colossus branch `5597e7ac9582595e87066bd0116c3ed553db98e6`.
 
+The first published checkpoint is [`243ca456`](https://github.com/decorum-guy/iva-games/commit/243ca456df28d61c145532b8b76e9681826f6d6a), [draft PR #29](https://github.com/decorum-guy/iva-games/pull/29). Current integration also preserves the subsequently published District main `f00f0c949730893045a36e97b6ed08c8da55185c`.
+
 ### Current changes
 
 - Seven guided lessons against **The Warden / Смотритель**, with real core actions and a real final victory. The tutorial preserves an existing hunt, uses no hunt records and cannot enter ordinary or online games.

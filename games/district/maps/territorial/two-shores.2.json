@@ -1,0 +1,107 @@
+{
+  "schemaVersion": 3,
+  "profile": "district@0.4",
+  "id": "two-shores",
+  "version": "2",
+  "name": {
+    "ru": "Два берега",
+    "en": "Two Shores"
+  },
+  "supportedPlayers": [2, 3, 4],
+  "landmasses": 2,
+  "sectors": [
+    {
+      "id": "bluff",
+      "name": {
+        "ru": "Высокий берег",
+        "en": "High Bluff"
+      },
+      "tiles": [
+        [0, 0, "wood", 4, []],
+        [1, 0, "ore", 6, []],
+        [2, 0, "wool", 10, []],
+        [0, 1, "wood", 11, []],
+        [1, 1, "grain", 9, []],
+        [2, 1, "wool", 3, ["floodplain"]]
+      ]
+    },
+    {
+      "id": "sawmills",
+      "name": {
+        "ru": "Лесопилки",
+        "en": "Sawmills"
+      },
+      "tiles": [
+        [-1, 2, "grain", 12, []],
+        [0, 2, "wood", 5, []],
+        [1, 2, "brick", 5, []],
+        [-1, 3, "grain", 3, []],
+        [0, 3, "wood", 6, ["floodplain"]]
+      ]
+    },
+    {
+      "id": "foundry",
+      "name": {
+        "ru": "Литейный квартал",
+        "en": "Foundry"
+      },
+      "tiles": [
+        [5, 0, "ore", 5, []],
+        [6, 0, "brick", 10, []],
+        [7, 0, "wool", 11, []],
+        [4, 1, "ore", 9, []],
+        [5, 1, "brick", 9, []],
+        [6, 1, "ore", 12, ["floodplain"]]
+      ]
+    },
+    {
+      "id": "delta",
+      "name": {
+        "ru": "Речная дельта",
+        "en": "River Delta"
+      },
+      "tiles": [
+        [4, 2, "wool", 8, []],
+        [5, 2, "brick", 4, []],
+        [6, 2, "wool", 2, []],
+        [4, 3, "grain", 2, []],
+        [5, 3, "grain", 8, ["floodplain"]]
+      ]
+    }
+  ],
+  "ferries": [
+    {
+      "a": [2, 1, 1],
+      "b": [4, 1, 5],
+      "eventSectorId": "bluff"
+    },
+    {
+      "a": [2, 1, 3],
+      "b": [4, 1, 3],
+      "eventSectorId": "sawmills"
+    },
+    {
+      "a": [2, 1, 2],
+      "b": [4, 1, 3],
+      "eventSectorId": "bluff"
+    }
+  ],
+  "ports": [
+    {
+      "at": [0, 0, 5],
+      "resource": "wood"
+    },
+    {
+      "at": [-1, 3, 4],
+      "resource": null
+    },
+    {
+      "at": [7, 0, 1],
+      "resource": "ore"
+    },
+    {
+      "at": [5, 3, 3],
+      "resource": null
+    }
+  ]
+}
