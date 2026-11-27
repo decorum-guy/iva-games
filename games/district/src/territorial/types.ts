@@ -76,6 +76,7 @@ export type TerritoryAction =
   | { type: 'offer'; targetId: string; give: Stock; receive: Stock; parentId?: string }
   | { type: 'accept' | 'decline' | 'cancel'; offerId: string }
   | { type: 'play-card'; cardId: string; resources?: Resource[] };
+export type Activity = { revision: number; kind: 'roll' | 'build' | 'deal' | 'tactic' | 'win' };
 export interface TerritoryOutcome { winnerParticipantIds: string[]; reason: 'points' | 'abandoned' }
 export interface TerritoryRules {
   costs: typeof COSTS;
@@ -104,6 +105,7 @@ export interface TerritoryState {
   lastRoll: [number, number] | null; playedCard: boolean; protectedThisTurn: boolean; freeRoutes: number;
   routeHolder: string | null; patrolHolder: string | null; offerNumber: number;
   offers: TerritoryOffer[]; volunteered?: string[]; left: string[]; outcome: TerritoryOutcome | null;
+  activity?: Activity;
   news: TerritoryNews;
 }
 
@@ -121,6 +123,7 @@ export interface TerritoryView {
     discard: number; points: number; coupons: Coupon[]; protected: string[]; volunteered: boolean };
   bank: Stock; cardsAvailable: number; lastRoll: [number, number] | null; blockedTileId: string | null;
   routeHolder: string | null; patrolHolder: string | null; goal: number; offers: TerritoryOffer[];
+  activity?: Activity;
   news: PublicNews[]; threats: PublicNews[]; preset: NewsPreset; outcome: TerritoryOutcome | null;
   legal: { roll: boolean; end: boolean; options: TerritoryOption[]; block: { tileId: string; targets: string[] }[];
     bank: Record<Resource, number>; buyCard: Stock | null; protect: boolean; protectionCost: Partial<Stock>; trade: boolean };

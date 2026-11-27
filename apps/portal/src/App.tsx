@@ -2,6 +2,8 @@ import type { DistrictMap } from "@iva-games/district";
 import { AVATARS } from "./types";
 import { DISTRICT_ISLAND_MAPS, DISTRICT_MAP_CATALOG, DISTRICT_MAPS, DISTRICT_RULES_VERSION } from "@iva-games/district";
 import { DistrictPanel } from "./District";
+import { TERRITORY_RULES, territoryMaps } from "@iva-games/district/territorial";
+import { districtPreset, TerritorialLobby, TerritorialSettingsFields } from "./TerritorialLobby";
 import { districtBotName } from "./districtCopy";
 import { DistrictMapSelect, DistrictLobbyMap } from "./DistrictMap";
 import type { AvatarStyle } from "./types";
@@ -10,7 +12,7 @@ import { Catalogue } from "./Catalogue";
 import { gameDescription, gameTitle } from "./gameCopy";
 import { go, PortalLink, readRoute } from "./navigation";
 import type { Route } from "./navigation";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import type { LabView } from "@iva-games/session-kit/lab";
 import { getSession, PlatformError, request } from "./api";
@@ -40,6 +42,8 @@ import type {
   TelegramStatus,
   User,
 } from "./types";
+
+const TerritorialMatch = lazy(() => import("./TerritorialDistrict").then(module => ({ default: module.TerritorialMatch })));
 
 const entranceAtLoad = readEntrance();
 const emptySocial: Social = {
@@ -491,6 +495,7 @@ export default function App() {
   const friendCount = social.incoming.length;
   const islandMatch = route.page === "rooms" && !!route.roomId && selectedRoom?.gameId === "district" &&
     (selectedRoom.state === "playing" || selectedRoom.state === "finished") && selectedRoom.rulesVersion !== DISTRICT_RULES_VERSION;
+  const territorialMatch = islandMatch && selectedRoom?.rulesVersion === TERRITORY_RULES;
   const title = {
     home: "Iva Games",
     chess: t("Шахматы", "Chess"),
@@ -753,7 +758,7 @@ export default function App() {
                 </button>
               </div>
             </aside>
-            <main className={`workspace ${islandMatch ? "district-match-workspace" : ""}`}>
+            <main className={`workspace ${territorialMatch ? "territorial-workspace" : islandMatch ? "district-match-workspace" : ""}`}>
               {!islandMatch && <header className="page-heading">
                 <div>
                   <p className="greeting">
@@ -1366,6 +1371,9 @@ function CreateRoom({
   const [capacity, setCapacity] = useState(Math.min(game?.maxPlayers || 4, 4));
   const [title, setTitle] = useState("");
   const [districtMap, setDistrictMap] = useState<DistrictMap>(DISTRICT_ISLAND_MAPS[0]);
+  const [territorialMap, setTerritorialMap] = useState(territoryMaps[0]);
+  const [preset, setPreset] = useState(districtPreset(undefined));
+  const territorial = game?.rulesVersion === TERRITORY_RULES;
   return (
     <Modal title={t("Новая комната", "New room")} onClose={close}>
       <form
@@ -1375,7 +1383,10 @@ function CreateRoom({
             gameId,
             capacity,
             title: title.trim() || t("Играем вместе", "Playing together"),
-            ...(gameId === "district" ? { settings: { mapId: districtMap.id, mapVersion: districtMap.version } } : {}),
+            ...(gameId === "district" ? {
+              settings: territorial ? { mapId: territorialMap.id, mapVersion: territorialMap.version, newsPreset: preset } :
+                { mapId: districtMap.id, mapVersion: districtMap.version },
+            } : {}),
           });
         }}
       >
@@ -1426,7 +1437,9 @@ function CreateRoom({
             ))}
           </select>
         </label>
-        {gameId === "district" && <DistrictMapSelect value={districtMap.id} version={districtMap.version} onChange={setDistrictMap} />}
+        {gameId === "district" && (territorial
+          ? <TerritorialSettingsFields map={territorialMap} setMap={setTerritorialMap} preset={preset} setPreset={setPreset} />
+          : <DistrictMapSelect value={districtMap.id} version={districtMap.version} onChange={setDistrictMap} />)}
         <p className="form-note">
           <Icon name="lock" size={17} />
           {t(
@@ -1493,6 +1506,9 @@ function RoomDetail({
       ["pending", "accepted"].includes(invite.status) &&
       !joinedInvitation(invite),
   );
+  if (room.rulesVersion === TERRITORY_RULES && room.matchId && ["playing", "finished"].includes(room.state)) {
+    return <Suspense fallback={<span className="spinner" />}><TerritorialMatch key={room.matchId} room={room} refresh={refresh} /></Suspense>;
+  }
   return (
     <section className="room-detail">
       <button className="back-link" onClick={() => go("rooms")}>
@@ -1518,7 +1534,9 @@ function RoomDetail({
           </button>
         )}
       </div>
-      {lobby && room.gameId === "district" && <DistrictLobbyMap rulesVersion={room.rulesVersion} mapId={room.settings.mapId} mapVersion={room.settings.mapVersion} />}
+      {lobby && room.gameId === "district" && (room.rulesVersion === TERRITORY_RULES
+        ? <TerritorialLobby room={room} />
+        : <DistrictLobbyMap rulesVersion={room.rulesVersion} mapId={room.settings.mapId} mapVersion={room.settings.mapVersion} />)}
       <div className={`room-columns ${room.gameId === "district" && !lobby ? "district-playing-seats" : ""}`}>
         <div className="seats-panel">
           <div className="section-title">
@@ -1916,13 +1934,19 @@ function RoomSettings({
   const { t } = useLanguage();
   const [title, setTitle] = useState(room.title);
   const [capacity, setCapacity] = useState(room.capacity);
+  const territorial = room.rulesVersion === TERRITORY_RULES;
+  const [territorialMap, setTerritorialMap] = useState(territoryMaps.find(item => item.id === room.settings.mapId) ?? territoryMaps[0]);
+  const [preset, setPreset] = useState(districtPreset(room.settings.newsPreset));
   const [districtMap, setDistrictMap] = useState(DISTRICT_MAP_CATALOG.find(map => map.id === room.settings.mapId && (room.settings.mapVersion === undefined || map.version === room.settings.mapVersion)) ?? (room.rulesVersion === DISTRICT_RULES_VERSION ? DISTRICT_MAPS[0] : DISTRICT_ISLAND_MAPS[0]));
   return (
     <Modal title={t("Настройки комнаты", "Room settings")} onClose={close}>
       <form
         onSubmit={(event) => {
           event.preventDefault();
-          void save({ title, capacity, expectedRevision: room.revision, ...(room.gameId === "district" ? { settings: { mapId: districtMap.id, mapVersion: districtMap.version } } : {}) });
+          void save({ title, capacity, expectedRevision: room.revision, ...(room.gameId === "district" ? {
+            settings: territorial ? { mapId: territorialMap.id, mapVersion: territorialMap.version, newsPreset: preset } :
+              { mapId: districtMap.id, mapVersion: districtMap.version },
+          } : {}) });
         }}
       >
         <label>
@@ -1954,7 +1978,9 @@ function RoomSettings({
             ))}
           </select>
         </label>
-        {room.gameId === "district" && <DistrictMapSelect value={districtMap.id} version={districtMap.version} onChange={setDistrictMap} />}
+        {room.gameId === "district" && (territorial
+          ? <TerritorialSettingsFields map={territorialMap} setMap={setTerritorialMap} preset={preset} setPreset={setPreset} />
+          : <DistrictMapSelect value={districtMap.id} version={districtMap.version} onChange={setDistrictMap} />)}
         <p className="form-note">
           {t(
             "После сохранения снова нажмите «Я готов».",

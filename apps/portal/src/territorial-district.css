@@ -1,0 +1,48 @@
+.workspace.territorial-workspace { margin: 0; padding: 12px clamp(10px, 2vw, 30px); max-width: none; min-width: 0; }
+.portal:has(.territorial-workspace) .sidebar,
+.portal:has(.territorial-workspace) .mobile-account { display: none; }
+.portal:has(.territorial-workspace) .language-switch { left: auto; right: 12px; top: 8px; position: fixed; }
+.territory-match { color: #21443e; width: 100%; max-width: 1780px; margin: 0 auto; }
+.territory-practice { padding: 12px clamp(10px, 2vw, 30px); min-height: 100dvh; background: #f2f3e8; }
+.territory-top { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 20px; min-height: 56px; margin-bottom: 8px; padding-right: 78px; }
+.territory-practice .territory-top { padding-right: 0; }
+.territory-map-title h2 { margin: 0; line-height: 1.06; font-size: clamp(22px, 3vw, 34px); letter-spacing: -.06em; }
+.territory-map-title .back-link { margin: 0 0 2px; font-size: 12px; }
+.territory-turn { display: flex; gap: 4px 14px; flex-wrap: wrap; align-items: center; color: #42645b; line-height: 1.1; font-size: 13px; }
+.territory-turn strong { color: #154c45; }
+.territory-tools { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+.territory-players { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(190px, 46%), 1fr)); gap: 7px; list-style: none; padding: 0; margin: 0 0 9px; }
+.territory-players > li { display: flex; align-items: center; gap: 7px; border: 1px solid #ccdcd1; border-radius: 10px; background: #f8f6ec; padding: 6px 9px; min-width: 0; }
+.territory-players > .is-active { border-color: #40877b; box-shadow: inset 0 -2px #539184; }
+.territory-seat { border-radius: 4px; display: grid; place-items: center; flex: 0 0 22px; height: 22px; color: white; font-size: 13px; font-weight: 800; }
+.territory-person { display: grid; min-width: 0; line-height: 1.2; }
+.territory-person strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
+.territory-person small { font-size: 10px; color: #526f66; }
+.territory-points { margin-left: auto; font-size: 17px; white-space: nowrap; }
+.territory-points small { font-size: 10px; font-weight: 600; color: #526f66; }
+.territory-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(265px, 320px); gap: 11px; height: calc(100dvh - 129px); min-height: 440px; }
+.territory-map-shell { min-width: 0; min-height: 0; }
+.territory-inspector { overflow: auto; min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: 8px; scrollbar-width: thin; }
+.territory-hand, .territory-lesson, .territory-outcome, .territory-notice { border: 1px solid #d7dfd4; border-radius: 10px; padding: 9px 10px; background: #f9f7ed; }
+.territory-hand { display: grid; gap: 5px; font-size: 13px; }
+.territory-lesson h3, .territory-outcome h3 { margin: 0; font-size: 17px; }
+.territory-lesson p { font-size: 13px; line-height: 1.5; }
+.territory-lesson > .button { margin: 3px 4px 4px 0; }
+.territory-lesson-steps { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 8px; align-items: baseline; font-size: 12px; }
+.territory-notice { font-size: 13px; }
+.territory-notice .button { margin-left: 5px; }
+.territory-help { display: grid; gap: 9px; line-height: 1.46; padding-left: 20px; }
+.territory-lobby { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 24px; border: 1px solid #d1dccb; border-radius: 12px; padding: 12px 15px; margin-bottom: 12px; background: #f6f6e9; }
+.territory-lobby > div { display: grid; gap: 3px; }
+.territory-lobby small { color: #45665d; }
+.territory-lobby .button { margin-left: auto; }
+@media (max-width: 860px) {
+  .workspace.territorial-workspace { padding: 10px; }
+  .territory-layout { display: flex; flex-direction: column; height: auto; min-height: 0; }
+  .territory-map-shell { height: clamp(275px, 43dvh, 480px); }
+  .territory-map-shell > .territorial-board { min-height: 0; }
+  .territory-inspector { overflow: visible; }
+  .territory-top { gap: 6px 9px; }
+  .territory-top .territory-tools { margin-left: 0; }
+  .territory-practice .territory-tools { margin-left: auto; }
+}

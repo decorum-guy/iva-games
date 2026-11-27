@@ -1,0 +1,36 @@
+.territorial-news { min-width:0; color:#203e46; background:#f9faf4; border:1px solid #ccd9cc; border-radius:11px; overflow:hidden; font:500 13px/1.45 system-ui,sans-serif; }
+.tn-header,.tn-issue-label { display:flex; justify-content:space-between; align-items:center; gap:10px; }
+.tn-header { padding:7px 12px; border-bottom:1px solid #dce3d6; }
+.tn-header h3,.tn-card h4,.tn-list h4 { margin:0; line-height:1.25; color:inherit; }
+.tn-header h3 { font-size:15px; }
+.territorial-news button { color:#255b61; cursor:pointer; font:inherit; }
+.territorial-news button:focus-visible,.tn-list summary:focus-visible { outline:2px solid #246f77; outline-offset:-2px; }
+.tn-sound { display:grid; place-items:center; width:32px; height:32px; border:0; border-radius:5px; background:transparent; }
+.tn-sound[aria-pressed=true] { background:#deebe4; }
+.tn-issue-label { padding:5px 12px; color:#526b67; font-size:12px; }
+.tn-issue-label button { border:0; background:transparent; text-decoration:underline; text-underline-offset:2px; padding:3px 0; }
+.tn-issue-cards { max-height:clamp(130px,36svh,350px); overflow:auto; overscroll-behavior:contain; }
+.tn-card { position:relative; margin:0 8px 8px; padding:7px 10px 10px; border-inline-start:3px solid #46786e; background:#edf2e9; border-radius:0 5px 5px 0; }
+.tn-stage-forecast,.tn-stage-update,.tn-stage-confirmed { border-inline-start:3px dashed #9d722e; background:#f8f0dc; }
+.tn-stage-cancelled { border-inline-start-color:#858e83; background:#eaf0e9; }
+.tn-stage,.tn-meta,.tn-card h4 { overflow-wrap:anywhere; }
+.tn-stage { color:#486c61; font-size:11px; font-weight:750; }
+.tn-stage-forecast .tn-stage,.tn-stage-update .tn-stage,.tn-stage-confirmed .tn-stage { color:#765116; }
+.tn-card h4 { margin:2px 0 3px; font-size:15px; }
+.tn-meta { display:flex; flex-wrap:wrap; gap:0 9px; color:#52635c; }
+.tn-card p { margin:6px 0; }
+.tn-changes { margin:7px 0; }
+.tn-changes div { margin:3px 0; }
+.tn-changes dt { display:inline; font-weight:700; }
+.tn-changes dd { display:inline; margin:0 0 0 6px; }
+.tn-no-damage { font-weight:650; }
+.tn-area { margin-top:5px; padding:4px 8px; border-radius:5px; border:1px solid #aabdb0; background:#fbfbf4; }
+.tn-area[aria-pressed=true] { background:#deebe3; }
+.tn-empty { margin:8px 12px; color:#566e65; }
+.tn-list { border-top:1px solid #d8e2d6; }
+.tn-list summary { padding:7px 12px; cursor:pointer; font-weight:650; }
+.tn-list>div { padding:0 9px 6px; max-height:200px; overflow:auto; overscroll-behavior:contain; }
+.tn-list h4 { padding:4px 3px; font-size:12px; }
+.tn-list button { display:block; width:100%; padding:5px 4px; text-align:start; border:0; background:transparent; overflow-wrap:anywhere; }
+.tn-list button:hover { background:#e8eee5; }
+@media(max-width:700px) { .tn-issue-cards { max-height:24svh; } .tn-issue-label button,.tn-area,.tn-list button,.tn-list summary { min-height:34px; } }

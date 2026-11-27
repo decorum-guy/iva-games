@@ -354,6 +354,13 @@ export function applyTerritory(previous: TerritoryState, id: string, action: Ter
   if (s.phase === 'play' && action.type !== 'end' && active) scoreWinners(s, [id]);
   if (s.phase !== 'finished' && phaseIdOf(s) !== phaseIdOf(previous)) s.deadlineAt = now + s.rules.limits.turnMs;
   s.revision++;
+  switch (action.type) {
+    case 'roll': s.activity = { revision: s.revision, kind: 'roll' }; break;
+    case 'place': case 'settle': case 'route': case 'upgrade': s.activity = { revision: s.revision, kind: 'build' }; break;
+    case 'bank': case 'accept': s.activity = { revision: s.revision, kind: 'deal' }; break;
+    case 'play-card': s.activity = { revision: s.revision, kind: 'tactic' }; break;
+  }
+  if (s.outcome?.reason === 'points') s.activity = { revision: s.revision, kind: 'win' };
   return s;
 }
 
@@ -422,6 +429,7 @@ export function viewTerritory(s: TerritoryState, id: string, now: number, clone 
       id: offer.id, authorId: offer.authorId, targetId: offer.targetId, give: offer.give, receive: offer.receive,
       ...(offer.parentId ? { parentId: offer.parentId } : {}),
     })),
+    ...(s.activity ? { activity: s.activity } : {}),
     news: news.messages, threats, preset: news.preset, outcome: s.outcome,
     legal: { roll: active && phase === 'roll', end: playing, options: placeOptions(s, id), block: active && phase === 'block' ? blockOptions(s) : [],
       bank: Object.fromEntries(RESOURCES.map(resource => [resource, tradeRate(s, id, resource)])) as Record<Resource, number>,
