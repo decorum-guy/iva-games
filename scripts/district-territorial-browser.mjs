@@ -1,0 +1,564 @@
+/** Exercise two real browsers against the built District server with isolated accounts. */
+import assert from 'node:assert/strict';
+import { chromium, expect } from '@playwright/test';
+import { spawn } from 'node:child_process';
+import { createServer } from 'node:net';
+import { mkdir, mkdtemp, readdir, readFile, rm, stat } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { setTimeout as delay } from 'node:timers/promises';
+import { build } from 'vite';
+import Database from 'better-sqlite3';
+import { randomUUID } from 'node:crypto';
+import { pathToFileURL } from 'node:url';
+
+const root = fileURLToPath(new URL('../', import.meta.url));
+for (const path of ['dist-platform/main.js', 'apps/portal/dist/index.html']) {
+  assert.ok((await stat(join(root, path)).catch(() => null))?.isFile(), 'Run npm run build:foundation first');
+}
+const directory = await mkdtemp(join(tmpdir(), 'iva-territorial-browser-'));
+const mailbox = join(directory, 'mail');
+let running = null;
+let browser = null;
+
+let origin = '';
+let port = 0;
+
+async function availablePort() {
+  const probe = createServer();
+  await new Promise((resolve, reject) => {
+    probe.once('error', reject);
+    probe.listen(0, '127.0.0.1', resolve);
+  });
+  const address = probe.address();
+  assert.ok(address && typeof address !== 'string');
+  await new Promise((resolve, reject) => probe.close((error) => (error ? reject(error) : resolve())));
+  return address.port;
+}
+
+const request = (url, options = {}) => fetch(url, { ...options, signal: AbortSignal.timeout(5000) });
+
+async function start() {
+  const child = spawn(process.execPath, ['dist-platform/main.js'], {
+    cwd: root,
+    env: {
+      ...process.env,
+      NODE_ENV: 'development',
+      PLATFORM_HOST: '127.0.0.1',
+      PLATFORM_PORT: String(port),
+      PORTAL_ORIGIN: origin,
+      PLATFORM_ALLOWED_HOSTS: `127.0.0.1:${port}`,
+      PLATFORM_ALLOWED_ORIGINS: origin,
+      PLATFORM_DATABASE_PATH: join(directory, 'platform.sqlite'),
+      PLATFORM_LAB_DATABASE_PATH: join(directory, 'lab.sqlite'),
+      MAIL_MODE: 'file',
+      MAIL_FILE_DIRECTORY: mailbox,
+      DISTRICT_TERRITORIAL_ENABLED: 'true',
+      TELEGRAM_ENABLED: 'false',
+      TELEGRAM_AUTH_ENABLED: 'false',
+      PORTAL_DIST_DIRECTORY: join(root, 'apps/portal/dist'),
+    },
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  const state = { child, output: '', error: null };
+  running = state;
+  const collect = (part) => {
+    state.output = (state.output + String(part)).slice(-12000);
+  };
+  child.stdout.on('data', collect);
+  child.stderr.on('data', collect);
+  child.on('error', (error) => {
+    state.error = error;
+  });
+  const ready = `Iva Games platform listening on 127.0.0.1:${port}`;
+  const deadline = Date.now() + 10000;
+  while (Date.now() < deadline) {
+    if (state.error) throw state.error;
+    assert.ok(child.exitCode === null && child.signalCode === null, 'Built platform exited before readiness');
+    // A racing process on the selected port must never be treated as our test server.
+    if (state.output.split(/\r?\n/).includes(ready)) {
+      assert.equal((await request(origin + '/health/ready')).status, 200);
+      return;
+    }
+    await delay(25);
+  }
+  throw new Error('Built platform readiness timeout');
+}
+
+async function stop() {
+  const state = running;
+  if (!state) return;
+  running = null;
+  const { child } = state;
+  if (state.error || child.exitCode !== null || child.signalCode !== null) return;
+  child.kill('SIGTERM');
+  const deadline = Date.now() + 10000;
+  while (child.exitCode === null && child.signalCode === null && Date.now() < deadline) await delay(25);
+  if (child.exitCode === null && child.signalCode === null) {
+    child.kill('SIGKILL');
+    const killDeadline = Date.now() + 1500;
+    while (child.exitCode === null && child.signalCode === null && Date.now() < killDeadline) await delay(25);
+    throw new Error(`Built platform did not stop gracefully. Startup and shutdown log:\n${state.output}`);
+  }
+}
+
+class Client {
+  cookie = '';
+  csrf = '';
+
+  async request(path, data, key) {
+    const response = await request(`${origin}/api/platform/v1${path}`, {
+      method: data === undefined ? 'GET' : 'POST',
+      headers: {
+        Cookie: this.cookie,
+        ...(data === undefined
+          ? {}
+          : { Origin: origin, 'Content-Type': 'application/json', 'X-CSRF-Token': this.csrf }),
+        ...(key ? { 'Idempotency-Key': key } : {}),
+      },
+      ...(data === undefined ? {} : { body: JSON.stringify(data) }),
+    });
+    const cookie = response.headers.getSetCookie().find((value) => value.startsWith('iva_dev_session='));
+    if (cookie) this.cookie = cookie.split(';')[0];
+    const result = await response.json();
+    assert.ok(response.ok, `${path}: HTTP ${response.status}, ${result.error?.code ?? 'unknown error'}`);
+    if (path === '/session') this.csrf = result.csrfToken;
+    return result;
+  }
+
+  async register(handle) {
+    await this.request('/session');
+    const email = `${handle}@example.test`;
+    const registered = await this.request('/auth/register', {
+      email,
+      handle,
+      displayName: handle,
+      password: 'isolated local fixture password',
+    });
+    await this.request('/session');
+    let token;
+    for (const file of await readdir(mailbox)) {
+      const contents = await readFile(join(mailbox, file), 'utf8');
+      if (!contents.startsWith(`To: ${email}\n`)) continue;
+      const url = contents.match(/https?:\/\/[^\s]+\/verify\?token=[^\s]+/)?.[0];
+      if (url) token = new URL(url).searchParams.get('token');
+    }
+    assert.ok(token, 'Verification must reach the isolated file mailbox');
+    await this.request('/auth/verify', { token });
+    assert.equal((await this.request('/session')).user.emailVerified, true);
+    return registered.user;
+  }
+}
+
+let cleanupPromise;
+function cleanup() {
+  cleanupPromise ??= (async () => {
+    try {
+      await Promise.allSettled([browser?.close()]);
+      await stop();
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  })();
+  return cleanupPromise;
+}
+for (const signal of ['SIGINT', 'SIGTERM'])
+  process.once(signal, () => {
+    void cleanup().finally(() => process.exit(signal === 'SIGINT' ? 130 : 143));
+  });
+
+const result = { uiActions: [], layouts: [], commands: 0, restarted: false, trade: false, tutorialSteps: [] };
+const artifacts = join(root, '.qa', 'district-territorial-browser');
+async function newsFixtures(clients, pages, guest) {
+  const [alice, bob] = clients;
+  let room = (
+    await alice.request(
+      '/rooms',
+      {
+        gameId: 'district',
+        capacity: 2,
+        title: 'Isolated news fixture',
+        settings: { mapId: 'azure-bay', mapVersion: '2', newsPreset: 'medium' },
+      },
+      'fixture-room',
+    )
+  ).room;
+  const path = '/rooms/' + room.roomId;
+  const invite = (await alice.request(path + '/invitations', { playerId: guest.playerId }, 'fixture-invite'))
+    .invitation;
+  await bob.request('/invitations/' + invite.invitationId + '/accept', {}, 'fixture-accept');
+  room = (await bob.request(path + '/join', {}, 'fixture-join')).room;
+  for (const [index, c] of clients.entries())
+    await c.request(path + '/ready', { ready: true, expectedRevision: room.revision }, 'fixture-ready-' + index);
+  room = (await alice.request(path + '/start', { expectedRevision: room.revision }, 'fixture-start')).room;
+  await build({
+    configFile: false,
+    logLevel: 'error',
+    build: {
+      ssr: 'games/district/src/territorial/news.ts',
+      outDir: join(directory, 'news-core'),
+      target: 'node22',
+      rollupOptions: { output: { entryFileNames: 'news.mjs' } },
+    },
+  });
+  const { tutorialNews, newsBoundary } = await import(pathToFileURL(join(directory, 'news-core', 'news.mjs')).href);
+  const database = join(directory, 'lab.sqlite');
+  await stop();
+  const reader = new Database(database, { readonly: true });
+  const baseline = JSON.parse(
+    reader.prepare('SELECT state_json FROM district_territorial_matches WHERE match_id=?').get(room.matchId).state_json,
+  );
+  reader.close();
+  const samples = [];
+  for (const [id, draws, label] of [
+    ['G02', [], 'aid'],
+    ['H04', [0], 'surprise'],
+    ['H04', [99, 0, 99], 'cancel'],
+    ['H04', [99, 0, 0], 'confirmed'],
+    ['P02', [0, 0], 'investment'],
+    ['E01', [99, 0, 0], 'spread'],
+    ['E01', [99, 0, 99], 'contained'],
+  ]) {
+    const state = structuredClone(baseline);
+    state.phase = 'roll';
+    state.turn = 17;
+    state.round = 8;
+    state.news.processedRound = 8;
+    state.news.nextRound = 99;
+    const node = state.map.nodes[0],
+      zone = node.eventSectorId;
+    const other = state.map.nodes.find((n) => n.eventSectorId !== zone);
+    state.buildings[node.id] = { ownerId: state.participants[0].participantId, level: 2 };
+    state.buildings[other.id] = { ownerId: state.participants[1].participantId, level: 2 };
+    let roll = 0;
+    tutorialNews(state, id, zone, (bound) => (draws[roll++] ?? 0) % bound);
+    let seen = 0;
+    for (let tick = 0; tick < 7; tick++) {
+      if (state.news.messages.length > seen) {
+        const fresh = state.news.messages.slice(seen);
+        seen = state.news.messages.length;
+        samples.push({ label, state: structuredClone(state), ids: fresh.map((n) => n.messageId) });
+      }
+      state.round++;
+      newsBoundary(state);
+    }
+  }
+  result.fixtureStages = [];
+  for (const [index, sample] of samples.entries()) {
+    await stop();
+    sample.state.revision = 1000 + index;
+    sample.state.deadlineAt = Date.now() + 150000;
+    const db = new Database(database);
+    db.prepare('UPDATE district_territorial_matches SET state_json=? WHERE match_id=?').run(
+      JSON.stringify(sample.state),
+      room.matchId,
+    );
+    db.close();
+    await start();
+    const [a, b] = await Promise.all(clients.map(async (c) => (await c.request(path + '/match')).view));
+    assert.deepEqual(a.news, b.news);
+    for (const page of pages) await page.goto(origin + path);
+    for (const id of sample.ids) {
+      const msg = a.news.find((n) => n.messageId === id);
+      const forecast = ['forecast', 'confirmed', 'update'].includes(msg.stage);
+      if (forecast)
+        assert.deepEqual(
+          Object.keys(msg).filter(
+            (k) =>
+              ![
+                'messageId',
+                'templateId',
+                'eventInstanceId',
+                'chainId',
+                'round',
+                'stage',
+                'headline',
+                'zone',
+                'dueRound',
+              ].includes(k),
+          ),
+          [],
+        );
+      for (const page of pages) {
+        const card = page.locator('[data-news-id="' + id + '"]');
+        if (!(await card.count())) {
+          const journal = page
+            .locator('.tn-list')
+            .filter({ has: page.locator('summary', { hasText: 'News journal' }) });
+          if ((await journal.getAttribute('open')) === null) await journal.locator('summary').click();
+          await journal.getByRole('button').filter({ hasText: msg.headline.en }).click();
+        }
+        await expect(card).toBeVisible();
+        if (forecast) {
+          await expect(card.locator('.tn-changes')).toHaveCount(0);
+          await expect(card.locator('.tn-meta')).toContainText('Due at the end');
+        }
+        if (msg.zone === undefined || msg.stage === 'cancelled') await expect(card.locator('.tn-area')).toHaveCount(0);
+        else {
+          const show = card.locator('.tn-area');
+          if ((await show.getAttribute('aria-pressed')) !== 'true') await show.click();
+          await expect(
+            page.locator(
+              '.tb-news-frame.' + (forecast ? 'risk' : 'applied') + ' ' + (msg.zone === null ? 'rect' : 'polygon'),
+            ),
+          ).toBeVisible();
+          await expect(page.locator('.tb-news-frame [data-board-target]')).toHaveCount(0);
+        }
+        if (!forecast && msg.changes?.length) await expect(card.locator('.tn-changes')).toBeVisible();
+      }
+      result.fixtureStages.push(sample.label + '/' + msg.stage);
+    }
+  }
+}
+async function training(page, roomId) {
+  await page.goto(origin + '/district-training?room=' + roomId);
+  await page.getByRole('button', { name: 'EN', exact: true }).click();
+  const lesson = page.locator('.territory-lesson');
+  for (let step = 0; step < 12; step++) {
+    if (await lesson.getByRole('link', { name: 'Play', exact: true }).isVisible()) break;
+    const highlighted = page.locator('.tb-target.is-available').first();
+    if (await highlighted.count()) await highlighted.focus().then(() => highlighted.press('Enter'));
+    const button = lesson.locator('button.primary');
+    result.tutorialSteps.push(await button.innerText());
+    await button.click();
+  }
+  await expect(lesson.getByRole('link', { name: 'Play', exact: true })).toBeVisible();
+  await lesson.getByRole('button', { name: 'Prepare for a threat' }).click();
+  const forecast = page.locator('.tn-stage-confirmed');
+  await expect(forecast.locator('.tn-changes')).toHaveCount(0);
+  await forecast.getByRole('button', { name: 'Show on map' }).click();
+  await expect(page.locator('.tb-news-frame.risk polygon')).toBeVisible();
+  const home = page.locator('[data-board-target="node:v1_1"]');
+  await home.focus();
+  await home.press('Enter');
+  await lesson.locator('button.primary').click();
+  for (let i = 0; i < 2; i++) await lesson.getByRole('button', { name: 'Play one round' }).click();
+  // Reopen the issue if the earlier forecast is still being inspected.
+  await page.locator('.tn-list summary').filter({ hasText: 'News journal' }).click();
+  await page.locator('.tn-list button').filter({ hasText: 'Occurred · Meteor impact' }).click();
+  await expect(page.locator('.tb-news-frame.applied polygon')).toBeVisible();
+  await expect(page.locator('.tn-card')).toContainText('No damage');
+  await lesson.getByRole('button', { name: 'Finish episode' }).click();
+  await lesson.getByRole('link', { name: 'Play', exact: true }).click();
+  await expect(page.locator('.territorial-board')).toBeVisible();
+}
+try {
+  port = await availablePort();
+  origin = 'http://127.0.0.1:' + port;
+  await start();
+  await mkdir(artifacts, { recursive: true });
+  const clients = [new Client(), new Client()];
+  const [alice, bob] = clients;
+  await alice.register('territory_first');
+  const guest = await bob.register('territory_second');
+  const friendship = await alice.request('/friend-requests', { playerId: guest.playerId }, 'territory-friends-send');
+  await bob.request('/friend-requests/' + friendship.requestId + '/accept', {}, 'territory-friends-accept');
+  let room = (
+    await alice.request(
+      '/rooms',
+      {
+        gameId: 'district',
+        capacity: 3,
+        title: 'Territorial QA',
+        settings: { mapId: 'two-shores', mapVersion: '2', newsPreset: 'very-hard' },
+      },
+      'territory-create',
+    )
+  ).room;
+  const path = '/rooms/' + room.roomId;
+  const invite = (await alice.request(path + '/invitations', { playerId: guest.playerId }, 'territory-invite'))
+    .invitation;
+  await bob.request('/invitations/' + invite.invitationId + '/accept', {}, 'territory-invite-accept');
+  room = (await bob.request(path + '/join', {}, 'territory-join')).room;
+  room = (
+    await alice.request(path + '/bots', { difficulty: 'hard', expectedRevision: room.revision }, 'territory-add-bot')
+  ).room;
+  for (const [index, client] of clients.entries())
+    await client.request(path + '/ready', { ready: true, expectedRevision: room.revision }, 'territory-ready-' + index);
+  room = (await alice.request(path + '/start', { expectedRevision: room.revision }, 'territory-start')).room;
+  assert.equal(room.rulesVersion, 'district@0.4');
+  const current = async (client) => (await client.request(path + '/match')).view;
+  const post = async (client, view, action) =>
+    (
+      await client.request(path + '/actions', {
+        actionId: randomUUID(),
+        expectedRevision: view.revision,
+        payload: { phaseId: view.phaseId, ...action },
+      })
+    ).view;
+  await build({
+    configFile: false,
+    logLevel: 'error',
+    build: {
+      ssr: 'games/district/src/territorial/bot.ts',
+      outDir: join(directory, 'policy'),
+      target: 'node22',
+      rollupOptions: { output: { entryFileNames: 'policy.mjs' } },
+    },
+  });
+  const { chooseTerritoryBot } = await import(pathToFileURL(join(directory, 'policy', 'policy.mjs')).href);
+  browser = await chromium.launch({
+    headless: true,
+    args: ['--mute-audio'],
+    ...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE
+      ? { executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE }
+      : {}),
+  });
+  const pages = [],
+    contexts = [],
+    errors = [];
+  for (const [index, client] of clients.entries()) {
+    const context = await browser.newContext({
+      viewport: index ? { width: 390, height: 844 } : { width: 1366, height: 768 },
+      hasTouch: Boolean(index),
+    });
+    const [name, value] = client.cookie.split('=');
+    await context.addCookies([{ name, value, url: origin }]);
+    await context.addInitScript(() => localStorage.setItem('iva.portal.language', 'en'));
+    const page = await context.newPage();
+    page.on('pageerror', (error) => errors.push(error.message));
+    await page.goto(origin + path);
+    await expect(page.locator('.territorial-board')).toBeVisible();
+    pages.push(page);
+    contexts.push(context);
+    const box = await page.locator('.tb-surface').boundingBox();
+    assert.ok(box.width >= 300 && box.height >= 230);
+    assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+    result.layouts.push({
+      viewport: page.viewportSize(),
+      boardWidth: Math.round(box.width),
+      boardHeight: Math.round(box.height),
+    });
+  }
+  await pages[0].setViewportSize({ width: 1440, height: 900 });
+  const wide = await pages[0].locator('.tb-surface').boundingBox();
+  result.layouts.push({
+    viewport: pages[0].viewportSize(),
+    boardWidth: Math.round(wide.width),
+    boardHeight: Math.round(wide.height),
+  });
+  await training(pages[0], room.roomId);
+  async function clickAction(page, button) {
+    const pendingResponse = page.waitForResponse(
+      (r) => r.url().endsWith(path + '/actions') && r.request().method() === 'POST',
+    );
+    await button.click();
+    const response = await pendingResponse;
+    assert.equal(response.status(), 200, await response.text());
+    result.uiActions.push(response.request().postDataJSON().payload.type);
+  }
+  let done;
+  for (let step = 0; step < 3500; step++) {
+    const views = await Promise.all(clients.map(current));
+    const snapshot = views[0];
+    if (!result.denseScreenshot && snapshot.round >= 8) {
+      for (const [index, page] of pages.entries()) {
+        await page.reload();
+        await expect(page.locator('.tb-house').first()).toBeVisible();
+        await page.screenshot({ path: join(artifacts, index ? 'mobile-midgame.png' : 'desktop-midgame.png') });
+      }
+      result.denseScreenshot = {
+        round: snapshot.round,
+        houses: Object.keys(snapshot.buildings).length,
+        routes: Object.keys(snapshot.routes).length,
+      };
+    }
+    if (snapshot.outcome) {
+      done = snapshot;
+      break;
+    }
+    if (snapshot.revision !== views[1].revision) continue;
+    if (snapshot.round >= 2 && !result.restarted && views.some((v) => v.activeParticipantId === v.you.participantId)) {
+      await contexts[1].setOffline(true);
+      await stop();
+      await start();
+      const restored = await current(alice);
+      assert.equal(restored.revision, snapshot.revision);
+      assert.equal(restored.matchId, snapshot.matchId);
+      assert.deepEqual(restored.news, snapshot.news);
+      assert.deepEqual(restored.buildings, snapshot.buildings);
+      await contexts[1].setOffline(false);
+      await pages[1].reload();
+      await expect(pages[1].locator('.territorial-board')).toBeVisible();
+      result.restarted = true;
+    }
+    let played = false;
+    for (const [index, view] of views.entries()) {
+      const page = pages[index],
+        client = clients[index];
+      const action = chooseTerritoryBot(view, 'hard', 'acceptance-' + index + '-' + view.revision);
+      if (!action) continue;
+      if ((action.type === 'place' || action.type === 'route') && !result.uiActions.includes(action.type)) {
+        const id = action.nodeId ?? action.edgeId;
+        const target = page.locator('[data-board-target="' + (action.nodeId ? 'node:' : 'edge:') + id + '"]');
+        await target.focus();
+        await target.press('Enter');
+        await clickAction(
+          page,
+          page.getByRole('button', { name: action.nodeId ? 'Build house' : 'Build road', exact: true }),
+        );
+      } else if (!result.trade && view.phase === 'play' && view.you.participantId === view.activeParticipantId) {
+        const other = views[1 - index];
+        const give = Object.keys(view.you.hand).find(
+          (r) => view.you.hand[r] > 0 && Object.keys(other.you.hand).some((k) => k !== r && other.you.hand[k] > 0),
+        );
+        const take = Object.keys(other.you.hand).find((r) => r !== give && other.you.hand[r] > 0);
+        if (give && take) {
+          await page.reload();
+          await page.getByRole('button', { name: 'Offer a trade', exact: true }).click();
+          const counterpart = view.players.find((p) => p.participantId === other.you.participantId);
+          await page.locator('.ta-trades select').selectOption(counterpart.participantId);
+          const resourceName = (r) => r.charAt(0).toUpperCase() + r.slice(1);
+          await page.getByRole('spinbutton', { name: 'I give · ' + resourceName(give), exact: true }).fill('1');
+          await page.getByRole('spinbutton', { name: 'I request · ' + resourceName(take), exact: true }).fill('1');
+          await clickAction(page, page.getByRole('button', { name: 'Send offer', exact: true }));
+          const otherPage = pages[1 - index];
+          await otherPage.reload();
+          await clickAction(
+            otherPage,
+            otherPage
+              .locator('.ta-offer')
+              .filter({ hasText: nameOfHuman(view) })
+              .getByRole('button', { name: 'Accept', exact: true }),
+          );
+          result.trade = true;
+        } else await post(client, view, action);
+      } else await post(client, view, action);
+      result.commands++;
+      played = true;
+      break;
+    }
+    if (!played) await delay(8);
+  }
+  assert.ok(done?.outcome?.winnerParticipantIds.length, 'Match did not finish with a winner');
+  for (const [index, client] of clients.entries()) {
+    const final = await current(client);
+    assert.deepEqual(final.outcome, done.outcome);
+    assert.deepEqual(final.news, done.news);
+    await pages[index].reload();
+    await expect(pages[index].locator('.territory-outcome')).toBeVisible();
+  }
+  await newsFixtures(clients, pages, guest);
+  assert.deepEqual(errors, []);
+  assert.ok(result.restarted && result.trade);
+  console.log(
+    JSON.stringify(
+      {
+        ...result,
+        rounds: done.round,
+        revision: done.revision,
+        winners: done.outcome.winnerParticipantIds.length,
+        newsMessages: done.news.length,
+      },
+      null,
+      2,
+    ),
+  );
+} finally {
+  await cleanup();
+}
+
+function nameOfHuman(view) {
+  return view.players.find((p) => p.participantId === view.you.participantId).displayName;
+}

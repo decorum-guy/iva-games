@@ -136,19 +136,24 @@ describe('Territorial SQLite registration and compatibility', () => {
     } finally { second.close(); }
   });
 
-  it('refuses incompatible outer snapshots without rewriting or deleting the match', async () => {
+  it('refuses incompatible saved state, catalogue and preset schemas without rewriting the match', async () => {
     const f = registrationFixture();
     const { matchId } = await f.runtime.createMatch(request());
     const valid = f.rawState(matchId);
-    const newer = JSON.parse(valid);
-    newer.schemaVersion++;
-    const raw = JSON.stringify(newer);
-    f.db.prepare('UPDATE district_territorial_matches SET state_json=? WHERE match_id=?').run(raw, matchId);
-    f.reopen();
-    await expect(f.runtime.viewForPlayer(matchId, 'owner')).rejects.toMatchObject({ code: 'INCOMPATIBLE_VERSION' });
-    await expect(f.runtime.applyAction(matchId, 'owner', { actionId: 'declined-future', expectedRevision: 0, payload: { type: 'roll' } })).rejects.toMatchObject({ code: 'INCOMPATIBLE_VERSION' });
-    expect(f.rawState(matchId)).toBe(raw);
-    expect(f.receiptCount(matchId)).toBe(0);
+    const edits: ((state: TerritoryState) => unknown)[] = [
+      state => ({ ...state, schemaVersion: 2 }),
+      state => ({ ...state, news: { ...state.news, version: 'district-news@2' } }),
+      state => ({ ...state, news: { ...state.news, profile: { ...state.news.profile, version: 'district-news-profile@2' } } }),
+    ];
+    for (const edit of edits) {
+      const raw = JSON.stringify(edit(JSON.parse(valid)));
+      f.db.prepare('UPDATE district_territorial_matches SET state_json=? WHERE match_id=?').run(raw, matchId);
+      f.reopen();
+      await expect(f.runtime.viewForPlayer(matchId, 'owner')).rejects.toMatchObject({ code: 'INCOMPATIBLE_VERSION' });
+      await expect(f.runtime.applyAction(matchId, 'owner', { actionId: 'declined-future', expectedRevision: 0, payload: { type: 'roll' } })).rejects.toMatchObject({ code: 'INCOMPATIBLE_VERSION' });
+      expect(f.rawState(matchId)).toBe(raw);
+      expect(f.receiptCount(matchId)).toBe(0);
+    }
   });
 
   it('commits a deadline move even if the triggering player POST is stale', async () => {

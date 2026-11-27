@@ -20,7 +20,7 @@
 .territory-person small { font-size: 10px; color: #526f66; }
 .territory-points { margin-left: auto; font-size: 17px; white-space: nowrap; }
 .territory-points small { font-size: 10px; font-weight: 600; color: #526f66; }
-.territory-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(265px, 320px); gap: 11px; height: calc(100dvh - 129px); min-height: 440px; }
+.territory-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(265px, 320px); gap: 11px; height: calc(100dvh - 141px); min-height: 440px; }
 .territory-map-shell { min-width: 0; min-height: 0; }
 .territory-inspector { overflow: auto; min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: 8px; scrollbar-width: thin; }
 .territory-hand, .territory-lesson, .territory-outcome, .territory-notice { border: 1px solid #d7dfd4; border-radius: 10px; padding: 9px 10px; background: #f9f7ed; }
