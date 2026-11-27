@@ -97,20 +97,31 @@ async function nativeTap(page, locator) {
   assert.ok(point.receivesPointer, 'The visible control must receive the real touch without scrolling or force: ' + await locator.textContent());
   await page.touchscreen.tap(point.x, point.y);
 }
-async function nativeSwipe(page, scroll) {
+async function scrollBounds(scroll) {
+  return scroll.evaluate(element => ({ top: element.scrollTop, max: Math.max(0, element.scrollHeight - element.clientHeight) }));
+}
+async function nativeSwipe(page, scroll, { direction = 1, distance: requestedDistance } = {}) {
   const box = await scroll.boundingBox(); assert.ok(box && box.height > 40);
-  const x = box.x + box.width / 2, startY = box.y + box.height - 12, distance = Math.min(box.height * .55, box.height - 30);
-  const before = await scroll.evaluate(element => element.scrollTop);
+  const before = await scrollBounds(scroll);
+  // scrollTop is fractional while scrollHeight/clientHeight are rounded. A
+  // boundary is a successful end to scrolling, not another required movement.
+  if ((direction > 0 ? before.max - before.top : before.top) <= 1) return false;
+  const x = box.x + box.width / 2, startY = direction > 0 ? box.y + box.height - 12 : box.y + 12;
+  const distance = Math.min(requestedDistance ?? box.height * .55, box.height - 30);
   const session = await page.context().newCDPSession(page);
   try {
     await session.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y: startY, id: 1 }] });
     for (let step = 1; step <= 8; step++) {
-      await session.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x, y: startY - distance * step / 8, id: 1 }] });
+      await session.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x, y: startY - direction * distance * step / 8, id: 1 }] });
       await page.evaluate(() => new Promise(resolve => requestAnimationFrame(resolve)));
     }
+    // Release a stationary finger rather than fling past a control. Browser
+    // versions and CI frame timing otherwise produce different momentum.
+    await page.waitForTimeout(120);
     await session.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
   } finally { await session.detach(); }
-  await expect.poll(() => scroll.evaluate(element => element.scrollTop)).toBeGreaterThan(before);
+  await expect.poll(async () => direction * ((await scrollBounds(scroll)).top - before.top)).toBeGreaterThan(0);
+  return true;
 }
 async function visibleSheet(page, selector, header) {
   const sheet = page.locator(selector);
@@ -489,8 +500,29 @@ try {
     const trade = receiver.locator('.ta-trade-window'), closeTrade = receiver.getByRole('button', { name: 'Закрыть торговлю', exact: true });
     await visibleSheet(receiver, '.ta-trade-window', closeTrade);
     const addWood = receiver.getByRole('button', { name: 'Получаю + Древесина', exact: true });
-    for (let gesture = 0; !(await touchPoint(addWood)).receivesPointer && gesture < 8; gesture++) {
-      await nativeSwipe(receiver, trade);
+    // Exercise the CI failure position deliberately: after reaching the bottom,
+    // the quantity control may need an upward scroll out from under the tabs.
+    let tradeBottom;
+    if (height === 600) {
+      for (let gesture = 0; gesture < 12; gesture++) {
+        if (!await nativeSwipe(receiver, trade)) break;
+        await visibleSheet(receiver, '.ta-trade-window', closeTrade);
+      }
+      tradeBottom = await scrollBounds(trade);
+      assert.ok(tradeBottom.max > 0 && tradeBottom.max - tradeBottom.top <= 1, 'Real touch must reach the trade scroll boundary');
+    }
+    let quantityGestures = 0;
+    for (; !(await touchPoint(addWood)).receivesPointer && quantityGestures < 12; quantityGestures++) {
+      const target = await touchPoint(addWood);
+      const center = await trade.evaluate(element => {
+        const box = element.getBoundingClientRect();
+        const header = element.querySelector('.ta-trade-tabs').getBoundingClientRect();
+        const footer = element.querySelector('.ta-trade-editor > .ta-buttons').getBoundingClientRect();
+        return (Math.max(box.top, header.bottom) + Math.min(box.bottom, footer.top)) / 2;
+      });
+      const direction = target.y < center ? -1 : 1;
+      assert.ok(await nativeSwipe(receiver, trade, { direction, distance: Math.max(35, Math.abs(target.y - center) + 20) }),
+        'The quantity control must be reachable without scrolling beyond a content boundary');
       await visibleSheet(receiver, '.ta-trade-window', closeTrade);
     }
     await nativeTap(receiver, addWood);
@@ -518,15 +550,18 @@ try {
     await nativeTap(cards, cards.getByLabel('Карты развития', { exact: true }));
     const cardPanel = cards.locator('.ta-card-panel'), closeCards = cards.getByRole('button', { name: 'Закрыть карты развития', exact: true });
     await visibleSheet(cards, '.ta-card-panel', closeCards);
-    for (let gesture = 0; gesture < 3; gesture++) {
-      await nativeSwipe(cards, cardPanel);
+    let cardGestures = 0;
+    for (; cardGestures < 3; cardGestures++) {
+      if (!await nativeSwipe(cards, cardPanel)) break;
       await visibleSheet(cards, '.ta-card-panel', closeCards);
     }
+    assert.ok(cardGestures > 0, 'The persistent Cards header must be checked after actual scrolling');
     await cards.screenshot({ path: join(harness.directory, `cards-scrolled-ru130-390x${height}.png`) });
     await nativeTap(cards, closeCards);
     await expect(cardPanel).toBeHidden();
     result.mobileLayouts.push({ width: 390, height, language: 'ru', textSize: 130, ...layout, roadPoints,
-      controlsVisibleWithoutScroll: true, collapsePreservesState: true, nativeTouch: true, newOfferReopens: true, stickyHeadersAfterScroll: true });
+      controlsVisibleWithoutScroll: true, collapsePreservesState: true, nativeTouch: true, newOfferReopens: true, stickyHeadersAfterScroll: true,
+      tradeBottom, quantityGestures, cardGestures });
     await Promise.all(mobile.map(page => page.goto('about:blank')));
   }
   passed('RU130 mobile offers keep terms and decisions together, collapse without a command, reopen for new offers and free the exact land/sea road touch targets');
