@@ -28,9 +28,9 @@ export function chooseTerritoryBot(view: TerritoryView, difficulty: BotDifficult
   }
   const value = (resource: Resource) => (9 + (income[resource] < 3 ? 4 : 0)) / (1 + you.hand[resource] * 0.65);
   const handValue = (stock: Stock) => RESOURCES.reduce((p, r) => p + stock[r] * value(r), 0);
-  const incoming = view.offers.find(offer => offer.targetId === id);
+  const incoming = view.offers.find(offer => offer.targetId === id && offer.agreedAt === undefined);
   if (incoming && legal.trade) {
-    if (covers(you.hand, incoming.receive) && handValue(incoming.give) >= handValue(incoming.receive) * (difficulty === 'hard' ? 1.15 : 0.75))
+    if (incoming.canAccept !== false && covers(you.hand, incoming.receive) && handValue(incoming.give) >= handValue(incoming.receive) * (difficulty === 'hard' ? 1.15 : 0.75))
       return { type: 'accept', offerId: incoming.id };
     return { type: 'decline', offerId: incoming.id };
   }

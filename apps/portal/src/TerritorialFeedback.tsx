@@ -136,6 +136,7 @@ export function historyTitle(entry: TerritoryHistoryEntry, view: TerritoryView, 
   if (entry.tileId) title += ' · ' + tileName(view, entry.tileId, lang);
   if (entry.cardKind) title += ' · ' + cardNames[entry.cardKind][i];
   if (entry.kind === 'block' && entry.reason) title += ' · ' + (entry.reason === 'patrol' ? cardNames.patrol[i] : lang === 'ru' ? 'семёрка' : 'seven');
+  if (entry.reason === 'consent') return lang === 'ru' ? 'Согласие на обмен · ждёт выбора' : 'Trade consent · awaiting selection';
   if (entry.offerStatus) title += ' · ' + closed[entry.offerStatus][i];
   if (entry.targetId) title += ' · ' + playerName(view, entry.targetId);
   return title;

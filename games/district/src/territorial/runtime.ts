@@ -13,15 +13,15 @@ import { DistrictError } from '../types';
 
 export const territorialId = (id: string) => id.startsWith('d4-');
 const hash = (input: unknown) => createHash('sha256').update(canonicalJson(input)).digest('hex');
-const HUMAN_TRADE_WINDOW_MS = 20_000;
+const HUMAN_TRADE_WINDOW_MS = 40_000;
 
 /** A separate deterministic pacing domain never consumes gameplay random draws. */
 function botDelay(state: TerritoryState, botSeed: string, participantId: string, action: TerritoryAction) {
   const draw = Number.parseInt(hash(['district-pace-v1', botSeed, state.revision, participantId, action.type]).slice(0, 8), 16);
-  if (state.phase === 'setup-home' || state.phase === 'setup-route') return 650 + draw % 551;
-  if (action.type === 'end') return 850 + draw % 651;
-  if (draw % 50 === 0) return 4_200 + draw % 701;
-  return 1_000 + draw % 3_001;
+  if (state.phase === 'setup-home' || state.phase === 'setup-route') return 1_000 + draw % 601;
+  if (action.type === 'end') return 2_200 + draw % 1_301;
+  if (draw % 50 === 0) return 4_800 + draw % 701;
+  return 1_800 + draw % 2_701;
 }
 
 export function territorySettings(input: unknown): { mapId: string; mapVersion: string; newsPreset: NewsPreset } {
@@ -134,7 +134,7 @@ export class TerritoryRuntime implements GameRuntime {
       if (scheduled && scheduled.at > this.now()) return;
       const active = currentId(state);
       // Only the public board and this bot's own hand cross the policy boundary.
-      const recipients = new Set(state.offers.map(offer => offer.targetId));
+      const recipients = new Set(state.offers.filter(offer => offer.agreedAt === undefined).map(offer => offer.targetId));
       // Once another eligible bot has been scheduled, an unfulfillable incoming
       // offer must not keep replacing its timer on every poll.
       const priority = (id: string) => scheduled?.participantId === id ? -1 : recipients.has(id) ? 0 : id === active ? 1 : 2;
@@ -143,7 +143,7 @@ export class TerritoryRuntime implements GameRuntime {
       let changed = false;
       for (const p of eligible) {
         const id = p.participantId;
-        if (id !== active && !state.discard[id] && !state.offers.some(offer => offer.targetId === id)) continue;
+        if (id !== active && !state.discard[id] && !state.offers.some(offer => offer.targetId === id && offer.agreedAt === undefined)) continue;
         const now = this.now();
         // Keep a real response window, including when a client refreshes or the process restarts.
         const responseUntil = id === active ? Math.max(0, ...state.offers.filter(offer => offer.authorId === id &&

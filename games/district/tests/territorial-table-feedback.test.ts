@@ -286,8 +286,8 @@ describe('SQLite replay and paced bots', () => {
         const scheduled = await f.runtime.viewForPlayer(matchId, 'a');
         const delayMs = scheduled.botActionAt! - f.clock.now;
         expect(Number.isFinite(delayMs)).toBe(true);
-        const range = category.startsWith('setup-') ? [650, 1_200] : category === 'end' ? [850, 1_500] :
-          category === 'human-response' ? [20_000, 20_000] : category === 'deadline-clamp' ? [400, 400] : [1_000, 4_900];
+        const range = category.startsWith('setup-') ? [1_000, 1_600] : category === 'end' ? [2_200, 3_500] :
+          category === 'human-response' ? [40_000, 40_000] : category === 'deadline-clamp' ? [400, 400] : [1_800, 5_500];
         expect(delayMs).toBeGreaterThanOrEqual(range[0]); expect(delayMs).toBeLessThanOrEqual(range[1]);
         f.clock.now = scheduled.botActionAt!;
         const performed = await f.runtime.viewForPlayer(matchId, 'a');
@@ -311,8 +311,8 @@ describe('SQLite replay and paced bots', () => {
         command: 'DISTRICT_PACING_REPORT_PATH=.qa/district/table-feedback.json npx vitest run --project district games/district/tests/territorial-table-feedback.test.ts',
         sourceHashes: Object.fromEntries(files.map(file => [file, createHash('sha256').update(readFileSync(file)).digest('hex')])),
         previous: { actionLoopMaximum: 32, computeBudgetMs: 65, perActionDelayMs: 0, humanResponseWindowMs: 8_000 },
-        current: { attemptsPerPollMaximum: 4, setupMs: [650, 1_200], importantMs: [1_000, 4_000], rareImportantMs: [4_200, 4_900],
-          endMs: [850, 1_500], humanResponseWindowMs: 20_000, cappedByPhaseDeadline: true, sleepsInHttpRequest: false },
+        current: { attemptsPerPollMaximum: 4, setupMs: [1_000, 1_600], importantMs: [1_800, 4_500], rareImportantMs: [4_800, 5_500],
+          endMs: [2_200, 3_500], humanResponseWindowMs: 40_000, cappedByPhaseDeadline: true, sleepsInHttpRequest: false },
         history: { truncated: false, legacyMissingHistoryFabricated: false, completenessField: 'historyComplete', automaticSourceField: 'history.source / latestRoll.source' },
         roundBoundary: { stateRoundMeans: 'completed rounds', displayedCurrentRound: 'state.round + 1',
           couponExample: { issuedStateRound: 1, endsAfterRound: 2, validThroughDisplayedRound: 2, absentAtDisplayedRound: 3 },
@@ -418,7 +418,7 @@ describe('SQLite replay and paced bots', () => {
     expect(f.read(matchId).offerHistory!.at(-1)?.status).toBe('expired');
   });
 
-  it('leaves twenty seconds for a human counteroffer while preserving the deadline and real expiry', async () => {
+  it('leaves forty seconds for a human counteroffer while preserving the deadline and real expiry', async () => {
     const f = runtimeFixture();
     const { matchId } = await f.runtime.createMatch(start([bot('bot', 0), human('a', 1)]));
     let s = f.read(matchId); s.phase = 'play'; s.turn = 1; s.deadlineAt = f.clock.now + 60_000;
@@ -426,7 +426,7 @@ describe('SQLite replay and paced bots', () => {
     s = applyTerritory(s, 'bot', { type: 'offer', targetId: 'a', give: stock({ wood: 1 }), receive: stock({ brick: 1 }) }, f.clock.now);
     f.write(s);
     const offered = await f.runtime.viewForPlayer(matchId, 'a');
-    expect(offered.botActionAt).toBe(f.clock.now + 20_000);
+    expect(offered.botActionAt).toBe(f.clock.now + 40_000);
     f.clock.now += 8_001;
     f.reopen();
     expect((await f.runtime.viewForPlayer(matchId, 'a')).offers).toHaveLength(1);
@@ -445,5 +445,43 @@ describe('SQLite replay and paced bots', () => {
     expect(bounded.botActionAt).toBe(limited.deadlineAt);
     f.clock.now = limited.deadlineAt;
     expect((await f.runtime.viewForPlayer(matchId, 'a')).offerHistory!.at(-1)).toMatchObject({ id: 'short-window', status: 'expired' });
+  });
+});
+
+
+describe('Grouped negotiations and visual production receipts', () => {
+  it('collects separate consents without transfer, chooses exactly one, keeps third-party terms private', () => {
+    let s = fresh();
+    s.players.a.hand = stock({ wood: 2 }); s.players.b.hand = stock({ brick: 2 }); s.players.c.hand = stock({ brick: 2 });
+    s = act(s, 'a', { type: 'offer', targetId: 'b', targetIds: ['b', 'c'], give: stock({ wood: 1 }), receive: stock({ brick: 1 }) });
+    const [one, two] = s.offers;
+    expect(one.groupId).toBe(two.groupId);
+    expect(viewTerritory(s, 'b', 0).offers.map(o => o.id)).toEqual([one.id]);
+    const before = structuredClone(s.players);
+    s = act(s, 'b', { type: 'accept', offerId: one.id });
+    s = act(s, 'c', { type: 'accept', offerId: two.id });
+    expect(s.players).toEqual(before);
+    expect(viewTerritory(s, 'a', 0).offers.every(o => o.canAccept)).toBe(true);
+    s = act(s, 'a', { type: 'accept', offerId: two.id });
+    expect(s.players.a.hand).toEqual(stock({ wood: 1, brick: 1 }));
+    expect(s.players.b).toEqual(before.b);
+    expect(s.players.c.hand).toEqual(stock({ wood: 1, brick: 1 }));
+    expect(s.offers).toEqual([]);
+    expect(s.offerHistory?.find(o => o.id === one.id)?.status).toBe('withdrawn');
+    expect(s.offerHistory?.find(o => o.id === two.id)?.status).toBe('accepted');
+    expect(() => act(s, 'a', { type: 'accept', offerId: one.id })).toThrow();
+  });
+  it('attributes actually granted roll resources to eligible tiles, including scarcity', () => {
+    let s = fresh(); s.phase = 'roll'; seedFor(s, 6);
+    const tile = s.map.tiles.find(tile => tile.number === 6 && tile.resource)!;
+    s.buildings[tile.nodeIds[0]] = { ownerId: 'a', level: 2 };
+    s.blockedTileId = null;
+    s.bank[tile.resource!] = 1;
+    s = act(s, 'a', { type: 'roll' });
+    const roll = s.latestRoll!;
+    expect(roll.sources?.some(source => source.tileId === tile.id && source.resource === tile.resource && source.amount === 1)).toBe(true);
+    for (const grant of roll.production) for (const resource of Object.keys(grant.resources) as (keyof Stock)[]) {
+      expect(roll.sources?.filter(source => source.ownerId === grant.ownerId && source.resource === resource).reduce((sum, source) => sum + source.amount, 0)).toBe(grant.resources[resource]);
+    }
   });
 });

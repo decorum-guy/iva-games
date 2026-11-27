@@ -134,6 +134,7 @@ function roll(s: TerritoryState) {
   const latest = s.latestRoll = { eventId: '', revision: s.revision + 1, actorId: currentId(s), round: s.round,
     turn: s.turn, dice: s.lastRoll, sum: number,
     triggeredTileIds: s.map.tiles.filter(tile => tile.resource && tile.number === number).map(tile => tile.id),
+    sources: [] as NonNullable<NonNullable<TerritoryState['latestRoll']>['sources']>,
     production: [] as NonNullable<TerritoryState['latestRoll']>['production'], blocked: [] as NonNullable<TerritoryState['latestRoll']>['blocked'] };
   if (number === 7) {
     s.pendingBlockade = { actorId: currentId(s), reason: 'seven' };
@@ -155,7 +156,7 @@ function roll(s: TerritoryState) {
     const sources = tileIds.map(id => tiles.get(id)!).filter(tile => tile.id !== s.blockedTileId && tile.number === number);
     return RESOURCES.flatMap(resource => {
       const count = sources.filter(tile => tile.resource === resource).length;
-      return count ? [{ nodeId, ownerId: building.ownerId, sector: eventSectorId, level: building.level, resource, base: building.level * count }] : [];
+      return count ? [{ nodeId, ownerId: building.ownerId, sector: eventSectorId, level: building.level, resource, tileIds: sources.filter(tile => tile.resource === resource).map(tile => tile.id), base: building.level * count }] : [];
     });
   });
   for (const op of operations) {
@@ -172,7 +173,7 @@ function roll(s: TerritoryState) {
       });
     }
   }
-  produce(s, operations);
+  latest.sources = produce(s, operations);
   latest.production = Object.entries(s.players).map(([ownerId, player]) => ({ ownerId, resources: positiveDifference(player.hand, before[ownerId]) }))
     .filter(item => sumStock(item.resources) > 0);
   s.phase = 'play';
@@ -269,29 +270,39 @@ function deal(s: TerritoryState, id: string, action: Extract<TerritoryAction, { 
   const player = s.players[id];
   if (action.type === 'offer') {
     const { targetId, give, receive, parentId } = action;
-    requireAction(s.players[targetId] && !s.left.includes(targetId) && targetId !== id && (id === currentId(s) || targetId === currentId(s)));
+    const targets = action.targetIds ?? [targetId];
+    requireAction(targets.length > 0 && targets.length <= 3 && targets[0] === targetId && new Set(targets).size === targets.length && (!parentId || targets.length === 1));
+    requireAction(targets.every(target => Object.hasOwn(s.players, target) && !s.left.includes(target) && target !== id && (id === currentId(s) || target === currentId(s))));
     requireAction(sumStock(give) && sumStock(receive) && covers(player.hand, give) && RESOURCES.every(resource => !(give[resource] && receive[resource])));
     if (parentId) {
       const parent = s.offers.find(offer => offer.id === parentId);
       requireAction(parent?.targetId === id && parent.authorId === targetId);
     }
-    closeOffers(s, offer => offer.id === parentId || offer.authorId === id && offer.targetId === targetId, 'replaced', id);
+    closeOffers(s, offer => offer.id === parentId || offer.authorId === id && targets.includes(offer.targetId), 'replaced', id);
     if (!parentId) (s.volunteered ??= []).push(id);
-    s.offers.push({ id: 'offer-' + ++s.offerNumber, authorId: id, targetId, offeredAt: now, give: { ...give }, receive: { ...receive }, ...(parentId ? { parentId } : {}) });
+    const groupId = targets.length > 1 ? 'group-' + (s.offerNumber + 1) : undefined;
+    for (const target of targets) s.offers.push({ id: 'offer-' + ++s.offerNumber, authorId: id, targetId: target, offeredAt: now, give: { ...give }, receive: { ...receive }, ...(parentId ? { parentId } : {}), ...(groupId ? { groupId } : {}) });
     return;
   }
   const offer = s.offers.find(item => item.id === action.offerId);
-  requireAction(offer && (action.type === 'cancel' ? offer.authorId === id : offer.targetId === id));
+  const confirming = action.type === 'accept' && offer?.authorId === id && !!offer.groupId && offer.agreedAt !== undefined;
+  requireAction(offer && (action.type === 'cancel' ? offer.authorId === id : offer.targetId === id || confirming));
   if (action.type === 'accept') {
-    const author = s.players[offer.authorId];
-    requireAction(covers(author.hand, offer.give) && covers(player.hand, offer.receive));
+    const author = s.players[offer.authorId], recipient = s.players[offer.targetId];
+    requireAction(covers(author.hand, offer.give) && covers(recipient.hand, offer.receive) && !s.left.includes(offer.targetId));
+    if (offer.groupId && !confirming) {
+      requireAction(offer.agreedAt === undefined);
+      offer.agreedAt = now;
+      return;
+    }
     for (const resource of RESOURCES) {
       const amount = offer.give[resource] - offer.receive[resource];
       author.hand[resource] -= amount;
-      player.hand[resource] += amount;
+      recipient.hand[resource] += amount;
     }
   }
   closeOffers(s, item => item.id === offer.id, action.type === 'accept' ? 'accepted' : action.type === 'decline' ? 'declined' : 'withdrawn', id);
+  if (confirming) closeOffers(s, item => item.groupId === offer.groupId && item.authorId === id, 'withdrawn', id);
 }
 
 function rememberAction(s: TerritoryState, before: TerritoryState, actorId: string, action: TerritoryAction) {
@@ -310,7 +321,7 @@ function rememberAction(s: TerritoryState, before: TerritoryState, actorId: stri
     case 'roll': {
       const roll = s.latestRoll!;
       Object.assign(entry, { dice: roll.dice, sum: roll.sum, triggeredTileIds: roll.triggeredTileIds,
-        production: roll.production, blocked: roll.blocked });
+        production: roll.production, blocked: roll.blocked, sources: roll.sources });
       break;
     }
     case 'discard':
@@ -335,11 +346,18 @@ function rememberAction(s: TerritoryState, before: TerritoryState, actorId: stri
       if (sumStock(received)) entry.received = received;
       break;
     case 'offer': {
-      Object.assign(entry, { offerId: 'offer-' + s.offerNumber, targetId: action.targetId, audienceIds: [actorId, action.targetId] });
+      const created = s.offers.filter(offer => offer.authorId === actorId && !before.offers.some(old => old.id === offer.id));
+      const first = created[0];
+      Object.assign(entry, { offerId: first?.id, targetId: first?.targetId, audienceIds: [actorId, first?.targetId].filter((id): id is string => !!id) });
+      for (const offer of created.slice(1)) remember(s, { kind: 'offer', actorId, phase: before.phase, offerId: offer.id, targetId: offer.targetId, audienceIds: [actorId, offer.targetId] }, before);
       break;
     }
     case 'accept': case 'decline': case 'cancel': {
       const offer = before.offers.find(item => item.id === action.offerId)!;
+      if (action.type === 'accept' && s.offers.some(item => item.id === offer.id && item.agreedAt !== undefined)) {
+        Object.assign(entry, { offerId: offer.id, targetId: offer.authorId, reason: 'consent', audienceIds: [offer.authorId, offer.targetId] });
+        break;
+      }
       Object.assign(entry, { offerId: offer.id, targetId: actorId === offer.authorId ? offer.targetId : offer.authorId,
         offerStatus: action.type === 'accept' ? 'accepted' : action.type === 'decline' ? 'declined' : 'withdrawn',
         audienceIds: [offer.authorId, offer.targetId] });
@@ -351,7 +369,7 @@ function rememberAction(s: TerritoryState, before: TerritoryState, actorId: stri
   if (action.type === 'roll') s.latestRoll!.eventId = recorded.id;
   const production = action.type === 'roll' ? s.latestRoll!.production :
     action.type === 'place' && sumStock(received) ? [{ ownerId: actorId, resources: received }] : [];
-  if (production.length) remember(s, { actorId, kind: 'distribution', production,
+  if (production.length) remember(s, { actorId, kind: 'distribution', production, ...(action.type === 'roll' ? { sources: s.latestRoll?.sources } : {}),
     reason: action.type === 'place' ? 'setup' : 'roll', phase: before.phase }, before);
   if (s.outcome && !before.outcome) remember(s, { actorId, kind: 'win',
     winnerParticipantIds: s.outcome.winnerParticipantIds, reason: s.outcome.reason }, before);
@@ -517,7 +535,8 @@ export function applyTerritory(previous: TerritoryState, id: string, action: Ter
   switch (action.type) {
     case 'roll': s.activity = { revision: s.revision, kind: 'roll' }; break;
     case 'place': case 'settle': case 'route': case 'upgrade': s.activity = { revision: s.revision, kind: 'build' }; break;
-    case 'bank': case 'accept': s.activity = { revision: s.revision, kind: 'deal' }; break;
+    case 'bank': s.activity = { revision: s.revision, kind: 'deal' }; break;
+    case 'accept': if (!s.offers.some(offer => offer.id === action.offerId)) s.activity = { revision: s.revision, kind: 'deal' }; break;
     case 'play-card': s.activity = { revision: s.revision, kind: 'tactic' }; break;
   }
   if (s.outcome?.reason === 'points') s.activity = { revision: s.revision, kind: 'win' };
@@ -596,8 +615,10 @@ export function viewTerritory(s: TerritoryState, id: string, now: number, clone 
       id: offer.id, authorId: offer.authorId, targetId: offer.targetId, give: offer.give, receive: offer.receive,
       ...(offer.parentId ? { parentId: offer.parentId } : {}),
       ...(offer.offeredAt !== undefined ? { offeredAt: offer.offeredAt } : {}),
-      canAccept: offer.targetId === id && phase === 'play' && !s.left.includes(id) &&
-        covers(s.players[offer.authorId].hand, offer.give) && covers(s.players[offer.targetId].hand, offer.receive),
+      ...(offer.groupId ? { groupId: offer.groupId } : {}), ...(offer.agreedAt !== undefined ? { agreedAt: offer.agreedAt } : {}),
+      canAccept: phase === 'play' && !s.left.includes(id) &&
+        (offer.targetId === id && offer.agreedAt === undefined && covers(s.players[offer.authorId].hand, offer.give) && covers(s.players[id].hand, offer.receive) ||
+          offer.authorId === id && !!offer.groupId && offer.agreedAt !== undefined && covers(s.players[id].hand, offer.give)),
       ...(!covers(s.players[offer.authorId].hand, offer.give) ? { unavailableReason: 'author-resources' as const } :
         // Only the recipient can inspect their own shortage. Publishing it to the
         // sender would turn unanswered proposals into probes of a hidden hand.
@@ -609,7 +630,10 @@ export function viewTerritory(s: TerritoryState, id: string, now: number, clone 
     pendingBlockade: s.pendingBlockade ?? null,
     ...(s.botSchedule?.revision === s.revision ? { botActionAt: s.botSchedule.at, botParticipantId: s.botSchedule.participantId } : {}),
     ...(s.activity ? { activity: s.activity } : {}),
-    news: news.messages, threats, preset: news.preset, outcome: s.outcome,
+    news: news.messages, threats, activeEffects: news.modifiers.filter(modifier => modifier.endsAfterRound > s.round).flatMap(modifier => {
+      const message = news.messages.find(item => item.eventInstanceId === modifier.eventInstanceId && 'changes' in item);
+      return message ? [{ eventInstanceId: modifier.eventInstanceId, templateId: message.templateId, zone: modifier.zone, endsAfterRound: modifier.endsAfterRound }] : [];
+    }), preset: news.preset, outcome: s.outcome,
     legal: { roll: active && phase === 'roll', end: playing, options, block: active && phase === 'block' ? blockOptions(s) : [],
       bank: Object.fromEntries(RESOURCES.map(resource => [resource, tradeRate(s, id, resource)])) as Record<Resource, number>,
       buyCard: playing && s.deck.length ? cardPricing.total : null, buyCardPricing: cardPricing,
@@ -650,9 +674,11 @@ export function parseTerritoryAction(value: unknown): TerritoryAction {
     case 'bank':
       keys('give', 'receive'); requireAction(isResource(data.give) && isResource(data.receive)); return { type, give: data.give, receive: data.receive };
     case 'offer':
-      keys('targetId', 'give', 'receive', 'parentId');
-      requireAction(isId(data.targetId) && (data.parentId === undefined || isId(data.parentId)));
-      return { type, targetId: data.targetId, give: parseStock(data.give), receive: parseStock(data.receive), ...(data.parentId ? { parentId: data.parentId } : {}) };
+      keys('targetId', 'targetIds', 'give', 'receive', 'parentId');
+      requireAction(isId(data.targetId) && (data.parentId === undefined || isId(data.parentId)) &&
+        (data.targetIds === undefined || Array.isArray(data.targetIds) && data.targetIds.length <= 3 && data.targetIds.every(isId)));
+      return { type, targetId: data.targetId, give: parseStock(data.give), receive: parseStock(data.receive), ...(data.parentId ? { parentId: data.parentId } : {}),
+        ...(Array.isArray(data.targetIds) ? { targetIds: data.targetIds as string[] } : {}) };
     case 'accept': case 'decline': case 'cancel':
       keys('offerId'); requireAction(isId(data.offerId)); return { type, offerId: data.offerId };
     case 'play-card':

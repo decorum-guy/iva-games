@@ -42,7 +42,8 @@ export function districtHistoryCue(entry: TerritoryHistoryEntry, ownId: string):
     case 'upgrade': return 'upgrade';
     case 'roll': return 'roll';
     case 'distribution': return entry.production?.some(row => Object.values(row.resources).some(n => n > 0)) ? 'production' : null;
-    case 'bank': case 'accept': return 'trade';
+    case 'bank': return 'trade';
+    case 'accept': return entry.reason === 'consent' ? null : 'trade';
     case 'buy-card': case 'play-card': return 'card';
     case 'block': return 'blockade';
     case 'win': return entry.reason === 'points' ? 'win' : null;
