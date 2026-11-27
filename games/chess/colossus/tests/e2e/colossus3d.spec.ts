@@ -111,7 +111,7 @@ test('real WebGL renders production models, accepts pointer moves and survives c
   });
   expect(lossSupported).toBe(true);
   await expect(board(page)).toBeVisible();
-  await expect(page.locator('.board-scene-fallback-note')).toContainText('Play continues on the 2D board');
+  await expect(page.locator('.board-scene-fallback-note')).toHaveText('3D is unavailable. Using 2D.');
   await expect(cell(page, 'a4')).toHaveAttribute('aria-label', /^a4, Rook 4\/4 HP/);
   await expect(commands(page)).toHaveCount(2);
   await guard(page, 'g1');

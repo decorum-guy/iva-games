@@ -180,6 +180,7 @@ select { appearance:none; padding-right:2.3rem; background-image:url("data:image
  .top-tools button { min-width:35px; min-height:38px; }
  .setup-screen { display:block; overflow-y:auto; overflow-x:hidden; padding:18px 8px 26px; height:100%; }
  .setup-world { display:grid; grid-template-columns:80px minmax(0,1fr); gap:10px 14px; text-align:left; }
+ .setup-world::before { inset:0; }
  .setup-monument { width:80px; height:104px; grid-column:1; grid-row:1; }
  .reliquary-ring { width:78px; height:78px; top:12px; left:0; }
  .setup-world h1,.setup-world>p { display:none; }

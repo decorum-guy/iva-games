@@ -22,6 +22,12 @@ Source: the owner's difficulty-select screenshot, pasted Vite log and direct rev
 
 The pasted log also contains actual file-change events for `index.html`, `main.tsx`, `tsconfig.json` and `vite.config.ts`. The mixed-export fix addresses the confirmed Fast Refresh invalidation; it does not identify which process repeatedly wrote those files on the owner's Mac. HMR state preservation in that environment and a sustained idle reproduction remain explicit items for Terra's acceptance. The branch remains unmerged and production deployment is outside this review.
 
+### Browser findings at the first UI checkpoint
+
+[The first UI revision run](https://github.com/decorum-guy/iva-games/actions/runs/46075540143) on `32e8a22bf5a3e9e8437eecbdf0c11949f879ac73` passed 22 browser cases, failed five and intentionally skipped the two mobile copies of the desktop-only animation observer. All three new desktop menu/bestiary/animation cases passed. Four mobile cases exposed the same 6px horizontal overflow from the menu's decorative `::before` background: its inherited negative side insets extended beyond the mobile content. The mobile decoration now stays within its parent. Direct browser geometry reproduced the extra 6px; this was not fixed by weakening the overflow assertion. The remaining failure was an obsolete expected fallback phrase after the English copy revision; the real context-loss transition had reached the 2D board. Its assertion now expects the new user-visible message.
+
+An additional controlled live-browser HMR check moved the king, selected the rook and saved a comment-only board edit. Vite reported the component hot update; every visible board label/selection/tab stop, round and command count remained identical. The comment was then removed and the source verified byte-for-byte against the published file. This tests the mounted interface in this browser; it does not attribute the owner's Mac file writes. Current-head repeat results are recorded in PR #29.
+
 ## Current review candidate — 27 November 2026
 
 The owner's current request is a complete third chess game in a separate review branch, including a training-only boss, original 2D/3D assets, sounds and future boss/game registration. Source: the attached project entry file, current main and the existing PR #10 implementation. Branch: `feat/colossus-complete-20261127`, combining main `d397460689b717cbcb892d993dd33aa4d4631c49` and the prior Colossus branch `5597e7ac9582595e87066bd0116c3ed553db98e6`.
