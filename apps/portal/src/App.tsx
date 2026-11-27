@@ -1442,10 +1442,15 @@ function CreateRoom({
           : <DistrictMapSelect value={districtMap.id} version={districtMap.version} onChange={setDistrictMap} />)}
         <p className="form-note">
           <Icon name="lock" size={17} />
-          {t(
-            "В комнату войдут только приглашённые друзья.",
-            "Only invited friends can join your room.",
-          )}
+          {gameId === "district"
+            ? t(
+              "Комната закрытая. После создания добавьте ботов или пригласите друзей.",
+              "This room is private. Add bots or invite friends after creating it.",
+            )
+            : t(
+              "В комнату войдут только приглашённые друзья.",
+              "Only invited friends can join your room.",
+            )}
         </p>
         <button
           className="button primary wide"
