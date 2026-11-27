@@ -1,0 +1,91 @@
+/* Map-first table. HUD controls never take part in board hit testing. */
+.territory-map-first { grid-template-rows:auto auto minmax(0,1fr); gap:7px; }
+.territory-map-first .territory-top { gap:10px; }
+.territory-map-first .territory-map-title { flex:0 0 auto; padding-right:12px; border-right:1px solid #97b4b6; gap:8px; }
+.territory-map-first .territory-map-title h2 { font-size:clamp(17px,1.65vw,25px); }
+.territory-map-first .territory-top .territory-players { flex:1 1 0; min-width:0; gap:5px; }
+.territory-map-first .territory-players>li { padding:5px 7px; gap:2px 5px; border:2px solid #bfd2d5; }
+.territory-map-first .territory-players>.is-active { border-color:#287981; box-shadow:inset 0 2px #287981,inset 0 -2px #287981; }
+.territory-map-first .territory-player-trade { white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
+.territory-map-first .territory-layout { grid-template-columns:minmax(0,1fr) clamp(350px,30vw,445px); gap:9px; }
+.territory-map-first .territory-panel-scroll { padding:10px; }
+.territory-map-first .territorial-actions { gap:7px;font-size:calc(12px * var(--table-text-scale,1)); }
+.territory-map-first .ta-selected { padding:9px; }
+.territory-map-first .territory-map-shell { overflow:visible; isolation:isolate; }
+.territory-map-first .territory-map-shell > .territorial-board { border-radius:14px; }
+.territory-map-tools { position:absolute;inset:0;z-index:4;pointer-events:none; }
+.territory-map-tools :is(button,summary,input,select) { pointer-events:auto; }
+.territory-trade-dock { position:absolute;inset:0;display:block;pointer-events:none; }
+.territory-map-tools .ta-trade-open,.territory-map-tools .ta-cards>summary { position:absolute;top:8px;left:8px;pointer-events:auto;display:flex;align-items:center;justify-content:center;gap:6px;box-shadow:0 3px 10px #123d4750;background:#f8fbf5;border:1px solid #a4bcad;border-radius:12px;min-height:44px;color:#245761;padding:8px 10px; }
+.territory-map-tools .ta-trade-open { left:74px; }
+.territory-map-tools .ta-trade-open[aria-expanded=true] { background:#d1e9e2; }
+.territory-map-tools .ta-cards { position:absolute;inset:0;border:0;pointer-events:none; }
+.territory-map-tools .ta-cards>summary { width:60px;list-style:none; }
+.territory-map-tools .ta-cards>summary::-webkit-details-marker { display:none; }
+.territory-map-tools .ta-cards>summary>span { min-width:18px;margin:0;font-size:10px; }
+.territory-map-tools .ta-card-panel,.ta-trade-window { position:absolute;top:60px;left:8px;max-height:calc(100% - 68px);width:min(410px,calc(100% - 16px));overflow:auto;overscroll-behavior:contain;background:#f7fbf8;border:1px solid #83aaa9;border-radius:13px;box-shadow:0 8px 26px #183e4860;pointer-events:auto;padding:10px;animation:td-open .19s ease-out both; }
+.territory-map-tools .ta-card-panel { z-index:2; }
+.territory-map-tools .ta-cards[open]>summary { background:#d1e9e2; }
+.territory-map-tools .ta-trade-window { z-index:3;width:min(455px,calc(100% - 16px)); }
+.territory-map-tools .ta-trade-tabs { display:flex;gap:5px;align-items:center;margin-bottom:7px; }
+.territory-map-tools .ta-trade-tabs button { flex:1;min-height:34px;padding:5px 8px; }
+.territory-map-tools .ta-trade-tabs button[aria-pressed=true] { background:#d9ebe4;border-color:#43867d; }
+.territory-map-tools .ta-trade-tabs .ta-close { flex:0 0 34px;font-size:20px; }
+.territory-map-tools .ta-trade-editor { border:0;padding:2px;background:transparent;gap:6px; }
+.territory-map-tools .ta-draft-heading small { font-size:10px; }
+.territory-map-tools .ta-draft-sides { gap:6px; }
+.territory-map-tools .ta-pick-cell { display:grid;justify-items:center;gap:2px;min-width:0; }
+.territory-map-tools .ta-amounts { padding-top:2px;gap:4px; }
+.territory-map-tools .ta-amounts .ta-pick-cell>span { font-size:10px;line-height:1.1;overflow-wrap:anywhere;text-align:center; }
+.territory-map-tools .ta-amounts input { min-height:26px;max-width:55px;padding:2px;font-size:13px; }
+.territory-map-tools .ta-pick-add { position:relative;padding:1px;min-height:34px;width:100%;background:#f0f4e8;border-color:#b7c8bb; }
+.territory-map-tools .ta-pick-add span { position:absolute;bottom:0;right:4px;color:#2b7764;font-weight:800; }
+.territory-map-tools .ta-picked-stock { grid-column:1/-1;display:flex;gap:4px;flex-wrap:wrap; }
+.territory-map-tools .ta-picked-stock button { display:flex;align-items:center;gap:3px;min-height:28px;padding:2px 5px;background:#e2efdf; }
+.territory-map-tools .ta-picked-stock svg { width:21px;height:21px; }
+.territory-map-tools .ta-picked-stock button span { color:#946247; }
+.territory-map-tools .ta-trade-editor .ta-buttons { position:sticky;bottom:0;background:#f7fbf8;padding:5px 0;z-index:1; }
+.territory-map-tools .ta-bank { border:0; }
+.territory-map-tools .ta-bank-palette { display:grid;grid-template-columns:repeat(5,1fr);gap:5px; }
+.territory-map-tools .ta-bank-palette button { padding:3px;min-height:38px; }
+.territory-map-tools .ta-bank-palette [aria-pressed=true] { background:#d8ebd9;outline:2px solid #4c8b75; }
+.territory-map-tools .ta-offer-stack { position:absolute;top:8px;right:8px;width:min(275px,42%);max-height:calc(100% - 75px);overflow:auto;display:flex;flex-direction:column;gap:7px;pointer-events:none;overscroll-behavior:contain;z-index:4; }
+.territory-map-tools .ta-offer-stack:has(.ta-offer) { pointer-events:auto; }
+.territory-map-tools .ta-offer { pointer-events:auto;position:relative;background:#f8fbf6;border:1px solid #8caaa4;box-shadow:0 4px 14px #123d4740;padding:7px;gap:5px;border-radius:11px;animation:td-open .24s ease-out both; }
+.territory-map-tools .ta-offer-status { display:flex;align-items:center;gap:3px;line-height:1.25;flex-wrap:wrap; }
+.territory-map-tools .ta-offer-status i { display:grid;place-items:center;width:18px;height:18px;border-radius:50%;font-size:15px;font-weight:800;font-style:normal;background:#e5ece7;color:#54796c; }
+.territory-map-tools .ta-offer[data-offer-status=agreed] .ta-offer-status i,.territory-map-tools .ta-offer[data-offer-status=accepted] .ta-offer-status i { color:#23704c;background:#d5edd5; }
+.territory-map-tools .ta-offer[data-offer-status=declined] .ta-offer-status i { color:#9b493b;background:#f7e1d9; }
+.territory-map-tools .ta-offer[data-offer-status=declined] { animation:td-rejected .28s ease-out; }
+.territory-map-tools .ta-offer .ta-exchange .ta-resource-name { display:none; }
+.territory-map-tools .ta-offer .ta-exchange .ta-resources { display:flex;gap:3px;flex-wrap:wrap; }
+.territory-map-tools .ta-offer .ta-buttons { gap:4px; }
+.territory-map-tools .ta-offer .ta-buttons button { min-height:34px;padding:5px 6px;font-size:11px; }
+.territory-map-tools .ta-offer.is-closed { opacity:.9; }
+.territory-map-tools .ta-map-required { position:absolute;left:8px;bottom:8px;z-index:6;max-height:calc(100% - 16px);width:min(420px,calc(100% - 16px));overflow:auto;pointer-events:auto;box-shadow:0 6px 16px #183e4860;border-radius:10px; }
+.territory-map-tools.is-mandatory :is(.ta-trade-window,.ta-card-panel,.ta-offer-stack) { visibility:hidden;pointer-events:none; }
+.territory-map-tools.is-mandatory .ta-map-required .ta-mandatory { padding:8px;gap:5px; }
+.territory-map-first .tb-area-caption { top:59px;left:8px;max-width:50%; }
+.territory-map-first .tb-block-mode [data-board-layer=route] *, .territory-map-first .tb-block-mode [data-board-layer=building] * { pointer-events:none!important; }
+.territory-map-first .tb-block-mode .tb-target.is-available .tb-tile-select { stroke-width:4;stroke-dasharray:none;stroke:#fff3ad; }
+.territory-map-first .territory-hand .ta-resource-cards>span:has(.ta-hand-pick:not(:disabled)) { cursor:pointer;transition:transform .15s,box-shadow .15s; }
+.territory-map-first .territory-hand .ta-resource-cards>span:has(.ta-hand-pick:hover:not(:disabled)) { transform:translateY(-3px);box-shadow:0 4px 8px #52785c50; }
+.territory-map-first .ta-hand-pick { position:absolute;inset:0;background:none;border:none;padding:0;border-radius:7px;cursor:pointer; }
+.territory-map-first .ta-hand-pick:disabled { cursor:default; }
+.territory-map-first .ta-hand-pick:focus-visible { outline:2px solid #287981;outline-offset:2px; }
+.territory-map-first .tn-close-only { font-size:23px;padding:0;min-width:32px;min-height:32px; }
+.territorial-actions .ta-pick-cell { display:grid;justify-items:center;gap:3px;min-width:0;font-size:calc(10px * var(--table-text-scale,1)); }
+.territorial-actions .ta-pick-cell>span { text-align:center;overflow-wrap:anywhere;max-width:100%; }
+@keyframes td-open { from {opacity:0;transform:translateY(-8px)} to {opacity:1;transform:translateY(0)} }
+@keyframes td-rejected { 0%{transform:translateX(0)} 30%{transform:translateX(3px)} 60%{transform:translateX(-3px)} 100%{transform:translateX(0)} }
+@media(max-width:1120px) { .territory-map-first .territory-top { flex-wrap:wrap; } .territory-map-first .territory-top .territory-players { order:3;flex:1 0 100%; } .territory-map-first .territory-map-title { border:0; } }
+@media(max-width:820px) { .territory-map-first .territory-layout {grid-template-columns:minmax(0,1fr) minmax(285px,38%);} }
+@media(max-width:620px) {
+  .territory-map-first .territory-layout {grid-template-columns:minmax(0,1fr);}
+  .territory-map-first .territory-top .territory-players { overflow-x:auto; }
+  .territory-map-first .territory-map-tools .ta-trade-window,.territory-map-first .territory-map-tools .ta-card-panel { top:54px;max-height:calc(100% - 57px); }
+  .territory-map-first .territory-map-tools .ta-offer-stack {width:min(215px,52%);top:54px;max-height:calc(100% - 60px);}
+  .territory-map-first .territory-map-tools .ta-map-required { width:calc(100% - 16px); }
+  .territory-map-first .territory-map-tools .ta-trade-open { min-height:40px; }
+  .territory-map-first .territory-map-tools .ta-cards>summary { min-height:40px; }
+}

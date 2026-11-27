@@ -225,7 +225,8 @@ try {
   await post(entry, entry.hostIndex, { type: 'offer', targetId: entry.expected.otherId, give: stock({ wood: 4 }), receive: stock({ brick: 1 }) });
   const bankPage = pages[entry.hostIndex], recipientPage = pages[entry.guestIndex];
   await bankPage.reload();
-  await bankPage.locator('.ta-bank > summary').click();
+  await bankPage.getByRole('button', { name: /^(Offer a trade|Continue saved terms)$/ }).click();
+  await bankPage.getByRole('button', { name: 'Bank', exact: true }).click();
   const bankBefore = await view(entry, entry.hostIndex);
   await bankPage.locator('.ta-bank').getByLabel('I receive', { exact: true }).selectOption('grain');
   const rate = bankBefore.legal.bank.wood;
@@ -239,7 +240,8 @@ try {
 
   entry = await open('trade-draft');
   const lostBankPage = pages[entry.hostIndex];
-  await lostBankPage.locator('.ta-bank > summary').click();
+  await lostBankPage.getByRole('button', { name: /^(Offer a trade|Continue saved terms)$/ }).click();
+  await lostBankPage.getByRole('button', { name: 'Bank', exact: true }).click();
   await lostBankPage.locator('.ta-bank').getByLabel('I receive', { exact: true }).selectOption('grain');
   const lostBankBefore = await view(entry, entry.hostIndex);
   const lostBankRate = lostBankBefore.legal.bank.wood;
@@ -276,6 +278,7 @@ try {
 
   entry = await open('patrol');
   let cardPage = pages[entry.hostIndex];
+  await cardPage.locator('.ta-cards > summary').click();
   let patrol = cardPage.locator('[data-card-id="fixture-card-0"]');
   const initialRevision = (await view(entry, entry.hostIndex)).revision;
   await patrol.getByRole('button', { name: 'Play card', exact: true }).click();

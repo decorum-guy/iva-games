@@ -154,7 +154,7 @@ export function TerritorialNews(props: NewsProps) {
       <div className="tn-issue-label"><div><strong>{mode === 'journal' ? (ru ? 'Журнал новостей' : 'News journal') :
         level === 'urgent' ? (ru ? 'Срочно' : 'Urgent') : level === 'warning' ? (ru ? 'Внимание' : 'Attention') : (ru ? 'Новости района' : 'District news')}</strong>
         {mode !== 'journal' && ordered[0] && <span>{ru ? 'Круг ' : 'Round '}{ordered[0].round}</span>}</div>
-        <button type="button" onClick={close} aria-label={ru ? 'Свернуть новости' : 'Dismiss news'}>{ru ? 'Свернуть' : 'Dismiss'} <span aria-hidden="true">×</span></button>
+        <button type="button" onClick={close} aria-label={ru ? 'Свернуть новости' : 'Dismiss news'} className="tn-close-only"><span aria-hidden="true">×</span></button>
       </div>
       <div className="tn-issue-cards" tabIndex={0} aria-label={ru ? 'Текст новостей, можно прокрутить' : 'Scrollable news text'}
         onKeyDown={event => {

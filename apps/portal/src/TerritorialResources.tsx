@@ -44,9 +44,9 @@ export function ResourceIcon({ resource, className = '' }: { resource: Resource;
   </svg>;
 }
 
-export function ResourceStock({ stock, lang, showZero = false, appearance = 'inline', delta, bank = false, resources }: {
+export function ResourceStock({ stock, lang, showZero = false, appearance = 'inline', delta, bank = false, resources, onPick }: {
   stock: Partial<Stock>; lang: Lang; showZero?: boolean; appearance?: 'inline' | 'cards';
-  delta?: Partial<Stock>; bank?: boolean; resources?: readonly Resource[];
+  delta?: Partial<Stock>; bank?: boolean; resources?: readonly Resource[]; onPick?: (resource: Resource) => void;
 }) {
   const entries = (resources ?? RESOURCES).filter(resource => showZero || stock[resource] || delta?.[resource]);
   if (!entries.length) return <span className="ta-free">{lang === 'ru' ? 'Бесплатно' : 'Free'}</span>;
@@ -58,7 +58,8 @@ export function ResourceStock({ stock, lang, showZero = false, appearance = 'inl
       return <span key={resource} role="listitem" data-resource={resource} className={amount === 0 ? 'is-empty' : ''}
         aria-label={`${resourceName(resource, lang)}: ${count}${change ? ` (${change > 0 ? '+' : ''}${change})` : ''}`}>
         <ResourceIcon resource={resource}/><span className="ta-resource-name">{resourceName(resource, lang)}</span>
-        <b>{count}</b>{change !== 0 && <em className={change > 0 ? 'ta-gain' : 'ta-loss'}>{change > 0 ? '+' : ''}{change}</em>}
+        <b>{count}</b>{onPick && <button className="ta-hand-pick" type="button" disabled={!amount} title={lang === 'ru' ? 'Добавить в обмен' : 'Add to trade'} aria-label={(lang === 'ru' ? 'Отдать ' : 'Give ') + resourceName(resource,lang)} onClick={() => onPick(resource)}/>}
+        {change !== 0 && <em className={change > 0 ? 'ta-gain' : 'ta-loss'}>{change > 0 ? '+' : ''}{change}</em>}
       </span>;
     })}
   </span>;

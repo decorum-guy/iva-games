@@ -22,6 +22,7 @@ interface BoardProps {
   rolledTileIds?: readonly string[];
   highlightedRoadIds?: readonly string[];
   blockade?: TerritoryBlockade | null;
+  blockMode?: boolean;
 }
 
 const terrainNames = {
@@ -84,7 +85,7 @@ function Port({ resource }: { resource: boolean }) {
   return <g pointerEvents="none" strokeLinecap="round"><path d="M-1 1 10 6M1-2l11 6" stroke="#765e48" strokeWidth="3"/><path d="m3 0-1 4m4-2-1 4m4-2-1 4" stroke="#d5a873" strokeWidth="2"/><circle cx="12" cy="8" r="5.5" fill={resource?'#265e6b':'#326e80'} stroke="#f3e2b8" strokeWidth="1"/><path d="M12 5v6m-3-3q3 5 6 0m-5-2h4" fill="none" stroke="#fff1cc" strokeWidth="1.15"/></g>;
 }
 
-export function TerritorialBoard({ map, lang, buildings, routes, players, blockedTileId, selection, onSelect, candidates, newsArea, rolledTileIds, highlightedRoadIds, blockade }: BoardProps) {
+export function TerritorialBoard({ map, lang, buildings, routes, players, blockedTileId, selection, onSelect, candidates, newsArea, rolledTileIds, highlightedRoadIds, blockade, blockMode }: BoardProps) {
   const ru = lang === 'ru';
   const uid = useId().replace(/:/g, '');
   const svg = useRef<SVGSVGElement>(null);
@@ -186,13 +187,13 @@ export function TerritorialBoard({ map, lang, buildings, routes, players, blocke
   const propsFor=(item:BoardSelection,label:string)=>{
     const key=keyOf(item);
     return {role:'button', 'aria-label':label, 'aria-pressed':selection!==null&&keyOf(selection)===key,
-      tabIndex:(focusKey||keyOf(selection??targets[0]))===key?0:-1,
+      tabIndex:blockMode ? item.kind === 'tile' && available.has(item.id) ? 0 : -1 : (focusKey||keyOf(selection??targets[0]))===key?0:-1,
       className:'tb-target'+(available.has(item.id)?' is-available':'')+(selection&&keyOf(selection)===key?' is-selected':'')+
         (item.kind === 'node' && buildings[item.id] ? ' has-building' : '')+
         (item.kind === 'tile' && rolled.has(item.id) ? ' is-rolled' : '')+
         (item.kind === 'edge' && couponRoads.has(item.id) ? ' is-coupon-road' : ''),
       'data-board-target':key,onClick:(event:MouseEvent<SVGGElement>)=>{
-        if(suppressClick.current) return;
+        if(suppressClick.current || blockMode && item.kind !== 'tile') return;
         let target = item;
         const transform = svg.current?.getScreenCTM();
         if (item.kind === 'edge' && transform) {
@@ -214,7 +215,7 @@ export function TerritorialBoard({ map, lang, buildings, routes, players, blocke
       onBlur:()=>setHoverLabel(''),onMouseEnter:()=>setHoverLabel(label),onMouseLeave:()=>setHoverLabel('')};
   };
   const paintId = (id:string) => uid+'-'+id;
-  return <div className="territorial-board" data-territory-map={map.id}>
+  return <div className={'territorial-board' + (blockMode ? ' tb-block-mode' : '')} data-territory-map={map.id}>
     <svg ref={svg} className="tb-surface" viewBox={viewBox} aria-label={map.name[lang]} role="group" onPointerDown={handleDown} onPointerMove={handleMove} onPointerUp={finishDrag} onPointerCancel={finishDrag} onPointerLeave={e=>{if(!e.currentTarget.hasPointerCapture(e.pointerId)) finishDrag(e);}}
       onKeyDown={event => {
         if (event.key === '+' || event.key === '=') { event.preventDefault(); zoomBy(1.35); }
@@ -234,7 +235,7 @@ export function TerritorialBoard({ map, lang, buildings, routes, players, blocke
         const label=terrainNames[kind][ru?0:1]+(tile.number?' · '+tile.number:(ru?' · Не производит ресурсы':' · No resource production'))+
           (rolled.has(tile.id)?(ru?' · Совпало с последним броском':' · Matches the latest roll'):'')+(blocked?' · '+blockadeLabel:'');
         return <g key={tile.id} {...propsFor({kind:'tile',id:tile.id},label)}>
-          <title>{label}</title><polygon points={tile.points} fill={'url(#'+paintId(kind)+')'} stroke="#696b51" strokeOpacity=".32" strokeWidth={unit}/>
+          <title>{label}</title><polygon data-tile-origin={tile.id} points={tile.points} fill={'url(#'+paintId(kind)+')'} stroke="#696b51" strokeOpacity=".32" strokeWidth={unit}/>
           <g transform={`translate(${tile.x} ${tile.y}) scale(${unit})`} pointerEvents="none">
             <TerrainDetail kind={kind} variant={index}/><g transform={`translate(${index%2===0?1:-1} -6) scale(${index%3===0?.91:1})`}><TerrainArt kind={kind}/></g>
             {tile.number!==null?<g transform="translate(0 12)" className="tb-number-token"><circle cy="1.8" r="10" fill="#726f58"/>

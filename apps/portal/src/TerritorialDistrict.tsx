@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { CSSProperties, FormEvent } from "react";
 import { advanceTutorial, createTutorial, startTutorialThreat, tutorialFrame } from "@iva-games/district/territorial";
-import type { Stock, TerritoryAction, TerritoryView } from "@iva-games/district/territorial";
+import type { Resource, Stock, TerritoryAction, TerritoryView } from "@iva-games/district/territorial";
 import { PlatformError, request } from "./api";
 import { go } from "./navigation";
 import { practiceLink } from "./TerritorialLobby";
@@ -11,12 +11,13 @@ import type { Language, Room } from "./types";
 import { TerritorialBoard } from "./TerritorialBoard";
 import type { BoardSelection } from "./TerritorialBoard";
 import { TerritorialNews, territorialNewsArea } from "./TerritorialNews";
-import { TerritorialActions, ResourceStock } from "./TerritorialActions";
+import { TerritorialActions, TerritorialMapActions, ResourceStock } from "./TerritorialActions";
 import { TerritorialHistory, TerritorialResult, TerritorialRoll, TerritorialTurn, blockadeText, historyTitle, playerName } from "./TerritorialFeedback";
 import { TerritorialSettings } from "./TerritorialSettings";
 import { useTerritorialPreferences } from "./territorialPreferences";
 import { useTerritorialAudio } from "./territorialAudio";
 import "./territorial-district.css";
+import "./territorial-table-polish.css";
 
 const colors = ["#ca4e37", "#2867a8", "#79498f", "#2c7954"];
 type Pending = { actionId: string; expectedRevision: number; payload: TerritoryAction & { phaseId: string } };
@@ -41,6 +42,7 @@ export function TerritorialMatch({ room, refresh }: { room: Room; refresh: () =>
   const [settings, setSettings] = useState(false);
   const [leave, setLeave] = useState(false);
   const [handDelta, setHandDelta] = useState<Partial<Stock>>({});
+  const [handPick, setHandPick] = useState<{ resource: Resource; serial: number } | null>(null);
   const [preferences, setPreferences] = useTerritorialPreferences();
   const audio = useTerritorialAudio(snapshot, preferences.sound);
   const active = useRef(true);
@@ -80,6 +82,10 @@ export function TerritorialMatch({ room, refresh }: { room: Room; refresh: () =>
   useEffect(() => {
     if (panel === 'actions' && selection) panelScroll.current?.scrollTo({ top: 0 });
   }, [selection, panel]);
+  const finished = Boolean(snapshot?.outcome);
+  useEffect(() => {
+    if (finished) { setPanel('actions'); panelScroll.current?.scrollTo({top:0}); }
+  }, [finished]);
   useEffect(() => {
     if (!preferences.shortcuts) return;
     function keydown(event: KeyboardEvent) {
@@ -112,7 +118,11 @@ export function TerritorialMatch({ room, refresh }: { room: Room; refresh: () =>
     if (!latest.current || sending.current || pending) return false;
     return submit({ actionId: crypto.randomUUID(), expectedRevision: latest.current.revision, payload: { ...action, phaseId: latest.current.phaseId } });
   }
-  const choose = (target: BoardSelection) => { setSelection(target); setPanel('actions'); };
+  const choose = (target: BoardSelection) => {
+    const block = latest.current?.legal.block;
+    if (block?.length && (target.kind !== 'tile' || !block.some(option => option.tileId === target.id))) return;
+    setSelection(target); setPanel('actions');
+  };
   function showCoupon(id: string) {
     setSelectedCouponId(id); setPanel('actions');
     const first = latest.current?.legal.couponRoutes?.[id]?.[0];
@@ -136,29 +146,29 @@ export function TerritorialMatch({ room, refresh }: { room: Room; refresh: () =>
   const ownClosed = [...(view.offerHistory ?? [])].reverse()[0];
   const incoming = view.offers.filter(offer => offer.targetId === view.you.participantId);
   const receipt = [...(view.history ?? [])].reverse().find(entry => !['end','distribution','offer-closed'].includes(entry.kind));
-  const classes = 'territory-match' + (preferences.reduceMotion ? ' territory-reduce-motion' : '') + (preferences.compactPanels ? ' territory-compact' : '') + (preferences.highContrast ? ' territory-contrast' : '');
+  const classes = 'territory-match territory-map-first' + (preferences.reduceMotion ? ' territory-reduce-motion' : '') + (preferences.compactPanels ? ' territory-compact' : '') + (preferences.highContrast ? ' territory-contrast' : '');
   return <section className={classes} style={{ '--table-text-scale': preferences.textSize / 100 } as CSSProperties}
     aria-label={t("Территориальная партия Района", "District territorial match")}>
     <header className="territory-top">
       <div className="territory-map-title"><button className="back-link" onClick={() => go("rooms")}>‹ {t("Комнаты", "Rooms")}</button><h2>{view.map.name[lang]}</h2></div>
-      <div className="territory-tools">
+      <TerritorialPlayers view={view} lang={lang}/><div className="territory-tools">
         <button type="button" className="territory-tool" onClick={() => setHelp(true)}>{t("Правила", "Rules")}</button>
         <button type="button" className="territory-tool" aria-label={t("Настройки", "Settings")} title={t("Настройки", "Settings")} onClick={() => setSettings(true)}><Icon name="settings" size={19}/><span>{t("Настройки", "Settings")}</span></button>
         {!view.outcome && !left && <button type="button" className="territory-concede" onClick={() => setLeave(true)}>{t("Сдаться", "Concede")}</button>}
       </div>
     </header>
-    <TerritorialPlayers view={view} lang={lang}/>
     <div className="territory-statusbar"><TerritorialTurn view={view} lang={lang}/><TerritorialRoll view={view} lang={lang} onSelect={choose}/></div>
     <div className="territory-layout">
       <div className="territory-map-column">
         <div className="territory-map-shell"><TerritorialBoard map={view.map} buildings={view.buildings} routes={view.routes} players={view.players} lang={lang}
           blockedTileId={view.blockedTileId} blockade={view.blockade} selection={selection} onSelect={choose} candidates={candidates}
-          rolledTileIds={view.latestRoll?.triggeredTileIds} highlightedRoadIds={couponRoads} newsArea={territorialNewsArea(news)}/>
+          rolledTileIds={view.latestRoll?.triggeredTileIds} highlightedRoadIds={couponRoads} newsArea={territorialNewsArea(news)} blockMode={view.legal.block.length > 0}/>
+          <TerritorialMapActions view={view} lang={lang} selection={selection} busy={busy || Boolean(pending) || loadError || Boolean(left)} onAction={act} handPick={handPick}/>
           {selectedCouponId && <div className="territory-map-filter" role="status"><span>{couponRoads.length ? t(`По купону: ${couponRoads.length} дорог`, `Coupon: ${couponRoads.length} roads`) : t('Сейчас подходящих дорог нет', 'No eligible roads right now')}</span>
             <button type="button" onClick={() => setSelectedCouponId(null)} aria-label={t('Убрать фильтр дорог', 'Clear road filter')}>×</button></div>}
         </div>
         <section className="territory-hand" aria-label={t('Ваша рука', 'Your hand')}><div className="territory-hand-heading"><strong>{t('Ваши ресурсы', 'Your resources')}</strong><small>{Object.values(view.you.hand).reduce((a,b) => a+b,0)} {t('в руке', 'in hand')}</small></div>
-          <ResourceStock stock={view.you.hand} lang={lang} showZero appearance="cards" delta={handDelta}/></section>
+          <ResourceStock stock={view.you.hand} lang={lang} showZero appearance="cards" delta={handDelta} onPick={view.turn > 0 && !view.outcome && !view.you.discard && !view.legal.block.length && !left ? resource => setHandPick(previous => ({resource,serial:(previous?.serial ?? 0)+1})) : undefined}/></section>
       </div>
       <aside className="territory-inspector">
         <div className="territory-tabs" role="group" aria-label={t('Панель стола', 'Table panel')}>
@@ -172,7 +182,6 @@ export function TerritorialMatch({ room, refresh }: { room: Room; refresh: () =>
           <div hidden={panel !== 'actions'}>
             {view.outcome && <TerritorialResult view={view} lang={lang}/>}
             {left && <p className="territory-notice">{t('Ваше место ведёт бот.', 'A bot is playing your seat.')}</p>}
-            {preferences.tradeNotices && incoming.length > 0 && <p className="territory-trade-notice" role="status">{t('Вам предложили обмен.', 'You have a trade offer.')}</p>}
             {selection?.kind === 'tile' && selection.id === view.blockedTileId && <div className="territory-blockade"><strong>{t('Производство заблокировано', 'Production blocked')}</strong><p>{blockadeText(view.blockade,view,lang)}</p></div>}
             <TerritorialActions view={view} lang={lang} selection={selection} busy={busy || Boolean(pending) || loadError || Boolean(left)} onAction={act}
               selectedCouponId={selectedCouponId} onShowCouponRoutes={showCoupon}/>
@@ -214,8 +223,8 @@ function TerritorialPlayers({ view, lang }: { view: TerritoryView; lang: Languag
     {view.players.map(player => <li key={player.participantId} className={player.participantId === view.activeParticipantId && !view.outcome ? "is-active" : ""}>
       <span className="territory-seat" style={{ background: colors[player.seatIndex] }}>{player.seatIndex + 1}</span>
       <span className="territory-person"><strong>{player.displayName}</strong>
-        <small>{player.isBot || player.left ? ru ? "Бот · " : "Bot · " : ""}{ru ? "Рука" : "Hand"} {player.handCount}
-          {" · "}{ru ? "Путь" : "Route"} {player.longestRoute}{player.cardCount > 0 ? ` · ${ru ? "Карты" : "Cards"} ${player.cardCount}` : ""}</small>
+        <small title={ru ? 'Рука — число ресурсов; путь — длина пути; разв. — карты развития' : 'Hand = resource count; route = route length; dev. = development cards'}>{player.isBot || player.left ? ru ? "Бот · " : "Bot · " : ""}{ru ? "Рес." : "Res."} {player.handCount}
+          {" · "}{ru ? "Путь" : "Route"} {player.longestRoute}{` · ${ru ? "Разв." : "Dev."} ${player.cardCount}`}</small>
       </span>
       <b className="territory-points">{player.participantId === view.you.participantId ? view.you.points : player.points}<small>/{view.goal}</small></b>{tradeLabel(player.participantId) && <span className="territory-player-trade">{tradeLabel(player.participantId)}</span>}
     </li>)}
