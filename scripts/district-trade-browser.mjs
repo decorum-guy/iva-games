@@ -78,6 +78,66 @@ async function enterPlay(entry, index) {
   assert.equal(current.phase, 'play');
   return current;
 }
+async function touchPoint(locator) {
+  return locator.evaluate(element => {
+    const box = element.getBoundingClientRect(), x = box.left + box.width / 2, y = box.top + box.height / 2;
+    let visible = box.width > 0 && box.height > 0 && x >= 0 && y >= 0 && x < innerWidth && y < innerHeight;
+    for (let parent = element.parentElement; parent; parent = parent.parentElement) {
+      const rect = parent.getBoundingClientRect(), style = getComputedStyle(parent);
+      if (/(auto|scroll|hidden|clip)/.test(style.overflowY) && (y < rect.top || y >= rect.bottom)) visible = false;
+      if (/(auto|scroll|hidden|clip)/.test(style.overflowX) && (x < rect.left || x >= rect.right)) visible = false;
+    }
+    const hit = visible ? document.elementFromPoint(x, y) : null;
+    return { x, y, receivesPointer: !!hit && (hit === element || element.contains(hit)) };
+  });
+}
+async function nativeTap(page, locator) {
+  await expect(locator).toBeVisible();
+  const point = await touchPoint(locator);
+  assert.ok(point.receivesPointer, 'The visible control must receive the real touch without scrolling or force: ' + await locator.textContent());
+  await page.touchscreen.tap(point.x, point.y);
+}
+async function nativeSwipe(page, scroll) {
+  const box = await scroll.boundingBox(); assert.ok(box && box.height > 40);
+  const x = box.x + box.width / 2, startY = box.y + box.height - 12, distance = Math.min(box.height * .55, box.height - 30);
+  const before = await scroll.evaluate(element => element.scrollTop);
+  const session = await page.context().newCDPSession(page);
+  try {
+    await session.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y: startY, id: 1 }] });
+    for (let step = 1; step <= 8; step++) {
+      await session.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x, y: startY - distance * step / 8, id: 1 }] });
+      await page.evaluate(() => new Promise(resolve => requestAnimationFrame(resolve)));
+    }
+    await session.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  } finally { await session.detach(); }
+  await expect.poll(() => scroll.evaluate(element => element.scrollTop)).toBeGreaterThan(before);
+}
+async function visibleSheet(page, selector, header) {
+  const sheet = page.locator(selector);
+  await expect(sheet).toBeInViewport({ ratio: 1 });
+  await expect(header).toBeInViewport({ ratio: 1 });
+  assert.ok((await touchPoint(header)).receivesPointer, 'The sheet header must remain above its scrolling content');
+  const geometry = await page.evaluate(selector => {
+    const rect = element => { const box = element.getBoundingClientRect(); return { x: box.x, y: box.y, width: box.width, height: box.height, bottom: box.bottom }; };
+    return { phase: rect(document.querySelector('.territory-phase')), sheet: rect(document.querySelector(selector)), board: rect(document.querySelector('.tb-surface')) };
+  }, selector);
+  assert.ok(geometry.sheet.y >= geometry.phase.bottom, 'An expanded sheet must preserve the active player and timer');
+  assert.ok(geometry.board.height >= 100, 'The reserved toolbar must leave a usable map');
+  return geometry;
+}
+async function tapRoad(page, id) {
+  const target = page.locator(`[data-board-target="edge:${id}"]`);
+  // SVG hit strokes can have a zero-height/width geometric box. Their midpoint
+  // still has to hit the board, and the real handler must select this exact road.
+  const point = await target.locator('.tb-edge-hit').evaluate(element => {
+    const rect = element.getBoundingClientRect(), x = rect.left + rect.width / 2, y = rect.top + rect.height / 2;
+    return { x, y, boardHit: !!document.elementFromPoint(x, y)?.closest('.tb-surface') };
+  });
+  assert.ok(point.boardHit, 'A map control or offer must not intercept road ' + id);
+  await page.touchscreen.tap(point.x, point.y);
+  await expect(target).toHaveAttribute('aria-pressed', 'true');
+  return point;
+}
 function passed(check) { checks.push(check); console.log(JSON.stringify({ passed: check })); }
 
 try {
@@ -381,6 +441,96 @@ try {
   passed('newly bought active card cannot be played this turn; charter shows its already-counted hidden point');
 
   await cardPage.screenshot({ path: join(harness.directory, 'cards-mobile.png') });
+
+  // Russian text at 130% in a real touch context. Do not let locator.click()
+  // scroll hidden decisions into view: the arriving offer must already be usable.
+  result.mobileLayouts = [];
+  for (const height of [600, 844]) {
+    const mobile = [];
+    for (const account of harness.manifest.accounts) {
+      const context = await browser.newContext({ storageState: account.storageState, viewport: { width: 390, height }, hasTouch: true, isMobile: true });
+      context.setDefaultTimeout(15_000);
+      await context.addInitScript(() => {
+        if (!['http:', 'https:'].includes(location.protocol)) return;
+        localStorage.setItem('iva.portal.language', 'ru');
+        localStorage.setItem('iva.district.table.preferences.v1', JSON.stringify({ textSize: 130, reduceMotion: true,
+          sound: { enabled: false, master: 0, effects: 0, news: 0 }, newsNotices: false }));
+      });
+      const page = await context.newPage(); page.on('pageerror', error => errors.push(String(error)));
+      contexts.push(context); pages.push(page); mobile.push(page);
+    }
+    entry = await harness.reset('trade-draft');
+    await Promise.all(mobile.map(async page => { await page.goto(entry.url); await expect(page.locator('.territory-match')).toBeVisible(); }));
+    const receiver = mobile[entry.guestIndex], sender = mobile[entry.hostIndex];
+    const offer = receiver.locator(`[data-offer-id="${entry.expected.offerId}"]`);
+    const layout = await visibleSheet(receiver, '.ta-offers-panel', receiver.getByRole('button', { name: 'Свернуть сделки', exact: true }));
+    for (const locator of [offer.locator('.ta-exchange'), ...['Принять', 'Другие условия', 'Отклонить'].map(name => offer.getByRole('button', { name, exact: true }))]) {
+      await expect(locator).toBeInViewport({ ratio: 1 });
+      assert.ok((await touchPoint(locator)).receivesPointer, 'Terms and all decisions must be visible together without internal scrolling');
+    }
+    await receiver.screenshot({ path: join(harness.directory, `offers-ru130-390x${height}.png`) });
+    const untouched = await view(entry, entry.hostIndex);
+    await nativeTap(sender, sender.getByRole('button', { name: 'Свернуть сделки', exact: true }));
+    await expect(sender.locator('.ta-offers-panel')).toBeHidden();
+    await expect(sender.getByRole('button', { name: 'Показать сделки', exact: true })).toContainText('1');
+    const roadPoints = [];
+    for (const id of [entry.expected.land, entry.expected.sea]) roadPoints.push({ id, ...await tapRoad(sender, id) });
+    const afterCollapse = await view(entry, entry.hostIndex);
+    assert.equal(afterCollapse.revision, untouched.revision);
+    assert.deepEqual(afterCollapse.offers, untouched.offers);
+    assert.deepEqual(afterCollapse.offerHistory, untouched.offerHistory);
+    assert.deepEqual(afterCollapse.you.hand, untouched.you.hand);
+    await sender.screenshot({ path: join(harness.directory, `offer-collapsed-roads-ru130-390x${height}.png`) });
+    await nativeTap(sender, sender.getByRole('button', { name: 'Показать сделки', exact: true }));
+    await expect(sender.locator('.ta-offers-panel')).toBeVisible();
+    assert.equal((await view(entry, entry.hostIndex)).revision, untouched.revision);
+
+    await nativeTap(receiver, offer.getByRole('button', { name: 'Другие условия', exact: true }));
+    const trade = receiver.locator('.ta-trade-window'), closeTrade = receiver.getByRole('button', { name: 'Закрыть торговлю', exact: true });
+    await visibleSheet(receiver, '.ta-trade-window', closeTrade);
+    const addWood = receiver.getByRole('button', { name: 'Получаю + Древесина', exact: true });
+    for (let gesture = 0; !(await touchPoint(addWood)).receivesPointer && gesture < 8; gesture++) {
+      await nativeSwipe(receiver, trade);
+      await visibleSheet(receiver, '.ta-trade-window', closeTrade);
+    }
+    await nativeTap(receiver, addWood);
+    await expect(receiver.getByRole('spinbutton', { name: 'Получаю · Древесина', exact: true })).toHaveValue('2');
+    await nativeTap(receiver, receiver.getByRole('button', { name: 'Банк', exact: true }));
+    await expect(receiver.locator('.ta-bank')).toBeVisible();
+    await visibleSheet(receiver, '.ta-trade-window', closeTrade);
+    await nativeTap(receiver, closeTrade);
+    await expect(trade).toBeHidden();
+    const response = receiver.waitForResponse(response => response.request().method() === 'POST' && response.url().endsWith('/actions'));
+    await nativeTap(receiver, offer.getByRole('button', { name: height === 600 ? 'Принять' : 'Отклонить', exact: true }));
+    const answered = await response; assert.equal(answered.status(), 200);
+    const outcome = (await answered.json()).view;
+    assert.equal(outcome.offerHistory.find(item => item.id === entry.expected.offerId).status, height === 600 ? 'accepted' : 'declined');
+    // Collapsing a receipt does not suppress a newly arriving offer.
+    await nativeTap(receiver, receiver.getByRole('button', { name: 'Свернуть сделки', exact: true }));
+    const newOffer = await post(entry, entry.hostIndex, { type: 'offer', targetId: entry.expected.otherId, give: stock({ wood: 1 }), receive: stock({ brick: 1 }) });
+    await expect(receiver.locator('.ta-offers-panel')).toBeVisible();
+    await expect(receiver.locator(`[data-offer-id="${newOffer.offers[0].id}"]`)).toBeVisible();
+
+    entry = await harness.reset('patrol');
+    await Promise.all(mobile.map(page => page.goto(entry.url)));
+    const cards = mobile[entry.hostIndex];
+    await expect(cards.locator('.territory-match')).toBeVisible();
+    await nativeTap(cards, cards.getByLabel('Карты развития', { exact: true }));
+    const cardPanel = cards.locator('.ta-card-panel'), closeCards = cards.getByRole('button', { name: 'Закрыть карты развития', exact: true });
+    await visibleSheet(cards, '.ta-card-panel', closeCards);
+    for (let gesture = 0; gesture < 3; gesture++) {
+      await nativeSwipe(cards, cardPanel);
+      await visibleSheet(cards, '.ta-card-panel', closeCards);
+    }
+    await cards.screenshot({ path: join(harness.directory, `cards-scrolled-ru130-390x${height}.png`) });
+    await nativeTap(cards, closeCards);
+    await expect(cardPanel).toBeHidden();
+    result.mobileLayouts.push({ width: 390, height, language: 'ru', textSize: 130, ...layout, roadPoints,
+      controlsVisibleWithoutScroll: true, collapsePreservesState: true, nativeTouch: true, newOfferReopens: true, stickyHeadersAfterScroll: true });
+    await Promise.all(mobile.map(page => page.goto('about:blank')));
+  }
+  passed('RU130 mobile offers keep terms and decisions together, collapse without a command, reopen for new offers and free the exact land/sea road touch targets');
+  passed('RU130 mobile trade/cards stay below the active clock, edit quantities by native touch and keep Bank/close reachable after real scrolling');
   assert.deepEqual(errors, []);
   result.pageErrors = errors.length;
   result.status = 'passed';

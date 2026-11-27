@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { RESOURCES, emptyStock } from '@iva-games/district/territorial';
 import type { CardKind, CouponKind, Resource, Stock, TerritoryAction, TerritoryClosedOffer, TerritoryOffer, TerritoryOfferStatus, TerritoryPricing, TerritoryView } from '@iva-games/district/territorial';
 import type { BoardSelection } from './TerritorialBoard';
@@ -291,6 +291,14 @@ function PlayerTrade({ view, lang, busy, onAction, handPick }: Props) {
   });
   const [sending, setSending] = useState(false);
   const [bankOpen, setBankOpen] = useState(false);
+  const [offersOpen, setOffersOpen] = useState(true);
+  const offerPanelId = useId();
+  const offerToggle = useRef<HTMLButtonElement>(null);
+  const knownOffers = useRef(new Set(view.offers.map(offer => offer.id)));
+  useEffect(() => {
+    if (view.offers.some(offer => !knownOffers.current.has(offer.id))) setOffersOpen(true);
+    knownOffers.current = new Set(view.offers.map(offer => offer.id));
+  }, [view.offers]);
   const picked = useRef(handPick?.serial);
   useEffect(() => {
     if (!handPick || picked.current === handPick.serial) return;
@@ -392,6 +400,15 @@ function PlayerTrade({ view, lang, busy, onAction, handPick }: Props) {
   }
   return <section className="ta-trades territory-trade-dock" aria-label={word(lang, 'Сделки с игроками', 'Player trades')}>
     <header className="ta-section-heading territory-sr-only"><h4 ref={tradeHeading} tabIndex={-1}>{word(lang, 'Сделки с игроками', 'Player trades')}</h4></header>
+    <button type="button" className="ta-offer-toggle" ref={offerToggle} hidden={!rows.length || offersOpen}
+      aria-controls={offerPanelId} aria-expanded={offersOpen} aria-label={word(lang, 'Показать сделки', 'Show offers')}
+      onClick={() => setOffersOpen(true)}>{word(lang, 'Сделки', 'Offers')} <b>{rows.length}</b></button>
+    <section className="ta-offers-panel" id={offerPanelId} hidden={!rows.length || !offersOpen} aria-label={word(lang, 'Предложения обмена', 'Trade offers')}>
+      <header className="ta-offer-heading"><strong>{word(lang, 'Сделки', 'Offers')} <span>{rows.length}</span></strong>
+        <button type="button" aria-label={word(lang, 'Свернуть сделки', 'Collapse offers')} onClick={() => {
+          setOffersOpen(false);
+          requestAnimationFrame(() => offerToggle.current?.focus());
+        }}>{word(lang, 'Свернуть', 'Collapse')} <span aria-hidden="true">⌄</span></button></header>
     <div className="ta-offer-stack" ref={stack} aria-live="polite">
       {[...bundles].map(([key,items])=>{
         const grouped=items[0].offer.authorId===own&&!!items[0].offer.groupId;
@@ -408,6 +425,7 @@ function PlayerTrade({ view, lang, busy, onAction, handPick }: Props) {
         </section>;
       })}
     </div>
+    </section>
     <button type="button" ref={newButton} className="ta-trade-open" disabled={sending || !!view.outcome} aria-expanded={draft.editing || bankOpen}
       aria-label={word(lang, hasContent ? 'Продолжить сохранённые условия' : 'Предложить обмен', hasContent ? 'Continue saved terms' : 'Offer a trade')}
       onClick={() => draft.editing || bankOpen ? closeEditor() : edit()}><svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 7h17l-4-4m4 4-4 4M21 17H4l4-4m-4 4 4 4"/></svg>{word(lang,'Торговать','Trade')}</button>
@@ -592,7 +610,26 @@ export function TerritorialMapActions(props: Props) {
   const busy = props.busy || !!view.outcome || !!view.players.find(player => player.participantId === view.you.participantId)?.left;
   const safeProps = {...props,busy};
   const mandatory = view.legal.block.length > 0 || view.you.discard > 0;
-  return <div className={'territory-map-tools territorial-actions' + (mandatory ? ' is-mandatory' : '')}>
+  const tools = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const element = tools.current;
+    const table = element?.closest('.territory-match');
+    if (!element || !table) return;
+    const phase = table.querySelector('.territory-phase');
+    const update = () => {
+      // Mobile sheets can rise above the map, but never cover the current player
+      // and turn clock. Measure the actual text/viewport instead of a fixed offset.
+      const top = Math.max(8, (phase?.getBoundingClientRect().bottom ?? 0) + 6);
+      const bottom = Math.min(element.getBoundingClientRect().bottom - 5, window.innerHeight - 8);
+      element.style.setProperty('--map-sheet-height', Math.max(0, bottom - top) + 'px');
+    };
+    const observer = new ResizeObserver(update);
+    for (const target of [element, phase, table.querySelector('.territory-top'), table.querySelector('.territory-statusbar')]) if (target) observer.observe(target);
+    window.addEventListener('resize', update);
+    update();
+    return () => { observer.disconnect(); window.removeEventListener('resize', update); };
+  }, []);
+  return <div ref={tools} className={'territory-map-tools territorial-actions' + (mandatory ? ' is-mandatory' : '')}>
     {view.turn > 0 && !view.outcome && <><PlayerTrade key={`${view.matchId}:${view.you.participantId}`} {...safeProps}/><TacticalCards {...safeProps}/></>}
     {mandatory && <div className="ta-map-required">
       {view.you.discard > 0 ? <Discard key={`${view.matchId}:${view.turn}`} {...safeProps}/> : <Block {...safeProps}/>}

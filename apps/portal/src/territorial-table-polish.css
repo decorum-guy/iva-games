@@ -52,8 +52,13 @@
 .territory-map-tools .ta-bank-palette { display:grid;grid-template-columns:repeat(5,1fr);gap:5px; }
 .territory-map-tools .ta-bank-palette button { padding:3px;min-height:38px; }
 .territory-map-tools .ta-bank-palette [aria-pressed=true] { background:#d8ebd9;outline:2px solid #4c8b75; }
-.territory-map-tools .ta-offer-stack { position:absolute;top:8px;right:8px;width:min(275px,42%);max-height:calc(100% - 75px);overflow:auto;display:flex;flex-direction:column;gap:7px;pointer-events:none;overscroll-behavior:contain;z-index:4; }
-.territory-map-tools .ta-offer-stack:has(.ta-offer) { pointer-events:auto; }
+.territory-map-tools .ta-offers-panel { position:absolute;top:8px;right:8px;width:min(275px,42%);max-height:calc(100% - 75px);display:flex;flex-direction:column;min-height:0;pointer-events:auto;z-index:4;border:1px solid #8caaa4;border-radius:12px;background:#f8fbf6;box-shadow:0 4px 14px #123d4740;overflow:hidden; }
+.territory-map-tools .ta-offer-heading { display:flex;align-items:center;justify-content:space-between;gap:6px;padding:3px 7px;flex:0 0 auto;border-bottom:1px solid #c5d9d4; }
+.territory-map-tools .ta-offer-heading strong { display:flex;align-items:center;gap:5px;font-size:12px; }
+.territory-map-tools .ta-offer-heading button { min-height:38px;padding:4px 7px;font-size:11px; }
+.territory-map-tools .ta-offer-heading strong span,.territory-map-tools .ta-offer-toggle b { border-radius:8px;background:#d9ebe4;padding:1px 5px; }
+.territory-map-tools .ta-offer-toggle { position:absolute;top:8px;right:8px;min-height:44px;display:flex;align-items:center;gap:6px;padding:6px 9px;font-size:12px;box-shadow:0 3px 10px #123d4740;z-index:4; }
+.territory-map-tools .ta-offer-stack { min-height:0;overflow:auto;display:flex;flex-direction:column;gap:7px;overscroll-behavior:contain; }
 .territory-map-tools .ta-offer { pointer-events:auto;position:relative;background:#f8fbf6;border:1px solid #8caaa4;box-shadow:0 4px 14px #123d4740;padding:7px;gap:5px;border-radius:11px;animation:td-open .24s ease-out both; }
 .territory-map-tools .ta-offer-status { display:flex;align-items:center;gap:3px;line-height:1.25;flex-wrap:wrap; }
 .territory-map-tools .ta-offer-status i { display:grid;place-items:center;width:18px;height:18px;border-radius:50%;font-size:15px;font-weight:800;font-style:normal;background:#e5ece7;color:#54796c; }
@@ -66,7 +71,7 @@
 .territory-map-tools .ta-offer .ta-buttons button { min-height:34px;padding:5px 6px;font-size:11px; }
 .territory-map-tools .ta-offer.is-closed { opacity:.9; }
 .territory-map-tools .ta-map-required { position:absolute;left:8px;bottom:8px;z-index:6;max-height:calc(100% - 16px);width:min(420px,calc(100% - 16px));overflow:auto;pointer-events:auto;box-shadow:0 6px 16px #183e4860;border-radius:10px; }
-.territory-map-tools.is-mandatory :is(.ta-trade-window,.ta-card-panel,.ta-offer-stack) { visibility:hidden;pointer-events:none; }
+.territory-map-tools.is-mandatory :is(.ta-trade-window,.ta-card-panel,.ta-offers-panel,.ta-offer-toggle) { visibility:hidden;pointer-events:none; }
 .territory-map-tools.is-mandatory .ta-map-required .ta-mandatory { padding:8px;gap:5px; }
 .territory-map-first .tb-area-caption { top:59px;left:8px;max-width:50%; }
 .territory-map-first .tb-block-mode [data-board-layer=route] *, .territory-map-first .tb-block-mode [data-board-layer=building] * { pointer-events:none!important; }
@@ -86,8 +91,6 @@
 @media(max-width:620px) {
   .territory-map-first .territory-layout {grid-template-columns:minmax(0,1fr);}
   .territory-map-first .territory-top .territory-players { overflow-x:auto; }
-  .territory-map-first .territory-map-tools .ta-trade-window,.territory-map-first .territory-map-tools .ta-card-panel { top:54px;max-height:calc(100% - 57px); }
-  .territory-map-first .territory-map-tools .ta-offer-stack {width:min(215px,52%);top:54px;max-height:calc(100% - 60px);}
   .territory-map-first .territory-map-tools .ta-map-required { width:calc(100% - 16px); }
   .territory-map-first .territory-map-tools .ta-trade-open { min-height:40px; }
   .territory-map-first .territory-map-tools .ta-cards>summary { min-height:40px; }
@@ -125,9 +128,25 @@
 @media(prefers-reduced-motion:reduce) { .tb-mote,.territory-income-flight { animation:none!important; } .tb-atmosphere { transition:none; } }
 @media(max-width:620px) {
  .territory-map-first .territory-map-column { position:relative;z-index:3; }
- .territory-map-first .territory-map-tools .ta-trade-window,.territory-map-first .territory-map-tools .ta-card-panel { top:auto;bottom:5px;max-height:min(400px,calc(100dvh - 210px)); }
+ /* Reserve the controls' row: a tap on a road must never open Cards or Trade. */
+ .territory-map-first .territory-map-shell { padding-top:54px; }
+ .territory-map-first .territory-map-tools .ta-trade-open,.territory-map-first .territory-map-tools .ta-cards>summary,.territory-map-first .territory-map-tools .ta-offer-toggle { top:3px; }
+ .territory-map-first .territory-map-tools :is(.ta-trade-window,.ta-card-panel,.ta-offers-panel) { top:auto;bottom:5px;max-height:min(400px,var(--map-sheet-height,calc(100dvh - 210px))); }
+ .territory-map-first .territory-map-tools .ta-offers-panel { left:8px;right:8px;width:auto; }
+ .territory-map-first .territory-map-tools .ta-offer h4 { font-size:calc(12px * var(--table-text-scale,1)); }
+ .territory-map-first .territory-map-tools .ta-offer-status { font-size:calc(10px * var(--table-text-scale,1)); }
+ .territory-map-first .territory-map-tools .ta-offer .ta-buttons button { min-height:40px;font-size:calc(10px * var(--table-text-scale,1)); }
+ .territory-map-first .territory-map-tools .ta-offer-heading button { min-height:40px; }
+ .territory-map-first .tb-area-caption { top:8px; }
  .territory-map-first .territory-map-tools .ta-map-required { max-height:min(300px,calc(100dvh - 210px)); }
- .territory-map-first .territory-map-tools .ta-offer-stack { top:50px;max-height:calc(100% - 53px); }
+}
+@media(max-width:620px) and (max-height:630px) {
+ .territory-map-first { gap:5px; }
+ .territory-map-first .territory-top { row-gap:4px; }
+ .territory-map-first .territory-players>li { padding-block:3px; }
+ .territory-map-first .territory-roll { min-height:35px;padding-block:3px;gap:5px; }
+ .territory-map-first .territory-die,.territory-map-first .territory-die-empty { width:26px;height:26px; }
+ .territory-map-first .territory-roll-copy>small { display:none; }
 }
 
 .territory-map-first .ta-offer-group { display:grid;gap:5px;border:1px solid #b1bca6;background:#f7f5e8;box-shadow:0 4px 14px #123d4740;border-radius:12px;padding:8px;animation:td-open .24s ease-out both; }
