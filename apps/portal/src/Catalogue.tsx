@@ -95,6 +95,7 @@ export function Catalogue({ page, games, user, busy, offline, retry, onPlay, onA
       </div> : <Empty icon="games" title={t("Игры скоро появятся", "Games are coming soon")} />}
       <footer className="catalogue-footer">
         <PortalLink href="/">Iva Games</PortalLink>
+        {page === "home" && <span>{t("Хороших вам голодных игр", "Happy Hunger Games")}</span>}
         {user ? <PortalLink href="/friends">{t("Мои друзья", "My friends")}</PortalLink>
           : <PortalLink href="/login">{t("Войти в аккаунт", "Sign in to your account")}</PortalLink>}
       </footer>
