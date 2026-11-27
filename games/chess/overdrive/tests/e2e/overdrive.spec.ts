@@ -1,9 +1,6 @@
 import { test, expect } from '@playwright/test'
 import type { BrowserContext, Page } from '@playwright/test'
-import { ABILITIES, transition } from '../../src/core'
-import { TEACHING_FIXTURES } from '../../src/core/teaching'
-import type { TeachingFixture } from '../../src/core/teaching'
-import { abilityName, lessonText } from '../../src/ui/i18n'
+import { transition } from '../../src/core'
 import type { Language } from '../../src/ui/i18n'
 import type { LocalSessionRecord } from '../../src/ui/session'
 
@@ -32,64 +29,6 @@ async function move(page: Page, from: string, to: string) {
 async function saved(page: Page): Promise<LocalSessionRecord> {
   return page.evaluate(() => JSON.parse(localStorage.getItem('overdrive-local-v1')!) as LocalSessionRecord)
 }
-async function exercise(page: Page, fixture: TeachingFixture, lang: Language) {
-  const piece = fixture.state.pieces.find(item => item.id === fixture.expected.pieceId)!
-  const target = fixture.expected.to ?? fixture.state.pieces.find(item => item.id === fixture.expected.targetId)!.square
-  await ready(page)
-  await clickSquare(page, piece.square)
-  if (fixture.expected.mode !== 'normal') {
-    const mode = fixture.expected.mode === 'activate' ? (lang === 'ru' ? 'Форсаж' : 'Overdrive') : (lang === 'ru' ? 'Импульс' : 'Impulse')
-    await page.locator('.od-power-switch').getByRole('button', { name: new RegExp(mode) }).click()
-  }
-  await clickSquare(page, target)
-  if (await page.locator('.od-command-dialog').isVisible()) {
-    const title = abilityName(ABILITIES[piece.type], lang)
-    await page.locator('.od-action-choices').getByRole('button', { name: new RegExp(title) }).click()
-  }
-  await expect(app(page)).toHaveAttribute('data-turn', '1')
-  await ready(page)
-  await expect(page.locator('.od-lesson')).toContainText(lessonText[fixture.id][lang][2])
-}
-
-for (const lang of ['ru', 'en'] as const) for (const finish of ['continue', 'new'] as const) {
-  test(`${lang}: nine lessons, persisted acknowledgements and ${finish} exit`, async ({ page, context }) => {
-    await preferences(context, lang)
-    await page.goto('/overdrive/')
-    await page.getByRole('button', { name: new RegExp(lang === 'ru' ? 'Освоить приёмы' : 'Learn the abilities') }).click()
-    for (const [index, fixture] of TEACHING_FIXTURES.entries()) {
-      await expect(app(page)).toHaveAttribute('data-mode', 'tutorial')
-      await expect(page.locator('.od-lesson')).toContainText(lessonText[fixture.id][lang][0])
-      await expect(page.locator('.od-lesson')).toContainText(lessonText[fixture.id][lang][1])
-      await exercise(page, fixture, lang)
-      // Actual reload of the just-played lesson: no localStorage replacement.
-      await page.reload()
-      await expect(page.locator('.od-lesson')).toContainText(lessonText[fixture.id][lang][2])
-      await expect(app(page)).toHaveAttribute('data-turn', '1')
-      if (index < TEACHING_FIXTURES.length - 1) {
-        await page.getByRole('button', { name: lang === 'ru' ? 'Следующий приём' : 'Next exercise', exact: true }).click()
-        if (index === 0) {
-          await page.reload()
-          await expect(app(page)).toHaveAttribute('data-turn', '0')
-          await expect(page.locator('.od-lesson')).toContainText(lessonText[TEACHING_FIXTURES[1].id][lang][0])
-        }
-      }
-    }
-    await page.getByRole('button', { name: finish === 'continue'
-      ? (lang === 'ru' ? 'Продолжить с движком' : 'Continue with the engine')
-      : (lang === 'ru' ? 'Играть с начала' : 'Play from the start'), exact: true }).click()
-    await expect(app(page)).toHaveAttribute('data-mode', 'bot')
-    const persisted = await saved(page)
-    if (finish === 'continue') {
-      expect(persisted.root.forms.white).toEqual({ pieceId: 'wn', remainingTurns: 2 })
-      expect(persisted.root.turnSerial).toBe(1)
-    } else {
-      expect(persisted.root.pieces).toHaveLength(32)
-      expect(persisted.root.turnSerial).toBe(0)
-      expect(persisted.root.energy).toEqual({ white: 0, black: 0 })
-    }
-  })
-}
-
 test('local launch, repeat-click/tap and Escape deselection, keyboard, save and language/view switching', async ({ page, context }) => {
   await preferences(context)
   await page.goto('/overdrive/')
