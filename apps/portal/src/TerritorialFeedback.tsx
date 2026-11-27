@@ -60,7 +60,7 @@ export function TerritorialTurn({ view, lang }: { view: TerritoryView; lang: Lan
       <span>{view.turn === 0 ? (ru ? 'Расстановка' : 'Setup') : `${ru ? 'Круг' : 'Round'} ${view.round + 1}`}</span>
       {!view.outcome && <time className="territory-clock" aria-label={(ru ? 'На действие осталось ' : 'Time left ') + clock}>{clock}</time>}
     </div>
-    <p>{phaseText(view, lang)}</p>
+    <p>{view.outcome ? (view.outcome.winnerParticipantIds.length ? (ru ? 'Победитель: ' : 'Winner: ') + view.outcome.winnerParticipantIds.map(id=>playerName(view,id)).join(', ') : phaseText(view,lang)) : phaseText(view, lang)}</p>
     <small>{view.botActionAt && !view.outcome ? `${actor} ${ru ? 'обдумывает действие' : 'is considering a move'}`
       : view.legal.end ? (ru ? 'Можно завершить ход' : 'You can end your turn')
         : view.phase === 'finished' ? (ru ? 'Карта и журналы доступны' : 'The map and journals remain available')

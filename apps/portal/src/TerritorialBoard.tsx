@@ -1,6 +1,6 @@
 import { useId, useMemo, useRef, useState } from 'react';
 import type { FocusEvent, KeyboardEvent, MouseEvent, PointerEvent } from 'react';
-import type { TerritoryBlockade, TerritoryMap } from '@iva-games/district/territorial';
+import type { TerritoryBlockade, TerritoryMap, TerritoryView } from '@iva-games/district/territorial';
 import { distanceToRoad, houseOutline, roadHitLine, territoryCoastlines } from './territorialBoardGeometry';
 import './territorial-board.css';
 
@@ -23,6 +23,7 @@ interface BoardProps {
   highlightedRoadIds?: readonly string[];
   blockade?: TerritoryBlockade | null;
   blockMode?: boolean;
+  activeEffects?: TerritoryView['activeEffects'];
 }
 
 const terrainNames = {
@@ -85,7 +86,7 @@ function Port({ resource }: { resource: boolean }) {
   return <g pointerEvents="none" strokeLinecap="round"><path d="M-1 1 10 6M1-2l11 6" stroke="#765e48" strokeWidth="3"/><path d="m3 0-1 4m4-2-1 4m4-2-1 4" stroke="#d5a873" strokeWidth="2"/><circle cx="12" cy="8" r="5.5" fill={resource?'#265e6b':'#326e80'} stroke="#f3e2b8" strokeWidth="1"/><path d="M12 5v6m-3-3q3 5 6 0m-5-2h4" fill="none" stroke="#fff1cc" strokeWidth="1.15"/></g>;
 }
 
-export function TerritorialBoard({ map, lang, buildings, routes, players, blockedTileId, selection, onSelect, candidates, newsArea, rolledTileIds, highlightedRoadIds, blockade, blockMode }: BoardProps) {
+export function TerritorialBoard({ map, lang, buildings, routes, players, blockedTileId, selection, onSelect, candidates, newsArea, rolledTileIds, highlightedRoadIds, blockade, blockMode, activeEffects = [] }: BoardProps) {
   const ru = lang === 'ru';
   const uid = useId().replace(/:/g, '');
   const svg = useRef<SVGSVGElement>(null);
@@ -247,6 +248,23 @@ export function TerritorialBoard({ map, lang, buildings, routes, players, blocke
           </g><polygon className="tb-tile-select" points={tile.points} strokeWidth={2.6*unit}/>
         </g>;
       })}
+      <g data-board-layer="atmosphere" pointerEvents="none" aria-hidden="true">
+        {tiles.map(tile => {
+          const contains = (polygon: Point[]) => polygon.reduce((inside, a, i) => {
+            const b = polygon[(i+1)%polygon.length];
+            return (a.y > tile.y) !== (b.y > tile.y) && tile.x < (b.x-a.x)*(tile.y-a.y)/(b.y-a.y)+a.x ? !inside : inside;
+          }, false);
+          const effects = activeEffects.filter(effect => effect.zone === null || effect.zone === 'all' || map.sectors.some(s => s.id === effect.zone && contains(s.polygon)));
+          const kinds = { illness: effects.some(e=>e.templateId==='E01'||e.templateId==='B02'),
+            weather: effects.some(e=>['B04','B05','B07','B08'].includes(e.templateId)),
+            setback: effects.some(e=>['B01','B03','B06'].includes(e.templateId)),
+            boon: effects.some(e=>/^[GP]/.test(e.templateId)) };
+          return <g key={tile.id}>{Object.entries(kinds).map(([kind,active])=><g key={kind} className={'tb-atmosphere tb-atmosphere-'+kind+(active?' is-live':'')} data-effect-tile={tile.id} data-effect-kind={kind}>
+            <polygon points={tile.points}/>
+            <g transform={`translate(${tile.x} ${tile.y}) scale(${unit})`}>{[-12,0,12].map((x,i)=><circle key={i} className="tb-mote" cx={x} cy={i===1?-10:4} r={kind==='weather'?1.5:2.3} style={{animationDelay:`${-i*1.1}s`}}/>)}</g>
+          </g>)}</g>;
+        })}
+      </g>
       {areaLabel&&<g className={'tb-news-frame '+newsArea!.kind} data-board-layer="news" pointerEvents="none" aria-label={areaLabel}>
         {highlighted?<polygon points={asPoints(highlighted.polygon)}/>:<path d={coastPath} fillRule="evenodd"/>}
       </g>}

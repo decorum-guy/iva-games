@@ -341,8 +341,8 @@ describe('SQLite replay and paced bots', () => {
     const { matchId } = await f.runtime.createMatch(start([bot('bot', 0), human('a', 1)]));
     const scheduled = await f.runtime.viewForPlayer(matchId, 'a');
     expect(scheduled.revision).toBe(0);
-    expect(scheduled.botActionAt! - f.clock.now).toBeGreaterThanOrEqual(650);
-    expect(scheduled.botActionAt! - f.clock.now).toBeLessThanOrEqual(1_200);
+    expect(scheduled.botActionAt! - f.clock.now).toBeGreaterThanOrEqual(1000);
+    expect(scheduled.botActionAt! - f.clock.now).toBeLessThanOrEqual(1600);
     expect(f.read(matchId).history).toEqual([]);
     f.reopen();
     expect((await f.runtime.viewForPlayer(matchId, 'a')).botActionAt).toBe(scheduled.botActionAt);
@@ -392,7 +392,7 @@ describe('SQLite replay and paced bots', () => {
     expect(f.read(matchId).history!.filter(entry => entry.kind === 'accept')).toHaveLength(1);
   });
 
-  it('does not let an unaffordable bot offer keep replacing another bot’s scheduled action on every poll', async () => {
+  it('declines an unaffordable bot offer once and preserves the next scheduled action', async () => {
     const f = runtimeFixture();
     const { matchId } = await f.runtime.createMatch(start([bot('active', 0), bot('recipient', 1), human('a', 2)]));
     let s = f.read(matchId); s.phase = 'play'; s.turn = 1;
@@ -404,7 +404,8 @@ describe('SQLite replay and paced bots', () => {
     expect(answer.botParticipantId).toBe('recipient');
     f.clock.now = answer.botActionAt!;
     const afterUnavailableAnswer = await f.runtime.viewForPlayer(matchId, 'a');
-    expect(afterUnavailableAnswer.revision).toBe(s.revision);
+    expect(afterUnavailableAnswer.revision).toBe(s.revision + 1);
+    expect(f.read(matchId).offerHistory!.at(-1)?.status).toBe('declined');
     expect(afterUnavailableAnswer.botParticipantId).toBe('active');
     for (let poll = 0; poll < 3; poll++) {
       const unchanged = await f.runtime.viewForPlayer(matchId, 'a');
@@ -415,7 +416,7 @@ describe('SQLite replay and paced bots', () => {
     const advanced = await f.runtime.viewForPlayer(matchId, 'a');
     expect(advanced.revision).toBeGreaterThan(s.revision);
     expect(advanced.activeParticipantId).toBe('recipient');
-    expect(f.read(matchId).offerHistory!.at(-1)?.status).toBe('expired');
+    expect(f.read(matchId).offerHistory!.at(-1)?.status).toBe('declined');
   });
 
   it('leaves forty seconds for a human counteroffer while preserving the deadline and real expiry', async () => {

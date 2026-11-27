@@ -526,7 +526,7 @@ try {
           if (await page.getByRole('button', { name: 'Dismiss news', exact: true }).isVisible()) await page.getByRole('button', { name: 'Dismiss news', exact: true }).click();
           await page.getByRole('button', { name: 'Offer a trade', exact: true }).click();
           const counterpart = view.players.find((p) => p.participantId === other.you.participantId);
-          await page.locator('.ta-trades select').selectOption(counterpart.participantId);
+          await page.locator('.ta-trade-editor select').selectOption(counterpart.participantId);
           const resourceName = (r) => r.charAt(0).toUpperCase() + r.slice(1);
           await page.getByRole('spinbutton', { name: 'I give · ' + resourceName(give), exact: true }).fill('1');
           await page.getByRole('spinbutton', { name: 'I receive · ' + resourceName(take), exact: true }).fill('1');

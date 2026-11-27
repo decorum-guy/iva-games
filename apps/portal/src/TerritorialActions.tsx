@@ -381,13 +381,14 @@ function PlayerTrade({ view, lang, busy, onAction, handPick }: Props) {
     }
     previousPositions.current = next;
   }, [view.offers, view.offerHistory]);
+  const [dismissed, setDismissed] = useState<string[]>([]);
   const latestGroup = [...view.offers].reverse().find(offer => offer.groupId)?.groupId ?? latestClosed?.groupId;
-  const visibleClosed = recent.filter(offer => offer.id === latestClosed?.id || latestGroup && offer.groupId === latestGroup);
+  const visibleClosed = recent.filter(offer => !dismissed.includes(offer.id) && (offer.id === latestClosed?.id || latestGroup && offer.groupId === latestGroup));
   return <section className="ta-trades territory-trade-dock" aria-label={word(lang, 'Сделки с игроками', 'Player trades')}>
     <header className="ta-section-heading territory-sr-only"><h4 ref={tradeHeading} tabIndex={-1}>{word(lang, 'Сделки с игроками', 'Player trades')}</h4></header>
     <div className="ta-offer-stack" ref={stack} aria-live="polite">
       {[...view.offers].reverse().map(offer => <OfferCard key={offer.id} offer={offer} view={view} lang={lang} busy={busy || sending} onAction={onAction} onCounter={edit} onResponse={() => tradeHeading.current?.focus()}/>)}
-      {visibleClosed.map(offer => <div className="ta-latest-deal" key={offer.id}><OfferCard offer={offer} closed={offer} view={view} lang={lang} busy={busy} onAction={onAction} onCounter={edit}/></div>)}
+      {visibleClosed.map(offer => <div className="ta-latest-deal" key={offer.id}><button type="button" className="ta-dismiss-receipt" aria-label={word(lang,"Скрыть результат сделки","Dismiss trade result")} onClick={()=>setDismissed(previous=>[...previous,offer.id])}>×</button><OfferCard offer={offer} closed={offer} view={view} lang={lang} busy={busy} onAction={onAction} onCounter={edit}/></div>)}
     </div>
     <button type="button" ref={newButton} className="ta-trade-open" disabled={sending || !!view.outcome} aria-expanded={draft.editing || bankOpen}
       aria-label={word(lang, hasContent ? 'Продолжить сохранённые условия' : 'Предложить обмен', hasContent ? 'Continue saved terms' : 'Offer a trade')}

@@ -13,6 +13,7 @@ import type { BoardSelection } from "./TerritorialBoard";
 import { TerritorialNews, territorialNewsArea } from "./TerritorialNews";
 import { TerritorialActions, TerritorialMapActions, ResourceStock } from "./TerritorialActions";
 import { TerritorialHistory, TerritorialResult, TerritorialRoll, TerritorialTurn, blockadeText, historyTitle, playerName } from "./TerritorialFeedback";
+import { TerritorialIncomeMotion } from "./TerritorialMotion";
 import { TerritorialSettings } from "./TerritorialSettings";
 import { useTerritorialPreferences } from "./territorialPreferences";
 import { useTerritorialAudio } from "./territorialAudio";
@@ -38,6 +39,7 @@ export function TerritorialMatch({ room, refresh }: { room: Room; refresh: () =>
   const [selectedCouponId, setSelectedCouponId] = useState<string | null>(null);
   const [panel, setPanel] = useState<'actions' | 'history'>('actions');
   const panelScroll = useRef<HTMLDivElement>(null);
+  const tableRef = useRef<HTMLElement>(null);
   const [help, setHelp] = useState(false);
   const [settings, setSettings] = useState(false);
   const [leave, setLeave] = useState(false);
@@ -147,7 +149,7 @@ export function TerritorialMatch({ room, refresh }: { room: Room; refresh: () =>
   const incoming = view.offers.filter(offer => offer.targetId === view.you.participantId);
   const receipt = [...(view.history ?? [])].reverse().find(entry => !['end','distribution','offer-closed'].includes(entry.kind));
   const classes = 'territory-match territory-map-first' + (preferences.reduceMotion ? ' territory-reduce-motion' : '') + (preferences.compactPanels ? ' territory-compact' : '') + (preferences.highContrast ? ' territory-contrast' : '');
-  return <section className={classes} style={{ '--table-text-scale': preferences.textSize / 100 } as CSSProperties}
+  return <section ref={tableRef} className={classes} style={{ '--table-text-scale': preferences.textSize / 100 } as CSSProperties}
     aria-label={t("Территориальная партия Района", "District territorial match")}>
     <header className="territory-top">
       <div className="territory-map-title"><button className="back-link" onClick={() => go("rooms")}>‹ {t("Комнаты", "Rooms")}</button><h2>{view.map.name[lang]}</h2></div>
@@ -162,7 +164,7 @@ export function TerritorialMatch({ room, refresh }: { room: Room; refresh: () =>
       <div className="territory-map-column">
         <div className="territory-map-shell"><TerritorialBoard map={view.map} buildings={view.buildings} routes={view.routes} players={view.players} lang={lang}
           blockedTileId={view.blockedTileId} blockade={view.blockade} selection={selection} onSelect={choose} candidates={candidates}
-          rolledTileIds={view.latestRoll?.triggeredTileIds} highlightedRoadIds={couponRoads} newsArea={territorialNewsArea(news)} blockMode={view.legal.block.length > 0}/>
+          rolledTileIds={view.latestRoll?.triggeredTileIds} highlightedRoadIds={couponRoads} newsArea={territorialNewsArea(news)} blockMode={view.legal.block.length > 0} activeEffects={view.activeEffects}/>
           <TerritorialMapActions view={view} lang={lang} selection={selection} busy={busy || Boolean(pending) || loadError || Boolean(left)} onAction={act} handPick={handPick}/>
           {selectedCouponId && <div className="territory-map-filter" role="status"><span>{couponRoads.length ? t(`По купону: ${couponRoads.length} дорог`, `Coupon: ${couponRoads.length} roads`) : t('Сейчас подходящих дорог нет', 'No eligible roads right now')}</span>
             <button type="button" onClick={() => setSelectedCouponId(null)} aria-label={t('Убрать фильтр дорог', 'Clear road filter')}>×</button></div>}
@@ -192,9 +194,10 @@ export function TerritorialMatch({ room, refresh }: { room: Room; refresh: () =>
           </div>
           <div hidden={panel !== 'history'}><TerritorialHistory view={view} lang={lang} onSelect={choose}/></div>
         </div>
-        <TerritorialNews view={view} lang={lang} selectedId={news?.messageId ?? null} onSelect={selectNews} autoOpen={preferences.newsNotices} onShowCouponRoutes={showCoupon}/>
+        <TerritorialNews view={view} lang={lang} selectedId={news?.messageId ?? null} onSelect={selectNews} autoOpen={preferences.newsNotices && !view.outcome && !view.you.discard && !view.legal.block.length} onShowCouponRoutes={showCoupon}/>
       </aside>
     </div>
+    <TerritorialIncomeMotion view={view} root={tableRef} reduceMotion={preferences.reduceMotion} disconnected={loadError}/>
     <div className="territory-sr-only" aria-live="polite" aria-atomic="true">{preferences.turnNotices && view.you.participantId === view.activeParticipantId ? t('Ваш ход.', 'Your turn.') : ''}
       {preferences.tradeNotices && ownClosed ? historyTradeNotice(ownClosed.status,lang) : ''}</div>
     {settings && <TerritorialSettings view={view} lang={lang} setLanguage={setLanguage} preferences={preferences} onChange={setPreferences}
@@ -215,6 +218,7 @@ function TerritorialPlayers({ view, lang }: { view: TerritoryView; lang: Languag
   const ru = lang === "ru";
   const tradeLabel = (id: string) => {
     const offer = view.offers.find(item => item.authorId === id || item.targetId === id && item.authorId === view.you.participantId);
+    if (offer?.agreedAt !== undefined) return ru ? 'Согласие получено' : 'Agreed';
     if (offer) return offer.authorId === view.you.participantId ? (ru ? 'Ждём ответа' : 'Awaiting reply') : (ru ? 'Предлагает обмен' : 'Offers a trade');
     const previous = [...(view.offerHistory ?? [])].reverse().find(item => item.authorId === id || item.targetId === id);
     return previous?.closedTurn === view.turn ? historyTradeNotice(previous.status, lang) : '';
