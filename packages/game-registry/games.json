@@ -1,0 +1,141 @@
+{
+  "version": 1,
+  "chessOrigin": "https://chess.iva-games.pro",
+  "games": [
+    {
+      "gameId": "remorse",
+      "collectionId": "chess",
+      "title": {
+        "ru": "Remorse",
+        "en": "Remorse"
+      },
+      "description": {
+        "ru": "Шахматы, в которых у каждого взятия есть последствия.",
+        "en": "Chess where every capture has consequences."
+      },
+      "minPlayers": 2,
+      "maxPlayers": 2,
+      "roomStatus": "unavailable",
+      "chess": {
+        "workspace": "@chess-2/remorse",
+        "source": "games/chess/remorse",
+        "route": "/",
+        "developmentUrl": "http://127.0.0.1:4173/",
+        "health": {
+          "path": "/api/health",
+          "protocol": "remorse-online-v1",
+          "rulesVersion": "remorse-digital-v1"
+        },
+        "database": {
+          "file": "remorse.sqlite",
+          "environment": "DATABASE_PATH"
+        }
+      }
+    },
+    {
+      "gameId": "overdrive",
+      "collectionId": "chess",
+      "title": {
+        "ru": "Форсаж",
+        "en": "Overdrive"
+      },
+      "description": {
+        "ru": "Шахматные фигуры с характером и собственными усилениями.",
+        "en": "Chess pieces with their own character and abilities."
+      },
+      "minPlayers": 2,
+      "maxPlayers": 2,
+      "roomStatus": "unavailable",
+      "chess": {
+        "workspace": "@chess-2/overdrive",
+        "source": "games/chess/overdrive",
+        "route": "/overdrive/",
+        "developmentUrl": "http://127.0.0.1:4185/overdrive/",
+        "health": {
+          "path": "/api/overdrive/health",
+          "protocol": "overdrive-online-v2",
+          "rulesVersion": "overdrive-v2"
+        },
+        "database": {
+          "file": "overdrive.sqlite",
+          "environment": "OVERDRIVE_DATABASE_PATH"
+        }
+      }
+    },
+    {
+      "gameId": "colossus",
+      "collectionId": "chess",
+      "title": {
+        "ru": "Колосс",
+        "en": "Colossus"
+      },
+      "description": {
+        "ru": "Восемь фигур против босса. Читайте его замысел, разбивайте броню и разыгрывайте карты — сами или вдвоём.",
+        "en": "Eight pieces against a boss. Read its intent, break its armour and play your cards — alone or together."
+      },
+      "minPlayers": 1,
+      "maxPlayers": 2,
+      "roomStatus": "unavailable",
+      "chess": {
+        "workspace": "@chess-2/colossus",
+        "source": "games/chess/colossus",
+        "route": "/colossus/",
+        "developmentUrl": "http://127.0.0.1:5195/",
+        "health": {
+          "path": "/api/colossus/health",
+          "protocol": "colossus-online-v1",
+          "rulesVersion": "colossus-v1"
+        },
+        "database": {
+          "file": "colossus.sqlite",
+          "environment": "COLOSSUS_DATABASE_PATH"
+        }
+      }
+    },
+    {
+      "gameId": "district",
+      "collectionId": "other",
+      "title": {
+        "ru": "Район",
+        "en": "District"
+      },
+      "description": {
+        "ru": "Общий город, личные планы и сделки, о которых вы ещё поспорите.",
+        "en": "A shared city, personal plans and deals worth arguing about."
+      },
+      "minPlayers": 2,
+      "maxPlayers": 4,
+      "roomStatus": "planned"
+    },
+    {
+      "gameId": "harbor",
+      "collectionId": "other",
+      "title": {
+        "ru": "Гавань",
+        "en": "Harbor"
+      },
+      "description": {
+        "ru": "Грузы, корабли и торговля. Узнайте, кто лучше договорится.",
+        "en": "Cargo, ships and trading. Find out who makes the best deals."
+      },
+      "minPlayers": 2,
+      "maxPlayers": 6,
+      "roomStatus": "planned"
+    },
+    {
+      "gameId": "platform-lab",
+      "collectionId": "other",
+      "title": {
+        "ru": "Пробный стол",
+        "en": "Practice table"
+      },
+      "description": {
+        "ru": "Выберите число, перехитрите друзей и наберите больше очков за три раунда.",
+        "en": "Pick a number, outsmart your friends and score the most points in three rounds."
+      },
+      "minPlayers": 2,
+      "maxPlayers": 4,
+      "roomStatus": "runtime"
+    }
+  ]
+}

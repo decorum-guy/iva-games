@@ -1,0 +1,106 @@
+{
+  "source": "Original hand-authored SVG paths; no external artwork",
+  "generator": "scripts/generate-colossus-cards.mjs",
+  "cards": {
+    "bandage": {
+      "file": "bandage.svg",
+      "sha256": "e35e20d67c7ae2283e085b7976b2f1eee84b18beaee7e4d288d15d67092bcb0d"
+    },
+    "stone-skin": {
+      "file": "stone-skin.svg",
+      "sha256": "bbd34baf61104e55d8e61824241215818057a87f7644c332d456201b9312b8ad"
+    },
+    "sharp-edge": {
+      "file": "sharp-edge.svg",
+      "sha256": "cf21be1ed6793c033b98970891c8b147fb813089fca2e37030876a9833e7df19"
+    },
+    "armor-tip": {
+      "file": "armor-tip.svg",
+      "sha256": "94485dc530c8591c65fb9b0ba90b4ce9043d35a5e93710abd5028407b0562736"
+    },
+    "focus": {
+      "file": "focus.svg",
+      "sha256": "f14ea9404c56388c91bd94f92a0c54708e7c865e87eab84bedfaa330a322f7e4"
+    },
+    "reposition": {
+      "file": "reposition.svg",
+      "sha256": "cfb7c5ed20421d94d08035b231d6d22a638ae00f3297c6d088674569791c0291"
+    },
+    "swap": {
+      "file": "swap.svg",
+      "sha256": "31fefb877ea519adf331f2de362835395f0097bf7395195c9a7a5703eb39bad1"
+    },
+    "minor-vow": {
+      "file": "minor-vow.svg",
+      "sha256": "59061004a49d600d86b0654c4c01f289efbd3b1e0e25897ae1a67b9bdbe76cfe"
+    },
+    "hospital": {
+      "file": "hospital.svg",
+      "sha256": "1ec3b3e79d2c737f0993a443b106df9b5b85c196cd2d3efdce1860ef366a3bbc"
+    },
+    "hunt-mark": {
+      "file": "hunt-mark.svg",
+      "sha256": "42caee0b5a7ba7d18cd96a3b26e44dbd2cc9bfff375922607b5540ab9cdf61d5"
+    },
+    "wedge": {
+      "file": "wedge.svg",
+      "sha256": "411bb76d689b3a02d41eaaaad1a8d7b169475d65ab3bfbc142cc2e3ce7c3c604"
+    },
+    "formation": {
+      "file": "formation.svg",
+      "sha256": "cc58332579b7b4382e6b18c0a7d68b5e30e562e7a5b3cb884b7cecd6c7ca80a3"
+    },
+    "disrupt": {
+      "file": "disrupt.svg",
+      "sha256": "7fc05972c9bade8cd1fb23e1dc117bc48b1284cf8c98026e86ca50d18180a21e"
+    },
+    "counterorder": {
+      "file": "counterorder.svg",
+      "sha256": "16713e191d694c71c902e14b8fa7a3df0611d72e81e526bad1b5c004085972f8"
+    },
+    "marble-vow": {
+      "file": "marble-vow.svg",
+      "sha256": "df46b6e270f378a722356f5ff002c9d4b0cd52eb3cb181ea5807fee7839eb357"
+    },
+    "shell-break": {
+      "file": "shell-break.svg",
+      "sha256": "4f82830d31edd84e3d83fb444874e7b6d6564af45153402892d387247d96d6c5"
+    },
+    "regent_reposition": {
+      "file": "regent_reposition.svg",
+      "sha256": "9328c33e77be2c8101c99cd0d43bb3d0956e2ab1c4309e175fc778c353015b1d"
+    },
+    "regent_far_gong": {
+      "file": "regent_far_gong.svg",
+      "sha256": "e2cb9dbb4533fb3d763b33396db9c72554ed57921dafd5c1636eee98f8a5aae7"
+    },
+    "regent_crossfire": {
+      "file": "regent_crossfire.svg",
+      "sha256": "b76404a3781e5c72b8a5033fe2aeb69282796eab142938b36ce9321de493c31e"
+    },
+    "spire_retreat": {
+      "file": "spire_retreat.svg",
+      "sha256": "794b2f96ee3f96e0c954f5abb5c81c9a626a1102a85a1fa41373ed913c3309ca"
+    },
+    "spire_fork": {
+      "file": "spire_fork.svg",
+      "sha256": "8b968443abdae73b2e84481499f51bb625ac584bfc624ab09e245f96ef39d769"
+    },
+    "spire_bent_dash": {
+      "file": "spire_bent_dash.svg",
+      "sha256": "f888d9e60df4a83bbd5de801dd9606c8078f1f6004f05e05051af706888eba13"
+    },
+    "archivist_parallel": {
+      "file": "archivist_parallel.svg",
+      "sha256": "b2e62189b4060c731443eac2b2763e95f0a87b04df77e04277f2617894aacedb"
+    },
+    "archivist_cross": {
+      "file": "archivist_cross.svg",
+      "sha256": "39c253a9e690b5beca8059cec221af111903232882375dd1e295cbbbcf9860d7"
+    },
+    "archivist_border": {
+      "file": "archivist_border.svg",
+      "sha256": "055eceab1de9ad7c5d3870414e360e8454de97e137cfa5c9db8ede71d804b344"
+    }
+  }
+}

@@ -89,13 +89,15 @@ verification_container="iva-backup-check-${service}-$$-${RANDOM}"
 timeout --foreground --kill-after=3s 60s docker run --name "$verification_container" --rm --interactive --network none --user 0:0 \
   --mount "type=bind,src=$destination/data,dst=/backup,readonly" \
   --entrypoint node "$image_id" --input-type=module - "$service" <<'NODE'
-import { cpSync, mkdtempSync } from 'node:fs';
+import { cpSync, existsSync, mkdtempSync, readdirSync, readFileSync } from 'node:fs';
 import Database from 'better-sqlite3';
 const directory = mkdtempSync('/tmp/iva-backup-check-');
 cpSync('/backup', directory, { recursive: true });
-const names = process.argv[2] === 'chess'
-  ? ['remorse.sqlite', 'overdrive.sqlite']
-  : ['platform.sqlite', 'platform-lab.sqlite'];
+const registered = existsSync('/app/game-registry.json')
+  ? JSON.parse(readFileSync('/app/game-registry.json', 'utf8')).games.filter(game => game.chess?.database).map(game => game.chess.database.file)
+  : ['remorse.sqlite', 'overdrive.sqlite'];
+const required = process.argv[2] === 'chess' ? registered : ['platform.sqlite', 'platform-lab.sqlite'];
+const names = [...new Set([...required, ...readdirSync(directory).filter(name => name.endsWith('.sqlite'))])];
 for (const name of names) {
   const database = new Database(`${directory}/${name}`, { fileMustExist: true });
   try {
@@ -103,7 +105,7 @@ for (const name of names) {
     if (rows.length !== 1 || rows[0].quick_check !== 'ok') throw new Error(`Invalid SQLite backup: ${name}`);
   } finally { database.close(); }
 }
-console.log('Both SQLite databases passed quick_check.');
+console.log(`${names.length} SQLite databases passed quick_check.`);
 NODE
 verification_container=''
 

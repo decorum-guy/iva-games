@@ -1,0 +1,55 @@
+name: Colossus review
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'games/chess/colossus/**'
+      - 'apps/server/**'
+      - 'packages/engine-sdk/**'
+      - 'packages/game-registry/**'
+      - 'scripts/*chess*'
+      - 'scripts/*registry*'
+      - 'scripts/compose-client.mjs'
+      - 'package*.json'
+      - '.github/workflows/colossus-review.yml'
+  push:
+    branches: [main, 'feat/colossus-*']
+    paths:
+      - 'games/chess/colossus/**'
+      - 'apps/server/**'
+      - 'packages/engine-sdk/**'
+      - 'packages/game-registry/**'
+      - 'scripts/*chess*'
+      - 'scripts/*registry*'
+      - 'scripts/compose-client.mjs'
+      - 'package*.json'
+      - '.github/workflows/colossus-review.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: colossus-review-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  browser-review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      COLOSSUS_E2E_PREBUILT: '1'
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: npm run colossus:test
+      - run: npm run server:test
+      - run: npm run build:all
+      - run: npx playwright install --with-deps chromium
+      - run: npm run colossus:e2e -- --workers=1
+      # Failed screenshots stay inside ignored .qa on the runner. No artifacts,
+      # traces, recordings or test databases are uploaded to GitHub.

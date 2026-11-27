@@ -1,15 +1,11 @@
+import { launchUrls } from '@iva-games/game-registry';
 import { Avatar, Brand, Empty, GameArt, Icon, useLanguage } from "./ui";
 import { PortalLink } from "./navigation";
 import type { Game, User } from "./types";
 import { gameDescription, gameTitle } from "./gameCopy";
 
 // Guest launch links are independent of availability in platform rooms.
-export const chessLaunchUrls: Partial<Record<string, string>> = {
-  remorse: import.meta.env.VITE_REMORSE_URL || (import.meta.env.DEV
-    ? "http://127.0.0.1:4173/" : "https://chess.iva-games.pro/"),
-  overdrive: import.meta.env.VITE_OVERDRIVE_URL || (import.meta.env.DEV
-    ? "http://127.0.0.1:4185/overdrive/" : "https://chess.iva-games.pro/overdrive/"),
-};
+export const chessLaunchUrls: Partial<Record<string, string>> = launchUrls({ development: import.meta.env.DEV, overrides: import.meta.env });
 
 export function Catalogue({ page, games, user, busy, offline, retry, onPlay, onAbout }: {
   page: "home" | "chess" | "games";
@@ -57,7 +53,7 @@ export function Catalogue({ page, games, user, busy, offline, retry, onPlay, onA
         <PortalLink href="/chess" className="collection-card">
           <GameArt kind="remorse" />
           <div className="collection-copy"><h2>{t("Шахматы", "Chess")}</h2>
-            <p>{t("Remorse, Форсаж и новые варианты шахмат.", "Remorse, Overdrive and new chess variants.")}</p>
+            <p>{t("Remorse, Форсаж, Колосс и новые варианты шахмат.", "Remorse, Overdrive, Colossus and new chess variants.")}</p>
             <span>{t("Выбрать игру", "Choose a game")} <Icon name="arrow" size={19} /></span></div>
         </PortalLink>
         <PortalLink href="/games" className="collection-card">

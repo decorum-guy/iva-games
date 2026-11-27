@@ -15,7 +15,8 @@
     "@node-rs/argon2": "2.2.2",
     "better-sqlite3": "13.2.0",
     "nodemailer": "10.6.1",
-    "@iva-games/district": "0.1.0"
+    "@iva-games/district": "0.1.0",
+    "@iva-games/game-registry": "0.1.0"
   },
   "devDependencies": {
     "@types/better-sqlite3": "9.6.0",

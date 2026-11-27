@@ -27,7 +27,7 @@ docker run --rm --network none --user 0:0 \
 args=()
 case "$service" in
   chess)
-    args=(--env PUBLIC_ORIGIN=https://chess.iva-games.pro --env OVERDRIVE_DATABASE_PATH=/data/overdrive.sqlite)
+    args=(--env PUBLIC_ORIGIN=https://chess.iva-games.pro --env OVERDRIVE_DATABASE_PATH=/data/overdrive.sqlite --env COLOSSUS_DATABASE_PATH=/data/colossus.sqlite)
     ;;
   platform)
     # An isolated, in-container health probe. No route or mail delivery.
@@ -47,10 +47,14 @@ done
 test "$health" = running/healthy
 docker exec -i "$container" node --input-type=module - "$service" <<'JS'
 import assert from 'node:assert/strict';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import Database from 'better-sqlite3';
-const files = process.argv[2] === 'chess'
-  ? ['/data/remorse.sqlite', '/data/overdrive.sqlite']
-  : ['/data/platform.sqlite', '/data/platform-lab.sqlite'];
+const registered = existsSync('/app/game-registry.json')
+  ? JSON.parse(readFileSync('/app/game-registry.json', 'utf8')).games.filter(game => game.chess?.database).map(game => game.chess.database.file)
+  : ['remorse.sqlite', 'overdrive.sqlite'];
+const required = process.argv[2] === 'chess' ? registered : ['platform.sqlite', 'platform-lab.sqlite'];
+// Include every database present in old/new backups, while requiring this image's registered files.
+const files = [...new Set([...required, ...readdirSync('/data').filter(name => name.endsWith('.sqlite'))])].map(name => '/data/' + name);
 for (const path of files) {
   const db = new Database(path, {readonly: true, fileMustExist: true});
   assert.equal(db.pragma('integrity_check', {simple: true}), 'ok', path);

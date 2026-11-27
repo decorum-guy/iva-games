@@ -17,7 +17,7 @@
     "build": "npm run typecheck && npm run build:client && npm run build:server",
     "build:remorse": "npm run build --workspace @chess-2/remorse --",
     "build:overdrive": "npm run build --workspace @chess-2/overdrive --",
-    "build:client": "npm run build:remorse && npm run build:overdrive && node scripts/compose-client.mjs",
+    "build:client": "node --experimental-strip-types scripts/check-game-registry.mjs && node --experimental-strip-types scripts/build-chess.mjs && node --experimental-strip-types scripts/compose-client.mjs",
     "build:server": "npm run build --workspace @chess-2/server --",
     "preview": "vite preview --outDir dist",
     "auditions:build": "npm run typecheck && npm run auditions:build --workspace @chess-2/remorse --",
@@ -26,7 +26,7 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "check:boundaries": "node scripts/check-boundaries.mjs",
+    "check:boundaries": "npm run check:registry && node scripts/check-boundaries.mjs",
     "check": "npm run check:boundaries && npm run typecheck && npm run lint && npm test",
     "test:e2e": "playwright test --config games/chess/remorse/playwright.config.ts",
     "start": "node dist-server/main.js",
@@ -62,7 +62,14 @@
     "district:test": "vitest run --project district",
     "district:maps": "node --experimental-strip-types games/district/scripts/check-maps.mjs",
     "district:simulate": "vite build --config games/district/vite.simulation.config.ts && node .qa/district-simulation-runner/simulate.mjs",
-    "district:browser": "node scripts/district-browser-smoke.mjs"
+    "district:browser": "node scripts/district-browser-smoke.mjs",
+    "colossus:dev": "npm run dev --workspace @chess-2/colossus --",
+    "colossus:test": "npm run test --workspace @chess-2/colossus --",
+    "colossus:balance": "node games/chess/colossus/scripts/colossus-balance.mjs",
+    "colossus:e2e": "playwright test --config games/chess/colossus/playwright.config.ts",
+    "build:colossus": "npm run build --workspace @chess-2/colossus --",
+    "check:registry": "node --experimental-strip-types scripts/check-game-registry.mjs",
+    "prebuild:foundation": "npm run check:registry"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
