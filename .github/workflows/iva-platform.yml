@@ -31,5 +31,8 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - run: npm run portal:e2e -- --workers=1
       - run: npm run district:browser
+      - run: node scripts/district-interface-browser.mjs
+      - run: node scripts/district-trade-browser.mjs
+      - run: node scripts/district-audio-browser.mjs
       - run: node scripts/district-territorial-browser.mjs
       # QA output stays in the job logs. No upload-artifact or video/trace storage.

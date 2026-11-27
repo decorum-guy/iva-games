@@ -199,7 +199,7 @@
   .territory-map-column { gap: 5px; }
   .territory-hand { padding: 3px 8px 5px; }
   .territory-hand-heading { display: none; }
-  .territory-hand .ta-resource-cards { padding: 2px 0; gap: 5px; }
+  .territory-hand .ta-resource-cards { padding: 2px 0; gap: 5px; grid-template-columns: minmax(0,1.2fr) repeat(4,minmax(0,1fr)); }
   .territory-hand .ta-resource-cards > span { grid-template-columns: 29px auto; min-height: 47px; padding: 2px 3px; }
   .territory-hand .ta-resource-cards .ta-resource-art { grid-row: 1; grid-column: 1; width: 29px; height: 27px; }
   .territory-hand .ta-resource-cards .ta-resource-name { grid-row: 2; grid-column: 1 / -1; font-size: calc(9px * var(--table-text-scale)); line-height: 1.1; overflow-wrap: anywhere; text-align: center; }
