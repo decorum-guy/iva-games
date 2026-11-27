@@ -52,9 +52,26 @@ let stopping = false;
 const stop = (): void => {
   if (stopping) return;
   stopping = true; clearInterval(timer);
-  server.close(() => { void Promise.all([platform.settle(), telegramWork]).then(() => {
+  platform.stopReconciliation();
+  // Compose allows 60s. A failed drain exits nonzero before Docker's SIGKILL,
+  // so deployment can reject it instead of describing a forced exit as clean.
+  const deadline = setTimeout(() => {
+    console.error('Platform shutdown exceeded 30s; durable state retained for recovery.');
+    process.exit(1);
+  }, 30_000);
+  void (async () => {
+    await server.shutdown();
+    // Accepted HTTP handlers can start adapter work while they drain. Only now
+    // is the runtime-work set stable; a response timeout is not cancellation.
+    await Promise.all([platform.settle(), telegramWork]);
     telegramTransport?.close(); platform.close(); lab.close(); district.close();
-  }); });
+  })().then(() => {
+    clearTimeout(deadline); process.exit(0);
+  }, () => {
+    clearTimeout(deadline);
+    console.error('Platform shutdown failed; durable state retained for recovery.');
+    process.exit(1);
+  });
 };
 process.once('SIGINT', stop);
 process.once('SIGTERM', stop);

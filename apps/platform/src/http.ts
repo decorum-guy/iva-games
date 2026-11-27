@@ -3,7 +3,7 @@ import { timingSafeEqual } from 'node:crypto';
 import type { IncomingMessage, Server, ServerResponse } from 'node:http';
 import { createReadStream, existsSync, statSync } from 'node:fs';
 import { extname, resolve, sep } from 'node:path';
-import { createClientAddressReader } from '@iva-games/session-kit/http';
+import { createClientAddressReader, createHttpLifecycle } from '@iva-games/session-kit/http';
 import { PlatformError } from './types.js';
 import type { SessionRecord, TelegramIntegration } from './types.js';
 import type { TelegramAuth } from './telegram/auth.js';
@@ -22,6 +22,7 @@ export interface HttpOptions {
   telegramWebhookSecret?: string;
   telegramAuth?: TelegramAuth;
   telegramAuthWebhookSecret?: string;
+  shutdownGraceMs?: number;
 }
 function error(code: string, message: string, status = 400): never { throw new PlatformError(code, message, status); }
 function only(body: Record<string, unknown>, fields: string[]): void {
@@ -51,7 +52,7 @@ function send(response: ServerResponse, status: number, body: unknown): void {
   response.end(JSON.stringify(body));
 }
 
-export function createPlatformHttpServer(service: PlatformService, options: HttpOptions): Server {
+export function createPlatformHttpServer(service: PlatformService, options: HttpOptions): Server & { shutdown(): Promise<void> } {
   const origin = new URL(options.publicOrigin).origin;
   const origins = new Set(options.allowedOrigins ?? [origin]);
   const hosts = new Set(options.allowedHosts ?? [new URL(origin).host]);
@@ -72,7 +73,7 @@ export function createPlatformHttpServer(service: PlatformService, options: Http
     return created.session;
   };
 
-  const server = createServer((request, response) => { void (async () => {
+  const server = createServer((request, response) => { void lifecycle.run(async () => {
     response.setHeader('Cache-Control', 'no-store');
     response.setHeader('X-Content-Type-Options', 'nosniff');
     response.setHeader('Referrer-Policy', 'no-referrer');
@@ -81,6 +82,10 @@ export function createPlatformHttpServer(service: PlatformService, options: Http
     response.setHeader('X-Frame-Options', 'DENY');
     if (secure) response.setHeader('Strict-Transport-Security', 'max-age=31536000');
     try {
+      if (lifecycle.stopping) {
+        response.setHeader('Connection', 'close');
+        error('SERVER_RESTARTING', 'Обновляем игру. Попробуйте ещё раз', 503);
+      }
       const host = request.headers.host;
       if (!host || !hosts.has(host)) error('HOST_NOT_ALLOWED', 'Неверный адрес сайта', 421);
       if (!request.url?.startsWith('/') || request.url.startsWith('//')) error('INVALID_URL', 'Неверный адрес');
@@ -124,7 +129,12 @@ export function createPlatformHttpServer(service: PlatformService, options: Http
         const mime: Record<string, string> = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png', '.webp': 'image/webp', '.woff2': 'font/woff2', '.ico': 'image/x-icon' };
         response.setHeader('Content-Type', mime[extname(file)] ?? 'application/octet-stream');
         if (extname(file) !== '.html') response.setHeader('Cache-Control', 'public, max-age=3600');
-        if (method === 'HEAD') response.end(); else createReadStream(file).pipe(response);
+        if (method === 'HEAD') response.end();
+        else {
+          const stream = createReadStream(file);
+          response.once('close', () => stream.destroy());
+          stream.on('error', () => response.destroy()).pipe(response);
+        }
         return;
       }
       const route = path.slice(PREFIX.length);
@@ -286,6 +296,7 @@ export function createPlatformHttpServer(service: PlatformService, options: Http
       } else error('NOT_FOUND', 'Не найдено', 404);
       send(response, 200, result);
     } catch (caught) {
+      if (response.destroyed) return;
       if (response.headersSent) { response.destroy(); return; }
       if (caught instanceof PlatformError) {
         if (caught.status === 429) response.setHeader('Retry-After', '60');
@@ -296,9 +307,10 @@ export function createPlatformHttpServer(service: PlatformService, options: Http
         send(response, 500, { error: { code: 'INTERNAL_ERROR', message: 'Не удалось выполнить действие. Попробуйте ещё раз' } });
       }
     }
-  })(); });
+  }); });
+  const lifecycle = createHttpLifecycle(server, options.shutdownGraceMs);
   server.requestTimeout = 15_000;
   server.headersTimeout = 10_000;
   server.keepAliveTimeout = 5_000;
-  return server;
+  return Object.assign(server, { shutdown: () => lifecycle.close() });
 }

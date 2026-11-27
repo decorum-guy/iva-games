@@ -22,6 +22,19 @@ const app = createOnlineServer({
 })
 const address = await app.listen(positive(process.env.PORT, 4173), process.env.HOST ?? '0.0.0.0')
 console.log('REMORSE HTTP/WebSocket listening on ' + address.host + ':' + address.port)
+let stopping = false
 for (const signal of ['SIGINT', 'SIGTERM'] as const) process.once(signal, () => {
-  void app.close().then(() => process.exit(0), () => process.exit(1))
+  if (stopping) return
+  stopping = true
+  const deadline = setTimeout(() => {
+    console.error('Chess shutdown exceeded 30s; durable state retained for recovery.')
+    process.exit(1)
+  }, 30_000)
+  void app.close().then(() => {
+    clearTimeout(deadline); process.exit(0)
+  }, () => {
+    clearTimeout(deadline)
+    console.error('Chess shutdown failed; durable state retained for recovery.')
+    process.exit(1)
+  })
 })

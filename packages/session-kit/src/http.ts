@@ -2,6 +2,8 @@
 import { isIP } from 'node:net';
 import type { IncomingHttpHeaders } from 'node:http';
 
+export { createHttpLifecycle } from './http-lifecycle.js';
+
 export const CLIENT_IP_HEADER = 'x-iva-client-ip';
 interface AddressRequest {
   readonly headers: IncomingHttpHeaders;

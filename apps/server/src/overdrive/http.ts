@@ -197,16 +197,19 @@ export function createOverdriveGateway(options: GatewayOptions) {
   const cleanup = setInterval(() => { try { service.cleanup() } catch { /* Retry the next bounded sweep. */ } }, 60_000)
   cleanup.unref()
 
+  let closeWork: Promise<void> | undefined
+
   return {
     service, store, handle, upgrade,
-    async close() {
-      if (closing) return
+    close(httpDrained: Promise<void> = Promise.resolve()): Promise<void> {
+      if (closeWork) return closeWork
       closing = true
       clearInterval(heartbeat)
       clearInterval(cleanup)
       for (const ws of sockets.clients) ws.terminate()
-      await new Promise<void>(resolve => sockets.close(() => resolve()))
-      service.close()
+      const socketsClosed = new Promise<void>(resolve => sockets.close(() => resolve()))
+      closeWork = Promise.all([socketsClosed, httpDrained]).then(() => { service.close() })
+      return closeWork
     },
   }
 }
