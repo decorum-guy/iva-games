@@ -77,7 +77,7 @@ export function createGame(options: CreateOptions = {}): GameState {
     bossHand: [], bossDiscard: [], bossDeckRemaining: 0, secret: { runSeed: hashSeed(seed), playerDeck: [], bossDeck: [] }, control: 'shared',
     assisted: mode === 'practice', consents: { end: [], surrender: [] }, outcome: null, events: [],
   };
-  resetBattle(state, mode === 'campaign' ? 'regent' : boss, true);
+  resetBattle(state, mode === 'campaign' ? CAMPAIGN_BOSSES[0] : boss, true);
   return state;
 }
 
@@ -101,7 +101,7 @@ export function getLeader(state: GameState): Actor {
 export function getActiveActor(state: GameState): Actor {
   if (!state.coop) return 'solo';
   if (state.control !== 'shared') return state.control;
-  if (state.phase === 'camp') return state.campaignIndex === 0 ? 'A' : 'B';
+  if (state.phase === 'camp') return state.campaignIndex % 2 === 0 ? 'A' : 'B';
   if (state.phase === 'promotion') return state.units.find(u => u.id === state.pendingPromotions[0])?.owner ?? getLeader(state);
   const leader = getLeader(state) as Seat;
   if (state.mustDiscard || state.commands <= 0) return leader;
@@ -454,7 +454,8 @@ function validateStateUnchecked(value: unknown): string[] {
   const integer = (x: unknown, min: number, max: number) => Number.isInteger(x) && Number(x) >= min && Number(x) <= max;
   if (s.version !== RULES_VERSION) errors.push('unsupported-version');
   if (!['hunt', 'campaign', 'practice', 'tutorial'].includes(s.mode) || !Object.keys(DIFFICULTIES).includes(s.difficulty) || typeof s.coop !== 'boolean') errors.push('invalid-settings');
-  if (!['army', 'promotion', 'camp', 'finished'].includes(s.phase) || !integer(s.revision, 0, Number.MAX_SAFE_INTEGER) || !integer(s.round, 1, 100000) || !integer(s.campaignIndex, 0, 2)) errors.push('invalid-progress');
+  if (!['army', 'promotion', 'camp', 'finished'].includes(s.phase) || !integer(s.revision, 0, Number.MAX_SAFE_INTEGER) || !integer(s.round, 1, 100000) || !integer(s.campaignIndex, 0, CAMPAIGN_BOSSES.length - 1)) errors.push('invalid-progress');
+  if (s.phase === 'camp' && (s.mode !== 'campaign' || s.campaignIndex >= CAMPAIGN_BOSSES.length - 1)) errors.push('invalid-progress');
   if (s.roundLimit !== null && !integer(s.roundLimit, 1, 1000)) errors.push('invalid-limit');
   if (s.mode !== 'practice' && s.mode !== 'tutorial' && s.roundLimit !== 24) errors.push('invalid-limit');
   if (!s.boss || !Object.keys(BOSSES).includes(s.boss.id)) return [...errors, 'invalid-boss'];

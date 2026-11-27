@@ -4,7 +4,7 @@
 
 The owner's current request is a complete third chess game in a separate review branch, including a training-only boss, original 2D/3D assets, sounds and future boss/game registration. Source: the attached project entry file, current main and the existing PR #10 implementation. Branch: `feat/colossus-complete-20261127`, combining main `d397460689b717cbcb892d993dd33aa4d4631c49` and the prior Colossus branch `5597e7ac9582595e87066bd0116c3ed553db98e6`.
 
-The first published checkpoint is [`243ca456`](https://github.com/decorum-guy/iva-games/commit/243ca456df28d61c145532b8b76e9681826f6d6a), [draft PR #29](https://github.com/decorum-guy/iva-games/pull/29). Current integration also preserves the subsequently published District main `f00f0c949730893045a36e97b6ed08c8da55185c`.
+The first published checkpoint is [`243ca456`](https://github.com/decorum-guy/iva-games/commit/243ca456df28d61c145532b8b76e9681826f6d6a), [PR #29](https://github.com/decorum-guy/iva-games/pull/29). Current integration also preserves the subsequently published District work and OVERDRIVE tutorial through main `573669650be25278a30f048733e171d6ed297144`.
 
 ### Current changes
 
@@ -36,6 +36,12 @@ The integrated checkpoint `b13aff44441a22146a491f29bea00ccf4c58094f` was actuall
 - [Colossus browser review](https://github.com/decorum-guy/iva-games/actions/runs/46064511747) passed 12 of 20 scenarios. This exposed real mobile card-panel overlap, 3D HTML cleanup errors on leaving a scene, and a focused accessible grid covering the view toggle. It also exposed a tutorial assertion matching both the boss wrapper and its SVG. Actual software WebGL context creation, framebuffer pixels and loading ordinary boss GLBs had passed before the teardown failure; that partial evidence is not full 3D acceptance.
 
 This revision resets inherited mobile card-panel offsets, gives every Drei HTML label a stable dedicated portal whose children are owned only by Drei, and reserves space below the focused keyboard grid. The tutorial assertion now selects the unique visible boss wrapper. The card helper additionally checks that the target cell owns the actual pointer hit before tapping; clicks are not forced. Root directly applied Stone Skin to the king at 390×600 after the fix, observing shield 2 and focus reduced from 3 to 2. Targeted TypeScript, ESLint and diff checks passed. The new full browser result belongs to the resulting commit and is recorded in [PR #29](https://github.com/decorum-guy/iva-games/pull/29) and its checks; this entry does not predeclare a pass.
+
+### Confirmed browser acceptance checkpoint
+
+Revision `1e734d9cc6809240982032335e72c0bc6b45a0ce` passed [Colossus review](https://github.com/decorum-guy/iva-games/actions/runs/46065429762): **119 Colossus tests, 83 server tests, the complete build and all 20 browser scenarios**. The matrix covers desktop 1366×768 and mobile 390×844 / 390×600. All seven lessons, ordinary card targeting, interrupted-lesson save preservation, RU/EN and keyboard controls, local cooperation and two independent online clients with a lost ACK passed at each viewport. Desktop additionally passed WebGL2 context/framebuffer evidence, ordinary and training model loading, pointer movement, scene teardown/re-entry, promotion across views and continued play after deliberate context loss. The tests use normal clicks and taps. Both [release images and persistent-volume replacement](https://github.com/decorum-guy/iva-games/actions/runs/46065429795) also passed for this revision. The complete [platform CI](https://github.com/decorum-guy/iva-games/actions/runs/46065429783) subsequently passed as well: **1,171 tests / 91 files, 47 infrastructure tests**, all build/smoke/portal/District steps and the separate new OVERDRIVE tutorial job.
+
+The final extension review additionally removes fixed campaign length/start/index assumptions and restricts campaign badges to the actual campaign roster. Existing three-boss order is retained. The new registry-driven campaign checks and integrated OVERDRIVE main belong to the next revision; its final result is linked to the exact head in PR #29. Previously passing checks are evidence for their recorded revision, not a substitute for that run.
 
 ## Historical implementation — 26 November 2026
 

@@ -38,3 +38,19 @@ jobs:
       - run: node scripts/district-audio-browser.mjs
       - run: node scripts/district-territorial-browser.mjs
       # QA output stays in the job logs. No upload-artifact or video/trace storage.
+
+  overdrive-tutorial:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: npx playwright install --with-deps chromium
+      - name: Check the short tutorial and saved/online game isolation
+        run: >-
+          npx playwright test --config games/chess/overdrive/playwright.config.ts tutorial.spec.ts
+          --project desktop-chromium --project mobile-chromium --project landscape-chromium

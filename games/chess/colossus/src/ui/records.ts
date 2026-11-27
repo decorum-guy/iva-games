@@ -1,4 +1,5 @@
-import type { BossId,GameState } from '../core';
+import { HUNT_BOSSES } from '../core';
+import type { BossId,GameState,HuntBossId } from '../core';
 
 export interface ResultRecord {
  id:string;boss:BossId;difficulty:GameState['difficulty'];mode:GameState['mode'];
@@ -8,6 +9,22 @@ export interface ResultRecord {
  rulesVersion?:string|null;
  /** Public online state intentionally has no seed. */
  seed?:number|null;
+ /** Bosses actually defeated by this campaign; absent only on legacy records. */
+ campaignBosses?:HuntBossId[];
+}
+
+// Historical records predate roster snapshots and always describe this original march.
+const LEGACY_CAMPAIGN_BOSSES:readonly HuntBossId[]=['regent','spire','archivist'];
+export function earnedBossIds(record:ResultRecord):HuntBossId[]{
+ if(record.winner!=='army'||record.assisted||(record.mode!=='hunt'&&record.mode!=='campaign'))return [];
+ const candidates:unknown=record.mode==='campaign'
+  ?record.campaignBosses===undefined?LEGACY_CAMPAIGN_BOSSES:record.campaignBosses
+  :[record.boss];
+ if(!Array.isArray(candidates))return [];
+ return [...new Set(candidates.filter((id):id is HuntBossId=>typeof id==='string'&&HUNT_BOSSES.includes(id as HuntBossId)))];
+}
+export function bossWinDifficulties(records:readonly ResultRecord[],boss:HuntBossId):Set<GameState['difficulty']>{
+ return new Set(records.filter(record=>earnedBossIds(record).includes(boss)).map(record=>record.difficulty));
 }
 
 export function compareHuntResults(a:ResultRecord,b:ResultRecord):number{
@@ -34,9 +51,11 @@ export function retainResultRecords(records:ResultRecord[],recentLimit=100):Resu
  for(const record of [...bestHuntResults(records,false),...bestHuntResults(records,true)])keep.add(record.id);
  const medals=new Set<string>();
  for(const record of records){
-  if(record.winner!=='army'||record.assisted||(record.mode!=='hunt'&&record.mode!=='campaign'))continue;
-  const key=record.mode==='campaign'?'campaign:'+record.difficulty:record.boss+':'+record.difficulty;
-  if(!medals.has(key)){medals.add(key);keep.add(record.id);}
+  const keys=earnedBossIds(record).map(boss=>boss+':'+record.difficulty);
+  if(record.mode==='campaign'&&record.winner==='army'&&!record.assisted)keys.push('campaign:'+record.difficulty);
+  for(const key of keys){
+   if(!medals.has(key)){medals.add(key);keep.add(record.id);}
+  }
  }
  return records.filter(record=>keep.has(record.id));
 }

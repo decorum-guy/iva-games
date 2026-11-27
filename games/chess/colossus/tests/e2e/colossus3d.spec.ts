@@ -1,5 +1,6 @@
 import { inflateSync } from 'node:zlib';
 import type { Page } from '@playwright/test';
+import { BOSSES, HUNT_BOSSES } from '../../src/core/data';
 import { activate, beginHunt, board, cell, commands, expect, guard, lesson, menu, openEnglish, response, test } from './helpers';
 
 /** Read screenshots in memory; no reference snapshots or screenshot artifacts are published. */
@@ -82,7 +83,8 @@ async function canvasSquare(page: Page, square: string) {
 test('real WebGL renders production models, accepts pointer moves and survives context loss', async ({ page }) => {
   const models = modelsLoaded(page);
   await openEnglish(page, '3d');
-  for (const [id, name] of [['regent', 'The Stone Regent'], ['spire', 'The Spire'], ['archivist', 'The Ash Archivist']]) {
+  for (const id of HUNT_BOSSES) {
+    const name = BOSSES[id].name.en;
     await activate(page.locator('.boss-choices').getByRole('button', { name, exact: true }));
     await beginHunt(page, '3d');
     await expect.poll(() => models.loaded.has(id)).toBe(true);

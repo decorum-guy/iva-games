@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import { BASE_DECK,BOSSES,HUNT_BOSSES,BOSS_CARD_LIST,CARD_LIST,DIFFICULTIES,STARTER_CARDS,validateDeck } from '../core';
+import { BASE_DECK,BOSSES,HUNT_BOSSES,BOSS_CARD_LIST,CAMPAIGN_BOSSES,CARD_LIST,DIFFICULTIES,STARTER_CARDS,validateDeck } from '../core';
 import type { HuntBossId,CardId,CreateOptions,Difficulty,Language } from '../core';
 import { copy } from './i18n';
 import { Card } from './Card';
 import { BossIcon } from './PieceIcon';
 import { Modal } from './Modal';
+import { bossWinDifficulties } from './records';
 import type { ResultRecord } from './records';
 export interface SetupProps {
  lang:Language;initial:CreateOptions;records:ResultRecord[];tutorialDone:boolean;hasSave:boolean;hasPractice:boolean;onContinue:(practice:boolean)=>void;
@@ -16,10 +17,10 @@ export function Setup(p:SetupProps){
  const [deck,setDeck]=useState<CardId[]>(p.initial.deck??BASE_DECK);const [cards,setCards]=useState(p.initial.bossCards??true);
  const [deckOpen,setDeckOpen]=useState(false);const [joinOpen,setJoinOpen]=useState(false);const [link,setLink]=useState('');const [name,setName]=useState('');
  const [coopCampaign,setCoopCampaign]=useState(false);const [bestiary,setBestiary]=useState<HuntBossId|null>(null);
- const option:CreateOptions={boss:mode==='campaign'||coopCampaign&&mode==='coop'?'regent':boss,difficulty,mode:mode==='coop'?(coopCampaign?'campaign':'hunt'):mode,coop:mode==='coop',deck,bossCards:cards};
+ const option:CreateOptions={boss:mode==='campaign'||coopCampaign&&mode==='coop'?CAMPAIGN_BOSSES[0]:boss,difficulty,mode:mode==='coop'?(coopCampaign?'campaign':'hunt'):mode,coop:mode==='coop',deck,bossCards:cards};
  const valid=validateDeck(deck).length===0;
  const chosen=BOSSES[option.boss??boss];
- const bossWins=(id:HuntBossId)=>new Set(p.records.filter(r=>r.winner==='army'&&!r.assisted&&r.mode!=='practice'&&(r.boss===id||r.mode==='campaign')).map(r=>r.difficulty));
+ const bossWins=(id:HuntBossId)=>bossWinDifficulties(p.records,id);
  return <section className="setup-screen">
  <div className="setup-world"><div className="reliquary-ring"/><BossIcon id={chosen.id} className="setup-monument"/>
  <h1>{c.title}</h1><p>{c.tagline}</p><div className="setup-boss-name"><h2>{chosen.name[p.lang]}</h2><p>{chosen.description[p.lang]}</p>

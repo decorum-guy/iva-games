@@ -1,3 +1,4 @@
+import { CAMPAIGN_BOSSES } from './data';
 import { bossCells, file, rank, shift, unitAt } from './geometry';
 import type { GameState, Intent, IntentStep, Unit } from './types';
 
@@ -22,7 +23,7 @@ export function checkOutcome(state: GameState): boolean {
     return true;
   }
   if (state.boss.hp <= 0) {
-    state.phase = state.mode === 'campaign' && state.campaignIndex < 2 ? 'camp' : 'finished';
+    state.phase = state.mode === 'campaign' && state.campaignIndex < CAMPAIGN_BOSSES.length - 1 ? 'camp' : 'finished';
     state.outcome = state.phase === 'finished' ? { winner: 'army', reason: 'boss-defeated', round: state.round } : null;
     state.events.push({ type: 'victory', key: 'boss-defeated' });
     return true;

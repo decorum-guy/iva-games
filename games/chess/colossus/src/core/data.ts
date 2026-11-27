@@ -61,4 +61,4 @@ export const BOSS_CARD_LIST: BossCardDefinition[] = [
   bossCard('archivist_border', 'archivist', 'legendary', 'Обугленный край', 'Charred Edge', 'Поджечь весь внешний периметр: 28 клеток, углы один раз. Огонь наносит 1 сейчас и 1 при следующем ответе.', 'Ignite the entire outer perimeter: 28 squares, counting corners once. Fire deals 1 now and 1 on the next response.'),
 ];
 export const BOSS_CARDS = Object.fromEntries(BOSS_CARD_LIST.map(c => [c.id, c])) as Record<string, BossCardDefinition>;
-export const CAMPAIGN_BOSSES: HuntBossId[] = ['regent', 'spire', 'archivist'];
+export const CAMPAIGN_BOSSES: readonly [HuntBossId, ...HuntBossId[]] = ['regent', 'spire', 'archivist'];

@@ -10,6 +10,7 @@ export interface Board2DProps {
   state: GameState
   selected: string | null
   targets: readonly string[]
+  previewTargets?: readonly string[]
   focusSquares: readonly string[]
   onSquare(square: string): void
   flipped: boolean
@@ -82,7 +83,7 @@ function spriteStyle(sprite: BoardSprite): CSSProperties {
     zIndex: 2 + Math.round(Math.max(0, sprite.lift) * 100) }
 }
 
-export function Board2D({ state, selected, targets, focusSquares, onSquare, flipped, language,
+export function Board2D({ state, selected, targets, previewTargets = [], focusSquares, onSquare, flipped, language,
   accessibleOnly = false, motion = null, reduced = false }: Board2DProps) {
   const [frame, setFrame] = useState<{ id: number; elapsed: number } | null>(null)
   useEffect(() => {
@@ -114,7 +115,7 @@ export function Board2D({ state, selected, targets, focusSquares, onSquare, flip
       const piece = state.pieces.find(p => p.square === square), chosen = piece?.id === selected
       const target = targets.includes(square), focus = focusSquares.includes(square)
       return <button key={square} type="button" role="gridcell" data-square={square} data-selected={chosen}
-        data-target={target} data-focus={focus} data-check={square === checkedSquare} className={`od-cell ${(x + y) % 2 ? 'light' : 'dark'}`}
+        data-target={target} data-preview={previewTargets.includes(square)} data-focus={focus} data-check={square === checkedSquare} className={`od-cell ${(x + y) % 2 ? 'light' : 'dark'}`}
         aria-label={`${square}${piece ? `, ${sideName(piece.side, language)}, ${pieceName(piece.type, language)}` : ''}${target ? tr(language, ', доступный ход', ', available move') : ''}${square === checkedSquare ? tr(language, ', шах', ', check') : ''}`}
         aria-selected={chosen} onClick={() => onSquare(square)} onKeyDown={event => {
           const direction = ({ ArrowLeft: -1, ArrowRight: 1, ArrowUp: -8, ArrowDown: 8 } as Record<string, number>)[event.key]
@@ -128,6 +129,7 @@ export function Board2D({ state, selected, targets, focusSquares, onSquare, flip
         {piece && <PieceIcon type={piece.type} side={piece.side} size={60} />}
         {piece && state.forms[piece.side]?.pieceId === piece.id && <span className="od-form-counter">{state.forms[piece.side]?.remainingTurns}</span>}
         {target && <span className="od-target" />}
+        {!target && previewTargets.includes(square) && <span className="od-preview-target" />}
       </button>
     })}
     {animating && <div className="od-motion-layer" aria-hidden="true">
