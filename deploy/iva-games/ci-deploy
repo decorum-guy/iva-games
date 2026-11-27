@@ -1,4 +1,6 @@
 #!/bin/sh
 # ForceCommand for the CI SSH account. Ignore SSH_ORIGINAL_COMMAND and argv.
 set -eu
-exec /usr/bin/timeout --kill-after=20s 720s /usr/bin/sudo -n -- /opt/iva-games/deploy/activation.py deploy
+# Two image pulls, two bounded backups, promotion and a compatible rollback
+# must fit without killing a backup before its thaw/cleanup trap can finish.
+exec /usr/bin/timeout --kill-after=30s 1020s /usr/bin/sudo -n -- /opt/iva-games/deploy/activation.py deploy

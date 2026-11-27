@@ -154,9 +154,10 @@ jobs:
     needs: publish
     if: github.event_name == 'workflow_run'
     runs-on: ubuntu-24.04
-    timeout-minutes: 18
+    timeout-minutes: 20
     permissions:
       contents: read
+      actions: read
       packages: read
     environment: production
     concurrency:
@@ -168,6 +169,10 @@ jobs:
       VPS_PORT: ${{ vars.IVA_SSH_PORT }}
       VPS_HOST_KEY: ${{ vars.IVA_SSH_HOST_KEY }}
     steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          persist-credentials: false
       - name: Promote the reviewed image digests
         env:
           DEPLOY_KEY: ${{ secrets.IVA_DEPLOY_SSH_KEY }}
@@ -180,7 +185,8 @@ jobs:
           test -n "$DEPLOY_KEY" && test -n "$VPS_HOST_KEY"
           printf '%s\n' "$DEPLOY_KEY" > "$config/key"
           printf '%s\n' "$VPS_HOST_KEY" > "$config/known_hosts"
-          main_sha="$(curl -fsS https://api.github.com/repos/"$GITHUB_REPOSITORY"/branches/main | jq -er .commit.sha)"
+          test "$(git rev-parse HEAD)" = "$RELEASE_SHA"
+          main_sha="$(python3 -B deploy/iva-games/github-main.py)"
           if [[ "$main_sha" != "$RELEASE_SHA" ]]; then
             echo "A newer main revision superseded this run."
             exit 0
@@ -193,7 +199,8 @@ jobs:
           chess="$(digest chess)"
           platform="$(digest platform)"
           # The server validates evidence against GitHub and GHCR independently.
-          # Registry auth is short-lived and goes via stdin, never argv.
+          # The short-lived token also authenticates server-side GitHub evidence
+          # checks. It goes via stdin, never argv, and is not persisted on VPS.
           for attempt in 1 2 3; do
             status=0
             printf '%s %s %s\n%s\n' "$RELEASE_SHA" "$chess" "$platform" "$REGISTRY_TOKEN" |
