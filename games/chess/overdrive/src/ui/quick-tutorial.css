@@ -1,0 +1,88 @@
+.od-quick-tutorial { position:fixed;inset:0;z-index:30;height:100dvh;display:grid;grid-template-rows:64px minmax(0,1fr) 42px;padding:0 clamp(12px,3vw,48px);background:radial-gradient(ellipse at 25% 45%,#f7fafb,#e3ecf1 65%,#d6e2e9);color:var(--od-ink); }
+.od-quick-header { display:flex;align-items:center;justify-content:space-between;gap:16px;border-bottom:1px solid var(--od-line); }
+.od-quick-header>div { display:flex;gap:18px;align-items:center; }
+.od-quick-header b { font-family:'Russo One',sans-serif;font-style:italic;font-size:20px; }
+.od-quick-header span { font-size:12px;color:var(--od-muted); }
+.od-quick-header button { min-height:40px;padding:8px 13px;font-size:12px;box-shadow:none; }
+.od-quick-header button span { font-size:22px;line-height:1; }
+.od-quick-layout { width:100%;max-width:1250px;margin:0 auto;display:grid;grid-template-columns:minmax(0,1fr) minmax(300px,360px);gap:clamp(20px,5vw,70px);min-height:0;padding:22px 0; }
+.od-quick-arena { display:grid;grid-template-rows:45px minmax(0,1fr) auto;gap:8px;min-width:0;min-height:0; }
+.od-quick-energy { display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;padding:0 12px;font-size:12px; }
+.od-quick-board-space { container-type:size;display:grid;place-items:center;min-width:0;min-height:0; }
+.od-quick-board-space>.od-board-2d { width:min(100cqw,100cqh);height:min(100cqw,100cqh);aspect-ratio:1;border-width:9px; }
+.od-quick-board-space .od-preview-target { position:absolute;width:12%;height:12%;border-radius:50%;background:#1c547a80;border:1px solid #e8f0f4aa;pointer-events:none;z-index:2; }
+.od-quick-board-space .od-cell[data-focus=true]:not([data-selected=true]) { box-shadow:inset 0 0 0 3px #ef8a51; }
+.od-quick-guide { display:flex;flex-direction:column;align-self:center;gap:14px;max-height:100%;min-height:0;overflow:auto;padding:3px 3px 12px;scrollbar-width:thin; }
+.od-quick-progress { display:flex;justify-content:space-between;align-items:center;gap:20px;font-size:12px;color:var(--od-muted); }
+.od-quick-progress b { color:var(--od-ink);font-variant-numeric:tabular-nums; }
+.od-quick-guide .od-progress-track { margin:0 0 4px; }
+.od-quick-guide h1 { font-size:clamp(22px,2.5vw,32px);line-height:1.18;letter-spacing:-.6px;outline:none; }
+.od-quick-instruction { font-size:15px;line-height:1.5;min-height:67px;color:#466b83; }
+.od-quick-guide .od-power-switch { margin:2px 0; }
+.od-quick-guide .od-power-switch button { min-height:58px; }
+.od-quick-timer { display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:42px;background:#f5e7da;border:1px solid #d8b28e;padding:6px 12px;border-radius:6px;font-size:12px; }
+.od-quick-timer>div { display:flex;gap:9px;margin-left:auto; }
+.od-quick-timer span { font-size:21px;line-height:1;color:#b8b8af; }
+.od-quick-timer span.live { color:#d96932; }
+.od-quick-timer b { min-width:30px;font-size:17px; }
+.od-quick-skip { text-align:left;font-size:12px;font-weight:600;color:#3c6a88;padding:12px 0;min-height:44px;text-decoration:underline;text-underline-offset:4px; }
+.od-quick-notice { border-left:3px solid #d87c43;background:#f1e3d3;padding:8px 10px;font-size:12px; }
+.od-quick-recap { display:grid;gap:10px; }
+.od-quick-recap p { font-size:13px;line-height:1.45; }
+.od-quick-recap button { margin-top:2px; }
+.od-quick-extras { margin-top:10px;padding-top:14px;border-top:1px solid var(--od-line); }
+.od-quick-extras h2 { font-size:13px;margin-bottom:10px; }
+.od-quick-pieces { display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:4px; }
+.od-quick-pieces button { display:grid;justify-items:center;gap:4px;min-width:0;padding:6px 2px;border:1px solid #aec4d2;background:#ecf2f4;border-radius:5px; }
+.od-quick-pieces button[aria-pressed=true] { background:#f4e0cf;border-color:#d47a40; }
+.od-quick-pieces button>.od-piece-icon { width:36px;height:40px;max-width:100%; }
+.od-quick-pieces button span { font-size:9px; }
+.od-quick-footer { border-top:1px solid var(--od-line);display:flex;align-items:center;justify-content:space-between; }
+.od-quick-footer button { padding:7px 0;min-height:36px;font-size:11px;color:var(--od-muted); }
+.od-header-actions .od-tutorial-entry { color:#b9592d;font-weight:750; }
+@media(max-width:700px) and (orientation:portrait) {
+  .od-quick-tutorial { grid-template-rows:54px minmax(0,1fr) 36px;padding-inline:12px; }
+  .od-quick-header { gap:8px; }
+  .od-quick-header>div { display:grid;gap:2px; }
+  .od-quick-header b { font-size:16px; }
+  .od-quick-header span { font-size:10px; }
+  .od-quick-header button { min-height:36px;padding:6px 10px;font-size:11px; }
+  .od-quick-layout { grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr) auto;gap:10px;padding:8px 0; }
+  .od-quick-arena { grid-template-rows:32px minmax(0,1fr) auto;gap:5px; }
+  .od-quick-energy { padding:0 4px;font-size:11px; }
+  .od-quick-guide { width:100%;max-height:320px;align-self:stretch;gap:7px;padding:2px 2px 4px; }
+  .od-quick-progress { font-size:10px; }
+  .od-quick-guide .od-progress-track { margin:0; }
+  .od-quick-guide h1 { font-size:22px; }
+  .od-quick-instruction { font-size:13px;line-height:1.4;min-height:37px; }
+  .od-quick-guide .od-power-switch button { min-height:44px; }
+  .od-quick-guide .od-power-switch span { font-size:11px; }
+  .od-quick-guide .od-power-switch b { font-size:17px; }
+  .od-quick-skip { min-height:34px;padding:6px 0;font-size:11px; }
+  .od-quick-timer { min-height:32px;padding:3px 8px;font-size:11px; }
+  .od-quick-timer span { font-size:17px; }
+  .od-quick-timer b { font-size:14px; }
+  .od-quick-recap { gap:5px; }
+  .od-quick-recap p { font-size:12px; }
+  .od-quick-recap button { min-height:38px;padding:7px 10px;font-size:12px; }
+  .od-quick-extras { margin-top:2px;padding-top:7px; }
+  .od-quick-extras h2 { font-size:12px;margin-bottom:6px; }
+  .od-quick-pieces button { padding-block:3px;gap:2px; }
+  .od-quick-pieces button>.od-piece-icon { width:28px;height:32px; }
+  .od-quick-footer button { min-height:32px; }
+}
+@media(max-height:560px) and (orientation:landscape) {
+  .od-quick-tutorial { grid-template-rows:42px minmax(0,1fr) 28px;padding-inline:12px; }
+  .od-quick-header b { font-size:16px; }
+  .od-quick-header button { min-height:30px;padding:4px 10px; }
+  .od-quick-layout { grid-template-columns:minmax(0,1fr) minmax(260px,42%);padding:8px 0;gap:20px; }
+  .od-quick-arena { grid-template-rows:26px minmax(0,1fr) auto;gap:3px; }
+  .od-quick-guide { gap:8px; }
+  .od-quick-guide h1 { font-size:23px; }
+  .od-quick-instruction { font-size:12px;min-height:36px; }
+  .od-quick-guide .od-power-switch button { min-height:40px; }
+  .od-quick-timer { min-height:28px;padding:3px 8px;font-size:10px; }
+  .od-quick-timer span { font-size:14px; }
+  .od-quick-timer b { font-size:13px; }
+  .od-quick-footer button { min-height:26px;padding:4px 0; }
+}
