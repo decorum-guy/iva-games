@@ -32,13 +32,15 @@ async function closeNews(page) {
   const close = page.getByRole('button', { name: /^(Dismiss news|Свернуть новости)$/ });
   if (await close.isVisible()) await close.click();
 }
-async function action(page, button) {
+async function action(page, button, input = 'mouse') {
   await closeNews(page);
   // The other participant may just have acted. Let the real polling client consume its next snapshot.
   await page.waitForResponse(response => response.url().endsWith('/match') && response.request().method() === 'GET' && response.ok());
   await page.evaluate(() => new Promise(resolve => requestAnimationFrame(resolve)));
   const response = page.waitForResponse(response => response.url().endsWith('/actions') && response.request().method() === 'POST');
-  await button.click();
+  if (input === 'touch') await button.tap();
+  else if (input === 'keyboard') { await button.focus(); await button.press('Enter'); }
+  else await button.click();
   const received = await response;
   assert.equal(received.status(), 200, await received.text());
   return (await received.json()).view;
@@ -85,6 +87,8 @@ async function readNewsByInput(page, input) {
           await page.evaluate(() => new Promise(resolve => requestAnimationFrame(resolve)));
         }
         await touch.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+      } else if (input === 'keyboard') {
+        await scroll.press(distance > 0 ? 'PageDown' : 'PageUp');
       } else {
         await page.mouse.move(position.x, (position.top + position.bottom) / 2);
         await page.mouse.wheel(0, distance);
@@ -124,8 +128,12 @@ try {
   // A seven, both independent discards, actual blockade and persistence after a new turn.
   let entry = await harness.reset('seven-discard'); await open(entry);
   let page = pages[entry.hostIndex], other = pages[entry.guestIndex];
+  await other.locator('.tn-open').click();
+  await expect(other.locator('.tn-issue')).toBeVisible();
   let rolled = await action(page, page.getByRole('button', { name:'Roll dice', exact:true }));
   assert.equal(rolled.latestRoll.sum,7);
+  await expect(other.locator('.ta-map-required')).toBeVisible();
+  await expect(other.locator('.tn-issue')).toHaveCount(0);
   const label = `${rolled.latestRoll.dice[0]} + ${rolled.latestRoll.dice[1]} = 7`;
   await expect(page.locator('.territory-dice').first()).toHaveAttribute('aria-label',label);
   await page.getByRole('spinbutton',{name:'Return resources to the bank · Wood',exact:true}).fill('4');
@@ -146,6 +154,7 @@ try {
   await action(other,other.getByRole('button',{name:'Roll dice',exact:true}));
   await page.reload(); await select(page,'tile',block.tileId);
   await expect(page.locator('.territory-blockade')).toContainText('Seven');
+  await closeNews(page);
   await page.getByRole('button',{name:'Turn history',exact:true}).click();
   await expect(page.locator('.territory-history')).toContainText(label);
   results.scenarios.push({name:'seven',dice:rolled.latestRoll.dice,discardBoth:true,blockade:'seven',reload:true,laterTurn:true});
@@ -189,8 +198,12 @@ try {
     const scroll = page.locator('.tn-issue-cards');
     await scroll.focus(); await scroll.press('End');
     await expect(page.locator('.tn-card .tn-area[aria-pressed]').last()).toBeInViewport();
+    const atEnd = await scroll.evaluate(element => element.scrollTop);
     await scroll.press('PageUp');
-    await expect(page.getByText('END OF TEST ISSUE',{exact:true})).toBeInViewport();
+    await expect.poll(() => scroll.evaluate(element => element.scrollTop)).toBeLessThan(atEnd);
+    // One page need not land on a particular paragraph at every font/viewport size.
+    // Read to the same final paragraph using real page keys, with bounded progress.
+    await readNewsByInput(page, 'keyboard');
     assert.ok(await scroll.evaluate(element=>element.scrollHeight>element.clientHeight && element.scrollTop>0));
     await select(page,'node',entry.expected.house);
     await expect(page.locator('.tn-issue')).toBeVisible();
@@ -246,20 +259,33 @@ try {
     await expect(page.getByRole('button', { name:'Действия', exact:true })).toBeInViewport();
     await page.screenshot({path:join(artifacts,`table-ru-text130-${size.width}x${size.height}.png`)});
   }
-  entry = await harness.reset('seven-discard'); await open(entry);
-  await action(pages[entry.hostIndex],pages[entry.hostIndex].getByRole('button',{name:'Roll dice',exact:true}));
-  page = pages[entry.guestIndex];
-  await expect(page.locator('.territory-phase p')).toContainText('Семёрка: верните 4 карты');
-  await expect(page.locator('.territory-phase p')).toBeInViewport();
-  await fits(page,'ru-text130-390x600-required-discard');
-  await page.screenshot({path:join(artifacts,'required-step-ru-text130-390x600.png')});
-  await page.getByRole('spinbutton',{name:'Верните ресурсы в банк · Зерно',exact:true}).fill('4');
-  const discard = page.getByRole('button',{name:'Вернуть 4 / 4',exact:true});
-  await discard.focus(); await expect(discard).toBeInViewport();
-  await page.screenshot({path:join(artifacts,'required-action-ru-text130-390x600.png')});
-  const afterSmallDiscard = await action(page,discard);
-  assert.equal(afterSmallDiscard.you.discard,0);
-  results.scenarios.push({name:'mobile-readability',language:'ru',text:130,resources:5,requiredStepVisible:true,requiredActionCompleted:true,physicalDevice:false});
+  for (const size of [{width:1366,height:768},{width:1024,height:600},{width:390,height:844},{width:390,height:600}]) {
+    entry = await harness.reset('seven-discard'); await open(entry);
+    page = pages[entry.guestIndex]; await page.setViewportSize(size);
+    // Keep a reader explicitly open while another real client causes a mandatory step.
+    const reading = size.width === 1024 ? 'journal' : 'issue';
+    await page.locator(reading === 'journal' ? '.tn-journal-open' : '.tn-open').click();
+    await expect(page.locator('.tn-issue')).toBeVisible();
+    await action(pages[entry.hostIndex],pages[entry.hostIndex].getByRole('button',{name:'Roll dice',exact:true}));
+    await expect(page.locator('.territory-phase p')).toContainText('Семёрка: верните 4 карты');
+    await expect(page.locator('.territory-phase p')).toBeInViewport();
+    await expect(page.locator('.tn-issue')).toHaveCount(0);
+    await expect(page.locator('.tn-open')).toBeDisabled();
+    await expect(page.locator('.tn-journal-open')).toBeDisabled();
+    const inputs = page.locator('.ta-map-required input');
+    await expect(inputs).toHaveCount(5);
+    for (const input of await inputs.all()) await expect(input).toBeInViewport({ratio:1});
+    await fits(page,`ru-text130-${size.width}x${size.height}-required-discard`);
+    await page.getByRole('spinbutton',{name:'Верните ресурсы в банк · Зерно',exact:true}).fill('4');
+    const discard = page.getByRole('button',{name:'Вернуть 4 / 4',exact:true});
+    await expect(discard).toBeInViewport({ratio:1});
+    await page.screenshot({path:join(artifacts,`required-action-ru-text130-${size.width}x${size.height}.png`)});
+    const input = size.width <= 620 ? 'touch' : size.width === 1366 ? 'keyboard' : 'mouse';
+    const afterSmallDiscard = await action(page,discard,input);
+    assert.equal(afterSmallDiscard.you.discard,0);
+    await expect(page.locator('.tn-open')).toBeEnabled();
+    results.scenarios.push({name:'required-action-over-news',viewport:size,language:'ru',text:130,resources:5,requiredStepVisible:true,requiredActionCompleted:true,reading,input,physicalDevice:false});
+  }
 
   // Delivered build bytes and audio media type, not a live production claim.
   assert.equal(await (await fetch(harness.origin)).text(),await readFile(join(harness.directory,'portal/index.html'),'utf8'));

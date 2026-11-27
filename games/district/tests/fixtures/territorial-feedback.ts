@@ -75,6 +75,8 @@ export function prepareFeedbackFixture(baseline: TerritoryState, scenario: Feedb
     });
   };
   if (scenario === 'seven-discard') {
+    // A reader may already have this issue open when another player rolls seven.
+    news('G06');
     s.players[board.ownerId].hand = stock({ wood: 5, brick: 4 });
     s.players[board.otherId].hand = stock({ grain: 8 });
     conserveBank();

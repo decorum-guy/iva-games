@@ -1,6 +1,7 @@
 .territorial-news { min-width: 0; color: #213f4b; font-size: calc(13px * var(--table-text-scale,1)); line-height: 1.5; border-top: 1px solid #bdd3d5; background: #e5f0f0; }
 .tn-header { display: flex; justify-content: space-between; align-items: stretch; }
 .territorial-news button { color: inherit; font: inherit; cursor: pointer; min-height: 44px; }
+.territorial-news button:disabled { cursor: default; opacity: .6; }
 .territorial-news button:focus-visible,.tn-issue-cards:focus-visible { outline: 3px solid #25868e; outline-offset: -3px; }
 .tn-open,.tn-journal-open { display: flex; align-items: center; gap: 7px; padding: 8px 12px; background: transparent; }
 .tn-open { flex: 1; text-align: left; }

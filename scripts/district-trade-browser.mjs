@@ -44,9 +44,15 @@ async function open(entry) {
   await Promise.all(pages.map(async page => {
     await page.goto(fresh.url);
     await expect(page.locator('.territory-match')).toBeVisible();
-    await expect(page.locator('.territory-inspector .territorial-actions')).toBeVisible();
+    await expect(page.locator('.territory-map-tools .ta-cards > summary')).toBeVisible();
   }));
   return fresh;
+}
+async function openTrade(page) {
+  const toggle = page.getByRole('button', { name: /^(Offer a trade|Continue saved terms)$/ });
+  // A restored draft is already open after a reload; the new map control toggles it.
+  if (await toggle.getAttribute('aria-expanded') !== 'true') await toggle.click();
+  await expect(page.locator('.ta-trade-window')).toBeVisible();
 }
 async function enterPlay(entry, index) {
   let current = await action(pages[index], pages[index].getByRole('button', { name: 'Roll dice', exact: true }));
@@ -98,6 +104,8 @@ try {
   for (const [index, account] of harness.manifest.accounts.entries()) {
     const context = await browser.newContext({ storageState: account.storageState,
       viewport: index ? { width: 390, height: 844 } : { width: 1440, height: 900 }, hasTouch: !!index });
+    context.setDefaultTimeout(15_000);
+    context.setDefaultNavigationTimeout(20_000);
     await context.addInitScript(() => {
       if (!['http:', 'https:'].includes(window.location.protocol)) return;
       localStorage.setItem('iva.portal.language', 'en');
@@ -193,7 +201,7 @@ try {
 
   entry = await open('trade-draft');
   const lostPage = pages[entry.hostIndex];
-  await lostPage.getByRole('button', { name: /^(Offer a trade|Continue saved terms)$/ }).click();
+  await openTrade(lostPage);
   await lostPage.locator('.ta-trade-editor').getByLabel('Trade with', { exact: true }).selectOption(entry.expected.otherId);
   for (const resource of resources) {
     await lostPage.getByRole('spinbutton', { name: 'I give · ' + name(resource), exact: true }).fill(resource === 'wood' ? '2' : '0');
@@ -235,7 +243,7 @@ try {
   await post(entry, entry.hostIndex, { type: 'offer', targetId: entry.expected.otherId, give: stock({ wood: 4 }), receive: stock({ brick: 1 }) });
   const bankPage = pages[entry.hostIndex], recipientPage = pages[entry.guestIndex];
   await bankPage.reload();
-  await bankPage.getByRole('button', { name: /^(Offer a trade|Continue saved terms)$/ }).click();
+  await openTrade(bankPage);
   await bankPage.getByRole('button', { name: 'Bank', exact: true }).click();
   const bankBefore = await view(entry, entry.hostIndex);
   await bankPage.locator('.ta-bank').getByLabel('I receive', { exact: true }).selectOption('grain');
@@ -250,7 +258,7 @@ try {
 
   entry = await open('trade-draft');
   const lostBankPage = pages[entry.hostIndex];
-  await lostBankPage.getByRole('button', { name: /^(Offer a trade|Continue saved terms)$/ }).click();
+  await openTrade(lostBankPage);
   await lostBankPage.getByRole('button', { name: 'Bank', exact: true }).click();
   await lostBankPage.locator('.ta-bank').getByLabel('I receive', { exact: true }).selectOption('grain');
   const lostBankBefore = await view(entry, entry.hostIndex);
@@ -299,6 +307,9 @@ try {
   await cardPage.locator(`[data-board-target="tile:${movedPhase.legal.block[0].tileId}"]`).click();
   const moved = await action(cardPage, cardPage.getByRole('button', { name: 'Move blockade', exact: true }));
   assert.equal(moved.blockade.reason, 'patrol');
+  await cardPage.locator('.ta-cards > summary').click();
+  await expect(cardPage.locator('.ta-cards .ta-feedback')).toContainText('Patrol complete. The blockade has moved.');
+  await expect(cardPage.locator('.ta-cards .ta-feedback')).not.toContainText('Choose the blockade');
   await expect(cardPage.locator('[data-card-id="fixture-card-1"]')).toContainText('A card was already played this turn');
   await expect(cardPage.locator('[data-card-id="fixture-card-2"]').getByRole('button', { name: 'Play card', exact: true })).toHaveCount(0);
   passed('patrol confirmation preserves card until confirmed, moves blockade with patrol cause and enforces one active card per turn');
@@ -336,9 +347,21 @@ try {
     else await cardPage.mouse.click(midpoint.x, midpoint.y);
     await expect(cardPage.locator('.ta-selected')).toContainText('Covered by Survey');
     routes = await action(cardPage, cardPage.locator('.ta-selected').getByRole('button', { name: kind === 'sea' ? 'Open sea lane' : 'Build road', exact: true }));
+    await cardPage.locator('.ta-cards > summary').click();
+    await expect(cardPage.locator('.ta-cards .ta-feedback')).toContainText(index === 0
+      ? 'Survey: choose the second route on the map.' : 'Survey complete. Both routes are built.');
+    await cardPage.locator('.ta-cards .ta-feedback').scrollIntoViewIfNeeded();
+    const closeCards = cardPage.getByRole('button', { name: 'Close development cards', exact: true });
+    await expect(closeCards).toBeInViewport({ ratio: 1 });
+    if (entry.hostIndex === 1) await closeCards.tap();
+    else await closeCards.click();
+    await expect(cardPage.locator('.ta-card-panel')).toBeHidden();
   }
   assert.ok(routes.legal.options.filter(option => option.kind === 'route').every(option => option.pricing.reason !== 'tactic'));
-  passed('survey covers two actual route purchases and then returns to the ordinary server price');
+  await action(cardPage, cardPage.getByRole('button', { name: 'End turn', exact: true }));
+  await cardPage.locator('.ta-cards > summary').click();
+  await expect(cardPage.locator('.ta-cards .ta-feedback')).toHaveCount(0);
+  passed('survey covers two actual routes, updates remaining/completed guidance and clears its receipt on the next turn');
 
   entry = await open('patrol');
   cardPage = pages[entry.hostIndex];

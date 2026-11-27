@@ -105,6 +105,11 @@ function urgency(item: PublicNews | undefined) {
 export function TerritorialNews(props: NewsProps) {
   const { view, lang, onSelect, autoOpen = true, onShowCouponRoutes } = props;
   const ru = lang === 'ru';
+  // A manually opened issue must yield as well when a live turn requires input.
+  const actionRequired = view.you.discard > 0 || view.legal.block.length > 0;
+  const requiredHint = view.you.discard > 0
+    ? (ru ? 'Сначала верните карты в банк.' : 'Return cards to the bank first.')
+    : (ru ? 'Сначала перенесите блокаду.' : 'Move the blockade first.');
   const [dismissed, setDismissed] = useState('');
   const [mode, setMode] = useState<'latest' | 'journal' | null>(null);
   const [articleId, setArticleId] = useState<string | null>(null);
@@ -126,7 +131,7 @@ export function TerritorialNews(props: NewsProps) {
     const group = issues.get(item.round) ?? [];
     group.push(item); issues.set(item.round, group);
   }
-  const visible = mode === 'journal' || (cards.length > 0 && (mode === 'latest' || autoOpen && dismissed !== issueKey));
+  const visible = !actionRequired && (mode === 'journal' || (cards.length > 0 && (mode === 'latest' || autoOpen && dismissed !== issueKey)));
   const severities = ordered.map(urgency);
   const level = selected ? urgency(selected) : severities.includes('urgent') ? 'urgent' : severities.includes('warning') ? 'warning' : 'ordinary';
   function close() {
@@ -142,11 +147,11 @@ export function TerritorialNews(props: NewsProps) {
   function read(id: string) { setArticleId(id); setMode('latest'); }
   return <section className="territorial-news" aria-label={ru ? 'Новости района' : 'District news'}>
     <header className="tn-header">
-      <button ref={opener} type="button" className="tn-open" onClick={() => open('latest')} aria-expanded={visible && mode !== 'journal'}>
+      <button ref={opener} type="button" className="tn-open" onClick={() => open('latest')} aria-expanded={visible && mode !== 'journal'} disabled={actionRequired} title={actionRequired ? requiredHint : undefined}>
         <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true"><path d="M5 4h15v16H5a2 2 0 0 1-2-2V8h2m0-4v14m3-10h9m-9 4h3m3 0h3m-9 4h9"/></svg>
         <strong>{ru ? 'Новости' : 'News'}</strong>{view.threats.length > 0 && <span className="tn-count">{view.threats.length}</span>}
       </button>
-      <button type="button" className="tn-journal-open" onClick={() => open('journal')}>{ru ? 'Журнал' : 'Journal'} <small>{view.news.length}</small></button>
+      <button type="button" className="tn-journal-open" onClick={() => open('journal')} disabled={actionRequired} title={actionRequired ? requiredHint : undefined}>{ru ? 'Журнал' : 'Journal'} <small>{view.news.length}</small></button>
     </header>
     {visible && <div ref={panel} className={'tn-issue tn-urgency-' + (mode === 'journal' ? 'ordinary' : level)} role="region"
       aria-label={mode === 'journal' ? (ru ? 'Журнал новостей' : 'News journal') : (ru ? 'Выпуск новостей' : 'News issue')}

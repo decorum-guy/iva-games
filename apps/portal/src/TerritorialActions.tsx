@@ -456,25 +456,49 @@ function CardArt({ kind }: { kind: CardKind }) {
   </svg>;
 }
 
+type CardFeedback = CardKind | 'bought' | 'unconfirmed';
+
+function cardFeedbackText(view: TerritoryView, kind: CardFeedback, lang: Lang) {
+  if (kind === 'bought') return word(lang, 'Карта куплена и добавлена в вашу руку.', 'Card bought and added to your hand.');
+  if (kind === 'supply') return word(lang, 'Снабжение получено. Две единицы добавлены в руку.', 'Supplies received. Two units were added to your hand.');
+  if (kind === 'patrol') return view.pendingBlockade?.actorId === view.you.participantId && view.pendingBlockade.reason === 'patrol'
+    ? word(lang, 'Патруль сыгран. Выберите клетку и цель блокады.', 'Patrol played. Choose the blockade tile and target.')
+    : word(lang, 'Патруль завершён. Блокада перенесена.', 'Patrol complete. The blockade has moved.');
+  if (kind === 'survey') {
+    const history = view.history ?? [];
+    const played = [...history].reverse().find(entry => entry.actorId === view.you.participantId && entry.turn === view.turn && entry.kind === 'play-card' && entry.cardKind === 'survey');
+    const built = played ? history.filter(entry => entry.actorId === view.you.participantId && entry.turn === view.turn && entry.kind === 'route' && entry.revision > played.revision).length : 0;
+    if (built >= 2) return word(lang, 'Подряд завершён. Оба пути построены.', 'Survey complete. Both routes are built.');
+    if (!view.legal.options.some(option => option.kind === 'route' && option.pricing?.reason === 'tactic'))
+      return word(lang, 'Сейчас нет доступного пути по Подряду.', 'No Survey route is available right now.');
+    return built === 1
+      ? word(lang, 'Подряд: выберите второй путь на карте.', 'Survey: choose the second route on the map.')
+      : word(lang, 'Подряд: выберите первый путь на карте.', 'Survey: choose the first route on the map.');
+  }
+  return word(lang, 'Действие не подтверждено. Проверьте сообщение о связи.', 'The action was not confirmed. Check the connection message.');
+}
+
 function TacticalCards({ view, lang, busy, onAction }: Props) {
   const [first, setFirst] = useState<Resource>('wood'), [second, setSecond] = useState<Resource>('brick');
   const [confirm, setConfirm] = useState<string | null>(null), [sending, setSending] = useState(false);
-  const [feedback, setFeedback] = useState<CardKind | 'bought' | 'unconfirmed' | null>(null);
+  const [feedback, setFeedback] = useState<{ kind: CardFeedback; turn: number } | null>(null);
   const heading = useRef<HTMLElement>(null);
   const details = useRef<HTMLDetailsElement>(null);
   const cost = view.legal.buyCard, index = lang === 'ru' ? 0 : 1;
   const shownCost = cost ?? view.legal.buyCardPricing?.total;
   const supplyReady = view.bank[first] > 0 && view.bank[second] > 0 && (first !== second || view.bank[first] >= 2);
+  const remember = (kind: CardFeedback) => setFeedback({ kind, turn: view.turn });
+  const feedbackText = feedback?.turn === view.turn && !view.outcome ? cardFeedbackText(view, feedback.kind, lang) : null;
   async function play(cardId: string, kind: CardKind) {
     setSending(true); setFeedback(null);
     try {
       if (await onAction({ type: 'play-card', cardId, ...(kind === 'supply' ? { resources: [first, second] } : {}) }) === true) {
         setConfirm(null);
-        setFeedback(kind);
-        if (kind === 'survey' && details.current) details.current.open = false;
+        remember(kind);
+        if ((kind === 'survey' || kind === 'patrol') && details.current) details.current.open = false;
         heading.current?.focus();
-      } else setFeedback('unconfirmed');
-    } catch { setFeedback('unconfirmed'); }
+      } else remember('unconfirmed');
+    } catch { remember('unconfirmed'); }
     finally { setSending(false); }
   }
   function availability(card: TerritoryView['you']['cards'][number]) {
@@ -489,13 +513,18 @@ function TacticalCards({ view, lang, busy, onAction }: Props) {
   return <details ref={details} className="ta-section ta-cards">
     <summary ref={heading} tabIndex={0} title={word(lang,'Карты развития','Development cards')} aria-label={word(lang,'Карты развития','Development cards')}><svg width="28" height="28" viewBox="0 0 32 32" fill="none" aria-hidden="true"><rect x="5" y="5" width="16" height="23" rx="3" transform="rotate(-13 13 16)" fill="#9fb9b2" stroke="#47747b" strokeWidth="1.5"/><rect x="12" y="3" width="16" height="24" rx="3" fill="#f1d698" stroke="#936f3e" strokeWidth="1.5"/><path d="m20 8 2 4 4 1-3 3 .5 4-3.5-2-3.5 2 .5-4-3-3 4-1z" fill="#537f83"/><path d="M16 23h8" stroke="#936f3e" strokeWidth="1.5"/></svg><span>{view.you.cards.length}</span></summary>
     <div className="ta-form ta-card-panel">
-      <h4>{word(lang,'Карты развития','Development cards')}</h4><p className="ta-muted">{word(lang, 'Одна активная карта за ход; купленную можно сыграть со следующего своего хода.', 'Play one active card per turn; a purchased card becomes playable on your next turn.')}</p>
+      <header className="ta-card-heading"><h4>{word(lang,'Карты развития','Development cards')}</h4>
+        <button type="button" className="ta-close" aria-label={word(lang,'Закрыть карты развития','Close development cards')} onClick={() => {
+          if (details.current) details.current.open = false;
+          heading.current?.focus();
+        }}>×</button></header>
+      <p className="ta-muted">{word(lang, 'Одна активная карта за ход; купленную можно сыграть со следующего своего хода.', 'Play one active card per turn; a purchased card becomes playable on your next turn.')}</p>
       {shownCost && view.cardsAvailable > 0 && <div className="ta-buy-card"><Cost lang={lang} cost={shownCost} hand={view.you.hand} pricing={view.legal.buyCardPricing}/>
         {!cost && !view.outcome && <small>{word(lang, 'Купить можно в свой ход после броска.', 'Buy on your turn after rolling.')}</small>}
         <button type="button" disabled={busy || sending || !cost || stockTotal(missingStock(view.you.hand, shownCost)) > 0} onClick={async () => {
           setSending(true); setFeedback(null);
-          try { setFeedback(await onAction({ type: 'buy-card' }) === true ? 'bought' : 'unconfirmed'); }
-          catch { setFeedback('unconfirmed'); }
+          try { remember(await onAction({ type: 'buy-card' }) === true ? 'bought' : 'unconfirmed'); }
+          catch { remember('unconfirmed'); }
           finally { setSending(false); }
         }}>{word(lang, 'Купить карту', 'Buy a card')}</button></div>}
       {view.you.cards.map(card => <article className={`ta-tactic ta-tactic-${card.kind}${card.playable ? ' is-playable' : ''}`} key={card.id} data-card-id={card.id}>
@@ -513,9 +542,7 @@ function TacticalCards({ view, lang, busy, onAction }: Props) {
       </article>)}
       {!view.you.cards.length && <p>{word(lang, 'В вашей руке пока нет карт развития.', 'There are no development cards in your hand yet.')}</p>}
       {!view.cardsAvailable && <p>{word(lang, 'Колода закончилась.', 'The deck is empty.')}</p>}
-      {feedback && <p className="ta-feedback" role="status">{word(lang,
-        feedback === 'bought' ? 'Карта куплена и добавлена в вашу руку.' : feedback === 'patrol' ? 'Патруль сыгран. Выберите клетку и цель блокады.' : feedback === 'survey' ? 'Подряд сыгран. Выберите первый путь на карте.' : feedback === 'supply' ? 'Снабжение получено. Две единицы добавлены в руку.' : 'Действие не подтверждено. Проверьте сообщение о связи.',
-        feedback === 'bought' ? 'Card bought and added to your hand.' : feedback === 'patrol' ? 'Patrol played. Choose the blockade tile and target.' : feedback === 'survey' ? 'Survey played. Choose the first route on the map.' : feedback === 'supply' ? 'Supplies received. Two units were added to your hand.' : 'The action was not confirmed. Check the connection message.')}</p>}
+      {feedbackText && <p className="ta-feedback" role="status">{feedbackText}</p>}
     </div>
   </details>;
 }

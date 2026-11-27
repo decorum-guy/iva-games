@@ -31,6 +31,9 @@
 .territory-map-tools .ta-trade-tabs button { flex:1;min-height:34px;padding:5px 8px; }
 .territory-map-tools .ta-trade-tabs button[aria-pressed=true] { background:#d9ebe4;border-color:#43867d; }
 .territory-map-tools .ta-trade-tabs .ta-close { flex:0 0 34px;font-size:20px; }
+.territory-map-tools :is(.ta-trade-tabs,.ta-card-heading) { position:sticky;top:-10px;z-index:3;margin:-10px -10px 0;padding:6px 10px;background:#f7fbf8;border-bottom:1px solid #c5d9d4; }
+.territory-map-tools .ta-card-heading { display:flex;align-items:center;justify-content:space-between;gap:8px; }
+.territory-map-tools .ta-card-heading .ta-close { min-height:38px;min-width:38px;padding:3px;font-size:23px; }
 .territory-map-tools .ta-trade-editor { border:0;padding:2px;background:transparent;gap:6px; }
 .territory-map-tools .ta-draft-heading small { font-size:10px; }
 .territory-map-tools .ta-draft-sides { gap:6px; }
