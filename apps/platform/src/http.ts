@@ -126,7 +126,7 @@ export function createPlatformHttpServer(service: PlatformService, options: Http
         if (!candidate.startsWith(`${staticRoot}${sep}`) && candidate !== staticRoot) error('NOT_FOUND', 'Страница не найдена', 404);
         const file = existsSync(candidate) && statSync(candidate).isFile() ? candidate : resolve(staticRoot, 'index.html');
         if (!existsSync(file)) error('NOT_FOUND', 'Сайт пока недоступен', 404);
-        const mime: Record<string, string> = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png', '.webp': 'image/webp', '.woff2': 'font/woff2', '.ico': 'image/x-icon' };
+        const mime: Record<string, string> = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png', '.webp': 'image/webp', '.woff2': 'font/woff2', '.ico': 'image/x-icon', '.wav': 'audio/wav' };
         response.setHeader('Content-Type', mime[extname(file)] ?? 'application/octet-stream');
         if (extname(file) !== '.html') response.setHeader('Cache-Control', 'public, max-age=3600');
         if (method === 'HEAD') response.end();

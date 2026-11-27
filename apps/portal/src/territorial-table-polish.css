@@ -1,0 +1,168 @@
+/* Map-first table. HUD controls never take part in board hit testing. */
+.territory-map-first { grid-template-rows:auto auto minmax(0,1fr); gap:7px; }
+.territory-map-first .territory-top { gap:10px; }
+.territory-map-first .territory-map-title { flex:0 0 auto; padding-right:12px; border-right:1px solid #97b4b6; gap:8px; }
+.territory-map-first .territory-map-title h2 { font-size:clamp(17px,1.65vw,25px); }
+.territory-map-first .territory-top .territory-players { flex:1 1 0; min-width:0; gap:5px; }
+.territory-map-first .territory-players>li { padding:5px 7px; gap:2px 5px; border:2px solid #bfd2d5; }
+.territory-map-first .territory-players>.is-active { border-color:#287981; box-shadow:inset 0 2px #287981,inset 0 -2px #287981; }
+.territory-map-first .territory-player-trade { white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
+.territory-map-first .territory-layout { grid-template-columns:minmax(0,1fr) clamp(350px,30vw,445px); gap:9px; }
+.territory-map-first .territory-panel-scroll { padding:10px; }
+.territory-map-first .territorial-actions { gap:7px;font-size:calc(12px * var(--table-text-scale,1)); }
+.territory-map-first .ta-selected { padding:9px; }
+.territory-map-first .territory-map-shell { overflow:visible; isolation:isolate; }
+.territory-map-first .territory-map-shell > .territorial-board { border-radius:14px; }
+.territory-map-tools { position:absolute;inset:0;z-index:4;pointer-events:none; }
+.territory-map-tools :is(button,summary,input,select) { pointer-events:auto; }
+.territory-trade-dock { position:absolute;inset:0;display:block;pointer-events:none; }
+.territory-map-tools .ta-trade-open,.territory-map-tools .ta-cards>summary { position:absolute;top:8px;left:8px;pointer-events:auto;display:flex;align-items:center;justify-content:center;gap:6px;box-shadow:0 3px 10px #123d4750;background:#f8fbf5;border:1px solid #a4bcad;border-radius:12px;min-height:44px;color:#245761;padding:8px 10px; }
+.territory-map-tools .ta-trade-open { left:74px; }
+.territory-map-tools .ta-trade-open[aria-expanded=true] { background:#d1e9e2; }
+.territory-map-tools .ta-cards { position:absolute;inset:0;border:0;pointer-events:none; }
+.territory-map-tools .ta-cards>summary { width:60px;list-style:none; }
+.territory-map-tools .ta-cards>summary::-webkit-details-marker { display:none; }
+.territory-map-tools .ta-cards>summary>span { min-width:18px;margin:0;font-size:10px; }
+.territory-map-tools .ta-card-panel,.ta-trade-window { position:absolute;top:60px;left:8px;max-height:calc(100% - 68px);width:min(410px,calc(100% - 16px));overflow:auto;overscroll-behavior:contain;background:#f7fbf8;border:1px solid #83aaa9;border-radius:13px;box-shadow:0 8px 26px #183e4860;pointer-events:auto;padding:10px;animation:td-open .19s ease-out both; }
+.territory-map-tools .ta-card-panel { z-index:2; }
+.territory-map-tools .ta-cards[open]>summary { background:#d1e9e2; }
+.territory-map-tools .ta-trade-window { z-index:3;width:min(455px,calc(100% - 16px)); }
+.territory-map-tools .ta-trade-tabs { display:flex;gap:5px;align-items:center;margin-bottom:7px; }
+.territory-map-tools .ta-trade-tabs button { flex:1;min-height:34px;padding:5px 8px; }
+.territory-map-tools .ta-trade-tabs button[aria-pressed=true] { background:#d9ebe4;border-color:#43867d; }
+.territory-map-tools .ta-trade-tabs .ta-close { flex:0 0 34px;font-size:20px; }
+.territory-map-tools :is(.ta-trade-tabs,.ta-card-heading) { position:sticky;top:-10px;z-index:3;margin:-10px -10px 0;padding:6px 10px;background:#f7fbf8;border-bottom:1px solid #c5d9d4; }
+.territory-map-tools .ta-card-heading { display:flex;align-items:center;justify-content:space-between;gap:8px; }
+.territory-map-tools .ta-card-heading .ta-close { min-height:38px;min-width:38px;padding:3px;font-size:23px; }
+.territory-map-tools .ta-trade-editor { border:0;padding:2px;background:transparent;gap:6px; }
+.territory-map-tools .ta-draft-heading small { font-size:10px; }
+.territory-map-tools .ta-draft-sides { gap:6px; }
+.territory-map-tools .ta-pick-cell { display:grid;justify-items:center;gap:2px;min-width:0; }
+.territory-map-tools .ta-amounts { padding-top:2px;gap:4px; }
+.territory-map-tools .ta-amounts .ta-pick-cell>span { font-size:10px;line-height:1.1;overflow-wrap:anywhere;text-align:center; }
+.territory-map-tools .ta-amounts input { min-height:26px;max-width:55px;padding:2px;font-size:13px; }
+.territory-map-tools .ta-pick-add { position:relative;padding:1px;min-height:34px;width:100%;background:#f0f4e8;border-color:#b7c8bb; }
+.territory-map-tools .ta-pick-add span { position:absolute;bottom:0;right:4px;color:#2b7764;font-weight:800; }
+.territory-map-tools .ta-picked-stock { grid-column:1/-1;display:flex;gap:4px;flex-wrap:wrap; }
+.territory-map-tools .ta-picked-stock button { display:flex;align-items:center;gap:3px;min-height:28px;padding:2px 5px;background:#e2efdf; }
+.territory-map-tools .ta-picked-stock svg { width:21px;height:21px; }
+.territory-map-tools .ta-picked-stock button span { color:#946247; }
+.territory-map-tools .ta-trade-editor .ta-buttons { position:sticky;bottom:0;background:#f7fbf8;padding:5px 0;z-index:1; }
+.territory-map-tools .ta-bank { border:0; }
+.territory-map-tools .ta-bank-palette { display:grid;grid-template-columns:repeat(5,1fr);gap:5px; }
+.territory-map-tools .ta-bank-palette button { padding:3px;min-height:38px; }
+.territory-map-tools .ta-bank-palette [aria-pressed=true] { background:#d8ebd9;outline:2px solid #4c8b75; }
+.territory-map-tools .ta-offers-panel { position:absolute;top:8px;right:8px;width:min(275px,42%);max-height:calc(100% - 75px);display:flex;flex-direction:column;min-height:0;pointer-events:auto;z-index:4;border:1px solid #8caaa4;border-radius:12px;background:#f8fbf6;box-shadow:0 4px 14px #123d4740;overflow:hidden; }
+.territory-map-tools .ta-offer-heading { display:flex;align-items:center;justify-content:space-between;gap:6px;padding:3px 7px;flex:0 0 auto;border-bottom:1px solid #c5d9d4; }
+.territory-map-tools .ta-offer-heading strong { display:flex;align-items:center;gap:5px;font-size:12px; }
+.territory-map-tools .ta-offer-heading button { min-height:38px;padding:4px 7px;font-size:11px; }
+.territory-map-tools .ta-offer-heading strong span,.territory-map-tools .ta-offer-toggle b { border-radius:8px;background:#d9ebe4;padding:1px 5px; }
+.territory-map-tools .ta-offer-toggle { position:absolute;top:8px;right:8px;min-height:44px;display:flex;align-items:center;gap:6px;padding:6px 9px;font-size:12px;box-shadow:0 3px 10px #123d4740;z-index:4; }
+.territory-map-tools .ta-offer-stack { min-height:0;overflow:auto;display:flex;flex-direction:column;gap:7px;overscroll-behavior:contain; }
+.territory-map-tools .ta-offer { pointer-events:auto;position:relative;background:#f8fbf6;border:1px solid #8caaa4;box-shadow:0 4px 14px #123d4740;padding:7px;gap:5px;border-radius:11px;animation:td-open .24s ease-out both; }
+.territory-map-tools .ta-offer-status { display:flex;align-items:center;gap:3px;line-height:1.25;flex-wrap:wrap; }
+.territory-map-tools .ta-offer-status i { display:grid;place-items:center;width:18px;height:18px;border-radius:50%;font-size:15px;font-weight:800;font-style:normal;background:#e5ece7;color:#54796c; }
+.territory-map-tools .ta-offer[data-offer-status=agreed] .ta-offer-status i,.territory-map-tools .ta-offer[data-offer-status=accepted] .ta-offer-status i { color:#23704c;background:#d5edd5; }
+.territory-map-tools .ta-offer[data-offer-status=declined] .ta-offer-status i { color:#9b493b;background:#f7e1d9; }
+.territory-map-tools .ta-offer[data-offer-status=declined] { animation:td-rejected .28s ease-out; }
+.territory-map-tools .ta-offer .ta-exchange .ta-resource-name { display:none; }
+.territory-map-tools .ta-offer .ta-exchange .ta-resources { display:flex;gap:3px;flex-wrap:wrap; }
+.territory-map-tools .ta-offer .ta-buttons { gap:4px; }
+.territory-map-tools .ta-offer .ta-buttons button { min-height:34px;padding:5px 6px;font-size:11px; }
+.territory-map-tools .ta-offer.is-closed { opacity:.9; }
+.territory-map-tools .ta-map-required { position:absolute;left:8px;bottom:8px;z-index:6;max-height:calc(100% - 16px);width:min(420px,calc(100% - 16px));overflow:auto;pointer-events:auto;box-shadow:0 6px 16px #183e4860;border-radius:10px; }
+.territory-map-tools.is-mandatory :is(.ta-trade-window,.ta-card-panel,.ta-offers-panel,.ta-offer-toggle) { visibility:hidden;pointer-events:none; }
+.territory-map-tools.is-mandatory .ta-map-required .ta-mandatory { padding:8px;gap:5px; }
+.territory-map-first .tb-area-caption { top:59px;left:8px;max-width:50%; }
+.territory-map-first .tb-block-mode [data-board-layer=route] *, .territory-map-first .tb-block-mode [data-board-layer=building] * { pointer-events:none!important; }
+.territory-map-first .tb-block-mode .tb-target.is-available .tb-tile-select { stroke-width:4;stroke-dasharray:none;stroke:#fff3ad; }
+.territory-map-first .territory-hand .ta-resource-cards>span:has(.ta-hand-pick:not(:disabled)) { cursor:pointer;transition:transform .15s,box-shadow .15s; }
+.territory-map-first .territory-hand .ta-resource-cards>span:has(.ta-hand-pick:hover:not(:disabled)) { transform:translateY(-3px);box-shadow:0 4px 8px #52785c50; }
+.territory-map-first .ta-hand-pick { position:absolute;inset:0;background:none;border:none;padding:0;border-radius:7px;cursor:pointer; }
+.territory-map-first .ta-hand-pick:disabled { cursor:default; }
+.territory-map-first .ta-hand-pick:focus-visible { outline:2px solid #287981;outline-offset:2px; }
+.territory-map-first .tn-close-only { font-size:23px;padding:0;min-width:32px;min-height:32px; }
+.territorial-actions .ta-pick-cell { display:grid;justify-items:center;gap:3px;min-width:0;font-size:calc(10px * var(--table-text-scale,1)); }
+.territorial-actions .ta-pick-cell>span { text-align:center;overflow-wrap:anywhere;max-width:100%; }
+@keyframes td-open { from {opacity:0;transform:translateY(-8px)} to {opacity:1;transform:translateY(0)} }
+@keyframes td-rejected { 0%{transform:translateX(0)} 30%{transform:translateX(3px)} 60%{transform:translateX(-3px)} 100%{transform:translateX(0)} }
+@media(max-width:1120px) { .territory-map-first .territory-top { flex-wrap:wrap; } .territory-map-first .territory-top .territory-players { order:3;flex:1 0 100%; } .territory-map-first .territory-map-title { border:0; } }
+@media(max-width:820px) { .territory-map-first .territory-layout {grid-template-columns:minmax(0,1fr) minmax(285px,38%);} }
+@media(max-width:620px) {
+  .territory-map-first .territory-layout {grid-template-columns:minmax(0,1fr);}
+  .territory-map-first .territory-top .territory-players { overflow-x:auto; }
+  .territory-map-first .territory-map-tools .ta-map-required { width:calc(100% - 16px); }
+  .territory-map-first .territory-map-tools .ta-trade-open { min-height:40px; }
+  .territory-map-first .territory-map-tools .ta-cards>summary { min-height:40px; }
+}
+
+/* Live map atmosphere is derived from applied server effects, never from forecast text. */
+.tb-atmosphere { opacity:0; transition:opacity .55s ease; pointer-events:none; }
+.tb-atmosphere.is-live { opacity:1; }
+.tb-atmosphere polygon { stroke:none; }
+.tb-atmosphere-illness polygon { fill:#77867d;fill-opacity:.49; }
+.tb-atmosphere-weather polygon { fill:#7096aa;fill-opacity:.28; }
+.tb-atmosphere-setback polygon { fill:#978052;fill-opacity:.25; }
+.tb-atmosphere-boon polygon { fill:#e9d479;fill-opacity:.23; }
+.tb-mote { fill:#e9e4ce; opacity:0; }
+.tb-atmosphere.is-live .tb-mote { animation:td-mote 3.8s ease-in-out infinite; }
+.tb-atmosphere-weather .tb-mote { fill:#d4eff6; }
+.tb-atmosphere-boon .tb-mote { fill:#fff6b9; }
+@keyframes td-mote { 0%,100%{opacity:0;transform:translateY(5px)} 30%,65%{opacity:.76} 95%{opacity:0;transform:translateY(-13px)} }
+.territory-income-motion { position:fixed;inset:0;z-index:25;pointer-events:none;overflow:hidden; }
+.territory-income-flight { position:absolute;left:var(--x);top:var(--y);width:38px;height:34px;display:grid;place-items:center;opacity:0;filter:drop-shadow(0 2px 3px #163d48a0);animation:td-flight .93s cubic-bezier(.25,.72,.35,1) var(--delay) both; }
+.territory-income-flight .ta-resource-art { width:38px;height:34px; }
+.territory-income-flight b { position:absolute;right:-5px;top:-3px;border-radius:9px;background:#f9fbec;color:#285e4c;font-size:11px;padding:1px 4px; }
+@keyframes td-flight { 0%{opacity:0;transform:translate(-50%,-50%) scale(.6)} 13%{opacity:1;transform:translate(-50%,calc(-50% - 12px)) scale(1.08)} 82%{opacity:1;transform:translate(calc(-50% + var(--dx)),calc(-50% + var(--dy) - 8px)) scale(.8)} 100%{opacity:0;transform:translate(calc(-50% + var(--dx)),calc(-50% + var(--dy))) scale(.48)} }
+.territory-map-first .ta-latest-deal { position:relative; }
+.territory-map-first .ta-dismiss-receipt { position:absolute;right:4px;top:3px;z-index:2;min-width:25px;min-height:25px;padding:0;background:#fff8;border-radius:6px; }
+.territory-map-first .ta-latest-deal .ta-offer { padding-right:30px; }
+.territory-map-first .ta-trade-window { z-index:5; }
+.territory-map-first .ta-card-panel { z-index:5; }
+.territory-map-first .territory-hand { position:relative;z-index:6; }
+.territory-map-first .territory-phase-heading strong { overflow-wrap:anywhere; }
+.territory-map-first .territory-blockade { padding:6px 8px;margin-bottom:6px; }
+.territory-map-first .territory-blockade p { margin:3px 0; }
+.territory-map-first.territory-reduce-motion .tb-mote { animation:none!important; }
+.territory-map-first.territory-reduce-motion .tb-atmosphere { transition:none; }
+@media(prefers-reduced-motion:reduce) { .tb-mote,.territory-income-flight { animation:none!important; } .tb-atmosphere { transition:none; } }
+@media(max-width:620px) {
+ .territory-map-first .territory-map-column { position:relative;z-index:3; }
+ /* Reserve the controls' row: a tap on a road must never open Cards or Trade. */
+ .territory-map-first .territory-map-shell { padding-top:54px; }
+ .territory-map-first .territory-map-tools .ta-trade-open,.territory-map-first .territory-map-tools .ta-cards>summary,.territory-map-first .territory-map-tools .ta-offer-toggle { top:3px; }
+ .territory-map-first .territory-map-tools :is(.ta-trade-window,.ta-card-panel,.ta-offers-panel) { top:auto;bottom:5px;max-height:min(400px,var(--map-sheet-height,calc(100dvh - 210px))); }
+ .territory-map-first .territory-map-tools .ta-offers-panel { left:8px;right:8px;width:auto; }
+ .territory-map-first .territory-map-tools .ta-offer h4 { font-size:calc(12px * var(--table-text-scale,1)); }
+ .territory-map-first .territory-map-tools .ta-offer-status { font-size:calc(10px * var(--table-text-scale,1)); }
+ .territory-map-first .territory-map-tools .ta-offer .ta-buttons button { min-height:40px;font-size:calc(10px * var(--table-text-scale,1)); }
+ .territory-map-first .territory-map-tools .ta-offer-heading button { min-height:40px; }
+ .territory-map-first .tb-area-caption { top:8px; }
+ .territory-map-first .territory-map-tools .ta-map-required { max-height:min(300px,calc(100dvh - 210px)); }
+}
+@media(max-width:620px) and (max-height:630px) {
+ .territory-map-first { gap:5px; }
+ .territory-map-first .territory-top { row-gap:4px; }
+ .territory-map-first .territory-players>li { padding-block:3px; }
+ .territory-map-first .territory-roll { min-height:35px;padding-block:3px;gap:5px; }
+ .territory-map-first .territory-die,.territory-map-first .territory-die-empty { width:26px;height:26px; }
+ .territory-map-first .territory-roll-copy>small { display:none; }
+}
+
+.territory-map-first .ta-offer-group { display:grid;gap:5px;border:1px solid #b1bca6;background:#f7f5e8;box-shadow:0 4px 14px #123d4740;border-radius:12px;padding:8px;animation:td-open .24s ease-out both; }
+.territory-map-first .ta-offer-group>strong { font-size:12px;color:#46635b; }
+.territory-map-first .ta-offer-group .ta-offer { box-shadow:none;padding:5px; }
+.territory-map-first .ta-offer-group .ta-offer header { gap:2px; }
+.territory-map-first .ta-offer-group .ta-offer h4 { margin:0;font-size:12px; }
+.territory-map-first .ta-offer-group .ta-buttons button { min-height:29px; }
+.territory-map-first .ta-offer-group .ta-exchange .ta-resource-name { display:none; }
+.territory-map-first .ta-trade-window .ta-select select { min-height:34px;padding:4px 6px; }
+.territory-map-first .ta-trade-window .ta-draft-sides { gap:5px; }
+.territory-map-first .ta-trade-window .ta-draft-heading { font-size:12px; }
+.territory-map-first .ta-trade-window .ta-amounts { gap:3px; }
+.territory-map-first .ta-trade-window .ta-pick-add .ta-resource-art { width:27px;height:25px; }
+.territory-map-first .ta-trade-window .ta-picked-stock button { min-height:25px; }
+.territory-map-first .ta-trade-window .ta-buttons>button { min-height:34px;padding:5px 8px; }
+.territory-map-first .ta-trade-window .ta-buttons { gap:4px; }
+.territory-map-first .ta-map-required .ta-mandatory h4 { margin:0; }
+.territory-map-first .ta-map-required .ta-mandatory { background:#fff7df; }

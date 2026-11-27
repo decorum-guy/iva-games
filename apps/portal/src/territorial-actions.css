@@ -1,0 +1,117 @@
+.territorial-actions { display: grid; align-content: start; gap: 12px; min-width: 0; color: #244950; font-family: inherit; font-size: calc(13px * var(--table-text-scale, 1)); font-weight: 500; line-height: 1.45; }
+.territorial-actions :is(h4,p) { margin: 0; }
+.territorial-actions h4 { font-size: calc(14px * var(--table-text-scale, 1)); line-height: 1.3; }
+.territorial-actions button { min-height: 44px; border: 1px solid #a3bfbf; border-radius: 7px; padding: 9px 12px; background: #f9fcf9; color: #215c65; font: inherit; font-weight: 700; line-height: 1.25; cursor: pointer; }
+.territorial-actions button:hover:not(:disabled) { background: #e7f4f0; border-color: #397f86; }
+.territorial-actions button:disabled { opacity: .5; cursor: default; }
+.territorial-actions button[hidden] { display: none; }
+.territorial-actions :is(button,summary,input,select):focus-visible { outline: 3px solid #31858e; outline-offset: 3px; }
+.territorial-actions .ta-primary { color: #fff; background: #236a76; border-color: #236a76; }
+.territorial-actions .ta-primary:hover:not(:disabled) { background: #18515d; border-color: #18515d; }
+.territorial-actions .ta-end { background: #d7eae4; border-color: #80aaa0; color: #164f51; width: 100%; }
+.territorial-actions .ta-text { border-color: transparent; background: transparent; font-size: calc(12px * var(--table-text-scale, 1)); }
+.ta-selected,.ta-form,.ta-trades,.ta-tactic,.ta-offer,.ta-purchase { display: grid; gap: 8px; min-width: 0; }
+.ta-selected { padding: 12px; border: 1px solid #a5c6bf; border-radius: 10px; background: #eef6ef; }
+.ta-selected header { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; }
+.ta-owner { color: #497375; font-size: calc(12px * var(--table-text-scale, 1)); }
+.ta-selected small,.ta-tactic small,.ta-muted { color: #526d6e; }
+.ta-selected .ta-purchase + .ta-purchase { border-top: 1px solid #b5ceca; padding-top: 10px; }
+.ta-cost { display: grid; gap: 5px; margin-block: 3px; font-size: calc(12px * var(--table-text-scale, 1)); }
+.ta-cost-line { display: flex; gap: 5px 10px; flex-wrap: wrap; justify-content: space-between; align-items: baseline; }
+.ta-cost-line > :first-child { flex-shrink: 0; }
+.ta-cost-total { border-top: 1px solid #c4d7cf; padding-top: 5px; font-size: calc(13px * var(--table-text-scale, 1)); }
+.ta-short { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; color: #984d34; }
+.ta-discount { color: #286f55; }
+.ta-surcharge { color: #995e37; }
+.ta-available { color: #617d7a; }
+.ta-coupon-reason,.ta-blockade-reason { color: #755c3d; font-size: calc(12px * var(--table-text-scale, 1)); }
+.ta-resources { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px 9px; min-width: 0; }
+.ta-resources > span { display: inline-flex; align-items: center; gap: 3px; min-width: 0; }
+.ta-resources > span > b { font-variant-numeric: tabular-nums; }
+.ta-resource-art { width: 24px; height: 23px; flex: 0 0 24px; }
+.ta-resource-name { font-size: .9em; }
+.ta-resources .ta-gain,.ta-resources .ta-loss { font-style: normal; font-weight: 800; border-radius: 4px; padding: 1px 4px; font-size: calc(11px * var(--table-text-scale, 1)); }
+.ta-resources .ta-gain { background: #d9f1db; color: #236c3b; }
+.ta-resources .ta-loss { background: #f6dfce; color: #963c27; }
+.ta-resource-cards { display: grid; grid-template-columns: repeat(5,minmax(0,1fr)); gap: 7px; padding: 5px 0; width: 100%; }
+.ta-resource-cards > span { position: relative; isolation: isolate; display: grid; grid-template-columns: 1fr; justify-items: center; gap: 0; padding: 5px 3px 7px; background: #f6f2d9; border: 1px solid #b2b99a; border-radius: 7px; box-shadow: 1px 2px 0 #c8d0c0, 2px 4px 0 #e1e4d5; }
+.ta-resource-cards > span[data-resource=wood] { background: #e5eed5; border-color: #96b59a; }
+.ta-resource-cards > span[data-resource=brick] { background: #f4e0d0; border-color: #c6a387; }
+.ta-resource-cards > span[data-resource=grain] { background: #f4edc4; border-color: #c9b671; }
+.ta-resource-cards > span[data-resource=wool] { background: #f4f1df; border-color: #c5c4b0; }
+.ta-resource-cards > span[data-resource=ore] { background: #dce9e7; border-color: #94acae; }
+.ta-resource-cards > span.is-empty { box-shadow: none; background: #eef1e9; }
+.ta-resource-cards > span.is-empty .ta-resource-art { opacity: .48; }
+.ta-resource-cards .ta-resource-art { width: 44px; height: 38px; max-width: 100%; }
+.ta-resource-cards .ta-resource-name { font-size: calc(9px * var(--table-text-scale, 1)); line-height: 1.35; max-width: 100%; overflow-wrap: anywhere; text-align: center; }
+.ta-resource-cards > span > b { font-size: 22px; line-height: 1.25; color: #264c4f; }
+.ta-resource-cards .ta-gain,.ta-resource-cards .ta-loss { position: absolute; top: -7px; right: -3px; box-shadow: 0 1px 4px #143a4425; }
+.ta-section { border-top: 1px solid #c5d9d4; min-width: 0; }
+.ta-section > summary { min-height: 44px; display: list-item; padding: 12px 3px; cursor: pointer; font-weight: 750; line-height: 1.4; }
+.ta-section > summary > span { display: inline-grid; place-items: center; min-width: 22px; min-height: 20px; margin-inline-start: 5px; padding-inline: 3px; border-radius: 10px; background: #e0eeea; font-size: calc(11px * var(--table-text-scale, 1)); }
+.ta-section > .ta-form { padding: 2px 0 10px; }
+.ta-section-heading { display: grid; gap: 3px; border-top: 1px solid #bfd3ce; padding-top: 11px; }
+.ta-section-heading small { color: #62807c; font-size: calc(11px * var(--table-text-scale, 1)); }
+.ta-buttons,.ta-pair { display: flex; align-items: end; flex-wrap: wrap; gap: 7px; }
+.ta-buttons > button { flex: 1 1 auto; }
+.ta-select { display: grid; gap: 5px; min-width: 0; flex: 1; font-weight: 650; }
+.ta-select select,.ta-amounts input { width: 100%; min-width: 0; min-height: 44px; padding: 7px; color: #254f55; background: #fffefa; border: 1px solid #aac3bd; border-radius: 6px; font: inherit; }
+.ta-select select:disabled,.ta-amounts:disabled { opacity: .65; }
+.ta-amounts { margin: 0; padding: 10px 0 0; min-width: 0; border: 0; display: grid; grid-template-columns: repeat(5,minmax(0,1fr)); gap: 6px; }
+.ta-amounts legend { font-weight: 750; }
+.ta-amounts label { display: grid; justify-items: center; min-width: 0; font-size: calc(10px * var(--table-text-scale, 1)); gap: 3px; }
+.ta-amounts .ta-resource-art { width: 33px; height: 29px; }
+.ta-amounts label > span { max-width: 100%; font-size: calc(9px * var(--table-text-scale, 1)); overflow-wrap: anywhere; text-align: center; }
+.ta-amounts input { padding-inline: 2px; font-size: calc(15px * var(--table-text-scale, 1)); text-align: center; font-variant-numeric: tabular-nums; }
+.ta-amounts input[aria-invalid=true] { border-color: #b76f4f; background: #fff0e5; }
+.ta-amounts label > small { color: #617b73; font-size: calc(10px * var(--table-text-scale, 1)); }
+.ta-offer { border: 1px solid #acc8c8; border-radius: 9px; padding: 10px; background: #edf6f5; }
+.ta-offer.is-outgoing { background: #f6f3e8; border-color: #d0c6a6; }
+.ta-offer.is-closed { background: #f5f8f3; border-color: #d1ddd2; }
+.ta-offer[data-offer-status=accepted] { border-color: #78ab94; }
+.ta-offer header { display: grid; gap: 4px; }
+.ta-offer-status { font-size: calc(11px * var(--table-text-scale, 1)); color: #527572; }
+.ta-offer[data-offer-status=accepted] .ta-offer-status { color: #28714d; font-weight: 750; }
+.ta-exchange { display: grid; grid-template-columns: minmax(0,1fr) 20px minmax(0,1fr); align-items: center; gap: 5px; }
+.ta-exchange > div { min-width: 0; display: grid; gap: 5px; }
+.ta-exchange > div > small { color: #5b7874; font-size: calc(11px * var(--table-text-scale, 1)); }
+.ta-exchange .ta-resources { display: grid; align-items: start; }
+.ta-exchange .ta-resources > span { gap: 3px; flex-wrap: wrap; }
+.ta-exchange .ta-resource-name { font-size: calc(10px * var(--table-text-scale, 1)); }
+.ta-exchange-sign { text-align: center; color: #62877e; font-size: 22px; }
+.ta-draft-sides { display: grid; gap: 12px; }
+.ta-trade-editor { border: 1px solid #86b0b7; border-radius: 9px; padding: 12px; background: #f3f9f7; }
+.ta-draft-heading { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 4px 7px; }
+.ta-draft-heading small { color: #5e7e78; font-size: calc(10px * var(--table-text-scale, 1)); }
+.ta-feedback { border-left: 3px solid #a79265; background: #f3eddb; padding: 9px 10px; display: grid; gap: 7px; font-size: calc(12px * var(--table-text-scale, 1)); }
+.ta-feedback.ta-success { border-color: #5e9c7b; background: #e7f2e6; color: #286146; }
+.ta-trade-open { justify-self: stretch; }
+.ta-rate { padding-block: 3px; }
+.ta-bank-stock { padding-top: 5px; }
+.ta-bank-stock summary { cursor: pointer; min-height: 44px; padding-block: 12px; font-weight: 650; }
+.ta-bank-stock > small { display: block; color: #607774; margin-top: 6px; }
+.ta-coupon { border-left: 3px solid #c6a657; padding: 9px 10px; background: #f7f2db; display: grid; gap: 6px; margin-bottom: 7px; }
+.ta-coupon small { color: #706a4e; font-size: calc(11px * var(--table-text-scale, 1)); }
+.ta-coupon button { font-size: calc(12px * var(--table-text-scale, 1)); }
+.ta-tactic { border: 1px solid #b3c8c3; border-radius: 8px; padding: 11px; background: #f2f7ef; }
+.ta-tactic.is-playable { border-color: #5c9294; box-shadow: inset 3px 0 #79aa9c; }
+.ta-tactic header { display: flex; gap: 9px; align-items: center; }
+.ta-tactic header > div { display: grid; gap: 3px; }
+.ta-card-art { width: 64px; height: 48px; flex: 0 0 64px; }
+.ta-card-state { color: #658074; font-size: calc(11px * var(--table-text-scale, 1)); font-weight: 650; }
+.ta-tactic.is-playable .ta-card-state { color: #28795b; }
+.ta-tactic-charter { background: #f7f1dd; }
+.ta-tactic-survey { background: #f4f2e4; }
+.ta-tactic-supply { background: #eff3df; }
+.ta-tactic-patrol { background: #eaf3f4; }
+.ta-card-confirm { padding-top: 8px; border-top: 1px solid #c4d6cd; display: grid; gap: 8px; }
+.ta-buy-card { display: grid; gap: 6px; padding: 2px 0 10px; }
+.ta-mandatory { padding: 12px; display: grid; gap: 8px; background: #f5ead4; border: 1px solid #c2a66f; border-radius: 9px; }
+.ta-action-hint { padding: 9px 0; color: #557c76; }
+@media (max-width: 400px) {
+  .ta-resource-cards { gap: 5px; }
+  .ta-resource-cards .ta-resource-name,.ta-amounts label > span { font-size: calc(8px * var(--table-text-scale, 1)); }
+  .ta-amounts { gap: 4px; }
+  .ta-trade-editor { padding: 9px; }
+}
+@media (prefers-reduced-motion: reduce) { .ta-resource-cards * { transition: none; } }
