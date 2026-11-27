@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { chromium, expect } from '@playwright/test';
 import { createFeedbackHarness } from './district-feedback-fixtures.mjs';
 
-const harness = await createFeedbackHarness();
+const harness = await createFeedbackHarness({ scenarioIds: ['production-flight','atmosphere-expiry','seven-discard','coupon-free','coupon-surcharge','coupon-expiry','long-news'] });
 const artifacts = join(harness.directory, 'browser');
 await mkdir(artifacts);
 const browser = await chromium.launch({ headless: true,

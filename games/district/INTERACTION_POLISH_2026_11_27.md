@@ -16,3 +16,8 @@
 - Новые проверки согласия и выбора одного адресата, атрибуции фактического производства, клика по руке, полёта и истечения атмосферного эффекта.
 - Результаты CI следует смотреть на фактической вершине PR 26. Ветку до прохождения браузерных проверок нельзя считать готовой к ручной приёмке. Safari, физическое касание, реальные звуки и художественное качество анимаций ещё предстоит оценить. 
 - Демо и данные Terra/владельца на Mac не менялись. PR остаётся draft, выпуск не выполняется.
+
+## Измеренный первый прогон политики ботов
+[CI 46052257302](https://github.com/decorum-guy/iva-games/actions/runs/46052257302), head `bd7809e`: 1003 unit/integration tests, 43 infrastructure tests, 14 portal e2e, legacy browser smoke and bot simulation passed. New interface browser suite failed during room provisioning with ROOM_LIMIT before executing cases. Subsequent change selects only the required fixtures, keeping the production room limit unchanged. New fixtures can be served explicitly using `--serve --scenario=production-flight --scenario=atmosphere-expiry`.
+
+На одинаковых шести seed, три уровня с ротацией мест, Azure Bay, новости medium, обе политики завершили 6/6 без недопустимых действий. Старая → новая: предложения 88 → 204; состоявшиеся сделки 31 → 65; отказы 57 → 139; встречные предложения 0 → 0; обмены с банком 66 → 47; среднее число кругов 21,17 → 19,5. Hard выиграл 3 в обеих выборках, normal 2 → 1, easy 1 → 2. Это 12 синтетических партий (не очное сравнение двух ботов и не ручной тест), рост активности торговли, не доказательство роста силы. Отдельный тест проверяет возможность встречного предложения, которая не встретилась в выборке.

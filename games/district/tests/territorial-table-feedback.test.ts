@@ -8,6 +8,7 @@ import type { Participant, StartMatchRequest } from '@iva-games/session-kit';
 import { randomStream } from '../src/random';
 import { applyTerritory, createTerritory, fallbackTerritory, viewTerritory } from '../src/territorial/core';
 import { territoryMaps } from '../src/territorial/maps';
+import { chooseTerritoryBot } from '../src/territorial/bot';
 import { TerritoryRuntime } from '../src/territorial/runtime';
 import { emptyStock, TERRITORY_BOT, TERRITORY_CONTENT, TERRITORY_RULES } from '../src/territorial/types';
 import type { Stock, TerritoryAction, TerritoryState } from '../src/territorial/types';
@@ -451,6 +452,21 @@ describe('SQLite replay and paced bots', () => {
 
 
 describe('Grouped negotiations and visual production receipts', () => {
+  it('can negotiate a bounded counteroffer and execute it once', () => {
+    let s = fresh();
+    s.players.a.hand = stock({ wood: 1 }); s.players.b.hand = stock({ wood: 1, brick: 2 });
+    s = act(s, 'a', { type: 'offer', targetId: 'b', give: stock({ wood: 1 }), receive: stock({ brick: 2 }) });
+    const parentId = s.offers[0].id;
+    const answer = chooseTerritoryBot(viewTerritory(s, 'b', 2000), 'normal', 'bounded-counter');
+    expect(answer).toMatchObject({ type: 'offer', targetId: 'a', parentId, give: stock({ brick: 1 }), receive: stock({ wood: 1 }) });
+    s = act(s, 'b', answer!);
+    expect(s.offerHistory?.find(o => o.id === parentId)?.status).toBe('replaced');
+    const id = s.offers[0].id;
+    s = act(s, 'a', { type: 'accept', offerId: id });
+    expect(s.players.a.hand).toEqual(stock({ brick: 1 }));
+    expect(s.players.b.hand).toEqual(stock({ wood: 2, brick: 1 }));
+    expect(() => act(s, 'a', { type: 'accept', offerId: id })).toThrow();
+  });
   it('collects separate consents without transfer, chooses exactly one, keeps third-party terms private', () => {
     let s = fresh();
     s.players.a.hand = stock({ wood: 2 }); s.players.b.hand = stock({ brick: 2 }); s.players.c.hand = stock({ brick: 2 });

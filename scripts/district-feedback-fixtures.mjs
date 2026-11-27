@@ -29,7 +29,7 @@ async function availablePort() {
   return address.port;
 }
 
-export async function createFeedbackHarness() {
+export async function createFeedbackHarness({ scenarioIds } = {}) {
   process.umask(0o077);
   assert.ok((await stat(join(root, 'apps/portal/dist/index.html')).catch(() => null))?.isFile(), 'Run npm run build:portal first');
   const parent = join(root, '.qa', 'district-feedback');
@@ -58,6 +58,10 @@ export async function createFeedbackHarness() {
     rollupOptions: { output: { entryFileNames: 'fixtures.mjs' } },
   } });
   const fixture = await import(pathToFileURL(join(directory, 'fixtures/fixtures.mjs')).href);
+  // Keep the real room limit intact: each harness provisions only the cases it needs.
+  const chosen = scenarioIds ?? fixture.feedbackScenarios.filter(item => !['production-flight','atmosphere-expiry'].includes(item.id)).map(item => item.id);
+  assert.ok(chosen.length > 0 && chosen.length <= 10 && new Set(chosen).size === chosen.length, 'Select 1–10 distinct fixtures per isolated harness');
+  for (const id of chosen) assert.ok(fixture.feedbackScenarios.some(item => item.id === id), 'Unknown fixture: ' + id);
   manifest.buildHashes.server = digest(await readFile(join(serverDirectory, 'main.js')));
   manifest.buildHashes.portalIndex = digest(await readFile(join(portalDirectory, 'index.html')));
   manifest.buildHashes.fixture = digest(await readFile(join(directory, 'fixtures/fixtures.mjs')));
@@ -163,8 +167,9 @@ export async function createFeedbackHarness() {
     for (const [index, client] of clients.entries()) await client.register(index);
     const friendship = await clients[0].request('/friend-requests', { playerId: clients[1].user.playerId });
     await clients[1].request(`/friend-requests/${friendship.requestId}/accept`, {});
-    for (const [index, scenario] of fixture.feedbackScenarios.entries()) {
-      const hostIndex = index % 2, guestIndex = 1 - hostIndex, host = clients[hostIndex], guest = clients[guestIndex];
+    for (const scenario of fixture.feedbackScenarios) {
+      if (!chosen.includes(scenario.id)) continue;
+      const hostIndex = manifest.scenarios.length % 2, guestIndex = 1 - hostIndex, host = clients[hostIndex], guest = clients[guestIndex];
       let room = (await host.request('/rooms', { gameId: 'district', capacity: 2, title: scenario.title,
         settings: { mapId: 'two-shores', mapVersion: '2', newsPreset: 'medium' } })).room;
       const path = '/rooms/' + room.roomId;
@@ -224,7 +229,8 @@ export async function createFeedbackHarness() {
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const mode = process.argv[2] ?? '--verify';
   assert.ok(['--verify', '--serve'].includes(mode), 'Use --verify or --serve');
-  const harness = await createFeedbackHarness();
+  const scenarioIds = process.argv.slice(3).filter(arg => arg.startsWith('--scenario=')).map(arg => arg.slice('--scenario='.length));
+  const harness = await createFeedbackHarness(scenarioIds.length ? { scenarioIds } : {});
   console.log(JSON.stringify({ synthetic: true, origin: harness.origin, directory: harness.directory,
     scenarios: harness.manifest.scenarios.map(({ id, url, apiCheck }) => ({ id, url, apiCheck })) }, null, 2));
   if (mode === '--serve') {
