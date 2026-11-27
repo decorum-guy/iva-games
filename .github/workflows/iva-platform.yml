@@ -15,7 +15,8 @@ concurrency:
 jobs:
   check:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    # The territorial game exercises the real paced bots, including trade response windows.
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v7
@@ -25,10 +26,15 @@ jobs:
       - run: npm ci --no-audit --no-fund
       - run: npm run check
       - run: python3 -B -m unittest discover -s deploy/iva-games -p 'test_*.py'
+      - run: npx vite build --config games/district/vite.territorial-simulation.config.ts
+      - run: node .qa/territorial-runner/simulate.mjs --bot-audit --map=azure-bay --samples=6
       - run: npm run build:all
       - run: npm run platform:smoke
       - run: npx playwright install --with-deps chromium
       - run: npm run portal:e2e -- --workers=1
       - run: npm run district:browser
+      - run: node scripts/district-interface-browser.mjs
+      - run: node scripts/district-trade-browser.mjs
+      - run: node scripts/district-audio-browser.mjs
       - run: node scripts/district-territorial-browser.mjs
       # QA output stays in the job logs. No upload-artifact or video/trace storage.

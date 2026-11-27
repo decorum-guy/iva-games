@@ -65,6 +65,12 @@ export interface TerritoryPlayer {
 }
 export interface TerritoryOffer {
   id: string; authorId: string; targetId: string; give: Stock; receive: Stock; parentId?: string; offeredAt?: number;
+  groupId?: string; agreedAt?: number;
+  canAccept?: boolean; unavailableReason?: 'author-resources' | 'target-resources';
+}
+export type TerritoryOfferStatus = 'accepted' | 'declined' | 'withdrawn' | 'expired' | 'replaced' | 'player-left' | 'match-finished';
+export interface TerritoryClosedOffer extends TerritoryOffer {
+  status: TerritoryOfferStatus; closedRevision: number; closedTurn: number; closedRound: number;
 }
 export type TerritoryAction =
   | { type: 'place' | 'settle' | 'upgrade' | 'protect'; nodeId: string }
@@ -73,10 +79,49 @@ export type TerritoryAction =
   | { type: 'discard'; resources: Stock }
   | { type: 'block'; tileId: string; targetId?: string }
   | { type: 'bank'; give: Resource; receive: Resource }
-  | { type: 'offer'; targetId: string; give: Stock; receive: Stock; parentId?: string }
+  | { type: 'offer'; targetId: string; targetIds?: string[]; give: Stock; receive: Stock; parentId?: string }
   | { type: 'accept' | 'decline' | 'cancel'; offerId: string }
   | { type: 'play-card'; cardId: string; resources?: Resource[] };
 export type Activity = { revision: number; kind: 'roll' | 'build' | 'deal' | 'tactic' | 'win' };
+export interface TerritoryProduction { ownerId: string; resources: Stock }
+export interface TerritoryBlockedProduction {
+  tileId: string; nodeId?: string; reason: 'blockade' | 'news'; eventInstanceId?: string;
+  blockade?: TerritoryBlockade;
+}
+export interface TerritoryProductionSource { ownerId: string; tileId: string; resource: Resource; amount: number }
+export interface TerritoryRoll {
+  eventId: string; revision: number; actorId: string; round: number; turn: number;
+  source?: 'player' | 'bot' | 'timeout';
+  dice: [number, number]; sum: number; triggeredTileIds: string[];
+  production: TerritoryProduction[]; blocked: TerritoryBlockedProduction[]; sources?: TerritoryProductionSource[];
+}
+export interface TerritoryBlockade {
+  actorId?: string; reason: 'seven' | 'patrol' | 'unknown'; tileId: string;
+  round?: number; turn?: number; revision?: number;
+}
+/** Public table history. Private resources/cards are added only for an authorised viewer. */
+export interface TerritoryHistoryEntry {
+  id: string; revision: number; actorId: string; round: number; turn: number;
+  source?: 'player' | 'bot' | 'timeout';
+  kind: TerritoryAction['type'] | 'distribution' | 'offer-closed' | 'win';
+  phase?: TerritoryState['phase']; nodeId?: string; edgeId?: string; tileId?: string;
+  dice?: [number, number]; sum?: number; triggeredTileIds?: string[];
+  production?: TerritoryProduction[]; blocked?: TerritoryBlockedProduction[]; sources?: TerritoryProductionSource[];
+  paid?: Stock; received?: Stock; resources?: Stock; count?: number;
+  cardKind?: CardKind; offerId?: string; offerStatus?: TerritoryOfferStatus;
+  targetId?: string; reason?: string; winnerParticipantIds?: string[];
+  beforeLevel?: number; afterLevel?: number;
+}
+export interface StoredTerritoryHistoryEntry extends TerritoryHistoryEntry {
+  audienceIds?: string[];
+  privateByParticipantId?: Record<string, Partial<Pick<TerritoryHistoryEntry, 'resources' | 'cardKind' | 'paid' | 'received'>>>;
+}
+export interface TerritoryPricing {
+  base: Stock; discount: Stock; surcharge: Stock; total: Stock;
+  couponId?: string; freeRoutes: boolean; reason: 'setup' | 'normal' | 'coupon' | 'tactic';
+  couponDecisions: { couponId: string; applies: boolean;
+    reason: 'eligible' | 'sector' | 'sea' | 'purchase' | 'expired' | 'tactic-first' | 'other-coupon' }[];
+}
 export interface TerritoryOutcome { winnerParticipantIds: string[]; reason: 'points' | 'abandoned' }
 export interface TerritoryRules {
   costs: typeof COSTS;
@@ -106,16 +151,22 @@ export interface TerritoryState {
   routeHolder: string | null; patrolHolder: string | null; offerNumber: number;
   offers: TerritoryOffer[]; volunteered?: string[]; left: string[]; outcome: TerritoryOutcome | null;
   activity?: Activity;
+  history?: StoredTerritoryHistoryEntry[]; latestRoll?: TerritoryRoll | null;
+  blockade?: TerritoryBlockade | null; pendingBlockade?: { actorId: string; reason: 'seven' | 'patrol' } | null;
+  offerHistory?: TerritoryClosedOffer[];
+  botSchedule?: { revision: number; participantId: string; at: number };
   news: TerritoryNews;
 }
 
 export interface TerritoryOption {
   kind: 'place' | 'settle' | 'upgrade' | 'route'; id: string; cost: Stock;
+  pricing?: TerritoryPricing;
 }
 export interface TerritoryView {
   gameId: 'district'; rulesVersion: typeof TERRITORY_RULES; contentVersion: typeof TERRITORY_CONTENT;
   matchId: string; revision: number; serverNow: number; phaseId: string; phase: TerritoryState['phase'];
   activeParticipantId: string; round: number; turn: number; deadlineAt: number | null;
+  rules?: TerritoryRules;
   map: TerritoryMap; buildings: TerritoryState['buildings']; routes: TerritoryState['routes'];
   players: { participantId: string; displayName: string; seatIndex: number; isBot: boolean; left: boolean;
     handCount: number; cardCount: number; points: number; longestRoute: number; patrols: number }[];
@@ -124,7 +175,11 @@ export interface TerritoryView {
   bank: Stock; cardsAvailable: number; lastRoll: [number, number] | null; blockedTileId: string | null;
   routeHolder: string | null; patrolHolder: string | null; goal: number; offers: TerritoryOffer[];
   activity?: Activity;
-  news: PublicNews[]; threats: PublicNews[]; preset: NewsPreset; outcome: TerritoryOutcome | null;
+  history?: TerritoryHistoryEntry[]; historyComplete?: boolean; latestRoll?: TerritoryRoll | null;
+  blockade?: TerritoryBlockade | null; pendingBlockade?: { actorId: string; reason: 'seven' | 'patrol' } | null;
+  offerHistory?: TerritoryClosedOffer[]; botActionAt?: number; botParticipantId?: string;
+  news: PublicNews[]; threats: PublicNews[]; activeEffects?: { eventInstanceId: string; templateId: string; zone: Zone; endsAfterRound: number }[]; preset: NewsPreset; outcome: TerritoryOutcome | null;
   legal: { roll: boolean; end: boolean; options: TerritoryOption[]; block: { tileId: string; targets: string[] }[];
-    bank: Record<Resource, number>; buyCard: Stock | null; protect: boolean; protectionCost: Partial<Stock>; trade: boolean };
+    bank: Record<Resource, number>; buyCard: Stock | null; buyCardPricing?: TerritoryPricing | null;
+    couponRoutes?: Record<string, string[]>; protect: boolean; protectionCost: Partial<Stock>; trade: boolean };
 }

@@ -599,7 +599,7 @@ export default function App() {
   };
 
   return (
-    <LanguageContext.Provider value={{ lang, t }}>
+    <LanguageContext.Provider value={{ lang, t, setLanguage: setLang }}>
       <div className={`portal ${user && !entrance && !cataloguePage && route.page !== "login" ? "signed-in" : ""}`}>
         <div className="language-switch" aria-label={t("Язык", "Language")}>
           <button aria-pressed={lang === "ru"} onClick={() => setLang("ru")}>

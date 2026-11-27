@@ -1,6 +1,5 @@
 import Database from 'better-sqlite3';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
-import { setImmediate } from 'node:timers/promises';
 import { canonicalJson, SessionError } from '@iva-games/session-kit';
 import type { ActionEnvelope, GameRuntime, StartMatchRequest } from '@iva-games/session-kit';
 import { chooseTerritoryBot } from './bot';
@@ -9,11 +8,21 @@ import { getTerritoryMap, territoryMaps } from './maps';
 import { newsCatalogVersion, newsProfiles } from './news-catalog';
 import type { NewsPreset } from './news-catalog';
 import { TERRITORY_BOT, TERRITORY_CONTENT, TERRITORY_RULES, TERRITORY_SAVE } from './types';
-import type { TerritoryState, TerritoryView } from './types';
+import type { TerritoryAction, TerritoryState, TerritoryView } from './types';
 import { DistrictError } from '../types';
 
 export const territorialId = (id: string) => id.startsWith('d4-');
 const hash = (input: unknown) => createHash('sha256').update(canonicalJson(input)).digest('hex');
+const HUMAN_TRADE_WINDOW_MS = 40_000;
+
+/** A separate deterministic pacing domain never consumes gameplay random draws. */
+function botDelay(state: TerritoryState, botSeed: string, participantId: string, action: TerritoryAction) {
+  const draw = Number.parseInt(hash(['district-pace-v1', botSeed, state.revision, participantId, action.type]).slice(0, 8), 16);
+  if (state.phase === 'setup-home' || state.phase === 'setup-route') return 1_000 + draw % 601;
+  if (action.type === 'end') return 2_200 + draw % 1_301;
+  if (draw % 50 === 0) return 4_800 + draw % 701;
+  return 1_800 + draw % 2_701;
+}
 
 export function territorySettings(input: unknown): { mapId: string; mapVersion: string; newsPreset: NewsPreset } {
   if (input !== undefined && (input === null || typeof input !== 'object' || Array.isArray(input))) {
@@ -115,46 +124,60 @@ export class TerritoryRuntime implements GameRuntime {
     try { await work; } finally { this.driving.delete(matchId); }
   }
   private async driveBots(matchId: string) {
-    const start = performance.now();
-    for (let actionIndex = 0; actionIndex < 32 && performance.now() - start < 65; actionIndex++) {
+    // Reads schedule work; subsequent polling/status calls execute it when eligible.
+    // Nothing sleeps in an HTTP request and a restart preserves the exact due time.
+    for (let attempt = 0; attempt < 4; attempt++) {
       if (!this.db.open) return;
       const { state, botSeed } = this.advance(matchId);
       if (state.outcome) return;
+      const scheduled = state.botSchedule?.revision === state.revision ? state.botSchedule : undefined;
+      if (scheduled && scheduled.at > this.now()) return;
       const active = currentId(state);
       // Only the public board and this bot's own hand cross the policy boundary.
-      const recipients = new Set(state.offers.map(offer => offer.targetId));
-      const priority = (id: string) => recipients.has(id) ? 0 : id === active ? 1 : 2;
+      const recipients = new Set(state.offers.filter(offer => offer.agreedAt === undefined).map(offer => offer.targetId));
+      // Once another eligible bot has been scheduled, an unfulfillable incoming
+      // offer must not keep replacing its timer on every poll.
+      const priority = (id: string) => scheduled?.participantId === id ? -1 : recipients.has(id) ? 0 : id === active ? 1 : 2;
       const order = [...state.participants].sort((a, b) => priority(a.participantId) - priority(b.participantId));
       const eligible = order.filter(p => p.controller.kind === 'bot' || state.left.includes(p.participantId));
-      let committed = false;
+      let changed = false;
       for (const p of eligible) {
         const id = p.participantId;
-        if (id !== active && !state.discard[id] && !state.offers.some(offer => offer.targetId === id)) continue;
+        if (id !== active && !state.discard[id] && !state.offers.some(offer => offer.targetId === id && offer.agreedAt === undefined)) continue;
         const now = this.now();
-        // A bot can propose a deal to a human and leave a short response window.
-        if (id === active && state.offers.some(offer => offer.authorId === id && !state.left.includes(offer.targetId) &&
-          state.participants.some(p => p.participantId === offer.targetId && p.controller.kind === 'human') &&
-          now - (offer.offeredAt ?? 0) < 8_000)) continue;
+        // Keep a real response window, including when a client refreshes or the process restarts.
+        const responseUntil = id === active ? Math.max(0, ...state.offers.filter(offer => offer.authorId === id &&
+          !state.left.includes(offer.targetId) && state.participants.some(member => member.participantId === offer.targetId && member.controller.kind === 'human'))
+          .map(offer => (offer.offeredAt ?? now - HUMAN_TRADE_WINDOW_MS) + HUMAN_TRADE_WINDOW_MS)) : 0;
         const view = viewTerritory(state, id, now, false);
         const difficulty = p.controller.kind === 'bot' ? p.controller.difficulty : 'normal';
         const safe = fallbackTerritory(view);
         const action = chooseTerritoryBot(view, difficulty, `${botSeed}:${state.revision}:${id}`) ?? safe;
         if (!action) continue;
-        committed = this.db.transaction(() => {
+        const result = this.db.transaction(() => {
           const { state: current } = this.read(matchId);
-          if (current.revision !== state.revision) return true;
+          if (current.revision !== state.revision) return 'changed';
+          let schedule = current.botSchedule;
+          if (schedule?.revision !== current.revision || schedule.participantId !== id) {
+            const desired = Math.max(now + botDelay(current, botSeed, id, action), responseUntil);
+            schedule = { revision: current.revision, participantId: id,
+              at: current.deadlineAt === null ? desired : Math.min(desired, current.deadlineAt) };
+            current.botSchedule = schedule;
+            this.write(current);
+          }
+          if (schedule.at > this.now()) return 'waiting';
           try { this.write(applyTerritory(current, id, action, this.now())); }
           catch (error) {
             if (!(error instanceof DistrictError)) throw error;
-            if (!safe) return false;
+            if (!safe) return 'none';
             this.write(applyTerritory(current, id, safe, this.now()));
           }
-          return true;
+          return 'changed';
         }).immediate();
-        if (committed) break;
+        if (result === 'waiting') return;
+        if (result === 'changed') { changed = true; break; }
       }
-      if (!committed) return;
-      if (actionIndex % 4 === 3) await setImmediate();
+      if (!changed) return;
     }
   }
   async viewForPlayer(matchId: string, playerId: string): Promise<TerritoryView> {

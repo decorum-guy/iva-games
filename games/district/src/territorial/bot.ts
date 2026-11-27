@@ -28,10 +28,23 @@ export function chooseTerritoryBot(view: TerritoryView, difficulty: BotDifficult
   }
   const value = (resource: Resource) => (9 + (income[resource] < 3 ? 4 : 0)) / (1 + you.hand[resource] * 0.65);
   const handValue = (stock: Stock) => RESOURCES.reduce((p, r) => p + stock[r] * value(r), 0);
-  const incoming = view.offers.find(offer => offer.targetId === id);
+  const incoming = view.offers.find(offer => offer.targetId === id && offer.agreedAt === undefined);
   if (incoming && legal.trade) {
-    if (covers(you.hand, incoming.receive) && handValue(incoming.give) >= handValue(incoming.receive) * (difficulty === 'hard' ? 1.15 : 0.75))
+    if (incoming.canAccept !== false && covers(you.hand, incoming.receive) && handValue(incoming.give) >= handValue(incoming.receive) * (difficulty === 'hard' ? 1.15 : 0.75))
       return { type: 'accept', offerId: incoming.id };
+    // A bad but affordable offer can receive one smaller counterproposal.
+    // Never counter an already-countered or grouped offer, or an invalid sender stock.
+    if (difficulty !== 'easy' && !incoming.parentId && !incoming.groupId && incoming.unavailableReason !== 'author-resources') {
+      const give = {...incoming.receive};
+      for (const resource of [...RESOURCES].sort((a,b)=>value(b)-value(a))) {
+        if (!give[resource]) continue;
+        give[resource] = Math.min(give[resource],you.hand[resource]);
+        if (give[resource]>1) give[resource]--;
+      }
+      if (sumStock(give)>0 && covers(you.hand,give) && handValue(incoming.give)>=handValue(give)*(difficulty==='hard'?1.15:0.9) &&
+        RESOURCES.some(resource=>give[resource]!==incoming.receive[resource]))
+        return {type:'offer',targetId:incoming.authorId,parentId:incoming.id,give,receive:{...incoming.give}};
+    }
     return { type: 'decline', offerId: incoming.id };
   }
   if (you.discard || !active || legal.roll) return fallbackTerritory(view);
@@ -111,12 +124,20 @@ export function chooseTerritoryBot(view: TerritoryView, difficulty: BotDifficult
   if (doable && doable.kind !== 'route') return optionAction(doable);
   const desired = candidates.find(option => option.kind !== 'route' && shortage(you.hand, option.cost) === 1) ?? candidates[0];
   const plans = [...(desired ? [desired.cost] : []), ...(legal.buyCard ? [legal.buyCard] : [])];
-  if (desired && !you.volunteered && shortage(you.hand, desired.cost) === 1) {
-    const receive = RESOURCES.find(resource => you.hand[resource] < desired.cost[resource]);
-    const give = [...RESOURCES].filter(resource => you.hand[resource] > desired.cost[resource] + 1)
+  const tradePlan = plans.find(plan => shortage(you.hand,plan) === 1);
+  if (tradePlan && !you.volunteered) {
+    const receive = RESOURCES.find(resource => you.hand[resource] < tradePlan[resource]);
+    // Preserve the chosen build budget. Normal/hard can offer one spare unit,
+    // not just resources with two spare units as before.
+    const give = [...RESOURCES].filter(resource => you.hand[resource] > tradePlan[resource] + Number(difficulty==='easy'))
       .sort((a, b) => value(a) - value(b))[0];
-    const partner = players.filter(p => p.participantId !== id && !p.left && p.handCount >= 2 &&
-      (p.isBot || difficulty !== 'easy')).sort((a, b) => a.points - b.points || b.handCount - a.handCount)[0];
+    const visibleSupply = (owner: string) => Object.entries(view.buildings).reduce((total,[nodeId,building]) =>
+      total + (building.ownerId === owner ? nodes.get(nodeId)!.tileIds.reduce((sum,tileId)=>{
+        const tile=tiles.get(tileId)!; return sum+(tile.resource===receive?dots(tile.number!)*building.level:0);
+      },0):0),0);
+    const partner = players.filter(p => p.participantId !== id && !p.left && p.handCount >= 1 &&
+      (p.isBot || difficulty !== 'easy') && (p.points < view.goal-1 || you.points >= view.goal-1))
+      .sort((a,b)=>visibleSupply(b.participantId)-visibleSupply(a.participantId)||a.points-b.points||b.handCount-a.handCount)[0];
     if (receive && give && partner) return { type: 'offer', targetId: partner.participantId,
       give: { ...emptyStock(), [give]: 1 }, receive: { ...emptyStock(), [receive]: 1 } };
   }

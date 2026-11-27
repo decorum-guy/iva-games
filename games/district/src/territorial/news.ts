@@ -5,7 +5,7 @@ import { newsCatalog, newsCatalogVersion, newsProfiles } from './news-catalog';
 import type { NewsEffect, NewsPreset, NewsStage, NewsTemplate } from './news-catalog';
 import type { Resource } from './maps';
 import { RESOURCES } from './types';
-import type { AppliedChange, NewsChain, PublicNews, Stock, TerritoryNews, TerritoryState, Zone } from './types';
+import type { AppliedChange, NewsChain, PublicNews, Stock, TerritoryNews, TerritoryProductionSource, TerritoryState, Zone } from './types';
 
 const interval = (range: readonly [number, number], rand: (bound: number) => number) => range[0] + rand(range[1] - range[0] + 1);
 const weighted = (weights: number[], rand: (bound: number) => number): number => {
@@ -339,8 +339,20 @@ export function exposedThreat(s: TerritoryState, nodeId: string): NewsChain | un
   });
 }
 
-type Operation = { nodeId: string; ownerId: string; sector: string; level: number; resource: Resource; base: number };
+type Operation = { nodeId: string; ownerId: string; sector: string; level: number; resource: Resource; base: number; tileIds?: string[] };
 export function produce(s: TerritoryState, operations: Operation[]) {
+  const sources: TerritoryProductionSource[] = [];
+  const reducedOperations: { op: Operation; units: number }[] = [];
+  function attribute(op: Operation, amount: number, bonus = false) {
+    // Partition granted units over eligible source tiles in stable map order; no phantom income from a blocked tile.
+    const tiles = op.tileIds ?? [];
+    for (const tileId of tiles) {
+      const units = Math.min(amount, bonus ? 1 : op.level);
+      if (units > 0) sources.push({ ownerId: op.ownerId, tileId, resource: op.resource, amount: units });
+      amount -= units;
+      if (amount <= 0) break;
+    }
+  }
   const bonus: { operation: Operation; eventInstanceId: string }[] = [];
   const byResource: Partial<Record<Resource, Record<string, number>>> = {};
   const changes = new Map<string, Record<string, Partial<Stock>>>();
@@ -365,12 +377,18 @@ export function produce(s: TerritoryState, operations: Operation[]) {
     if (suppression && reduced < op.base) record(suppression.eventInstanceId, op.ownerId, op.resource, reduced - op.base);
     const demand = byResource[op.resource] ??= {};
     demand[op.ownerId] = (demand[op.ownerId] ?? 0) + reduced;
+    reducedOperations.push({ op, units: reduced });
     const boost = effects.find(item => item.effect.op === 'production' && item.effect.mode === 'bonus');
     if (reduced > 0 && boost) bonus.push({ operation: op, eventInstanceId: boost.eventInstanceId });
   }
   for (const resource of RESOURCES) {
     for (const [id, amount] of Object.entries(alloc(s, resource, byResource[resource] ?? {}, `production:${s.turn}`))) {
       grant(s, resource, id, amount);
+      let remaining = amount;
+      for (const { op, units } of reducedOperations) if (op.ownerId === id && op.resource === resource && remaining > 0) {
+        const actual = Math.min(remaining, units);
+        attribute(op, actual); remaining -= actual;
+      }
     }
   }
   const order = shuffled(bonus.sort((a, b) => a.operation.nodeId.localeCompare(b.operation.nodeId) || a.operation.resource.localeCompare(b.operation.resource)),
@@ -380,6 +398,7 @@ export function produce(s: TerritoryState, operations: Operation[]) {
     const owners = s.news.bonusOwners[op.ownerId] ?? 0;
     if (!s.bank[op.resource] || nodes >= op.level || owners >= s.news.profile.bonusOwnerCap) continue;
     grant(s, op.resource, op.ownerId, 1);
+    attribute(op, 1, true);
     s.news.bonusNodes[op.nodeId] = nodes + 1;
     s.news.bonusOwners[op.ownerId] = owners + 1;
     s.news.bonusByEvent[eventInstanceId] = (s.news.bonusByEvent[eventInstanceId] ?? 0) + 1;
@@ -390,4 +409,5 @@ export function produce(s: TerritoryState, operations: Operation[]) {
     if (!message || !('changes' in message)) continue;
     for (const [ownerId, resources] of Object.entries(byOwner)) message.changes.push({ kind: 'production', ownerId, resources });
   }
+  return sources;
 }
