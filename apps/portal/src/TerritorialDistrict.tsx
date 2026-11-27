@@ -5,6 +5,7 @@ import type { TerritoryAction, TerritoryView } from "@iva-games/district/territo
 import { PlatformError, request } from "./api";
 import { go } from "./navigation";
 import { practiceLink } from "./TerritorialLobby";
+import { districtBotName } from "./districtCopy";
 import { Modal, useLanguage } from "./ui";
 import type { Language, Room } from "./types";
 import { TerritorialBoard } from "./TerritorialBoard";
@@ -19,7 +20,7 @@ type T = ReturnType<typeof useLanguage>["t"];
 
 export function TerritorialMatch({ room, refresh }: { room: Room; refresh: () => Promise<void> }) {
   const { t, lang } = useLanguage();
-  const [view, setView] = useState<TerritoryView | null>(null);
+  const [snapshot, setView] = useState<TerritoryView | null>(null);
   const latest = useRef<TerritoryView | null>(null);
   const [pending, setPending] = useState<Pending | null>(null);
   const [busy, setBusy] = useState(false);
@@ -92,11 +93,13 @@ export function TerritorialMatch({ room, refresh }: { room: Room; refresh: () =>
     void submit({ actionId: crypto.randomUUID(), expectedRevision: latest.current.revision, payload: { ...action, phaseId: latest.current.phaseId } });
   }
 
-  if (!view) return <section className="territory-match">
+  if (!snapshot) return <section className="territory-match">
     <button className="back-link" onClick={() => go("rooms")}>‹ {t("Мои комнаты", "My rooms")}</button>
     {loadError ? <button className="button secondary" onClick={() => void load()}>{t("Загрузить партию", "Load match")}</button> : <span className="spinner" />}
   </section>;
 
+  const view: TerritoryView = { ...snapshot, players: snapshot.players.map(player => player.isBot
+    ? { ...player, displayName: districtBotName(player.seatIndex, lang) } : player) };
   const activePlayer = view.players.find(player => player.participantId === view.activeParticipantId)!;
   const own = view.you.participantId === view.activeParticipantId;
   const left = view.players.find(player => player.participantId === view.you.participantId)?.left;

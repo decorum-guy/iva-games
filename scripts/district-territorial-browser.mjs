@@ -420,6 +420,7 @@ try {
     page.on('pageerror', (error) => errors.push(error.message));
     await page.goto(origin + path);
     await expect(page.locator('.territorial-board')).toBeVisible();
+    await expect(page.locator('.territory-players').getByText('Bot 3', { exact: true })).toBeVisible();
     pages.push(page);
     contexts.push(context);
     const box = await page.locator('.tb-surface').boundingBox();
