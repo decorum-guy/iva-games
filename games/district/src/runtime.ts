@@ -11,6 +11,8 @@ import { chooseDistrictBotAction } from './bot';
 import { getDistrictMap, resolveDistrictMapSettings } from './maps';
 import { districtProfileForMap, districtProfileForVersion, DistrictError } from './types';
 import type { DistrictAction, DistrictState, DistrictView } from './types';
+import { TerritoryRuntime, territorySettings, territorialId } from './territorial/runtime';
+import { TERRITORY_BOT, TERRITORY_CONTENT, TERRITORY_RULES } from './territorial/types';
 
 interface MatchRow { match_id: string; request_hash: string; state: string; bot_seed: string }
 interface ReceiptRow { request_hash: string; response: string }
@@ -25,6 +27,9 @@ function normalizeSettings(input: unknown, schemaVersion: 1 | 2): { mapId: strin
 }
 
 function resolveRoomVersion(rulesVersion: string, contentVersion: string) {
+  if (rulesVersion === TERRITORY_RULES && contentVersion === TERRITORY_CONTENT) {
+    return { normalizeSettings: territorySettings, botVersion: TERRITORY_BOT };
+  }
   const profile = districtProfileForVersion(rulesVersion, contentVersion);
   if (!profile) return undefined;
   return { normalizeSettings: (input: unknown) => normalizeSettings(input, profile.schemaVersion), botVersion: profile.botVersion };
@@ -276,7 +281,24 @@ export class DistrictRuntime implements GameRuntime {
   }
 }
 
-export function createDistrictRegistration(options: { databasePath: string; now?: () => number }): GameRegistration & { close: () => void } {
-  const runtime = new DistrictRuntime(options);
-  return { ...runtime.registration(), close: () => runtime.close() };
+export function createDistrictRegistration(options: { databasePath: string; now?: () => number; territorialDefault?: boolean }): GameRegistration & { close: () => void } {
+  const legacy = new DistrictRuntime(options);
+  const territory = new TerritoryRuntime(options.databasePath, options.now);
+  const game = legacy.registration();
+  const adapter = (matchId: string): GameRuntime => territorialId(matchId) ? territory : legacy;
+  const runtime: GameRuntime = {
+    createMatch: async input => {
+      if (input.rulesVersion !== TERRITORY_RULES) return legacy.createMatch(input);
+      validateStart(input);
+      return territory.createMatch(input);
+    },
+    viewForPlayer: (matchId, playerId) => adapter(matchId).viewForPlayer(matchId, playerId),
+    applyAction: (matchId, playerId, action) => adapter(matchId).applyAction(matchId, playerId, action),
+    status: matchId => adapter(matchId).status(matchId),
+  };
+  return {
+    ...game, runtime, ...(options.territorialDefault ? { rulesVersion: TERRITORY_RULES,
+      contentVersion: TERRITORY_CONTENT, normalizeSettings: territorySettings } : {}),
+    close: () => { territory.close(); legacy.close(); },
+  };
 }

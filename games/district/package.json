@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "exports": { ".": "./src/index.ts", "./maps": "./src/maps.ts", "./runtime": "./src/runtime.ts" },
+  "exports": { ".": "./src/index.ts", "./maps": "./src/maps.ts", "./runtime": "./src/runtime.ts", "./territorial": "./src/territorial/index.ts" },
   "scripts": { "test": "vitest run --config vitest.config.ts", "maps:check": "node --experimental-strip-types scripts/check-maps.mjs" },
   "dependencies": { "@iva-games/session-kit": "0.1.0", "better-sqlite3": "13.2.0" }
 }
