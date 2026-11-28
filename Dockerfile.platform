@@ -4,7 +4,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends python3 make g+
 # Copy all workspaces before installation so a new registered game needs no Dockerfile list edit.
 COPY . .
 RUN npm ci
-ARG VITE_REMORSE_URL=https://chess.iva-games.pro/
+ARG VITE_REMORSE_URL=https://chess.iva-games.pro/remorse/
 ARG VITE_OVERDRIVE_URL=https://chess.iva-games.pro/overdrive/
 ARG VITE_COLOSSUS_URL=https://chess.iva-games.pro/colossus/
 RUN npm run build:foundation && npm prune --omit=dev --ignore-scripts

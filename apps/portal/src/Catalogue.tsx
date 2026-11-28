@@ -3,6 +3,7 @@ import { Avatar, Brand, Empty, GameArt, Icon, useLanguage } from "./ui";
 import { PortalLink } from "./navigation";
 import type { Game, User } from "./types";
 import { gameDescription, gameTitle } from "./gameCopy";
+import { chessHomeUrl } from "./links";
 
 // Guest launch links are independent of availability in platform rooms.
 export const chessLaunchUrls: Partial<Record<string, string>> = launchUrls({ development: import.meta.env.DEV, overrides: import.meta.env });
@@ -26,7 +27,7 @@ export function Catalogue({ page, games, user, busy, offline, retry, onPlay, onA
     <header className="catalogue-header">
       <Brand />
       <nav className="catalogue-nav" aria-label={t("Разделы игр", "Game collections")}>
-        <PortalLink href="/chess" aria-current={page === "chess" ? "page" : undefined}>{t("Шахматы", "Chess")}</PortalLink>
+        <PortalLink href={chessHomeUrl} aria-current={page === "chess" ? "page" : undefined}>{t("Шахматы", "Chess")}</PortalLink>
         <PortalLink href="/games" aria-current={page === "games" ? "page" : undefined}>{t("Другие игры", "Other games")}</PortalLink>
       </nav>
       <div className="catalogue-account">
@@ -50,7 +51,7 @@ export function Catalogue({ page, games, user, busy, offline, retry, onPlay, onA
             : t("Сделки, неожиданные ходы и хорошие вечера вместе.", "Deals, unexpected moves and good evenings together.")}</p>
       </div>
       {page === "home" ? <div className="collection-grid">
-        <PortalLink href="/chess" className="collection-card">
+        <PortalLink href={chessHomeUrl} className="collection-card">
           <GameArt kind="remorse" />
           <div className="collection-copy"><h2>{t("Шахматы", "Chess")}</h2>
             <p>{t("Remorse, Форсаж, Колосс и новые варианты шахмат.", "Remorse, Overdrive, Colossus and new chess variants.")}</p>

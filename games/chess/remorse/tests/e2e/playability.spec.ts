@@ -34,7 +34,7 @@ async function open(page: Page, locale: 'ru' | 'en' = 'en', reduce = true) {
       localStorage.setItem('remorse-settings-v1', JSON.stringify({ board: '2d', locale, reduce }))
     }
   }, { locale, reduce })
-  await page.goto('/')
+  await page.goto('/remorse/')
   await expect(page.getByTestId('mode-ai')).toBeVisible()
 }
 

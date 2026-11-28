@@ -27,7 +27,7 @@ async function open(page: Page) {
       localStorage.setItem('remorse-settings-v1', JSON.stringify({ board: '2d', reduce: true }));
     }
   });
-  await page.goto('/');
+  await page.goto('/remorse/');
   await expect(page.getByTestId('mode-ai')).toBeVisible();
 }
 
@@ -229,7 +229,7 @@ test('rated reservation survives a separate practice match and locks rated contr
   await ready(page);
   await page.getByTestId('leave-game').click();
   const second = await context.newPage();
-  await second.goto('/');
+  await second.goto('/remorse/');
   await second.getByTestId('mode-ai').click();
   await expect(second.getByTestId('setup-start')).toBeDisabled();
   await second.getByTestId('setup-cancel').click();
@@ -248,7 +248,7 @@ test('real IndexedDB settles a mate exactly once when two tabs play its final mo
   const prior = walk(ratedStart('black'), [move('f2', 'f3'), move('e7', 'e5'), move('g2', 'g4')]);
   await seedBrowser(page, prior.record, true);
   const second = await context.newPage();
-  await second.goto('/');
+  await second.goto('/remorse/');
   await expect(playfield(second)).toHaveAttribute('data-game-id', prior.record.id);
   await Promise.all([clickMove(page, 'd8', 'h4'), clickMove(second, 'd8', 'h4')]);
   await expect(page.getByTestId('game-result')).toHaveAttribute('data-reason', 'checkmate');

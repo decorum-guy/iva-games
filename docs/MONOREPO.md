@@ -42,7 +42,7 @@ SDK и игровые экспорты в этой итерации предна
 | `npm ci` | Установка закреплённых зависимостей и связывание внутренних workspaces. |
 | `npm run build:remorse` | `games/chess/remorse/dist`; клиент REMORSE может обслуживаться отдельно от корня своего хоста. |
 | `npm run build:overdrive` | `games/chess/overdrive/dist`; самостоятельный клиент Форсажа. |
-| `npm run build:client` | Сборка обоих клиентов и сборка общего `dist`. |
+| `npm run build:client` | Сборка шахматных клиентов и коллекции в общий `dist`. |
 | `npm run build:server` | `dist-server/main.js`. |
 | `npm run build` | TypeScript, оба клиента, композиция и сервер. |
 | `npm run build:foundation` | Отдельные сервер платформы `dist-platform` и портал `apps/portal/dist`. |
@@ -55,7 +55,7 @@ SDK и игровые экспорты в этой итерации предна
 | `npm run test:e2e`, `npm run overdrive:e2e` | Разделённые браузерные наборы игр. |
 | `npm run auditions:build`, `npm run auditions:test` | Существующая отдельная сцена сравнения звуков REMORSE. |
 
-`scripts/compose-client.mjs` собирает совмещённый клиент: REMORSE по `/`, OVERDRIVE по `/overdrive/`. Каждая игра собирается с абсолютной базой `/`; её созданные JS/CSS и собственные статические ресурсы доступны по прежним `/assets/...`. Композиция не должна затирать файлы другой игры при совпадении имени с разными байтами. Иконки `remorse.svg` и `overdrive.svg` также сохраняют адреса.
+`scripts/compose-client.mjs` собирает совмещённый клиент: коллекция по `/`, REMORSE по `/remorse/`, OVERDRIVE по `/overdrive/`, COLOSSUS по `/colossus/`. Старые ссылки REMORSE с фрагментом комнаты на `/` передаются на `/remorse/` с сохранением фрагмента. Каждая игра собирается с абсолютной базой `/`; её созданные JS/CSS и собственные статические ресурсы доступны по прежним `/assets/...`. Композиция не должна затирать файлы другой игры при совпадении имени с разными байтами. Иконки `remorse.svg` и `overdrive.svg` также сохраняют адреса.
 
 Раздельная сборка не равна публикации. Если отдельно обслуживать `games/chess/overdrive/dist`, хостинг должен возвращать его `index.html` по корню и корректно отдавать все ресурсы. Для сетевой партии нужен Node-сервер с соответствующим статическим выходом и разрешённым origin. Режимы сервера, Docker и backup описаны в [apps/server/README.md](../apps/server/README.md).
 

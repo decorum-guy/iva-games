@@ -24,11 +24,17 @@ async function withStaticFiles(files: Record<string, string>, check: (origin: st
 describe('workspace production entry points', () => {
   it('serves the distinct entries and unchanged asset URLs from a combined build', async () => {
     await withStaticFiles({
-      'index.html': '<title>REMORSE</title>',
+      'index.html': '<title>Chess catalogue</title>',
+      'remorse/index.html': '<title>REMORSE</title>',
       'overdrive/index.html': '<title>OVERDRIVE</title>',
       'assets/overdrive/entry.js': 'export const game = "overdrive"',
     }, async origin => {
-      expect(await (await fetch(origin + '/')).text()).toBe('<title>REMORSE</title>')
+      expect(await (await fetch(origin + '/')).text()).toBe('<title>Chess catalogue</title>')
+      for (const path of ['/remorse', '/remorse/', '/remorse/room']) {
+        const response = await fetch(origin + path)
+        expect(response.status).toBe(200)
+        expect(await response.text()).toBe('<title>REMORSE</title>')
+      }
       for (const path of ['/overdrive', '/overdrive/', '/overdrive/room']) {
         const response = await fetch(origin + path)
         expect(response.status).toBe(200)

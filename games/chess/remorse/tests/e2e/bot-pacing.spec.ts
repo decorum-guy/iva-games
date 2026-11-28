@@ -63,7 +63,7 @@ for (const rolled of [true, false]) {
       }).observe(document, { subtree: true, childList: true, attributes: true, characterData: true })
     }, { locale, reduced })
     const { record } = botCapture(rolled)
-    await page.goto('/')
+    await page.goto('/remorse/')
     await page.getByTestId('mode-ai').waitFor()
     await seedRecords(page, [record], 'game/' + record.id)
     await page.reload()
@@ -126,7 +126,7 @@ test('keeps the result readable when a long task delays its first paint', async 
     }).observe(document, { subtree: true, childList: true, attributes: true })
   }, { reduced })
   const { record } = botCapture(false)
-  await page.goto('/')
+  await page.goto('/remorse/')
   await page.getByTestId('mode-ai').waitFor()
   await seedRecords(page, [record], 'game/' + record.id)
   await page.reload()
@@ -163,7 +163,7 @@ test('waits for the returned result after visibility changes during the AI die',
     }).observe(document, { subtree: true, childList: true, attributes: true })
   }, { reduced })
   const { record } = botCapture(true)
-  await page.goto('/')
+  await page.goto('/remorse/')
   await page.getByTestId('mode-ai').waitFor()
   await seedRecords(page, [record], 'game/' + record.id)
   await page.reload()
@@ -195,7 +195,7 @@ test('a selected figure can be cleared again, including a restored bonus', async
   await page.addInitScript(() => {
     localStorage.setItem('remorse-settings-v1', JSON.stringify({ board: '2d', reduce: true, sound: false }))
   })
-  await page.goto('/')
+  await page.goto('/remorse/')
   await page.getByTestId('mode-hotseat').waitFor()
   const game = createMatch({ mode: 'hotseat', human: null, level: null, provenance: 'standard' }, {
     root: createPosition({ pieces: [

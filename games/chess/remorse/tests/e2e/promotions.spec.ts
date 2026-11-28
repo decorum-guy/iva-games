@@ -25,7 +25,7 @@ async function open(page: Page, reduce = true) {
     if (!localStorage.getItem('remorse-settings-v1')) localStorage.setItem('remorse-settings-v1',
       JSON.stringify({ board: '2d', sound: false, locale: 'en', reduce }))
   }, reduce)
-  await page.goto('/')
+  await page.goto('/remorse/')
   await expect(page.getByTestId('mode-hotseat')).toBeVisible()
 }
 

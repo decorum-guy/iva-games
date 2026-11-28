@@ -78,7 +78,7 @@ async function open(page: Page, locale: 'ru' | 'en', board: '2d' | '3d') {
       return Reflect.apply(start, this, args)
     }
   }, { locale, board })
-  await page.goto('/')
+  await page.goto('/remorse/')
   await expect(page.getByTestId('mode-learn')).toBeVisible()
 }
 
