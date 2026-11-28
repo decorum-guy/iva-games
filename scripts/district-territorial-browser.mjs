@@ -326,7 +326,7 @@ async function training(page, roomId, touch = false) {
   for (let step = 0; step < 12; step++) {
     if (await lesson.getByRole('link', { name: 'Play', exact: true }).isVisible()) break;
     const highlighted = page.locator('.tb-target.is-available').first();
-    if (await highlighted.count()) await highlighted.focus().then(() => highlighted.press('Enter'));
+    if (await highlighted.count()) await (touch ? highlighted.tap() : highlighted.focus().then(() => highlighted.press('Enter')));
     const button = lesson.locator('button.primary');
     const issue = page.locator('.tn-issue');
     if (!checkedNewsLayout && await issue.isVisible()) {
