@@ -103,8 +103,8 @@ class BackupTest(unittest.TestCase):
             db.close()
         self.work.cleanup()
 
-    def run_backup(self, fault=''):
-        return subprocess.run(['bash', str(self.root / 'backup.sh'), 'platform', str(self.destination)],
+    def run_backup(self, fault='', service='platform'):
+        return subprocess.run(['bash', str(self.root / 'backup.sh'), service, str(self.destination)],
                               env={**self.env, 'BACKUP_TEST_FAULT': fault}, capture_output=True,
                               text=True, timeout=15)
 
@@ -125,12 +125,36 @@ class BackupTest(unittest.TestCase):
         self.assertLess(actions.index('unpause'), actions.index('run'))
         self.assertFalse(set(actions) & {'stop', 'start', 'restart', 'kill'})
         self.assertNotIn('chess', json.dumps(commands))
-        self.assertIn('Both SQLite databases passed quick_check.', result.stdout)
+        self.assertIn('2 SQLite databases passed quick_check.', result.stdout)
         # Read another disposable copy, never checkpoint the saved backup itself.
         restored = self.root / 'restore-test'
         shutil.copytree(self.destination / 'data', restored)
         for name in ('platform.sqlite', 'platform-lab.sqlite'):
             self.assertTrue((self.destination / 'data' / f'{name}-wal').exists())
+            with sqlite3.connect(restored / name) as db:
+                self.assertEqual(db.execute('SELECT value FROM durable').fetchall(), [('committed',)])
+
+    def test_chess_backup_checks_colossus_and_preserves_all_three_wal_databases(self):
+        for db in self.connections:
+            db.close()
+        self.connections = []
+        shutil.rmtree(self.source)
+        self.source.mkdir()
+        for name in ('remorse.sqlite', 'overdrive.sqlite', 'colossus.sqlite'):
+            db = sqlite3.connect(self.source / name)
+            db.execute('PRAGMA journal_mode=WAL')
+            db.execute('PRAGMA wal_autocheckpoint=0')
+            db.execute('CREATE TABLE durable (value TEXT NOT NULL)')
+            db.execute("INSERT INTO durable VALUES ('committed')")
+            db.commit()
+            self.connections.append(db)
+        (self.root / 'compose.sh').write_text('#!/usr/bin/env bash\n[[ "$*" == "ps --all --quiet chess" ]] || exit 1\nprintf "original-chess-container\\n"\n')
+        result = self.run_backup(service='chess')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn('3 SQLite databases passed quick_check.', result.stdout)
+        restored = self.root / 'restore-three'
+        shutil.copytree(self.destination / 'data', restored)
+        for name in ('remorse.sqlite', 'overdrive.sqlite', 'colossus.sqlite'):
             with sqlite3.connect(restored / name) as db:
                 self.assertEqual(db.execute('SELECT value FROM durable').fetchall(), [('committed',)])
 

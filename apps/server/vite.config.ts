@@ -15,6 +15,6 @@ export default defineConfig({
   },
   ssr: {
     external: ['ws', 'better-sqlite3'],
-    noExternal: ['@chess-2/remorse', '@chess-2/overdrive', '@chess-2/engine-sdk', '@iva-games/session-kit'],
+    noExternal: [/^@chess-2\//, '@iva-games/session-kit', '@iva-games/game-registry'],
   },
 })

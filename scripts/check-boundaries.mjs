@@ -4,8 +4,19 @@ import { fileURLToPath } from 'node:url'
 import ts from 'typescript'
 
 const root = fileURLToPath(new URL('../', import.meta.url))
-const paths = ['games/district', 'packages/engine-sdk', 'games/chess/remorse', 'games/chess/overdrive', 'apps/server', 'packages/session-kit', 'packages/telegram-transport', 'apps/platform', 'apps/portal']
-const packages = await Promise.all(paths.map(async path => ({
+const workspacePatterns = JSON.parse(await readFile(join(root, 'package.json'), 'utf8')).workspaces
+const paths = []
+for (const pattern of workspacePatterns) {
+  if (!pattern.endsWith('/*')) throw new Error('Unsupported workspace pattern: ' + pattern)
+  const parent = pattern.slice(0, -2)
+  for (const entry of await readdir(join(root, parent), { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue
+    const path = parent + '/' + entry.name
+    try { await readFile(join(root, path, 'package.json')); paths.push(path) }
+    catch (error) { if (error.code !== 'ENOENT') throw error }
+  }
+}
+const packages = await Promise.all([...new Set(paths)].map(async path => ({
   path, directory: resolve(root, path), manifest: JSON.parse(await readFile(join(root, path, 'package.json'), 'utf8')),
 })))
 const byName = new Map(packages.map(pkg => [pkg.manifest.name, pkg]))

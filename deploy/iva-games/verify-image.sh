@@ -28,11 +28,19 @@ start_runtime() {
     --env NODE_ENV=production
   )
   if [[ "$IMAGE_KIND" == chess ]]; then
-    args+=(
-      --env PUBLIC_ORIGIN=https://chess.iva-games.pro
-      --env DATABASE_PATH=/data/remorse.sqlite
-      --env OVERDRIVE_DATABASE_PATH=/data/overdrive.sqlite
-    )
+    args+=(--env PUBLIC_ORIGIN=https://chess.iva-games.pro)
+    local database_vars
+    database_vars="$(python3 - "$script_dir/../../packages/game-registry/games.json" <<'PYENV'
+import json, sys
+for game in json.load(open(sys.argv[1]))['games']:
+    database = game.get('chess', {}).get('database')
+    if database:
+        print(database['environment'] + '=/data/' + database['file'])
+PYENV
+    )"
+    if [[ -n "$database_vars" ]]; then
+      while IFS= read -r database_env; do args+=(--env "$database_env"); done <<< "$database_vars"
+    fi
   else
     # Loopback only, without registration delivery channels or recipients.
     args+=(
@@ -66,6 +74,7 @@ wait_healthy() {
 # Passed over stdin to Node in /app so imports resolve to runtime deps.
 cat > "$fixture" <<'NODE'
 import assert from 'node:assert/strict';
+import { randomUUID } from 'node:crypto';
 import { accessSync, constants, readFileSync, writeFileSync } from 'node:fs';
 import Database from 'better-sqlite3';
 
@@ -75,16 +84,21 @@ assert.ok(['initial', 'restored'].includes(phase));
 assert.equal(process.env.NODE_ENV, 'production');
 assert.notEqual(process.getuid(), 0, 'Application must run as a non-root user');
 const base = kind === 'chess' ? 'http://127.0.0.1:4173' : 'http://127.0.0.1:4310';
-const get = async (path, options = {}) => {
+const registry = JSON.parse(readFileSync('/app/game-registry.json', 'utf8'));
+const chess = registry.games.filter(game => game.chess);
+const marker = '/data/ci-persistence.json';
+const persisted = phase === 'restored' ? JSON.parse(readFileSync(marker, 'utf8')) : null;
+let colossusRoom = null;
+const get = async (path, options = {}, expectedStatus = 200) => {
   const response = await fetch(new URL(path, base), {
     ...options, signal: AbortSignal.timeout(5000), redirect: 'error',
   });
-  assert.equal(response.status, 200, `${path}: expected HTTP 200`);
+  assert.equal(response.status, expectedStatus, `${path}: expected HTTP ${expectedStatus}`);
   return response;
 };
 
 const healthPaths = kind === 'chess'
-  ? ['/api/health', '/api/overdrive/health']
+  ? chess.filter(game => game.chess.health).map(game => game.chess.health.path)
   : ['/health/live', '/health/ready'];
 for (const path of healthPaths) {
   const response = await get(path);
@@ -93,12 +107,13 @@ for (const path of healthPaths) {
   assert.equal(health.ok, true);
   if (kind === 'platform') assert.equal(health.service, 'iva-platform');
   else {
-    assert.equal(health.protocol, path.includes('overdrive') ? 'overdrive-online-v2' : 'remorse-online-v1');
-    assert.equal(health.rulesVersion, path.includes('overdrive') ? 'overdrive-v2' : 'remorse-digital-v1');
+    const expected = chess.find(game => game.chess.health?.path === path).chess.health;
+    assert.equal(health.protocol, expected.protocol);
+    assert.equal(health.rulesVersion, expected.rulesVersion);
   }
 }
 
-for (const path of kind === 'chess' ? ['/', '/overdrive/'] : ['/']) {
+for (const path of kind === 'chess' ? chess.map(game => game.chess.route) : ['/']) {
   const response = await get(path);
   assert.match(response.headers.get('content-type') ?? '', /text\/html/);
   const html = await response.text();
@@ -123,6 +138,7 @@ if (kind === 'platform') {
   const catalogue = await (await get('/api/platform/v1/games')).json();
   assert.ok(catalogue.games.some(game => game.gameId === 'platform-lab' && game.status === 'available'));
   assert.ok(catalogue.games.some(game => game.gameId === 'district' && game.status === 'available' && game.supportsBots && game.maxPlayers === 4));
+  for (const registered of chess) assert.ok(catalogue.games.some(game => game.gameId === registered.gameId && game.collectionId === 'chess'), `Missing registered game: ${registered.gameId}`);
   const district = catalogue.games.find(game => game.gameId === 'district');
   assert.equal(district.rulesVersion, districtRules, 'The production image must serve the current District rules despite a stale false flag');
   assert.equal(district.contentVersion, districtContent);
@@ -138,22 +154,54 @@ if (kind === 'platform') {
     assert.ok(session.csrfToken.length > 20);
   }
 } else if (phase === 'initial') {
-  for (const path of ['/api/guest', '/api/overdrive/guest']) {
+  const guests = {};
+  for (const entry of chess.filter(game => game.chess.health)) {
+    const path = entry.chess.health.path.replace(/health$/, 'guest');
+    const protocol = entry.chess.health.protocol;
+    const cookieName = entry.gameId + '_guest';
     const response = await get(path, {
       method: 'POST', body: '{}',
       headers: { Origin: 'https://chess.iva-games.pro', 'Content-Type': 'application/json' },
     });
-    assert.match(response.headers.get('set-cookie') ?? '', /HttpOnly/);
-    assert.match(response.headers.get('set-cookie') ?? '', /Secure/);
-    assert.equal(typeof (await response.json()).protocol, 'string');
+    const cookie = response.headers.get('set-cookie') ?? '';
+    assert.ok(cookie.startsWith(cookieName + '='));
+    assert.match(cookie, /HttpOnly/);
+    assert.match(cookie, /Secure/);
+    assert.match(cookie, /SameSite=Strict/);
+    assert.equal((await response.json()).protocol, protocol);
+    guests[path] = cookie.split(';')[0];
   }
+  const post = (path, data, cookie, status = 200) => get(path, { method: 'POST', body: JSON.stringify(data),
+    headers: { Origin: 'https://chess.iva-games.pro', 'Content-Type': 'application/json', Cookie: cookie } }, status);
+  const cookieA = guests['/api/colossus/guest'];
+  const second = await post('/api/colossus/guest', {}, '');
+  const cookieB = second.headers.get('set-cookie').split(';')[0];
+  assert.notEqual(cookieA, cookieB, 'Cooperative players require independent guest sessions');
+  const created = await (await post('/api/colossus/rooms', { protocol: 'colossus-online-v1', requestId: randomUUID(),
+    name: 'CI Ally A', options: {} }, cookieA, 201)).json();
+  await post(`/api/colossus/rooms/${created.snapshot.id}/join`, { protocol: 'colossus-online-v1', name: 'CI Ally B', invite: created.invite }, cookieB);
+  const current = (await (await get(`/api/colossus/rooms/${created.snapshot.id}`, { headers: { Cookie: cookieA } })).json()).snapshot;
+  const king = current.state.units.find(unit => unit.type === 'K');
+  const command = { protocol: 'colossus-online-v1', commandId: randomUUID(), expectedRevision: current.revision,
+    command: { type: 'action', action: { type: 'guard', unitId: king.id } } };
+  const accepted = await (await post(`/api/colossus/rooms/${created.snapshot.id}/commands`, command, cookieA)).json();
+  assert.equal(accepted.snapshot.state.commands, 2);
+  assert.equal(accepted.snapshot.state.secret, null);
+  colossusRoom = { id: created.snapshot.id, cookieA, command, ack: accepted.ack, state: accepted.snapshot.state };
+} else {
+  assert.ok(persisted.colossus, 'Missing persisted cooperative room fixture');
+  const saved = persisted.colossus;
+  const current = (await (await get(`/api/colossus/rooms/${saved.id}`, { headers: { Cookie: saved.cookieA } })).json()).snapshot;
+  assert.deepEqual(current.state, saved.state, 'Cooperative state changed after container replacement');
+  assert.equal(current.paused, true, 'A restarted server must await client reconnection');
+  const replay = await (await get(`/api/colossus/rooms/${saved.id}/commands`, { method: 'POST', body: JSON.stringify(saved.command),
+    headers: { Origin: 'https://chess.iva-games.pro', 'Content-Type': 'application/json', Cookie: saved.cookieA } })).json();
+  assert.deepEqual(replay.ack, saved.ack, 'The same command must retain its exact durable receipt');
+  assert.deepEqual(replay.snapshot.state, saved.state, 'Retry after restart must not spend another command');
 }
 
 const databases = kind === 'chess'
-  ? [
-      ['remorse.sqlite', ['guests', 'rooms', 'commands'], 'guests'],
-      ['overdrive.sqlite', ['guests', 'rooms', 'commands'], 'guests'],
-    ]
+  ? chess.filter(game => game.chess.database).map(game => [game.chess.database.file, ['guests', 'rooms', 'commands'], 'guests'])
   : [
       ['platform.sqlite', ['players', 'web_sessions', 'rooms', 'invitations'], 'web_sessions'],
       ['platform-lab.sqlite', ['matches', 'action_receipts', 'district_schema', 'district_matches', 'district_action_receipts'], 'matches'],
@@ -171,16 +219,22 @@ for (const [file, expectedTables, countTable] of databases) {
     for (const table of expectedTables) assert.ok(tables.has(table), `${file}: missing ${table}`);
     counts[file] = db.prepare(`SELECT count(*) AS count FROM ${countTable}`).get().count;
     if (countTable !== 'matches') assert.ok(counts[file] > 0, `${file}: API session was not persisted`);
+    if (file === 'colossus.sqlite') {
+      assert.equal(db.pragma('application_id', { simple: true }), 0x434f4c53);
+      for (const table of ['rooms', 'commands']) {
+        counts[file + '/' + table] = db.prepare(`SELECT count(*) AS count FROM ${table}`).get().count;
+        assert.ok(counts[file + '/' + table] > 0, `Colossus ${table} was not persisted`);
+      }
+    }
   } finally { db.close(); }
 }
-const marker = '/data/ci-persistence.json';
-if (phase === 'initial') writeFileSync(marker, JSON.stringify({ kind, counts }), { flag: 'wx', mode: 0o600 });
+if (phase === 'initial') writeFileSync(marker, JSON.stringify({ kind, counts, ...(colossusRoom ? { colossus: colossusRoom } : {}) }), { flag: 'wx', mode: 0o600 });
 else {
   const before = JSON.parse(readFileSync(marker, 'utf8'));
   assert.equal(before.kind, kind);
   assert.deepEqual(counts, before.counts, 'Application data changed after container replacement');
 }
-console.log(`${kind}/${phase}: health, HTML, JS/CSS, API session and two SQLite databases passed.`);
+console.log(`${kind}/${phase}: health, HTML, JS/CSS, API sessions and ${databases.length} SQLite databases passed.`);
 NODE
 
 start_runtime

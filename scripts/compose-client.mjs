@@ -1,3 +1,4 @@
+import { chessGames } from '../packages/game-registry/src/index.ts'
 import { mkdir, mkdtemp, readFile, readdir, rename, rm, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -16,14 +17,15 @@ async function collect(directory, prefix = '') {
   return result.sort()
 }
 
-// Validate both outputs and all collisions before replacing the combined build.
+// Validate all outputs and all collisions before replacing the combined build.
 // Each game remains independently deployable from games/chess/<game>/dist.
-for (const game of ['remorse', 'overdrive']) {
-  const source = join(root, 'games', 'chess', game, 'dist')
+for (const registration of chessGames) {
+  const game = registration.gameId
+  const source = join(root, registration.chess.source, 'dist')
   const entries = await collect(source)
   if (!entries.includes('index.html')) throw new Error(`Build ${game} before composing clients`)
   for (const entry of entries) {
-    const destination = game === 'overdrive' && entry === 'index.html' ? 'overdrive/index.html' : entry
+    const destination = entry === 'index.html' ? registration.chess.route.slice(1) + 'index.html' : entry
     const bytes = await readFile(join(source, entry))
     const previous = files.get(destination)
     if (previous && !previous.equals(bytes)) throw new Error(`Conflicting game build outputs: ${destination}`)
@@ -44,4 +46,4 @@ try {
 } finally {
   await rm(staging, { recursive: true, force: true })
 }
-process.stdout.write(`Composed ${files.size} client files: REMORSE / and OVERDRIVE /overdrive/\n`)
+process.stdout.write(`Composed ${files.size} client files: ${chessGames.map(game => game.gameId + ' ' + game.chess.route).join(', ')}\n`)

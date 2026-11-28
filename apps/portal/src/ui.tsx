@@ -1,3 +1,4 @@
+import { registration } from '@iva-games/game-registry';
 import { AVATARS } from "./types";
 import { AvatarArt, CHARACTER_AVATARS } from "./AvatarArt";
 import { createContext, useContext, useEffect, useRef } from "react";
@@ -252,6 +253,24 @@ export function Modal({
 }
 
 export function GameArt({ kind }: { kind: string }) {
+  if (kind === "colossus")
+    return (
+      <div className="game-art colossus-art" aria-hidden="true">
+        <svg viewBox="0 0 400 190" focusable="false">
+          <path d="M35 145 198 88 367 145 203 199Z" fill="#35434a" stroke="#b29863" strokeWidth="2" />
+          <path d="m75 132 170 56m-126-72 170 55m-127-71 169 54m-89-52-161 57m204-43-161 57m205-42-160 57" stroke="#87918c" strokeOpacity=".35" />
+          <path d="m235 57 33-13 35 13v52l-35 17-33-17Z" fill="#536269" stroke="#b29863" strokeWidth="3" />
+          <path d="m234 58 34 15 35-16m-35 16v52m-49-17 15-31m68 0 16 31" stroke="#b29863" strokeWidth="5" fill="none" />
+          <path d="m252 48-5-18 16 9 5-19 6 19 17-9-6 18" fill="#b29863" />
+          <path d="M250 87h11m13 0h11" stroke="#d9aa7e" strokeWidth="4" />
+          <g fill="#e1d8bd" stroke="#b29863" strokeWidth="2">
+            <path d="m125 122 6-30h16l6 30 5 7h-38Zm9-32V77h10v13m-16-7h22" />
+            <path d="m177 154 5-20h11l5 20 4 5h-29Z" /><circle cx="187" cy="128" r="7" />
+            <path d="m87 155 5-20h11l5 20 4 5H83Z" /><circle cx="97" cy="129" r="7" />
+          </g>
+        </svg>
+      </div>
+    );
   if (kind === "district")
     return (
       <div className="game-art district-art" aria-hidden="true">
@@ -294,7 +313,7 @@ export function GameArt({ kind }: { kind: string }) {
         <span className="harbor-cargo cargo-two" />
       </div>
     );
-  if (kind === "remorse" || kind === "overdrive")
+  if (registration(kind)?.collectionId === "chess")
     return (
       <div className={`game-art chess-art ${kind}`} aria-hidden="true">
         <span className="chess-board" />

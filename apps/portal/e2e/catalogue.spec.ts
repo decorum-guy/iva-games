@@ -6,6 +6,7 @@ const games = [
   { gameId: 'platform-lab', collectionId: 'other', title: 'Пробный стол', minPlayers: 2, maxPlayers: 6, supportsBots: true, rulesVersion: '1', contentVersion: '1', status: 'available' },
   { gameId: 'remorse', collectionId: 'chess', title: 'Remorse', minPlayers: 2, maxPlayers: 2, supportsBots: false, rulesVersion: 'pending', contentVersion: 'pending', status: 'unavailable' },
   { gameId: 'overdrive', collectionId: 'chess', title: 'Форсаж', minPlayers: 2, maxPlayers: 2, supportsBots: false, rulesVersion: 'pending', contentVersion: 'pending', status: 'unavailable' },
+  { gameId: 'colossus', collectionId: 'chess', title: 'Колосс', minPlayers: 1, maxPlayers: 2, supportsBots: false, rulesVersion: 'pending', contentVersion: 'pending', status: 'unavailable' },
   { gameId: 'district', collectionId: 'other', title: 'Район', minPlayers: 2, maxPlayers: 4, supportsBots: false, rulesVersion: 'pending', contentVersion: 'pending', status: 'planned' },
   { gameId: 'harbor', collectionId: 'other', title: 'Гавань', minPlayers: 3, maxPlayers: 6, supportsBots: false, rulesVersion: 'pending', contentVersion: 'pending', status: 'planned' },
 ];
@@ -44,15 +45,18 @@ test('guests can browse two distinct collections with direct links, reload and h
   await expect(page.getByRole('heading', { name: 'Во что сыграем?' })).toBeVisible();
   await page.getByRole('navigation', { name: 'Разделы игр' }).getByRole('link', { name: 'Шахматы', exact: true }).click();
   await expect(page).toHaveURL(/\/chess$/);
-  await expect(page.getByRole('article')).toHaveCount(2);
+  await expect(page.getByRole('article')).toHaveCount(3);
   await expect(page.getByRole('heading', { name: 'Форсаж', exact: true })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Район', exact: true })).toHaveCount(0);
   await expect(page.getByRole('article').filter({ has: page.getByRole('heading', { name: 'Remorse', exact: true }) }).getByRole('link', { name: 'Играть', exact: true }))
     .toHaveAttribute('href', 'http://127.0.0.1:4173/');
+  await expect(page.getByRole('article').filter({ has: page.getByRole('heading', { name: 'Колосс', exact: true }) }).getByRole('link', { name: 'Играть', exact: true }))
+    .toHaveAttribute('href', 'http://127.0.0.1:5195/');
   await page.getByRole('navigation', { name: 'Разделы игр' }).getByRole('link', { name: 'Другие игры', exact: true }).click();
   await expect(page).toHaveURL(/\/games$/);
   await expect(page.getByRole('article')).toHaveCount(3);
   await expect(page.getByRole('heading', { name: 'Форсаж', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('heading', { name: 'Колосс', exact: true })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Об игре', exact: true })).toHaveCount(2);
   await page.goBack();
   await expect(page.getByRole('heading', { name: 'Шахматы', exact: true })).toBeVisible();
@@ -69,6 +73,7 @@ test('collections remain readable on a narrow screen in Russian and English', as
   await expect(page.getByRole('heading', { name: 'Шахматы', exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'EN', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Chess', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Colossus', exact: true })).toBeVisible();
   await page.getByRole('link', { name: 'Other games', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Practice table', exact: true })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
@@ -96,6 +101,8 @@ test('public chess stays available before email verification and old invitations
   await page.goto('/chess');
   await expect(page.getByRole('heading', { name: 'Форсаж', exact: true })).toBeVisible();
   await expect(page.getByText('Продолжим после подтверждения')).toHaveCount(0);
+  await expect(page.getByRole('article').filter({ has: page.getByRole('heading', { name: 'Колосс', exact: true }) }).getByRole('link', { name: 'Играть', exact: true }))
+    .toHaveAttribute('href', 'http://127.0.0.1:5195/');
   await page.unroute('**/api/platform/v1/**');
   await mockPortal(page);
   await page.goto('/#/invite/test-invite');

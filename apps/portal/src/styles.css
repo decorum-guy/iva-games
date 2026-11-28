@@ -903,6 +903,14 @@ button {
   overflow: hidden;
   isolation: isolate;
 }
+.colossus-art {
+  background: #182126;
+}
+.colossus-art svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
 .district-art {
   background: #e2e7c8;
 }

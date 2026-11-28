@@ -20,11 +20,11 @@ import sys
 
 SPEC = {
     'chess': {
-        'roots': ['apps/server', 'games/chess/remorse', 'games/chess/overdrive'],
+        'roots': ['apps/server'],
         'build': 'build',
         'files': ['Dockerfile', 'games/chess', 'apps/server', 'packages/engine-sdk', 'packages/session-kit',
-                  'vite.config.ts', 'vite.server.config.ts', 'tsconfig.json', 'scripts/compose-client.mjs'],
-        'compatibility': ['apps/server/src/store.ts', 'apps/server/src/overdrive/store.ts',
+                  'vite.config.ts', 'vite.server.config.ts', 'tsconfig.json', 'scripts/compose-client.mjs', 'scripts/build-chess.mjs', 'scripts/check-game-registry.mjs', 'scripts/chess-health.mjs'],
+        'compatibility': ['apps/server/src/store.ts', ':(glob)apps/server/src/**/store.ts',
                           ':(glob)games/chess/**/src/core/**', ':(glob)games/chess/**/src/online/protocol.ts'],
     },
     'platform': {
@@ -37,7 +37,7 @@ SPEC = {
                           'games/district/src/core.ts', 'games/district/src/runtime.ts'],
     },
 }
-COMMON = ['.dockerignore', '.npmrc', 'tsconfig.base.json',
+COMMON = ['.dockerignore', '.npmrc', 'tsconfig.base.json', 'packages/game-registry', 'scripts/check-game-registry.mjs',
           'deploy/iva-games/image-inputs.py', 'deploy/iva-games/image-inputs.sh']
 
 
@@ -122,7 +122,19 @@ def dependency_closure(lock, roots):
 def fingerprints(service):
     spec = SPEC[service]
     root = manifest('package.json')
-    lock, local = dependency_closure(manifest('package-lock.json'), spec['roots'])
+    roots = list(spec['roots'])
+    if service == 'chess':
+        registry = manifest('packages/game-registry/games.json')
+        if registry.get('version') != 1 or not isinstance(registry.get('games'), list):
+            raise ValueError('Invalid game registry')
+        for game in registry['games']:
+            if not game.get('chess'):
+                continue
+            source = game['chess'].get('source', '')
+            if not re.fullmatch(r'games/chess/[a-z][a-z0-9-]*', source):
+                raise ValueError('Invalid registered chess source')
+            roots.append(source)
+    lock, local = dependency_closure(manifest('package-lock.json'), roots)
     root['scripts'] = build_scripts(root.get('scripts', {}), spec['build'])
     # Keep declared ranges as well as the resolved graph, so a range/override
     # change cannot be lost. The service's local workspaces include their code.
