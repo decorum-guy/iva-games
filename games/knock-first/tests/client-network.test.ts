@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { LIVE_PROTOCOL } from '@iva-games/session-kit';
 import { KnockConnection } from '../src/client/network';
-import { connectParticipant, createMission, viewForParticipant } from '../src/core/mission';
+import { applyCommand, connectParticipant, createMission, setInput, stepMission, viewForParticipant } from '../src/core/mission';
 import { KNOCK_CONTENT, KNOCK_RULES, KNOCK_WIRE } from '../src/core/version';
-import type { CommandReceipt } from '../src/core/types';
+import type { CommandPayload, CommandReceipt, PlayerInput } from '../src/core/types';
 
 // Transport-only fixtures: no browser, real socket, WebGL, audio or playthrough.
 type Frame = Record<string, unknown>;
@@ -73,6 +73,45 @@ describe('Knock connection lifecycle and outbox (mocked WebSocket)', () => {
     expect(onView).not.toHaveBeenCalled(); expect(onState).not.toHaveBeenCalledWith('connected');
     vi.advanceTimersByTime(100); expect(socket.sent).toEqual([]);
     socket.receive(snapshot()); expect(onView).toHaveBeenCalledTimes(1); expect(onState).toHaveBeenLastCalledWith('connected');
+  });
+
+  it('keeps a real rescue held when the input timer fires before the renderer samples the E key', async () => {
+    const state = createMission({ settings: { difficulty: 'calm' }, participants: [
+      { participantId: 'seat-a', displayName: 'A', kind: 'human' },
+      { participantId: 'seat-b', displayName: 'B', kind: 'human' },
+    ] });
+    const epoch = connectParticipant(state, 'seat-a');
+    const [human, partner] = state.actors;
+    state.phase = 'active'; partner.position = { ...human.position, x: human.position.x + 0.6 };
+    partner.status = 'downed'; partner.downedRemaining = 90;
+    connection.start(); const socket = MockWebSocket.instances[0];
+    socket.receive({ ...snapshot(), view: viewForParticipant(state, human.id), tick: state.tick });
+    let consumed = 0;
+    const deliver = () => {
+      for (const frame of socket.sent.slice(consumed)) {
+        if (frame.type === 'input') setInput(state, human.id, { ...(frame.payload as PlayerInput), seq: Number(frame.seq), controllerEpoch: epoch });
+        if (frame.type === 'command') {
+          const result = applyCommand(state, human.id, { actionId: String(frame.actionId), controllerEpoch: epoch,
+            payload: (frame.payload as { payload: CommandPayload }).payload });
+          socket.receive({ ...base, epoch: 'epoch-first-0001', type: 'receipt', actionId: frame.actionId, result });
+        }
+      }
+      consumed = socket.sent.length;
+    };
+    const down = connection.command({ type: 'hand', down: true });
+    // Keydown sends its command before the next render/input sample. The
+    // independent 34 ms transport timer must not cancel that new hold.
+    vi.advanceTimersByTime(34); deliver(); stepMission(state);
+    for (let tick = 0; tick < 65; tick++) {
+      connection.input({ moveX: 0, moveZ: 0, yaw: 0, pitch: 0, run: false, quiet: false, hand: true });
+      vi.advanceTimersByTime(34); deliver(); stepMission(state);
+    }
+    await expect(down).resolves.toMatchObject({ ok: true });
+    expect(partner.status).toBe('active');
+    expect(human.saves).toBe(1);
+    const up = connection.command({ type: 'hand', down: false });
+    vi.advanceTimersByTime(34); deliver(); await up;
+    expect(human.input.hand).toBe(false);
   });
 
   it.each([

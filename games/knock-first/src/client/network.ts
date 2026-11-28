@@ -100,6 +100,10 @@ export class KnockConnection {
   command(payload: CommandPayload, expectedRevision?: number): Promise<CommandReceipt> {
     if (this.stopped) return Promise.reject(new Error('CLOSED'));
     if (this.pending.size >= 8) return Promise.reject(new Error('BUSY'));
+    // Keydown/keyup commands precede the next rendered control sample. Keep
+    // the independent input timer in the same hand state, or its old neutral
+    // frame can cancel a rescue/install immediately after the command starts it.
+    if (payload.type === 'hand') this.inputValue = { ...this.inputValue, hand: payload.down };
     return new Promise((resolve, reject) => {
       const actionId = crypto.randomUUID(), pending: Pending = { payload: { payload, ...(expectedRevision === undefined ? {} : { expectedRevision }) }, expectedRevision: this.lastRevision, resolve, reject, sent: false };
       this.pending.set(actionId, pending); this.sendCommand(actionId, pending);
