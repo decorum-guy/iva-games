@@ -10,6 +10,7 @@ import { spawn, execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { mkdtemp, mkdir, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:net';
+import { request as httpRequest } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -50,9 +51,11 @@ const report = {
     originalFinishedCupReturn: { status: extended ? 'not started' : 'disabled' },
   },
   gitHead: execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim(),
+  gitTree: execFileSync('git', ['rev-parse', 'HEAD^{tree}'], { cwd: root, encoding: 'utf8' }).trim(),
   workingTreeDirty: !!execFileSync('git', ['status', '--porcelain'], { cwd: root, encoding: 'utf8' }).trim(),
   scopes: [], requiredScopeFailures: [], scenarios: [], cups: [], metrics: [], coldTransfers: [], layouts: [], browserErrors: [], consoleErrors: [], consoleErrorsDropped: 0, failedAssets: [], expectedOfflineAssetFailures: [], actionErrors: [], observedGameActions: {},
   controls: { keyboardEvents: 0, touchGestures: 0, acceptedUiActions: 0 },
+  roomResponses: [], restoreChecks: [], restoreCommands: [], localDriverTraces: [],
   controller: {
     method: 'Real keyboard W/A/D/Space/E/R, with normal bot decisions and wheel-angle feedback from received own-lane snapshots',
     delayedPrecision: { enabled: latencyMs > 0, track: 'precision', configuredPerDirectionMs: latencyMs, horizon: 'Decision wall time plus configured input delay minus snapshot.serverTime', inputHistory: 'Last 30 actually observed browser WebSocket input frames, in send order, including frames preceding the snapshot', deliveryEstimate: 'Runner framesent observation time plus configured relay delay', wheelEstimate: 'Snapshot wheel angle replayed at 60 Hz toward each historical steering target, with rate 2.8 rad/s and the snapshot speed limit', poseEstimate: 'Constant received x/z velocity and yaw angular velocity; y, speed and all other lane fields unchanged', clockAssumption: 'Isolated runner and server share one host wall clock. Snapshot timestamp can be later than its physics step; estimates require real-browser validation.', resetScope: 'Socket connection, match, epoch, stage and phase; only controller history is cleared', gameStateMutation: false },
@@ -73,6 +76,59 @@ function omitDataUrls(value) {
   return { text, omitted };
 }
 
+async function emitEvidence(kind, value) {
+  const envelope = { evidence: 'test-bench-browser@1', kind, data: value };
+  const write = text => new Promise((resolve, reject) => process.stdout.write(text + '\n', error => error ? reject(error) : resolve()));
+  if (Buffer.byteLength(JSON.stringify(envelope)) + 1 <= 8192) { await write(JSON.stringify(envelope)); return; }
+  // Every line stays below the observed 65,536-byte loss boundary. Split by
+  // Unicode code point, measuring its JSON-escaped byte cost, so recombining
+  // dataFragment in part order reproduces the complete JSON value exactly.
+  const pieces = []; let piece = ''; let bytes = 0;
+  for (const character of JSON.stringify(value)) {
+    const cost = Buffer.byteLength(JSON.stringify(character)) - 2;
+    if (bytes + cost > 6000) { pieces.push(piece); piece = ''; bytes = 0; }
+    piece += character; bytes += cost;
+  }
+  if (piece) pieces.push(piece);
+  for (const [index, dataFragment] of pieces.entries()) await write(JSON.stringify({ evidence: 'test-bench-browser@1', kind, part: index + 1, parts: pieces.length, dataFragment }));
+}
+
+function buildIdentity() {
+  return Object.fromEntries(['gitHead', 'gitTree', 'workingTreeDirty', 'builtMainSha256', 'builtWorkerSha256', 'builtIndexSha256', 'runnerSha256', 'qaDriverSha256', 'browserVersion'].map(key => [key, report[key] ?? null]));
+}
+
+function compactLocalTrace(trace) {
+  const { observations, keyTransitions, ...metadata } = trace;
+  return { ...metadata, firstObservations: observations.slice(0, 4), finalObservations: observations.slice(-24), peakSpeedObservation: observations.reduce((best, value) => !best || value.speed > best.speed ? value : best, null), longestDecisionInterval: observations.reduce((best, value) => !best || value.intervalMs > best.intervalMs ? value : best, null), finalKeyTransitions: keyTransitions.slice(-40) };
+}
+
+function compactFinalReport() {
+  const verdict = ({ id, name, status, dependencies, error }) => ({ id, name, status, dependencies, error });
+  return {
+    status: report.status, method: report.method, scope: report.scope, ...buildIdentity(),
+    humanPlaytest: report.humanPlaytest, audioListening: report.audioListening, physicalDevice: report.physicalDevice,
+    directGameplayApiCommands: report.directGameplayApiCommands, externalMessages: report.externalMessages,
+    fullCups: report.fullCups, tutorial: report.tutorial,
+    extendedCoverage: { enabled: extended, flag: report.extendedCoverage.flag, targetedZeroScoreTieCups: report.extendedCoverage.targetedZeroScoreTieCups, ...Object.fromEntries(['looseCargoPickup', 'zeroScoreTieCup', 'originalFinishedCupReturn'].map(key => [key, { status: report.extendedCoverage[key].status, error: report.extendedCoverage[key].error }])) },
+    scopes: report.scopes.map(verdict), requiredScopeFailures: report.requiredScopeFailures, scenarios: report.scenarios.map(verdict),
+    cups: report.cups.map(cup => ({ roomId: cup.roomId, matchId: cup.matchId, status: cup.status, completedStages: cup.stages.length, stages: cup.stages.map(stage => ({ stage: stage.stage, track: stage.track, mirrored: stage.mirrored, results: stage.results, sameProtocol: stage.sameProtocol, reset: stage.reset, disconnect: stage.disconnect, restart: stage.restart })), standings: cup.standings })),
+    controls: report.controls, observedGameActions: report.observedGameActions, roomResponses: report.roomResponses,
+    errorCounts: { uncaught: report.browserErrors.length, console: report.consoleErrors.length, consoleOccurrences: report.consoleErrors.reduce((sum, item) => sum + item.occurrences, 0), consoleDropped: report.consoleErrorsDropped, failedAssets: report.failedAssets.length, unexpectedActions: report.actionErrors.length, expectedOfflineAssets: report.expectedOfflineAssetFailures.length, transport: players.map(player => ({ profile: player.name, count: player.transportErrors.length })) },
+    coldTransfers: report.coldTransfers.map(value => ({ profile: value.profile, scope: value.scope, transferBytes: value.transferBytes, encodedBodyBytes: value.encodedBodyBytes, transferredEncodedBodyBytes: value.transferredEncodedBodyBytes, transferIsBrowserEstimate: value.transferIsBrowserEstimate, exactWireBytesMeasured: value.exactWireBytesMeasured, fixedHeaderAllowanceBytes: value.fixedHeaderAllowanceBytes, navigationEntries: value.navigationEntries, resourceEntries: value.resourceEntries, cachedRepeatCount: value.inSceneCachedRepeats.length, unavailableCount: value.zeroOrUnavailableEntries.length, excludedOriginCount: value.excludedOrigins.length, readiness: value.readiness, budget: value.budget })),
+    transport: report.transport, onlineRenderers: report.onlineRenderers,
+    controller: { ...report.controller, profiles: report.controller.profiles?.map(({ samples, resetObservations, ...stats }) => ({ ...stats, sampleCount: samples.length, recordedResetCount: resetObservations.length })) },
+    restoreChecks: report.restoreChecks.map(({ snapshots, inputFrames, ...check }) => ({ ...check, recordedSnapshots: snapshots.length, recordedInputFrames: inputFrames.length })),
+    restoreCommands: report.restoreCommands,
+    localDriverTraces: report.localDriverTraces.map(({ observations, keyTransitions, ...trace }) => ({ ...trace, recordedObservations: observations.length, recordedKeyTransitions: keyTransitions.length })),
+    metrics: report.metrics,
+    layouts: report.layouts.map(({ name, profile, width, height, scrollWidth, controls }) => ({ name, profile, width, height, scrollWidth, offscreen: controls.filter(control => control.visible && !control.inViewport) })),
+    assetLoads: report.assetLoads ?? players.map(player => ({ profile: player.name, files: player.loadedAssets.size, receivedSnapshots: player.receivedFrames, sentInputFrames: player.sentInputs, socketConnections: player.socketConnections, socketCloses: player.socketCloses })),
+    openCoverage: report.openCoverage, lastObserved: report.lastObserved, error: report.error, cleanupError: report.cleanupError,
+    evidenceFormat: 'test-bench-browser@1 NDJSON; multipart dataFragment values concatenate in part order into the exact JSON value. Every output line is at most 8192 bytes.',
+    omittedFromConsole: 'Complete resource lists and complete local-driver traces remain in the ignored local report. Scenario evidence, scope diagnostics, counters and build identities are emitted separately.',
+  };
+}
+
 async function until(predicate, label, timeout = 10000, interval = 30) {
   const deadline = Date.now() + timeout;
   while (Date.now() < deadline) { const value = await predicate(); if (value) return value; await delay(interval); }
@@ -83,6 +139,7 @@ async function scenario(name, work) {
   const row = { name, status: 'running' }; report.scenarios.push(row);
   try { const evidence = await work(); row.status = 'passed'; if (evidence !== undefined) row.evidence = evidence; return evidence; }
   catch (error) { row.status = 'failed'; row.error = error.message; throw error; }
+  finally { await emitEvidence('scenario', row); }
 }
 async function extendedScenario(key, name, work) {
   assert.equal(extended, true, 'Extended scenarios require IVA_BROWSER_EXTENDED=1');
@@ -99,6 +156,7 @@ async function requiredScope(id, name, work, dependencies = []) {
   if (missing.length) {
     row.error = 'Required prerequisites did not pass: ' + missing.join(', ');
     report.requiredScopeFailures.push({ id, status: row.status, error: row.error });
+    await emitEvidence('scope', row);
     return { ok: false };
   }
   console.info(`[test-bench browser scope] ${name}`);
@@ -113,6 +171,10 @@ async function requiredScope(id, name, work, dependencies = []) {
     const released = await Promise.allSettled(players.map(player => keys(player)));
     row.inputReleaseErrors = released.flatMap((result, index) => result.status === 'rejected' ? [{ profile: players[index].name, message: String(result.reason) }] : []);
     return { ok: false };
+  } finally {
+    const { failureScreens, ...verdict } = row;
+    await emitEvidence('scope', verdict);
+    for (const screen of failureScreens ?? []) await emitEvidence('scope-screen', { scope: id, ...screen });
   }
 }
 async function availablePort() {
@@ -213,10 +275,21 @@ function observe(player, page) {
   });
   const assetPath = url => { const p = new URL(url).pathname; return !p.startsWith('/api/') && (p.startsWith('/test-bench/') || p.startsWith('/assets/')); };
   page.on('requestfailed', request => {
+    const restore = player.restoreByRequest.get(request);
+    if (restore) restore.networkError = request.failure()?.errorText ?? 'Request failed';
     if (assetPath(request.url()) && request.failure()?.errorText !== 'net::ERR_ABORTED') {
       const failure = { profile: player.name, path: new URL(request.url()).pathname, error: request.failure()?.errorText };
       (player.intentionalOffline ? report.expectedOfflineAssetFailures : report.failedAssets).push(failure);
     }
+  });
+  page.on('request', request => {
+    if (request.method() !== 'POST' || !new URL(request.url()).pathname.endsWith('/actions')) return;
+    try {
+      const body = request.postDataJSON();
+      if (body?.payload?.type !== 'restore') return;
+      const command = { profile: player.name, path: new URL(request.url()).pathname, observedRequestAtMs: Date.now(), actionId: body.actionId, expectedRevision: body.expectedRevision, phaseId: body.payload.phaseId, status: null };
+      report.restoreCommands.push(command); player.restoreByRequest.set(request, command);
+    } catch { /* Non-JSON request evidence is handled by response/error checks. */ }
   });
   page.on('response', response => {
     if (assetPath(response.url())) { player.loadedAssets.add(new URL(response.url()).pathname); if (response.status() >= 400) report.failedAssets.push({ profile: player.name, path: new URL(response.url()).pathname, status: response.status() }); }
@@ -224,6 +297,14 @@ function observe(player, page) {
       const type = response.request().postDataJSON()?.payload?.type ?? 'unknown';
       report.observedGameActions[type] = (report.observedGameActions[type] ?? 0) + 1;
       if (response.status() >= 400) report.actionErrors.push({ profile: player.name, type, status: response.status() });
+      const restore = player.restoreByRequest.get(response.request());
+      if (restore) {
+        restore.status = response.status(); restore.observedResponseAtMs = Date.now();
+        const reading = response.json().then(body => {
+          restore.receipt = { error: body.error?.code ?? null, matchId: body.view?.matchId ?? null, phase: body.view?.phase ?? null, phaseId: body.view?.phaseId ?? null, revision: body.view?.revision ?? null, tick: body.view?.tick ?? null, resets: body.view?.you?.lane?.resets ?? null };
+        }).catch(error => { restore.receiptReadError = error.message; }).finally(() => player.restoreReceiptReads.delete(reading));
+        player.restoreReceiptReads.add(reading);
+      }
     }
   });
   page.on('websocket', socket => {
@@ -237,6 +318,12 @@ function observe(player, page) {
           const scope = { connection, roomId: frame.roomId, matchId: frame.matchId, epoch: frame.epoch, stage: frame.view.stage, phaseId: frame.view.phaseId, phase: frame.view.phase };
           if (!player.predictionScope || Object.keys(scope).some(key => player.predictionScope[key] !== scope[key])) resetKeyboardPrediction(player, 'Received snapshot changed controller scope', scope);
           player.snapshot = frame; player.snapshotConnection = connection; player.receivedAt = Date.now(); player.receivedFrames++;
+          if (player.activeRestoreCheck) {
+            const check = player.activeRestoreCheck;
+            const observed = { observedAtMs: Date.now(), serverTime: frame.serverTime, epoch: frame.epoch, lastAcceptedSeq: frame.lastAcceptedSeq, phase: frame.view.phase, phaseId: frame.view.phaseId, stage: frame.view.stage, laneTick: frame.view.you.lane?.tick ?? null, resets: frame.view.you.lane?.resets ?? null };
+            check.snapshotsObserved++; check.lastSnapshot = observed;
+            if (check.snapshots.length < 40) check.snapshots.push(observed);
+          }
           // Sample the exact accepted sequence, not older inputs that might have
           // been superseded before a snapshot. Both timestamps use this runner's clock.
           const sent = player.pendingInputs.get(frame.epoch + ':' + frame.lastAcceptedSeq);
@@ -251,6 +338,12 @@ function observe(player, page) {
         const frame = JSON.parse(String(event.payload));
         if (frame.type === 'input') {
           player.sentInputs++; player.lastSent = frame;
+          if (player.activeRestoreCheck) {
+            const check = player.activeRestoreCheck;
+            const observed = { observedAtMs: Date.now(), seq: frame.seq, epoch: frame.epoch, phaseId: frame.payload?.phaseId, throttle: frame.payload?.throttle, steering: frame.payload?.steering, brake: frame.payload?.brake };
+            check.inputFramesObserved++; check.lastInputFrame = observed;
+            if (check.inputFrames.length < 40) check.inputFrames.push(observed);
+          }
           const scope = player.predictionScope;
           if (scope?.connection === connection && scope.matchId === frame.matchId && scope.epoch === frame.epoch && scope.phase === 'racing' && scope.phaseId === frame.payload?.phaseId && Number.isFinite(frame.payload?.steering)) {
             // This is an observation of a frame the application really sent,
@@ -283,7 +376,7 @@ async function makePlayer(account, name, locale, hasTouch = false) {
   await context.addInitScript(() => performance.setResourceTimingBufferSize(2000));
   const separator = account.cookie.indexOf('=');
   await context.addCookies([{ name: account.cookie.slice(0, separator), value: account.cookie.slice(separator + 1), url: origin }]);
-  const player = { account, name, locale, context, held: new Set(), loadedAssets: new Set(), pendingInputs: new Map(), ackTimings: [], socketConnections: 0, socketCloses: 0, receivedFrames: 0, sentInputs: 0, transportErrors: [], snapshot: null, lastInteract: 0, lastRestore: 0, driveRemainder: { throttle: 0, steering: 0 }, steeringHistory: [], predictionScope: null, predictionStats: { calls: 0, historyFrames: 0, resets: 0, resetObservations: [], horizons: [], samples: [] } };
+  const player = { account, name, locale, context, held: new Set(), loadedAssets: new Set(), pendingInputs: new Map(), ackTimings: [], socketConnections: 0, socketCloses: 0, receivedFrames: 0, sentInputs: 0, transportErrors: [], snapshot: null, lastInteract: 0, lastRestore: 0, driveRemainder: { throttle: 0, steering: 0 }, steeringHistory: [], predictionScope: null, predictionStats: { calls: 0, historyFrames: 0, resets: 0, resetObservations: [], horizons: [], samples: [] }, restoreByRequest: new WeakMap(), restoreReceiptReads: new Set() };
   observe(player, await context.newPage()); players.push(player); return player;
 }
 const label = (player, ru, en) => player.locale === 'ru' ? ru : en;
@@ -294,8 +387,18 @@ async function waitView(player, predicate, description, timeout = 12000) {
 }
 async function keys(player, wanted = []) {
   const next = new Set(wanted);
-  for (const key of player.held) if (!next.has(key)) { await player.page.keyboard.up(key); report.controls.keyboardEvents++; }
-  for (const key of next) if (!player.held.has(key)) { await player.page.keyboard.down(key); report.controls.keyboardEvents++; }
+  const transition = async (key, direction) => {
+    const dispatchedAtMs = Date.now();
+    await player.page.keyboard[direction](key); report.controls.keyboardEvents++;
+    if (player.localKeyTrace) {
+      const trace = player.localKeyTrace;
+      trace.keyTransitionCount++;
+      if (trace.keyTransitions.length < 2000) trace.keyTransitions.push({ key, direction, dispatchedAtMs, acknowledgedAtMs: Date.now() });
+      else trace.droppedKeyTransitions++;
+    }
+  };
+  for (const key of player.held) if (!next.has(key)) await transition(key, 'up');
+  for (const key of next) if (!player.held.has(key)) await transition(key, 'down');
   player.held = next;
 }
 async function focusLane(player) {
@@ -316,14 +419,17 @@ async function action(player, locator, type, activation = 'click') {
   return body.view;
 }
 async function roomAction(player, locator, endpoint, activation = 'click') {
-  let result;
-  // A successful creation navigates immediately. Read its response while the
-  // response event is current, before awaiting the click/navigation lifecycle.
+  let result; let metadata;
+  const previousUrl = player.page.url();
+  // /rooms can destroy its document immediately after the client consumes the
+  // response. Metadata survives; a CDP body read still races that navigation.
   const pending = player.page.waitForResponse(async response => {
     const url = new URL(response.url());
     if (response.request().method() !== 'POST' || url.origin !== origin || !url.pathname.startsWith('/api/platform/v1/') || !url.pathname.endsWith(endpoint)) return false;
-    result = await response.json();
-    assert.equal(response.status(), 200, `${endpoint}: ${result.error?.code ?? 'HTTP failure'}`);
+    metadata = { profile: player.name, path: url.pathname, method: response.request().method(), status: response.status() };
+    report.roomResponses.push(metadata);
+    assert.equal(response.status(), 200, `${endpoint}: HTTP ${response.status()}`);
+    if (endpoint !== '/rooms') result = await response.json();
     return true;
   });
   const activate = async () => {
@@ -331,6 +437,15 @@ async function roomAction(player, locator, endpoint, activation = 'click') {
     else await locator.click();
   };
   await Promise.all([pending, activate()]);
+  if (endpoint === '/rooms') {
+    await player.page.waitForURL(url => url.origin === origin && /^\/rooms\/[^/]+$/.test(url.pathname) && url.href !== previousUrl, { waitUntil: 'commit' });
+    const roomId = decodeURIComponent(new URL(player.page.url()).pathname.split('/').at(-1));
+    // Observe the room reached by the real UI. This GET never creates a room,
+    // replays its POST, issues gameplay commands or changes application state.
+    result = await player.account.request('/rooms/' + encodeURIComponent(roomId));
+    assert.equal(result.room.roomId, roomId); assert.equal(result.room.gameId, 'test-bench');
+    metadata.navigationPath = new URL(player.page.url()).pathname; metadata.followup = 'Read-only GET of the room reached by UI navigation';
+  }
   report.controls.acceptedUiActions++; return result;
 }
 async function inspect(player, name, { race = false, low = false } = {}) {
@@ -423,17 +538,32 @@ async function measureColdTransfer(player) {
 }
 
 async function nodePathCalibration() {
+  const publicUrl = new URL(origin);
+  assert.equal(publicUrl.protocol, 'http:'); assert.equal(publicUrl.hostname, '127.0.0.1'); assert.ok(publicUrl.port);
+  const result = { method: 'Node http.request plus body completion against the same isolated platform, before browser launch; explicit public Host is preserved', hostHeader: publicUrl.host, configuredPerDirectionMs: latencyMs, pureNetworkRtt: false, requests: [], directBackend: null, configuredPublicPath: null };
+  report.transport.nodeCalibration = result;
   const sample = async url => {
+    const target = new URL('/health/ready', url);
+    assert.equal(target.protocol, 'http:'); assert.equal(target.hostname, '127.0.0.1'); assert.ok([String(port), publicUrl.port].includes(target.port));
     const samples = [];
     for (let i = 0; i < 6; i++) {
       const began = performance.now();
-      const response = await http(url + '/health/ready', { headers: { Host: new URL(origin).host }, cache: 'no-store' });
-      assert.equal(response.status, 200); await response.arrayBuffer(); samples.push(performance.now() - began);
+      const response = await new Promise((resolve, reject) => {
+        const request = httpRequest(target, { method: 'GET', headers: { Host: publicUrl.host, 'Cache-Control': 'no-store' } }, response => {
+          let bodyBytes = 0;
+          response.on('data', chunk => { bodyBytes += chunk.length; });
+          response.on('error', reject); response.on('end', () => resolve({ status: response.statusCode, bodyBytes }));
+        });
+        request.setTimeout(8000, () => request.destroy(new Error('Node calibration request timed out')));
+        request.on('error', reject); request.end();
+      });
+      const durationMs = performance.now() - began;
+      result.requests.push({ targetPort: target.port, hostHeader: publicUrl.host, ...response, durationMs: Math.round(durationMs * 10) / 10 });
+      assert.equal(response.status, 200); samples.push(durationMs);
     }
     return { samplesMs: samples.map(value => Math.round(value * 10) / 10), ...timing(samples) };
   };
-  const result = { method: 'Node fetch plus body completion against the same isolated platform, before browser launch', hostHeader: new URL(origin).host, configuredPerDirectionMs: latencyMs, pureNetworkRtt: false, directBackend: await sample(`http://127.0.0.1:${port}`), configuredPublicPath: await sample(origin) };
-  report.transport.nodeCalibration = result; return result;
+  result.directBackend = await sample(`http://127.0.0.1:${port}`); result.configuredPublicPath = await sample(origin); return result;
 }
 
 async function browserPathProbe(player) {
@@ -551,13 +681,22 @@ async function stableLessonMilestone(player, name) {
   assert.deepEqual(state(after), state(before), `${name}: the reached lesson goal must preserve its clock, cargo and physics while waiting for Continue`);
   return after;
 }
-async function localDriveTo(player, target, speed = 2.2, extra = () => false, timeout = 30000) {
+async function localDriveTo(player, target, speed = 2.2, extra = () => false, timeout = 30000, trace) {
   await focusLane(player); const deadline = Date.now() + timeout;
+  let priorDecisionAt = null;
+  const observeDecision = (hud, wanted, done) => {
+    if (!trace) return;
+    const atMs = Date.now(); trace.observationCount++;
+    if (trace.observations.length < 1000) trace.observations.push({ atMs, intervalMs: priorDecisionAt === null ? null : atMs - priorDecisionAt, x: hud.x, z: hud.z, speed: hud.speed, health: hud.health, cargoStatus: hud.cargoStatus, timer: hud.timer, next: hud.next, wanted, done });
+    else trace.droppedObservations++;
+    priorDecisionAt = atMs;
+  };
   while (Date.now() < deadline) {
     const hud = await localHud(player); assert.notEqual(hud.z, null, 'Visible minimap position is required for the local UI driver');
-    if (await extra(hud) || hud.z >= target - .35 && hud.speed <= .35) { await keys(player, ['Space']); return hud; }
+    if (await extra(hud) || hud.z >= target - .35 && hud.speed <= .35) { observeDecision(hud, ['Space'], true); await keys(player, ['Space']); return hud; }
     const desired = Math.min(speed, Math.max(0, (target - hud.z - .25) * 1.0));
-    await keys(player, hud.speed > desired + .12 || desired < .1 ? ['Space'] : hud.speed < desired ? ['KeyW'] : []);
+    const wanted = hud.speed > desired + .12 || desired < .1 ? ['Space'] : hud.speed < desired ? ['KeyW'] : [];
+    observeDecision(hud, wanted, false); await keys(player, wanted);
     await delay(45);
   }
   await keys(player); throw new Error(`Local keyboard driver did not reach ${target} m: ${JSON.stringify(await localHud(player))}`);
@@ -791,13 +930,26 @@ async function tutorial(player) {
   await expect(page.locator('.tb-race-lesson p b')).toHaveText(String(fast.health));
   await approachLoadingDock(player);
   await keys(player); await page.locator('.tb-interact').click(); await expect(page.locator('.tb-cargo-slot')).toHaveClass(/secured/);
-  await localDriveTo(player, 14, .85, hud => hud.next, 45000);
-  await until(async () => (await localHud(player)).next, 'tutorial holds its slow goal through the required settling period', 10000, 40);
-  const slow = await stableLessonMilestone(player, 'slow crossing'); await keys(player);
-  assert.equal(slow.lessonTitle, 'Теперь пройди медленнее');
-  assert.match(slow.cargoStatus ?? '', /\bsecured\b/, 'The slow comparison must keep the capsule secured');
-  assert.ok(slow.z >= 13.5, `The slow comparison must cross the ribs, received z=${slow.z}`);
-  assert.ok(Number.isFinite(slow.health) && slow.health > fast.health && slow.health <= 100, `Slow comparison integrity ${slow.health} must exceed fast ${fast.health}`);
+  const trace = { profile: player.name, name: 'First slow tutorial attempt', status: 'running', requestedTargetSpeed: .85, targetIsHardCap: false, fastBaselineIntegrity: fast.health, timingMethod: 'Runner times of actual keyboard command dispatch/acknowledgement and visible-HUD decisions, not DOM event timestamps', observationCount: 0, observations: [], droppedObservations: 0, keyTransitionCount: 0, keyTransitions: [], droppedKeyTransitions: 0 };
+  report.localDriverTraces.push(trace); player.localKeyTrace = trace;
+  let slow;
+  try {
+    await localDriveTo(player, 14, .85, hud => hud.next, 45000, trace);
+    await until(async () => (await localHud(player)).next, 'tutorial holds its slow goal through the required settling period', 10000, 40);
+    slow = await stableLessonMilestone(player, 'slow crossing'); await keys(player);
+    assert.equal(slow.lessonTitle, 'Теперь пройди медленнее');
+    assert.match(slow.cargoStatus ?? '', /\bsecured\b/, 'The slow comparison must keep the capsule secured');
+    assert.ok(slow.z >= 13.5, `The slow comparison must cross the ribs, received z=${slow.z}`);
+    assert.ok(Number.isFinite(slow.health) && slow.health > fast.health && slow.health <= 100, `Slow comparison integrity ${slow.health} must exceed fast ${fast.health}`);
+    trace.status = 'passed';
+  } catch (error) { trace.status = 'failed'; trace.error = error.message; throw error; }
+  finally {
+    delete player.localKeyTrace;
+    trace.lastHud = await localHud(player).catch(error => ({ unavailable: error.message }));
+    trace.decisionIntervalsMs = timing(trace.observations.map(value => value.intervalMs).filter(Number.isFinite));
+    trace.maximumObservedSpeed = Math.max(0, ...trace.observations.map(value => value.speed));
+    await emitEvidence('local-driver-trace', compactLocalTrace(trace));
+  }
   await expect(next()).toBeVisible(); await inspect(player, 'tutorial-slow-comparison', { race: true, low: true }); await next().click();
   await localDriveTo(player, 22.5, 1.8, hud => hud.next, 25000); await keys(player, ['Space']);
   await expect(next()).toBeVisible({ timeout: 5000 }); await keys(player); await next().click();
@@ -985,10 +1137,37 @@ async function driveStage(alice, bob, roomId, stage) {
   const seen = new Map([alice, bob].map(player => [player.name, new Map()]));
   const maxCharge = {};
   if (stage === 0) {
-    await keys(alice, ['KeyR']); await delay(740); await keys(alice);
-    await waitView(alice, current => current.you.lane?.resets === 1, 'held reset charges a real five-second penalty');
-    await expect(alice.page.locator('.tb-race-timer small')).toContainText('+5');
-    saved.reset = { resets: view(alice).you.lane.resets, shownPenaltyText: await alice.page.locator('.tb-race-timer small').textContent() };
+    const check = { profile: alice.name, stage, status: 'running', requestedHoldMs: 740, startedAtMs: Date.now(), timingMethod: 'Runner key dispatch and acknowledgement times; browser DOM event times are not instrumented', inputFramesObserved: 0, inputFrames: [], snapshotsObserved: 0, snapshots: [] };
+    report.restoreChecks.push(check); alice.activeRestoreCheck = check;
+    const restoreUi = () => alice.page.locator('.tb-race').evaluate(node => {
+      const button = node.querySelector('.tb-reset');
+      return { capturedAtMs: Date.now(), enabled: !!button && !button.disabled, hold: button?.style.getPropertyValue('--hold') ?? null, countdown: !!node.querySelector('.tb-countdown'), paused: node.classList.contains('paused'), documentVisible: document.visibilityState, documentFocused: document.hasFocus(), activeElement: document.activeElement?.tagName ?? null, shownPenalty: node.querySelector('.tb-race-timer small')?.textContent ?? null };
+    });
+    try {
+      await focusLane(alice); await expect(alice.page.locator('.tb-reset')).toBeEnabled();
+      check.phaseBefore = { phase: view(alice).phase, phaseId: view(alice).phaseId, stage: view(alice).stage, tick: view(alice).you.lane?.tick, resets: view(alice).you.lane?.resets };
+      check.uiBefore = await restoreUi(); assert.equal(check.phaseBefore.phase, 'racing'); assert.equal(check.uiBefore.countdown, false);
+      check.keyDownDispatchedAtMs = Date.now(); await keys(alice, ['KeyR']); check.keyDownAcknowledgedAtMs = Date.now();
+      const hold = async () => {
+        await delay(740); check.keyUpDispatchedAtMs = Date.now(); await keys(alice); check.keyUpAcknowledgedAtMs = Date.now();
+        check.runnerHoldAfterKeydownAckMs = check.keyUpDispatchedAtMs - check.keyDownAcknowledgedAtMs;
+      };
+      // Observe alongside the unchanged 740 ms hold. A delayed DOM read never
+      // extends the runner's wait before it sends keyup.
+      const sample = async () => { await delay(350); check.uiDuring = await restoreUi().catch(error => ({ unavailable: error.message })); };
+      await Promise.all([hold(), sample()]);
+      await waitView(alice, current => current.phase === 'racing' && current.you.lane?.resets === 1, 'held reset charges a real five-second penalty');
+      await expect(alice.page.locator('.tb-race-timer small')).toContainText('+5');
+      check.status = 'passed';
+      saved.reset = { resets: view(alice).you.lane.resets, shownPenaltyText: await alice.page.locator('.tb-race-timer small').textContent() };
+    } catch (error) { check.status = 'failed'; check.error = error.message; throw error; }
+    finally {
+      await keys(alice); await Promise.allSettled([...alice.restoreReceiptReads]);
+      check.uiAfter = await restoreUi().catch(error => ({ unavailable: error.message }));
+      check.commands = report.restoreCommands.filter(command => command.profile === alice.name && command.observedRequestAtMs >= check.startedAtMs);
+      delete alice.activeRestoreCheck;
+      await emitEvidence('restore-check', check);
+    }
   }
   const deadline = Date.now() + 115000;
   let disconnected = false, restarted = false, snapshots = false;
@@ -1253,6 +1432,8 @@ try {
   report.builtMainSha256 = digest(await readFile(join(root, 'dist-platform/main.js')));
   report.builtWorkerSha256 = digest(await readFile(join(root, 'dist-platform/test-bench-worker.js')));
   report.builtIndexSha256 = digest(await readFile(join(root, 'apps/portal/dist/index.html')));
+  report.runnerSha256 = digest(await readFile(fileURLToPath(import.meta.url)));
+  report.qaDriverSha256 = digest(await readFile(join(root, 'games/test-bench/scripts/qa-driver.ts')));
   fixtureDirectory = await mkdtemp(join(root, '.qa', 'test-bench-driver-'));
   await build({ root, configFile: false, logLevel: 'error', build: { ssr: join(root, 'games/test-bench/scripts/qa-driver.ts'), target: 'node22', outDir: fixtureDirectory, emptyOutDir: true, rollupOptions: { output: { entryFileNames: 'qa-driver.mjs' } } } });
   policy = await import(pathToFileURL(join(fixtureDirectory, 'qa-driver.mjs')).href);
@@ -1261,6 +1442,7 @@ try {
   await requiredScope('nodeCalibration', 'Node direct/backend and configured-path calibration before launching Chromium', nodePathCalibration);
   browser = await chromium.launch({ headless: true, args: ['--enable-unsafe-swiftshader', '--disable-background-timer-throttling', '--disable-renderer-backgrounding', '--disable-backgrounding-occluded-windows'], ...(process.env.IVA_CHROMIUM_PATH ? { executablePath: process.env.IVA_CHROMIUM_PATH } : {}) });
   report.browserVersion = browser.version();
+  await emitEvidence('identity', buildIdentity());
   const accountA = await new Account().register('bench_ui_alice'), accountB = await new Account().register('bench_ui_bob');
   assert.notEqual(accountA.cookie, accountB.cookie);
   const friendship = await accountA.request('/friend-requests', { playerId: accountB.user.playerId });
@@ -1355,8 +1537,17 @@ try {
     const { horizons, ...stats } = player.predictionStats;
     return { profile: player.name, ...stats, predictionHorizonMs: timing(horizons) };
   });
+  await Promise.allSettled(players.flatMap(player => [...player.restoreReceiptReads]));
   try { await cleanup(); } catch (error) { failure ??= error; report.status = 'failed'; report.cleanupError = error.message; }
   await mkdir(output, { recursive: true }); await writeFile(join(output, 'report.json'), JSON.stringify(report, null, 2) + '\n');
-  console.info(JSON.stringify({ ...report, layouts: report.layouts.map(({ name, profile, width, height, scrollWidth, controls }) => ({ name, profile, width, height, scrollWidth, offscreen: controls.filter(control => control.visible && !control.inViewport) })) }));
+  await emitEvidence('summary', compactFinalReport());
+  for (const [kind, values] of [['browser-error', report.browserErrors], ['console-error', report.consoleErrors], ['failed-asset', report.failedAssets], ['action-error', report.actionErrors], ['expected-offline-asset', report.expectedOfflineAssetFailures]]) {
+    for (const value of values.slice(0, 40)) await emitEvidence(kind, value);
+    if (values.length > 40) await emitEvidence(kind + '-omitted', { count: values.length - 40, location: 'Ignored local report' });
+  }
+  for (const player of players) if (player.transportErrors.length) await emitEvidence('transport-errors', { profile: player.name, count: player.transportErrors.length, first: player.transportErrors.slice(0, 40) });
+  for (const screen of report.failureScreens ?? []) await emitEvidence('final-screen', screen);
 }
-if (failure) throw failure;
+// Drain the awaited stdout writes before a nonzero exit. Candidate 6's final
+// single records were truncated at exactly 65,536 UTF-8 bytes in CI logs.
+if (failure) process.exitCode = 1;
