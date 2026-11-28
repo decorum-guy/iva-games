@@ -326,7 +326,7 @@ export class ShiftRuntime implements GameRuntime {
       },
       snapshot: () => {
         if (!current()) fail('STALE_EPOCH');
-        return { tick: entry.state.tick, view: viewForSeat(entry.state, seatId) };
+        return { tick: entry.state.tick, view: viewForSeat(entry.state, seatId), finished: entry.state.phase === 'finished' };
       },
       close: () => {
         if (closed) return;

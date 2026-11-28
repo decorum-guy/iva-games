@@ -32,7 +32,8 @@ export interface LiveGameSession {
   readonly wireVersion: string;
   input(payload: unknown): void;
   command(actionId: string, payload: unknown): Promise<unknown>;
-  snapshot(): { tick: number; view: unknown };
+  /** Optional internal hint: the immutable final view needs one reliable send. */
+  snapshot(): { tick: number; view: unknown; finished?: boolean };
   isCurrent(): boolean;
   close(): void;
 }

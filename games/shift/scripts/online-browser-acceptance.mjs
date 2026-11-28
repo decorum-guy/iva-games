@@ -189,6 +189,10 @@ function watchPage(page, name, game) {
       try {
         const frame = JSON.parse(String(payload));
         if (frame.type === 'snapshot') {
+          // A closing socket may deliver its last buffered snapshot after a
+          // replacement has already acquired a newer controller epoch.
+          if (peer.matchId === frame.matchId && peer.controllerEpoch > frame.controllerEpoch) return;
+          peer.controllerEpoch = frame.controllerEpoch;
           auditView(frame.view, peer); peer.view = frame.view; peer.matchId = frame.matchId; peer.frames++; peer.recent.set(frame.tick, frame.view);
           while (peer.recent.size > 40) peer.recent.delete(peer.recent.keys().next().value);
           if (peer.frames === 1 || frame.view.phase !== peer.previousPhase) peer.samples.push({ type: 'phase', tick: frame.tick, view: frame.view });
@@ -249,6 +253,7 @@ async function keyboardAudioInFreshContext(game) {
   const replacement = await createBrowserPeer(game, 'pilot');
   await replacement.page.goto(game.url, { waitUntil: 'domcontentloaded' });
   await until(() => replacement.view?.self.controllerEpoch > oldEpoch, 'Fresh audio-only keyboard context acquires its ordinary seat');
+  game.peers[0] = replacement;
   await replacement.page.locator('.shift-scene canvas').first().waitFor();
   const before = await replacement.page.evaluate(() => window.__shiftAcceptance.audioAudit());
   assert.equal(before.gestures.pointers, 0); assert.equal(before.gestures.keys, 0);
@@ -269,7 +274,11 @@ async function keyboardAudioInFreshContext(game) {
   assert.equal(after.gestures.pointers, 0); assert.ok(after.gestures.trustedKeys > 0);
   await old.page.locator('.shift-connection').waitFor();
   assert.match(await old.page.locator('.shift-connection').innerText(), /другой вкладке|Another tab/i);
-  game.peers[0] = replacement; await automated(replacement);
+  await automated(replacement);
+  const socketState = await bounded(replacement.page.evaluate(() => window.__shiftAcceptance.active?.readyState), 'Adopted keyboard controller socket');
+  assert.equal(socketState, 1, 'The adopted keyboard controller remains connected');
+  const adoptedTick = replacement.view.tick;
+  await until(() => replacement.view.phase === 'finished' || replacement.view.tick > adoptedTick, 'Adopted keyboard controller receives advancing snapshots', 4000);
   check('Fresh authenticated online context unlocks native AudioContext through keyboard before any pointer', {
     game: game.label, before, beforeGameKey, after, classification: 'Browser AudioContext state only; no listening or speaker-output claim',
   });
@@ -342,7 +351,11 @@ async function lobby(game, detailed) {
 
 async function contentionAndReconnect(game) {
   const [host, guest] = game.peers;
-  await until(() => host.view.phase === 'active' && guest.view.phase === 'active', 'Round active');
+  try { await until(() => host.view.phase === 'active' && guest.view.phase === 'active', 'Round active'); }
+  catch (error) {
+    log({ boundary: 'Round active', peers: game.peers.map(peer => ({ name: peer.name, frames: peer.frames, sockets: peer.sockets, closes: peer.closes.length, phase: peer.view?.phase, tick: peer.view?.tick, round: peer.view?.round, role: peer.view?.self.role, epoch: peer.view?.self.controllerEpoch, errors: peer.errors })) });
+    throw error;
+  }
   const rejected = host.view.shiftOptions.find(o => o.reason === 'NOT_ADJACENT');
   if (rejected) {
     await host.page.locator('.shift-room-keys').getByRole('button', { name: rejected.roomId, exact: true }).click();
@@ -503,7 +516,9 @@ try {
       const game = { ...item, room, roomId: room.roomId, demo, label: `${item.arena}-${item.teamSize}v${item.teamSize}`, url: `${demo.origin}/rooms/${room.roomId}`, hostSeat: room.members.find(m => m.playerId === demo.pilot.user.playerId).participantId, peers: [], comparedFrames: 0, oneWayDelayMs: item.arena === 'depot' && item.teamSize === 3 ? 60 : 0 };
       for (const name of ['pilot', 'navigator']) game.peers.push(await createBrowserPeer(game, name));
       await lobby(game, batch === 0 && games.length === 0);
-      if (batch === 0 && games.length === 0) { await keyboardAudioInFreshContext(game); await contentionAndReconnect(game); await crashAndTakeover(game); }
+      // The contention fixture uses the first ready round. Run UI/audio context
+      // replacement after those timing-sensitive actions, then adopt it for play.
+      if (batch === 0 && games.length === 0) { await contentionAndReconnect(game); await crashAndTakeover(game); await keyboardAudioInFreshContext(game); }
       games.push(game);
       if (!smoke) game.run = drive(game).catch(error => { game.error = error; log({ game: game.label, matchFailure: error.message }); });
     }

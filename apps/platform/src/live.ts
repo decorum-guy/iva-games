@@ -74,21 +74,26 @@ export function attachPlatformLive(server: Server, service: PlatformService, opt
       };
       wss.handleUpgrade(request, socket, head, ws => {
         const scope = { version, matchId, controllerEpoch: controller.controllerEpoch };
-        let pending = 0;
+        let pending = 0, finalSnapshotSent = false;
         let inputBudget = INPUT_BURST, inputBudgetAt = performance.now(), commandWindow = 0, commands = 0;
-        const send = (frame: unknown, disposable = false): void => {
-          if (stopping || closed || ws.readyState !== WebSocket.OPEN) return;
-          if (ws.bufferedAmount > MAX_BUFFER * 4) { ws.close(1013, 'Slow connection'); return; }
-          if (disposable && ws.bufferedAmount > MAX_BUFFER) return;
+        const send = (frame: unknown, disposable = false): boolean => {
+          if (stopping || closed || ws.readyState !== WebSocket.OPEN) return false;
+          if (ws.bufferedAmount > MAX_BUFFER * 4) { ws.close(1013, 'Slow connection'); return false; }
+          if (disposable && ws.bufferedAmount > MAX_BUFFER) return false;
           ws.send(JSON.stringify(frame));
+          return true;
         };
         const snapshot = (): void => {
           if (stopping || closed || ws.readyState !== WebSocket.OPEN) return;
           try {
             const denied = authorizationFailure();
             if (denied) { ws.close(denied, 'Session changed'); return; }
+            // Retain permission/epoch checks after the immutable result, without
+            // repeatedly constructing and transmitting its recap and journal.
+            if (finalSnapshotSent) return;
             const current = controller.snapshot();
-            send({ type: 'snapshot', ...scope, tick: current.tick, view: current.view }, true);
+            const sent = send({ type: 'snapshot', ...scope, tick: current.tick, view: current.view }, !current.finished);
+            if (sent && current.finished) finalSnapshotSent = true;
           } catch (error) {
             send({ type: 'error', ...scope, code: code(error) });
             close(); ws.close(1011, 'Live unavailable');

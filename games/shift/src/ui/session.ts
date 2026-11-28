@@ -44,6 +44,8 @@ export function useLocalSession(config: LocalGameConfig): ClientSession {
   }, []);
   useEffect(() => {
     const save = () => { try { localStorage.setItem(config.lesson ? lessonSave(config.lesson) : SAVE, JSON.stringify(ref.current)); } catch { /* Gameplay continues when storage is full. */ } };
+    // The menu checks for a checkpoint before this effect's unmount cleanup runs.
+    save();
     const timer = window.setInterval(() => {
       if (paused.current || document.hidden) return;
       const game = ref.current!, state = game.state;

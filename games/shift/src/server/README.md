@@ -67,6 +67,13 @@ Slow sockets drop obsolete snapshots and close at the hard buffer limit;
 receipts are not intentionally dropped. HTTP `GET .../match` remains the
 recovery view and common lobby polling remains available.
 
+The immutable final view is sent once per connection as a non-disposable frame.
+An internal runtime hint suppresses further view construction, serialization
+and transmission after that send; it is not a new wire field. The connection
+continues checking authorization, controller epoch and room membership, so
+takeover, revocation and rematch still close an obsolete channel. Reconnecting
+receives the final view again on the new connection.
+
 ## Ownership and recovery
 
 Each process owns one in-memory state per match. Socket callbacks queue actions;

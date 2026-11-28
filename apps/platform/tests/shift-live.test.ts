@@ -166,6 +166,39 @@ describe('shared authenticated live gateway with Shift', () => {
     expect(await revoked).toBe(4003);
   });
 
+  it('sends each finished view once without rebuilding it and still enforces takeover and revocation', async () => {
+    const f = await fixture(), a = await f.signup('final_a'), b = await f.signup('final_b');
+    const room = await f.room(a, b);
+    const openLive = f.platform.openLiveSession.bind(f.platform), snapshotCalls: number[] = [];
+    vi.spyOn(f.platform, 'openLiveSession').mockImplementation((...args) => {
+      const lease = openLive(...args), originalSnapshot = lease.snapshot.bind(lease), index = snapshotCalls.length;
+      snapshotCalls.push(0);
+      lease.snapshot = () => { snapshotCalls[index]++; return originalSnapshot(); };
+      return lease;
+    });
+    const first = f.connect(a, room); await first.wait(frame => frame.type === 'snapshot');
+    // A normal match completes through fixed steps and public-view substitute bots.
+    f.shift.runtime.advanceTicks(16_000);
+    const final = await first.wait(frame => frame.type === 'snapshot' && frame.view?.phase === 'finished');
+    expect(final).not.toHaveProperty('finished'); // The terminal hint stays internal.
+    const callsAtFinal = snapshotCalls[0], auth = vi.spyOn(f.platform, 'getSession');
+    await new Promise(resolve => setTimeout(resolve, 250));
+    expect(first.frames.filter(frame => frame.type === 'snapshot' && frame.view?.phase === 'finished')).toHaveLength(1);
+    expect(snapshotCalls[0]).toBe(callsAtFinal);
+    expect(auth).toHaveBeenCalled();
+    const oldClosed = new Promise<number>(resolve => first.socket.once('close', resolve));
+    const second = f.connect(a, room), replacement = await second.wait(frame => frame.type === 'snapshot');
+    expect(replacement.view?.phase).toBe('finished');
+    expect(replacement.controllerEpoch).toBeGreaterThan(final.controllerEpoch!);
+    expect(await oldClosed).toBe(4001);
+    await new Promise(resolve => setTimeout(resolve, 200));
+    expect(second.frames.filter(frame => frame.type === 'snapshot')).toHaveLength(1);
+    expect(snapshotCalls[1]).toBe(1);
+    const revoked = new Promise<number>(resolve => second.socket.once('close', resolve));
+    f.platform.revokeSession(a.session.sessionHash);
+    expect(await revoked).toBe(4003);
+  }, 30_000);
+
   it('accepts a bounded input burst after network jitter while continuing to limit a flood', async () => {
     const f = await fixture(), a = await f.signup('jitter_a'), b = await f.signup('jitter_b'), room = await f.room(a, b);
     const client = f.connect(a, room), first = await client.wait(frame => frame.type === 'snapshot');

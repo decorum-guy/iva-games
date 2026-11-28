@@ -198,6 +198,15 @@ async function uiSweep() {
   const { page, context } = await setupPage();
   try {
     await snap(page, 'home-ru');
+    await settings(page, '2d');
+    await page.getByRole('button', { name: /Начать практику/ }).click(); await page.locator('.shift-match').waitFor();
+    await page.getByRole('button', { name: 'Пауза', exact: true }).click(); const firstExit = await view(page);
+    await page.getByRole('button', { name: 'В меню', exact: true }).click(); await page.locator('.shift-home').waitFor();
+    await page.getByRole('button', { name: 'Продолжить практику', exact: true }).click(); await page.locator('.shift-match').waitFor();
+    const firstResume = await view(page);
+    if (firstResume.tick < firstExit.tick || firstResume.round !== firstExit.round) defect('Immediate practice resume lost progress', { firstExitTick: firstExit.tick, firstResumeTick: firstResume.tick });
+    log('Practice resume after first immediate exit', { exitTick: firstExit.tick, resumedTick: firstResume.tick, beforePeriodicCheckpoint: firstExit.tick < 60, pageReloaded: false });
+    await page.getByRole('button', { name: 'В меню', exact: true }).click(); await page.locator('.shift-home').waitFor();
     await page.getByRole('button', { name: /Как устроен матч/ }).click();
     const dialog = page.getByRole('dialog'); await dialog.waitFor();
     for (let i = 0; i < 14; i++) await page.keyboard.press('Tab');
