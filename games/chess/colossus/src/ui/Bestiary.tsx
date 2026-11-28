@@ -109,7 +109,12 @@ export function Bestiary({ language, difficulty, records, initialBoss, onClose, 
       </div>
       <span className="bestiary-announcement" role="status" aria-live="polite" aria-atomic="true">{boss.name[language]}, {position}</span>
       <div ref={detailsRef} id={`${id}-details`} className="bestiary-details" data-testid="bestiary-details"
-        role="region" aria-labelledby={`${id}-boss`} tabIndex={0}>
+        role="region" aria-labelledby={`${id}-boss`} tabIndex={0} onKeyDown={event => {
+          if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
+          if (event.key !== 'Home' && event.key !== 'End') return;
+          event.preventDefault();
+          event.currentTarget.scrollTop = event.key === 'Home' ? 0 : event.currentTarget.scrollHeight;
+        }}>
         <div key={selection.revision} className={`bestiary-detail-content${selection.revision ? ' bestiary-detail-in' : ''}`}>
           <p className="bestiary-description">{boss.description[language]}</p>
           <dl className="bestiary-stats">

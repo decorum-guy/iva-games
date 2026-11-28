@@ -2,7 +2,7 @@ import { Component,useCallback,useEffect,useMemo,useRef,useState } from 'react';
 import type { ReactNode } from 'react';
 import {
  BASE_DECK,BOSSES,BOSS_CARDS,BOSS_CARD_LIST,CAMPAIGN_BOSSES,CARDS,DIFFICULTIES,UNIT_NAMES,applyAction,bossCells,createGame,
- editPractice,getActiveActor,getLeader,legalActions,legalCardActions,previewResponse,restoreGame,squareName,undoGame
+ editPractice,getActiveActor,getLeader,legalActions,legalCardActions,previewResponse,squareName,undoGame
 } from '../core';
 import type { Action,Actor,CardId,CreateOptions,GameState,Language,Seat } from '../core';
 import { ColossusOnlineClient } from '../online/client';
@@ -13,6 +13,9 @@ import { Card } from './Card';
 import { PieceIcon } from './PieceIcon';
 import { Setup } from './Setup';
 import { Modal } from './Modal';
+import { StrikeGuide } from './StrikeGuide';
+import { downloadLocalRecovery,openLocalRun,PRACTICE,SAVE,saveLocalRun } from './localSaves';
+import type { SavedRun } from './localSaves';
 import { PracticeEditor } from './PracticeEditor';
 import { LESSONS,lessonComplete,lessonState,lessonGuidance,isLessonActionAllowed } from './tutorial';
 import { copy,errorText,rarityNames } from './i18n';
@@ -23,12 +26,10 @@ import type { ResultRecord } from './records';
 import './colossus.css';
 import './experience.css';
 
-const SAVE='colossus.save.v1',PRACTICE='colossus.practice.v1',SETTINGS='colossus.settings.v1',RECORDS='colossus.records.v1',TUTORIAL='colossus.tutorial.v1',ROOM='colossus.room.v1';
+const SETTINGS='colossus.settings.v1',RECORDS='colossus.records.v1',TUTORIAL='colossus.tutorial.v1',ROOM='colossus.room.v1';
 interface Preferences {lang:Language;view:'3d'|'2d';sound:boolean;reduced:boolean;theme:'ivory'|'jade'|'bronze'}
-interface Saved {state:GameState;options:CreateOptions;attemptId:string}
 const rememberRoom=(id:string)=>{try{localStorage.setItem(ROOM,JSON.stringify(id));}catch{/* A valid server session does not depend on local storage. */}};
 const read=<T,>(key:string,fallback:T):T=>{try{return JSON.parse(localStorage.getItem(key)??'null')??fallback;}catch{return fallback;}};
-function loadSaved(key=SAVE):Saved|null{try{const raw=read<Saved|null>(key,null);if(!raw)return null;return {...raw,state:restoreGame(raw.state)};}catch{return null;}}
 function loadRecords():ResultRecord[]{
  const entries=read<unknown>(RECORDS,[]);if(!Array.isArray(entries))return [];
  return entries.filter((r):r is ResultRecord=>!!r&&typeof r==='object'&&Object.hasOwn(BOSSES,r.boss)&&Object.hasOwn(DIFFICULTIES,r.difficulty)&&typeof r.id==='string'&&[r.round,r.lost,r.kingHp,r.armyHp].every(x=>typeof x==='number'&&Number.isFinite(x))&&typeof r.coop==='boolean'&&typeof r.cards==='boolean'&&typeof r.assisted==='boolean'&&['hunt','campaign','practice'].includes(r.mode)).map(r=>({...r,rulesVersion:typeof r.rulesVersion==='string'?r.rulesVersion:undefined,seed:r.seed===null?null:typeof r.seed==='number'&&Number.isFinite(r.seed)?r.seed:undefined}));
@@ -41,11 +42,13 @@ function Meter({value,max,type,label}:{value:number;max:number;type:string;label
 const sameTargets=(a:string[]=[],b:string[]=[])=>a.length===b.length&&a.every(x=>b.includes(x));
 
 export default function ColossusApp(){
- const stored=useMemo(()=>({normal:loadSaved(),practice:loadSaved(PRACTICE)}),[]);const saved=stored.normal??stored.practice;const [prefs,setPrefs]=useState(preferences);const lang=prefs.lang,c=copy[lang];
+ const [stored]=useState(()=>({normal:openLocalRun(SAVE),practice:openLocalRun(PRACTICE)}));
+ const [saveNotices,setSaveNotices]=useState(()=>({normal:stored.normal.notice,practice:stored.practice.notice}));
+ const saved=stored.normal.saved??stored.practice.saved;const [prefs,setPrefs]=useState(preferences);const lang=prefs.lang,c=copy[lang];
  const [game,setGame]=useState<GameState>(()=>saved?.state??createGame({seed:crypto.randomUUID(),bossCards:true}));
  const [options,setOptions]=useState<CreateOptions>(saved?.options??{boss:'regent',difficulty:'knight',mode:'hunt',deck:BASE_DECK,bossCards:true});
  const [attempt,setAttempt]=useState(saved?.attemptId??crypto.randomUUID());const [setup,setSetup]=useState(true);
- const [hasStarted,setHasStarted]=useState(!!saved);const localRun=useRef<Saved|null>(stored.normal);const practiceRun=useRef<Saved|null>(stored.practice);const tutorialReturn=useRef<Saved|null>(null);
+ const [hasStarted,setHasStarted]=useState(!!saved);const localRun=useRef<SavedRun|null>(stored.normal.saved);const practiceRun=useRef<SavedRun|null>(stored.practice.saved);const tutorialReturn=useRef<SavedRun|null>(null);
  const [selected,setSelected]=useState<string|null>(null);const [actionMode,setActionMode]=useState<'move'|'attack'>('move');
  const [selectedCard,setSelectedCard]=useState<CardId|null>(null);const [cardTargets,setCardTargets]=useState<string[]>([]);const [cardTo,setCardTo]=useState<number|null>(null);const [cardStep,setCardStep]=useState<number|null>(null);
  const [pendingAttack,setPendingAttack]=useState<Array<Extract<Action,{type:'attack'}>>>([]);const [choice,setChoice]=useState<Action[]>([]);
@@ -62,7 +65,17 @@ export default function ColossusApp(){
  const adopt=useCallback((incoming:RoomSnapshot)=>{const connection=client.current;if(!connection)return;const current=connection.snapshot;if(!current||current.id!==incoming.id)return;const s=current.revision>incoming.revision?current:incoming;const previous=lastRoomSnapshot.current;if(previous?.id===s.id&&previous.revision>s.revision)return;lastRoomSnapshot.current=s;setSnapshot(s);if(s.state.revision!==lastNetworkGame.current){lastNetworkGame.current=s.state.revision;setGame(s.state);if(previous?.id===s.id)soundForTransition(previous.state,s.state,`room/${s.id}/${s.state.revision}`);clearSelection();}setBusy(false);},[clearSelection]);
  const disconnect=useCallback(()=>{client.current?.stop();client.current=null;setSnapshot(null);lastNetworkGame.current=-1;lastRoomSnapshot.current=null;setInviteLink('');setCopied(false);try{localStorage.removeItem(ROOM);}catch{/* local storage can be unavailable */}const url=new URL(location.href);url.searchParams.delete('room');url.searchParams.delete('invite');window.history.replaceState({},'',url.pathname+url.search+url.hash);},[]);
  useEffect(()=>{setSoundEnabled(prefs.sound);try{localStorage.setItem(SETTINGS,JSON.stringify(prefs));}catch{/* preferences still work for this session */}},[prefs]);
- useEffect(()=>{if(!hasStarted||snapshot||lesson!==null||!game.secret)return;const save={state:game,options,attemptId:attempt};if(game.mode==='practice')practiceRun.current=save;else localRun.current=save;try{localStorage.setItem(game.mode==='practice'?PRACTICE:SAVE,JSON.stringify(save));}catch{setError(c.saveError);}},[game,options,attempt,snapshot,lesson,c.saveError,hasStarted]);
+ useEffect(()=>{
+  if(!hasStarted||snapshot||lesson!==null||!game.secret)return;
+  const save={state:game,options,attemptId:attempt};
+  const isPractice=game.mode==='practice';
+  (isPractice?practiceRun:localRun).current=save;
+  try {
+   if(saveLocalRun(isPractice?PRACTICE:SAVE,save)){
+    setSaveNotices(old=>({...old,[isPractice?'practice':'normal']:{damaged:false,archived:true}}));
+   }
+  } catch {setError(c.saveError);}
+ },[game,options,attempt,snapshot,lesson,c.saveError,hasStarted]);
  useEffect(()=>{if(!game.outcome||lesson!==null||game.mode==='tutorial')return;const id=snapshot?.id??attempt;setRecords(old=>{if(old.some(r=>r.id===id))return old;const record:ResultRecord={id,boss:game.boss.id==='sentinel'?'regent':game.boss.id,difficulty:game.difficulty,mode:game.mode==='tutorial'?'hunt':game.mode,coop:game.coop,cards:game.bossCardsEnabled,round:game.round,lost:game.units.filter(u=>u.hp<=0).length,kingHp:game.units.find(u=>u.type==='K')?.hp??0,armyHp:game.units.filter(u=>u.type!=='K').reduce((n,u)=>n+u.hp,0),winner:game.outcome!.winner,assisted:game.assisted,rulesVersion:game.version,seed:game.secret?.runSeed??null,...(game.mode==='campaign'&&game.outcome!.winner==='army'?{campaignBosses:[...CAMPAIGN_BOSSES]}:{})};const result=retainResultRecords([record,...old]);try{localStorage.setItem(RECORDS,JSON.stringify(result));}catch{/* result stays visible */}return result;});},[game,attempt,snapshot?.id,lesson]);
  useEffect(()=>{const onPageHide=()=>client.current?.stop();window.addEventListener('pagehide',onPageHide);return()=>{window.removeEventListener('pagehide',onPageHide);client.current?.stop();};},[]);
  useEffect(()=>{const query=new URLSearchParams(location.search);const room=query.get('room');const invitation=query.get('invite');const previous=read<string|null>(ROOM,null);if(!room&&!previous)return;const connection=new ColossusOnlineClient();client.current=connection;setBusy(true);
@@ -83,7 +96,17 @@ export default function ColossusApp(){
  },[pendingAttack,selectedCard,cardTargets,cardActions,game.units,actionMode,unitActions]);
  const attackTargets=selectedCard&&CARDS[selectedCard].target==='boss'?bossCells(game.boss):actionMode==='attack'&&!selectedCard?unitActions.filter((a):a is Extract<Action,{type:'attack'}>=>a.type==='attack').map(a=>a.target):[];
  const currentUnit=game.units.find(u=>u.id===selected);
- const selectionHint=lessonDone?c.correct:pendingAttack.length?c.chooseRetreat:selectedCard?(CARDS[selectedCard].target==='intent'?c.chooseAttack:CARDS[selectedCard].target==='move'&&cardTargets.length?c.chooseCardSquare:c.chooseCardTarget):selected?actionMode==='move'?c.chooseSquare:c.chooseTarget:c.choosePiece;
+ const selectedDefinition=selectedCard?CARDS[selectedCard]:null;
+ let cardUnavailable=c.unavailable as string;
+ if(game.cardPlayed)cardUnavailable=c.cardUsed;
+ else if(selectedDefinition&&game.focus<selectedDefinition.cost)cardUnavailable=c.insufficient;
+ else if(actor!==leader)cardUnavailable=c.partnerTurn;
+ let cardHint=c.chooseCardTarget as string;
+ if(!cardActions.length)cardHint=cardUnavailable;
+ else if(validCard.length)cardHint=c.applyCard;
+ else if(selectedDefinition?.target==='intent')cardHint=c.chooseAttack;
+ else if(selectedDefinition?.target==='move'&&cardTargets.length)cardHint=c.chooseCardSquare;
+ const selectionHint=lessonDone?c.correct:pendingAttack.length?c.chooseRetreat:selectedCard?cardHint:selected?actionMode==='move'?c.chooseSquare:c.chooseTarget:c.choosePiece;
  const isInteractive=!busy&&!paused&&game.phase==='army'&&!game.mustDiscard&&!setup&&!lessonDone;
  const hintEnabled=game.mode==='practice'&&!game.coop&&!snapshot&&!setup&&game.phase==='army'&&!game.mustDiscard;
  const hint=useHint(game,hintEnabled,()=>setGame(old=>({...old,assisted:true})));
@@ -144,7 +167,12 @@ export default function ColossusApp(){
   }catch(e){setError(errorText(e,lang));setSetup(true);}finally{setBusy(false);}
  }
  async function join(link:string,name:string){
-  setError('');setBusy(true);hint.cancel();disconnect();setHasStarted(false);try{const u=new URL(link,location.href);const id=u.searchParams.get('room'),token=u.searchParams.get('invite');if(!id||!token)throw new Error('invite');const connection=new ColossusOnlineClient();client.current=connection;const state=await connection.join(id,token,name);adopt(state);setSetup(false);connection.start(adopt,e=>setError(errorText(e,lang)));rememberRoom(id);historyReplaceRoom(id);setLesson(null);}catch(e){setError(errorText(e,lang));}finally{setBusy(false);}
+  unlockSounds();setError('');setBusy(true);hint.cancel();disconnect();setHasStarted(false);try{const u=new URL(link,location.href);const id=u.searchParams.get('room'),token=u.searchParams.get('invite');if(!id||!token)throw new Error('invite');const connection=new ColossusOnlineClient();client.current=connection;const state=await connection.join(id,token,name);adopt(state);setSetup(false);connection.start(adopt,e=>setError(errorText(e,lang)));rememberRoom(id);historyReplaceRoom(id);setLesson(null);}catch(e){setError(errorText(e,lang));}finally{setBusy(false);}
+ }
+ function downloadSave(practice:boolean){
+  try {if(downloadLocalRecovery(practice?PRACTICE:SAVE))return;}
+  catch {/* A blocked download uses the same recovery message. */}
+  setError(c.downloadSaveError);
  }
  async function networkCommand(command:Parameters<ColossusOnlineClient['send']>[0]){
   if(!client.current)return;setBusy(true);setError('');try{adopt((await client.current.send(command)).snapshot);}catch(e){setError(errorText(e,lang));}finally{setBusy(false);}
@@ -169,7 +197,7 @@ export default function ColossusApp(){
  const recordCard=(r:ResultRecord)=><article key={r.id}><b>{BOSSES[r.boss].name[lang]}</b><span>{DIFFICULTIES[r.difficulty].name[lang]} · {r.mode==='campaign'?c.campaign:r.mode==='practice'?c.practice:c.hunt} · {r.coop?c.coop:c.solo} · {r.cards?c.bossCardsOn:c.bossCardsOff}{r.assisted?' · '+c.training:''}</span><span>{r.winner==='army'?c.victory:c.defeat} · {c.round} {r.round} · {c.losses} {r.lost} · ♔ {r.kingHp} HP · {c.army} {r.armyHp} HP</span></article>;
  const board=<SceneBoundary key={prefs.view} fallback={<><div className="scene-fallback-note" role="status">{c.fallback3d}</div><Board2D {...boardProps}/></>}>{prefs.view==='3d'?<Board3D {...boardProps}/>:<Board2D {...boardProps}/>}</SceneBoundary>;
 
- return <div className={'colossus-app '+(prefs.reduced?'reduce-motion':'')+' theme-'+prefs.theme} data-game="colossus" onPointerDownCapture={unlockSounds} onKeyDownCapture={unlockSounds}>
+ return <div className={'colossus-app '+(prefs.reduced?'reduce-motion':'')+' theme-'+prefs.theme} data-game="colossus" onPointerDownCapture={setup?undefined:unlockSounds} onKeyDownCapture={setup?undefined:unlockSounds}>
  <header className="top-rail"><button type="button" className="wordmark" onClick={menu}>COLOSSUS<span>Iva Games</span></button><div className="top-tools">
  {!setup&&<button type="button" onClick={menu}>{c.menu}</button>}
  <button type="button" onClick={()=>setPanel('rules')} aria-label={c.help}>?</button>
@@ -177,7 +205,7 @@ export default function ColossusApp(){
  <button type="button" onClick={()=>setPanel('settings')} aria-label={c.settings}>⚙</button>
  <button type="button" className="language-switch" onClick={()=>setPrefs(old=>({...old,lang:old.lang==='ru'?'en':'ru'}))}>{lang==='ru'?'EN':'RU'}</button>
  </div></header>
- {setup?<Setup lang={lang} initial={options} records={records} tutorialDone={tutorialDone} hasSave={!!localRun.current||!!snapshot} hasPractice={!!practiceRun.current} reducedMotion={prefs.reduced} onContinue={practice=>void resume(practice)} onStart={(o,n)=>void start(o,n)} onTutorial={()=>beginLesson()} onJoin={(l,n)=>void join(l,n)} busy={busy} error={error}/>:
+ {setup?<Setup lang={lang} initial={options} records={records} tutorialDone={tutorialDone} hasSave={!!localRun.current||!!snapshot} hasPractice={!!practiceRun.current} reducedMotion={prefs.reduced} saveNotices={saveNotices} onDownloadSave={downloadSave} onContinue={practice=>void resume(practice)} onStart={(o,n)=>void start(o,n)} onTutorial={()=>beginLesson()} onJoin={(l,n)=>void join(l,n)} busy={busy} error={error}/>:
  <main className={'battle-layout'+(lesson!==null?' is-tutorial':'')}>
  <section className="arena-column">
  <div className="boss-heading"><div><span className="mode-caption">{lesson!==null?c.tutorial:game.mode==='campaign'?c.campaign+' '+(game.campaignIndex+1)+'/'+CAMPAIGN_BOSSES.length:snapshot?c.online:game.coop?c.coop:game.mode==='practice'?c.practice:c.hunt} · {DIFFICULTIES[game.difficulty].name[lang]}</span><h1>{BOSSES[game.boss.id].name[lang]}</h1></div><div className="round-counter"><span>{c.round}</span><b>{game.round}<small>/{game.roundLimit??'∞'}</small></b></div></div>
@@ -206,7 +234,7 @@ export default function ColossusApp(){
  </div></aside>
  <section className="hand-section" hidden={lesson!==null&&lesson!==5}><div className="hand-heading"><h2>{c.hand}</h2><span className="focus-resource"><i>✦</i><b>{game.focus}</b><small>/5</small> {c.focus.toLowerCase()}</span><span className="draw-count">{c.drawLeft}: {game.deckRemaining}</span></div>
  <div className="hand-cards">{game.hand.map(id=><Card key={id} card={CARDS[id]} lang={lang} selected={selectedCard===id} compact unavailable={game.cardPlayed||game.focus<CARDS[id].cost||actor!==leader} onClick={()=>selectCard(id)}/>)}</div>
- {selectedCard&&!game.mustDiscard&&<div className={'card-target-panel '+CARDS[selectedCard].rarity}><div><h3>{CARDS[selectedCard].name[lang]} <small>{rarityNames[CARDS[selectedCard].rarity][lang]}</small></h3><p>{CARDS[selectedCard].description[lang]}</p><span>{cardTargets.map(id=>{const u=game.units.find(x=>x.id===id)!;return UNIT_NAMES[u.type][lang]+' '+squareName(u.square!);}).join(', ')}{cardTo!==null?' → '+squareName(cardTo):''}</span>{!cardActions.length&&<small className="card-unavailable-reason">{game.cardPlayed?c.cardUsed:game.focus<CARDS[selectedCard].cost?c.insufficient:actor!==leader?c.partnerTurn:c.unavailable}</small>}</div><button type="button" className="primary-button" disabled={!validCard.length||busy||paused} onClick={()=>chooseActions(validCard)}>{c.apply}</button><button type="button" className="icon-button" onClick={()=>setSelectedCard(null)} aria-label={c.cancel}>×</button></div>}
+ {selectedCard&&!game.mustDiscard&&<div className={'card-target-panel '+CARDS[selectedCard].rarity}><div><h3>{CARDS[selectedCard].name[lang]} <small>{rarityNames[CARDS[selectedCard].rarity][lang]}</small></h3><p>{CARDS[selectedCard].description[lang]}</p><span>{cardTargets.map(id=>{const u=game.units.find(x=>x.id===id)!;return UNIT_NAMES[u.type][lang]+' '+squareName(u.square!);}).join(', ')}{cardTo!==null?' → '+squareName(cardTo):''}</span>{!cardActions.length&&<small className="card-unavailable-reason">{cardUnavailable}</small>}</div><button type="button" className="primary-button" disabled={!validCard.length||busy||paused} onClick={()=>chooseActions(validCard)}>{c.apply}</button><button type="button" className="icon-button" onClick={()=>setSelectedCard(null)} aria-label={c.cancel}>×</button></div>}
  </section>
  {lesson!==null&&<section className="tutorial-banner" role="status"><span className="lesson-number">{lesson+1}<small>/{LESSONS.length}</small></span><div><h3>{LESSONS[lesson].title[lang]}</h3><p>{lessonDone?(lesson===3&&!fireComparison?(lang==='ru'?'Пешка приняла луч и спасла короля. Теперь проверим ту же позицию с огнём.':'The pawn took the ray and saved the king. Now compare the same position with fire.'):LESSONS[lesson].done[lang]):guidance?.text[lang]}</p></div><button type="button" className="tutorial-skip" onClick={menu}>{lang==='ru'?'В меню':'Menu'}</button><button type="button" className="secondary-button" onClick={()=>beginLesson(lesson,fireComparison)}>{c.lessonReset}</button><button type="button" className="primary-button" disabled={!lessonDone} onClick={nextLesson}>{lesson===3&&!fireComparison?c.compareFire:lesson===LESSONS.length-1?c.tutorialDone:c.nextLesson}</button></section>}
  {snapshot&&(snapshot.paused||snapshot.returnRequested||snapshot.restoreScheduled||snapshot.state.control!=='shared')&&<div className="online-banner" role="status"><b>{snapshot.status==='waiting'?c.waitingPartner:snapshot.paused?c.partnerAway:snapshot.restoreScheduled?c.returnNext:c.soloControl+' · '+snapshot.state.control}</b>{snapshot.status==='waiting'&&<button type="button" onClick={()=>setPanel('online')}>{c.invitation}</button>}{snapshot.canTakeover&&<button type="button" onClick={()=>void networkCommand({type:'takeover'})}>{c.takeover}</button>}{snapshot.returnRequested&&snapshot.state.control===snapshot.you&&<button type="button" onClick={()=>void networkCommand({type:'restore-control',accept:true})}>{c.acceptReturn}</button>}{snapshot.state.control!=='shared'&&snapshot.state.control!==snapshot.you&&<button type="button" onClick={()=>void networkCommand({type:'request-return'})}>{c.returnControl}</button>}</div>}
@@ -216,7 +244,7 @@ export default function ColossusApp(){
  {!setup&&(game.phase==='promotion'||choice.length>0)&&<Modal title={c.promote} dismissible={game.phase!=='promotion'} onClose={()=>setChoice([])}><p>{actor===active?c.promotionHp:c.partnerTurn+' · '+c.commander+' '+active}</p>{networkRecovery}<div className="promotion-choices">{(choice.length?choice:allActions.filter(a=>a.type==='promote')).map((action,i)=>{const kind=action.type==='move'||action.type==='promote'?action.promotion:action.type==='card'?Object.values(action.promotions??{})[0]:undefined;return <button type="button" key={i} onClick={()=>{setChoice([]);void dispatch(action);}}>{kind&&<PieceIcon kind={kind}/>}<span>{kind?UNIT_NAMES[kind][lang]:c.apply}</span></button>})}</div></Modal>}
  {!setup&&game.phase==='camp'&&<Modal title={c.camp} dismissible={false} onClose={()=>{}}><p>{actor===active?c.campText:c.partnerTurn+' · '+c.commander+' '+active}</p>{networkRecovery}<div className="camp-army">{game.units.map(u=><span key={u.id} className={u.hp<=0?'fallen':''}><PieceIcon kind={u.type}/>{u.hp}/{u.maxHp}</span>)}</div><div className="camp-choices">{allActions.filter((a):a is Extract<Action,{type:'camp'}>=>a.type==='camp').map((a,i)=><button type="button" key={i} className="secondary-button" onClick={()=>void dispatch(a)}>{a.reviveId?c.revive+' · '+UNIT_NAMES[game.units.find(u=>u.id===a.reviveId)!.type][lang]:a.healId?c.heal+' · '+UNIT_NAMES[game.units.find(u=>u.id===a.healId)!.type][lang]:c.leaveCamp}</button>)}</div></Modal>}
  {panel&&<Modal title={panel==='boss-cards'?c.catalog:panel==='online'?c.invitation:panel==='editor'?c.editor:c[panel==='rules'?'help':panel]} onClose={()=>setPanel(null)} className={panel==='boss-cards'?'boss-catalog-modal':''}>
- {panel==='rules'&&<><p className="rules-prose">{c.rulesText}</p><p>{c.bossCardRule}</p><p>{c.cardHint}</p><button type="button" className="primary-button" onClick={()=>beginLesson()}>{c.learnAgain}</button></>}
+ {panel==='rules'&&<><p className="rules-prose">{c.rulesText}</p><StrikeGuide lang={lang}/><p>{c.bossCardRule}</p><p>{c.cardHint}</p><button type="button" className="primary-button" onClick={()=>beginLesson()}>{c.learnAgain}</button></>}
  {panel==='boss-cards'&&<><p>{c.bossCardRule}</p><div className="boss-card-catalog">{BOSS_CARD_LIST.filter(card=>card.boss===game.boss.id).map(card=><Card key={card.id} card={card} lang={lang} selected={game.intent.bossCard===card.id} status={game.intent.bossCard===card.id?c.intent:game.bossDiscard.includes(card.id)?c.usedCard:game.bossHand.includes(card.id)?c.waitingCard:c.future}/>)}</div></>}
  {panel==='settings'&&<div className="settings-list"><label className="check-row"><input type="checkbox" checked={prefs.sound} onChange={e=>{setSoundEnabled(e.target.checked);unlockSounds();setPrefs(old=>({...old,sound:e.target.checked}));}}/>{c.sound}</label><label className="check-row"><input type="checkbox" checked={prefs.reduced} onChange={e=>setPrefs(old=>({...old,reduced:e.target.checked}))}/>{c.reduced}</label><div className="segmented"><button type="button" className={prefs.view==='3d'?'active':''} onClick={()=>setPrefs(old=>({...old,view:'3d'}))}>3D</button><button type="button" className={prefs.view==='2d'?'active':''} onClick={()=>setPrefs(old=>({...old,view:'2d'}))}>2D</button></div><label className="field-label">{c.themeAll}<select value={prefs.theme} onChange={e=>setPrefs(old=>({...old,theme:e.target.value as Preferences['theme']}))}><option value="ivory">{c.ivory}</option><option value="jade" disabled={wins.length<1}>{c.jade} · 1 {lang==='ru'?'победа':'victory'}</option><option value="bronze" disabled={!wins.some(r=>r.mode==='campaign')&&new Set(wins.map(r=>r.boss)).size<3}>{c.bronze} · 3 {lang==='ru'?'босса':'bosses'}</option></select></label><button type="button" className="secondary-button" onClick={()=>setPanel('records')}>{c.records}</button>{snapshot&&<button type="button" className="secondary-button" onClick={()=>setPanel('online')}>{c.room}</button>}</div>}
  {panel==='records'&&<div className="records-list"><h3>{c.bestHunts}</h3><p>{c.rankingRule}</p>{bestHunts.length?bestHunts.map(recordCard):<p>{c.noRecords}</p>}{assistedHunts.length>0&&<><h3>{c.assistedHunts}</h3>{assistedHunts.map(recordCard)}</>}<details className="record-history" open={!bestHunts.length&&!assistedHunts.length}><summary>{c.history} · {records.length}</summary><div>{records.map(recordCard)}</div></details></div>}

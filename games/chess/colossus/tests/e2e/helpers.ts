@@ -63,6 +63,7 @@ export async function playCard(page: Page, id: string, target: string) {
   await activate(page.locator(`.hand-cards [data-card="${id}"]`));
   const targetCell = cell(page, target);
   await expect(targetCell).toBeVisible();
+  await targetCell.scrollIntoViewIfNeeded();
   await expect.poll(() => targetCell.evaluate(element => {
     const rect = element.getBoundingClientRect();
     const hit = document.elementFromPoint(rect.x + rect.width / 2, rect.y + rect.height / 2);
@@ -102,21 +103,21 @@ export async function response(page: Page) {
   await activate(button);
 }
 export async function fitsViewport(page: Page) {
-  const measures = await page.evaluate(() => {
-    const bounds = (selector: string) => {
-      const rect = document.querySelector(selector)!.getBoundingClientRect();
-      return { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom, width: rect.width, height: rect.height };
-    };
-    return { width: innerWidth, height: innerHeight, scrollWidth: document.documentElement.scrollWidth,
-      scrollHeight: document.documentElement.scrollHeight, board: bounds('[data-testid="board-2d"]'), response: bounds('.end-button') };
-  });
+  const layout = page.locator('.battle-layout');
+  const measures = await layout.evaluate(element => ({
+    width: innerWidth, height: innerHeight, scrollWidth: document.documentElement.scrollWidth,
+    scrollHeight: document.documentElement.scrollHeight, clipTop: element.getBoundingClientRect().top,
+    scrolls: getComputedStyle(element).overflowY === 'auto' && element.scrollHeight > element.clientHeight,
+  }));
   expect(measures.scrollWidth).toBeLessThanOrEqual(measures.width + 1);
   expect(measures.scrollHeight).toBeLessThanOrEqual(measures.height + 1);
-  for (const bounds of [measures.board, measures.response]) {
-    expect(bounds.left).toBeGreaterThanOrEqual(-1);
-    expect(bounds.top).toBeGreaterThanOrEqual(-1);
-    expect(bounds.right).toBeLessThanOrEqual(measures.width + 1);
-    expect(bounds.bottom).toBeLessThanOrEqual(measures.height + 1);
+  for (const control of [board(page), page.locator('.end-button')]) {
+    if (measures.scrolls) await control.scrollIntoViewIfNeeded();
+    const bounds = (await control.boundingBox())!;
+    expect(bounds.x).toBeGreaterThanOrEqual(-1);
+    expect(bounds.y).toBeGreaterThanOrEqual((measures.scrolls ? measures.clipTop : 0) - 1);
+    expect(bounds.x + bounds.width).toBeLessThanOrEqual(measures.width + 1);
+    expect(bounds.y + bounds.height).toBeLessThanOrEqual(measures.height + 1);
     expect(bounds.width).toBeGreaterThan(10);
     expect(bounds.height).toBeGreaterThan(10);
   }

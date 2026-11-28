@@ -172,8 +172,13 @@ test('bestiary keeps top controls fixed through scrolling, every boss, wrapping 
   };
   await selectedBoss(roster.length - 1);
   await details.focus();
+  await expect(details).toBeFocused();
+  expect(await details.evaluate(element => element.scrollHeight - element.clientHeight)).toBeGreaterThan(0);
   await page.keyboard.press('End');
-  await expect.poll(() => details.evaluate(element => element.scrollTop), { message: 'The details pane can really scroll' }).toBeGreaterThan(0);
+  await expect.poll(() => details.evaluate(element => element.scrollHeight - element.clientHeight - element.scrollTop),
+    { message: 'End reaches the bottom of the focused details pane' }).toBeLessThanOrEqual(1);
+  await page.keyboard.press('Home');
+  await expect.poll(() => details.evaluate(element => element.scrollTop)).toBe(0);
   await expectFixed(dialog, original);
   await reachable(next);
   await reachable(close);

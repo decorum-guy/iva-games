@@ -1,4 +1,4 @@
-import { BASE_DECK, BOSS_CARD_LIST, BOSS_CARDS, BOSSES, CAMPAIGN_BOSSES, CARD_LIST, CARDS, DIFFICULTIES, HUNT_BOSSES, STARTER_CARDS, UNIT_HP } from './data';
+import { BASE_DECK, BOSS_CARD_LIST, BOSS_CARDS, BOSSES, CAMPAIGN_BOSSES, CARD_LIST, CARDS, DIFFICULTIES, HUNT_BOSSES, STARTER_CARDS, UNIT_HP, UNIT_STRIKES } from './data';
 import { cloneGame, checkOutcome, hitBoss, resolveResponse } from './combat';
 import { planIntent } from './bosses';
 import { bossCells, DIAGONAL, DIRECTIONS, hashSeed, isFree, isSquare, knightSquares, ORTHOGONAL, rank, ray, shift, shuffled, unitAt } from './geometry';
@@ -161,7 +161,7 @@ function attackActions(state: GameState, unit: Unit): Action[] {
     }
   } else {
     const directions = unit.type === 'B' ? DIAGONAL : unit.type === 'R' ? ORTHOGONAL : DIRECTIONS;
-    const range = unit.type === 'K' ? 1 : unit.type === 'B' ? 4 : 3;
+    const range = UNIT_STRIKES[unit.type].range;
     for (const d of directions) for (const target of ray(from, d, range)) {
       if (body.includes(target)) { result.push({ type: 'attack', unitId: unit.id, target }); break; }
       if (unitAt(state, target)) break;
@@ -385,10 +385,10 @@ export function applyAction(state: GameState, action: Action, actor: Actor = 'so
     if (action.type === 'move') moveUnit(next, unit, action.to, action.promotion);
     else if (action.type === 'guard') { unit.shield = Math.max(unit.shield, 1); next.events.push({ type: 'shield', unitId: unit.id, amount: 1 }); }
     else {
-      const damage = (unit.type === 'K' ? 1 : unit.type === 'Q' || unit.type === 'R' ? 3 : unit.type === 'B' && next.boss.armor === 0 ? 3 : 2)
-        + unit.attackBonus + Number(next.huntMark > 0) + Number(next.intent.rest);
+      const baseDamage = unit.type === 'B' && next.boss.armor === 0 ? UNIT_STRIKES.B.exposedDamage : UNIT_STRIKES[unit.type].damage;
+      const damage = baseDamage + unit.attackBonus + Number(next.huntMark > 0) + Number(next.intent.rest);
       if (action.lunge) moveUnit(next, unit, shift(unit.square!, 0, 1)!);
-      hitBoss(next, damage, unit.type === 'R' ? 1 : 0, unit.id);
+      hitBoss(next, damage, unit.type === 'R' ? UNIT_STRIKES.R.removeArmor : 0, unit.id);
       if (unit.armorTip && next.boss.armor > 0) hitBoss(next, 0, 2, unit.id);
       unit.attackBonus = 0; unit.armorTip = false; next.huntMark = Math.max(0, next.huntMark - 1);
       if (unit.type === 'N') moveUnit(next, unit, action.retreat!);

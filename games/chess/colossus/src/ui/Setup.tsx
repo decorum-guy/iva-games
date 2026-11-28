@@ -3,6 +3,7 @@ import { BASE_DECK, BOSSES, HUNT_BOSSES, CAMPAIGN_BOSSES, CARD_LIST, DIFFICULTIE
 import type { HuntBossId, CardId, CreateOptions, Difficulty, Language } from '../core';
 import { copy } from './i18n';
 import { Bestiary } from './Bestiary';
+import type { SaveNotice } from './localSaves';
 import { Card } from './Card';
 import { BossIcon } from './PieceIcon';
 import { Modal } from './Modal';
@@ -17,6 +18,8 @@ export interface SetupProps {
   hasPractice: boolean;
   reducedMotion?: boolean;
   onContinue: (practice: boolean) => void;
+  saveNotices: { normal: SaveNotice; practice: SaveNotice };
+  onDownloadSave: (practice: boolean) => void;
   onStart: (options: CreateOptions, network: boolean) => void;
   onTutorial: () => void;
   onJoin: (link: string, name: string) => void;
@@ -78,6 +81,7 @@ export function Setup(p: SetupProps) {
     coop: mode === 'coop', deck, bossCards: cards,
   };
   const valid = validateDeck(deck).length === 0;
+  const saveNotice = mode === 'practice' ? p.saveNotices.practice : p.saveNotices.normal;
   const chosen = BOSSES[option.boss ?? boss];
   const startLabel = p.busy ? c.pending : mode === 'coop' && network ? c.createRoom : {
     hunt: c.play,
@@ -154,6 +158,10 @@ export function Setup(p: SetupProps) {
       </div>
       {!valid && <p className="error-text">{c.deckError}</p>}
       {p.error && <p className="error-text" role="alert">{p.error}</p>}
+      {(saveNotice.damaged || saveNotice.archived) && <div className="save-notice">
+        <p role={saveNotice.damaged ? 'alert' : 'status'}>{saveNotice.damaged ? c.invalidSave : c.recoveredSave}</p>
+        <button type="button" className="secondary-button" onClick={() => p.onDownloadSave(mode === 'practice')}>{c.downloadSave}</button>
+      </div>}
       <div className="start-actions">
         <button type="button" data-testid="start-game" className="primary-button" disabled={!valid || p.busy} onClick={() => p.onStart(option, mode === 'coop' && network)}>{startLabel}</button>
         {(mode === 'practice' ? p.hasPractice : p.hasSave) && <button type="button" className="secondary-button" disabled={p.busy} onClick={() => p.onContinue(mode === 'practice')}>{c.continue}</button>}

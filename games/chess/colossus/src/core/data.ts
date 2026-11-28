@@ -1,6 +1,14 @@
 import type { BossCardDefinition, BossDefinition, BossId, CardDefinition, CardId, Difficulty, HuntBossId, Localized, UnitType } from './types';
 
 export const UNIT_HP: Record<UnitType, number> = { K: 20, Q: 6, R: 4, B: 3, N: 3, P: 2 };
+export const UNIT_STRIKES = {
+  K: { damage: 1, range: 1 },
+  Q: { damage: 3, range: 3 },
+  R: { damage: 3, range: 3, removeArmor: 1 },
+  B: { damage: 2, range: 4, exposedDamage: 3 },
+  N: { damage: 2 },
+  P: { damage: 2 },
+} as const;
 export const UNIT_NAMES: Record<UnitType, Localized> = {
   K: { ru: 'Король', en: 'King' }, Q: { ru: 'Ферзь', en: 'Queen' },
   R: { ru: 'Ладья', en: 'Rook' }, B: { ru: 'Слон', en: 'Bishop' },

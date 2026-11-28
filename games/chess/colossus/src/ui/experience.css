@@ -57,6 +57,7 @@ select { appearance:none; padding-right:2.3rem; background-image:url("data:image
 .deck-button small { font-size:.8125rem; }
 .deck-chevron { width:16px; height:16px; margin-left:auto; flex:0 0 16px; fill:none; stroke:#c9bc96; stroke-width:1.5; }
 .setup-controls .primary-button { min-height:48px; font-size:1rem; }
+.save-notice { display:grid; justify-items:start; gap:8px; padding:12px 14px; border:1px solid #a98b5277; border-radius:5px; background:#222d2d; font-size:.875rem; line-height:1.45; }
 .tutorial-invitation { display:flex; align-items:center; gap:14px; padding:13px 15px; border:1px solid #bca87860; background:#bca8780b; text-align:left; border-radius:5px; }
 .tutorial-invitation b { font-size:.9375rem; font-weight:500; color:#e8d7b1; }
 .tutorial-invitation small { display:block; margin-top:5px; font-size:.8125rem; color:#aebfbe; }
@@ -143,6 +144,11 @@ select { appearance:none; padding-right:2.3rem; background-image:url("data:image
 .result-overlay h2 { font-size:2rem; }
 .result-overlay p,.result-numbers,.result-category { font-size:.9375rem!important; }
 .modal-body>p { font-size:1rem; line-height:1.6; }
+.strike-guide { width:100%; border-collapse:collapse; color:#e5e1d1; text-align:left; font-size:.875rem; line-height:1.4; }
+.strike-guide caption { padding-bottom:8px; color:#eadabb; text-align:left; font-size:1.125rem; font-weight:700; }
+.strike-guide thead { color:#efcf89; }
+.strike-guide :is(th,td) { border-bottom:1px solid #a8986e44; padding:8px 6px; vertical-align:top; }
+.strike-guide td { overflow-wrap:anywhere; }
 .colossus-modal { border-radius:9px; }
 .card-description { font-size:.875rem; line-height:1.5; }
 .card-name { font-size:1rem; }
@@ -314,15 +320,16 @@ select { appearance:none; padding-right:2.3rem; background-image:url("data:image
 @media (max-height:620px) and (min-width:761px) {
  .colossus-app { grid-template-rows:44px minmax(0,1fr); }
  .top-rail { min-height:44px; }
- .battle-layout { grid-template-rows:minmax(0,1fr); grid-template-columns:minmax(0,1fr) 240px; padding-top:5px; }
- .arena-column { grid-row:1/3; min-height:0; }
- .intent-column { grid-column:2; grid-row:1; max-height:none; }
- .hand-section { grid-column:2; grid-row:2; min-height:0; }
+ .battle-layout { grid-template-rows:max-content max-content; grid-template-columns:minmax(0,1fr) 240px; padding-top:5px; }
+ .arena-column { grid-row:1/3; min-height:0; align-self:start; }
+ .arena-surface { height:clamp(350px,calc(100dvh - 40px),460px); }
+ .intent-column { grid-column:2; grid-row:1; max-height:48dvh; }
+ .hand-section { grid-column:2; grid-row:2; min-height:0; align-self:start; }
  .hand-cards { justify-content:flex-start; }
  .relic-card.compact { width:108px; min-width:108px; height:100px; min-height:100px; }
  .compact .card-illustration { height:27px; }
  .compact .card-name { font-size:.8125rem; }
- .battle-layout.is-tutorial { grid-template-rows:auto minmax(0,1fr) auto; }
+ .battle-layout.is-tutorial { grid-template-rows:max-content max-content max-content; }
  .is-tutorial .arena-column { grid-column:1; grid-row:2/4; }
  .is-tutorial .intent-column { grid-column:2; grid-row:2; }
  .is-tutorial .hand-section { grid-column:2; grid-row:3; }
@@ -340,7 +347,25 @@ select { appearance:none; padding-right:2.3rem; background-image:url("data:image
  .intent-name { font-size:1.25rem; margin-bottom:8px; }
  .intent-steps b { font-size:.8125rem; }
  .forecast { margin-top:8px; padding-top:8px; }
- .army-strip,.battle-extra { display:none; }
+ .army-strip { display:none; }
+}
+
+/* Short viewports scroll the controls outside the board's minimum area. */
+@media (max-width:760px) and (max-height:680px), (min-width:761px) and (max-height:620px) {
+ .battle-layout { align-content:start; overflow-y:auto; overflow-x:hidden; overscroll-behavior-y:contain; padding-bottom:12px; }
+ .arena-surface { flex:none; }
+ .hand-section .card-target-panel { position:relative; inset:auto; display:grid; grid-template-columns:minmax(0,1fr) auto; min-height:0; margin:6px 0 0; gap:6px 10px; }
+ .card-target-panel>div { min-width:0; padding-right:0; }
+ .card-target-panel p { overflow-wrap:anywhere; }
+ .card-target-panel .icon-button { position:static; grid-area:1/2; align-self:start; min-width:36px; min-height:36px; }
+ .card-target-panel .primary-button { grid-column:1/-1; justify-self:end; min-height:44px; }
+}
+
+@media (max-width:760px) and (max-height:680px) {
+ .battle-layout { grid-template-rows:max-content max-content max-content; }
+ .battle-layout.is-tutorial { grid-template-rows:max-content max-content max-content max-content; }
+ .arena-surface { height:min(100vw,24rem); }
+ .intent-column.expanded .intent-content { position:relative; inset:auto; margin:4px 0 0; max-height:60dvh; }
 }
 }
 

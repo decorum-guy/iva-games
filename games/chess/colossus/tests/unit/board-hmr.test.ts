@@ -1,4 +1,4 @@
-import { cp, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises';
+import { cp, mkdtemp, readFile, realpath, rm, symlink, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
@@ -17,7 +17,8 @@ it.each([
 ] as const)('editing $file retains a React Refresh boundary and emits a self-accepted Vite update', async ({ file, primaryExport }) => {
   const gameRoot = fileURLToPath(new URL('../..', import.meta.url));
   const repoRoot = resolve(gameRoot, '../../..');
-  const root = await mkdtemp(join(tmpdir(), 'iva-colossus-dev-hmr-'));
+  // Vite's filesystem allowlist and watcher use physical paths, including on macOS.
+  const root = await mkdtemp(join(await realpath(tmpdir()), 'iva-colossus-dev-hmr-'));
   let server: ViteDevServer | undefined;
   let socket: WebSocket | undefined;
   try {
