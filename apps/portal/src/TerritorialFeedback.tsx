@@ -126,7 +126,7 @@ const actions: Record<TerritoryHistoryEntry['kind'], [string, string]> = {
 };
 const closed = {
   accepted: ['Согласие: обмен исполнен', 'Accepted: trade completed'], declined: ['Отклонено', 'Declined'],
-  withdrawn: ['Отозвано', 'Withdrawn'], expired: ['Ход закончился', 'Turn ended'], replaced: ['Заменено новыми условиями', 'Replaced by new terms'],
+  'response-timeout': ['Нет ответа за 10 секунд', 'No response in 10 seconds'], withdrawn: ['Отозвано', 'Withdrawn'], expired: ['Ход закончился', 'Turn ended'], replaced: ['Заменено новыми условиями', 'Replaced by new terms'],
   'player-left': ['Участник вышел', 'Player left'], 'match-finished': ['Партия закончилась', 'Match ended'],
 };
 const cardNames = { patrol: ['Патруль','Patrol'], survey: ['Подряд','Survey'], supply: ['Снабжение','Supply'], charter: ['Грамота','Charter'] };
@@ -140,7 +140,7 @@ export function historyTitle(entry: TerritoryHistoryEntry, view: TerritoryView, 
   if (entry.cardKind) title += ' · ' + cardNames[entry.cardKind][i];
   if (entry.kind === 'block' && entry.reason) title += ' · ' + (entry.reason === 'patrol' ? cardNames.patrol[i] : lang === 'ru' ? 'семёрка' : 'seven');
   if (entry.reason === 'consent') return lang === 'ru' ? 'Согласие на обмен · ждёт выбора' : 'Trade consent · awaiting selection';
-  if (entry.offerStatus && !['accept', 'decline', 'cancel'].includes(entry.kind)) title += ' · ' + closed[entry.offerStatus][i];
+  if (entry.offerStatus && !['accept', 'decline', 'cancel'].includes(entry.kind)) title += ' · ' + closed[entry.reason === 'response-timeout' ? 'response-timeout' : entry.offerStatus][i];
   if (entry.targetId) title += ' · ' + playerName(view, entry.targetId);
   return title;
 }

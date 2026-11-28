@@ -216,12 +216,6 @@ function historyTradeNotice(status: string, lang: Language) {
 
 function TerritorialPlayers({ view, lang }: { view: TerritoryView; lang: Language }) {
   const ru = lang === "ru";
-  const tradeLabel = (id: string) => {
-    const offer = view.offers.find(item => item.authorId === id || item.targetId === id && item.authorId === view.you.participantId);
-    if (offer?.agreedAt !== undefined) return ru ? 'Согласие получено' : 'Agreed';
-    if (offer) return offer.authorId === view.you.participantId ? (ru ? 'Ждём ответа' : 'Awaiting reply') : (ru ? 'Предлагает обмен' : 'Offers a trade');
-    return '';
-  };
   return <ul className="territory-players">
     {view.players.map(player => <li key={player.participantId} className={player.participantId === view.activeParticipantId && !view.outcome ? "is-active" : ""}>
       <span className="territory-seat" style={{ background: colors[player.seatIndex] }}>{player.seatIndex + 1}</span>
@@ -229,7 +223,7 @@ function TerritorialPlayers({ view, lang }: { view: TerritoryView; lang: Languag
         <small title={ru ? `Ресурсы: ${player.handCount} · Путь: ${player.longestRoute} · Карты развития: ${player.cardCount}` : `Resources: ${player.handCount} · Route: ${player.longestRoute} · Development cards: ${player.cardCount}`}>{player.isBot || player.left ? ru ? "Бот · " : "Bot · " : ""}{ru ? "Ресурсы" : "Resources"} {player.handCount}
           {" · "}{ru ? "Путь" : "Route"} {player.longestRoute}{` · ${ru ? "Карты" : "Cards"} ${player.cardCount}`}</small>
       </span>
-      <b className="territory-points">{player.participantId === view.you.participantId ? view.you.points : player.points}<small>/{view.goal}</small></b>{view.phase === 'play' && <span className="territory-player-trade">{tradeLabel(player.participantId) || '\u00a0'}</span>}
+      <b className="territory-points">{player.participantId === view.you.participantId ? view.you.points : player.points}<small>/{view.goal}</small></b>
     </li>)}
   </ul>;
 }

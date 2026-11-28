@@ -159,3 +159,24 @@
 .ta-group-heading { display:flex;align-items:center;justify-content:space-between;gap:5px; }
 .ta-group-heading strong { font-size:12px; }
 .territory-map-first .ta-group-cancel { min-height:34px;padding:4px 6px;font-size:11px; }
+/* Sent quotes have two terms lines and fixed response slots; no visible clocks/status paragraphs. */
+.territory-map-tools .ta-offer-terms { display:grid;gap:3px;font-size:11px; }
+.territory-map-tools .ta-offer-terms>div { display:flex;align-items:center;flex-wrap:wrap;gap:3px 5px; }
+.territory-map-tools .ta-offer-terms .ta-resources { gap:3px; }
+.territory-map-tools .ta-offer-terms .ta-resource-name { display:none; }
+.territory-map-tools .ta-offer-group { padding:6px;gap:5px;animation:none; }
+.territory-map-tools .ta-group-heading { align-items:start; }
+.territory-map-tools .ta-group-cancel { min-width:36px;min-height:36px;padding:3px; }
+.territory-map-tools .ta-response-list { display:flex;flex-wrap:wrap;gap:4px; }
+.territory-map-tools .ta-offer.is-outgoing,.territory-map-tools .ta-closed-response { flex:0 0 78px;width:78px;height:44px;padding:3px;box-sizing:border-box;border:1px solid #b7cbc3;border-radius:8px;background:#f8fbf6;box-shadow:none;display:flex;align-items:center; }
+.territory-map-tools .ta-response-chip { display:flex;align-items:center;gap:4px;min-height:36px; }
+.territory-map-tools .ta-response-chip>button,.territory-map-tools .ta-response-chip>span[role=img],.territory-map-tools .ta-closed-response>span[role=img] { display:grid;place-items:center;width:36px;min-width:36px;height:36px;min-height:36px;padding:0;font-size:18px; }
+.territory-map-tools .ta-player-dot { display:grid;place-items:center;flex:0 0 24px;width:24px;height:24px;margin:0;border-radius:50%;font-size:12px;color:white;font-weight:800; }
+.territory-map-tools .ta-offer:not(.is-outgoing) { padding:6px;gap:5px; }
+.territory-map-tools .ta-closed-response { gap:4px; }
+.territory-map-tools .ta-offer-terms { grid-template-columns:minmax(0,1fr);width:100%; }
+.territory-map-tools .ta-offer-terms>div { grid-column:1;grid-row:auto;justify-self:stretch;text-align:left;width:100%; }
+.territory-map-tools .ta-offer-terms .ta-resources:nth-child(2) { justify-content:flex-start; }
+.territory-map-tools .ta-offer.is-outgoing,.territory-map-tools .ta-closed-response { flex-basis:52px;width:52px;height:78px;justify-content:center; }
+.territory-map-tools .ta-offer.is-outgoing .ta-response-chip,.territory-map-tools .ta-closed-response { flex-direction:column;gap:2px; }
+.territory-map-tools .ta-response-chip>button,.territory-map-tools .ta-response-chip>span[role=img],.territory-map-tools .ta-closed-response>span[role=img] { width:44px;min-width:44px;height:44px;min-height:44px; }
