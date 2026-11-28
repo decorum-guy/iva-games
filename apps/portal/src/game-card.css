@@ -1,0 +1,61 @@
+.game-card-art {
+  position: relative;
+  flex-shrink: 0;
+  isolation: isolate;
+}
+
+.input-recommendation-sticker {
+  position: absolute;
+  right: 15px;
+  bottom: 15px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: calc(100% - 30px);
+  padding: 6px 12px 6px 9px;
+  border: 3px solid #fffdf2;
+  border-radius: 8px 9px 7px 9px;
+  background:
+    radial-gradient(ellipse at 25% 0, #ffffffb3, transparent 70%),
+    linear-gradient(130deg, #fff8df, #f4e7bd);
+  box-shadow:
+    inset 0 0 0 1px #ded2ad,
+    0 1px 0 #c9bd96,
+    0 3px 7px #17374436;
+  color: #173744;
+  font-size: .8rem;
+  font-weight: 800;
+  line-height: 1.35;
+  transform: rotate(-3deg);
+  pointer-events: none;
+}
+
+.input-recommendation-sticker::after {
+  content: '';
+  position: absolute;
+  top: -1px;
+  right: -1px;
+  width: 8px;
+  height: 8px;
+  border-radius: 0 5px 0 3px;
+  background: linear-gradient(225deg, #e0d0a1 46%, #fffdf2 54%);
+  box-shadow: -1px 1px 1px #17374415;
+}
+
+.input-recommendation-sticker img {
+  display: block;
+  flex: 0 0 auto;
+}
+
+.game-device-notice {
+  display: inline-block;
+  max-width: 100%;
+  padding: 8px 11px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #f7f8f4;
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 750;
+  line-height: 1.4;
+}
