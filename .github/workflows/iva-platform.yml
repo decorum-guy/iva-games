@@ -162,7 +162,6 @@ jobs:
       packages: read
     env:
       IMAGE_TAG: iva-forpost-load:${{ github.run_id }}-${{ github.run_attempt }}
-      FORPOST_QA_OUTPUT_DIRECTORY: ${{ runner.temp }}/forpost-load-${{ github.run_id }}-${{ github.run_attempt }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -210,6 +209,8 @@ jobs:
             --file Dockerfile.realtime --tag "$IMAGE_TAG" .
       - name: Measure four rooms for a real hour within two CPUs and two GiB
         if: steps.load-changes.outputs.required == 'true'
+        env:
+          FORPOST_QA_OUTPUT_DIRECTORY: ${{ runner.temp }}/forpost-load-${{ github.run_id }}-${{ github.run_attempt }}
         run: bash apps/realtime-server/scripts/profile-image.sh --seconds=3600 --rooms=4
       # The runtime uses an explicit test-fixture admission profile for this
       # measurement. No production capacity profile is inferred or emitted.

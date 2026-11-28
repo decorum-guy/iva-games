@@ -17,6 +17,8 @@
 
 ## Подтверждённые границы
 
+Обновление после повторного аудита: PR53 затем принят в main `7c2be21db5743b15b4a42d708ac959039c6b725e` и включён обычным merge. Его документация теперь действует; production-контракты PR50 от этого не изменились.
+
 | Область | PR50 | Forpost и следствие |
 |---|---|---|
 | Wire | JSON `protocolVersion: 'iva-realtime@1'`; claim требует `expectedGeneration`, heartbeat — `nonce`; delta содержит `changes[]` с путями; `hasControl`. | JSON `protocolVersion: 1`; claim/heartbeat без этих дополнительных полей; delta содержит верхнеуровневый `patch`; `controlling`. Одинаковые `/ws/realtime/v1` и subprotocol `iva-realtime-v1` не делают клиентов взаимозаменяемыми. |
