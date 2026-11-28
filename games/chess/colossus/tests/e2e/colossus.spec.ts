@@ -1,6 +1,6 @@
 import type { CommandEnvelope, CommandResponse } from '../../src/online/protocol';
 import {
-  activate, audioNames, beginHunt, board, cell, commands, continueLocal, expect, fitsViewport,
+  activate, chooseMode, audioNames, beginHunt, board, cell, commands, continueLocal, expect, fitsViewport,
   guard, heardCue, installAudioProbe, lesson, menu, mobileIntent, move, nextLesson, openEnglish,
   openTutorial, playCard, response, strike, test,
 } from './helpers';
@@ -54,7 +54,7 @@ test('practice editing and an interrupted lesson preserve the ordinary hunt', as
   await beginHunt(page);
   await move(page, 'a1', 'a4');
   await menu(page);
-  await activate(page.locator('.mode-tabs').getByRole('button', { name: 'Practice', exact: true }));
+  await chooseMode(page, 'Practice');
   await beginHunt(page);
   await move(page, 'a1', 'a3');
   await mobileIntent(page, true);
@@ -201,7 +201,7 @@ test('keyboard navigation and RU/EN changes preserve the current position', asyn
 
 test('local commanders share commands and consent before ending an unused round', async ({ page }) => {
   await openEnglish(page);
-  await activate(page.locator('.mode-tabs').getByRole('button', { name: 'Two commanders', exact: true }));
+  await chooseMode(page, 'Two commanders');
   await beginHunt(page);
   await guard(page, 'a1');
   await expect(page.locator('.coop-bar .segmented .active')).toHaveText('B');
@@ -230,7 +230,7 @@ test('independent online commanders recover a lost ACK without repeating the act
     const a = await first.newPage(), b = await second.newPage();
     for (const page of [a, b]) page.on('pageerror', error => errors.push(error.message));
     await Promise.all([openEnglish(a), openEnglish(b)]);
-    await activate(a.locator('.mode-tabs').getByRole('button', { name: 'Two commanders', exact: true }));
+    await chooseMode(a, 'Two commanders');
     await activate(a.locator('.coop-choice').getByRole('button', { name: 'Online', exact: true }));
     await activate(a.getByRole('button', { name: 'Create room', exact: true }));
     const invitation = a.getByRole('dialog', { name: 'Invitation', exact: true });
@@ -239,7 +239,8 @@ test('independent online commanders recover a lost ACK without repeating the act
     expect(new URL(link).searchParams.has('invite')).toBe(true);
     const room = new URL(link).searchParams.get('room');
 
-    await activate(b.getByRole('button', { name: 'Join · Online', exact: true }));
+    await activate(b.getByTestId('mode-friend'));
+    await activate(b.getByRole('dialog', { name: 'With a friend', exact: true }).getByRole('button', { name: 'Join', exact: true }));
     const join = b.getByRole('dialog', { name: 'Join', exact: true });
     await join.getByLabel('Your name', { exact: true }).fill('Test commander B');
     await join.getByLabel('Invitation link', { exact: true }).fill(link);

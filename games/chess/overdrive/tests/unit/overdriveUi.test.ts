@@ -77,7 +77,7 @@ describe('Overdrive component/data integration (server-rendered, not browser acc
     const html = render()
     const text = plain(html)
     expect(html).toContain('role="dialog"')
-    for (const label of ['Начать партию', 'За одной доской', 'Обучение на доске', 'Играть по сети']) expect(text).toContain(label)
+    for (const label of ['Начать партию', 'На одном устройстве', 'Обучение', 'С другом']) expect(text).toContain(label)
     expect(botCall).toHaveBeenLastCalledWith(expect.objectContaining({ enabled: false }))
   })
 

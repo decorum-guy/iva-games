@@ -828,3 +828,7 @@ html.in-match, .in-match body { height: 100%; overflow: hidden; overscroll-behav
   0%, 46% { opacity: 1; transform: scale(1); }
   100% { opacity: 0; transform: scale(.72); }
 }
+
+.setup-more>summary { cursor:pointer;padding:10px 0;color:var(--quiet);font-size:.9rem; }
+.setup-more[open] { display:block; }
+.setup-more[open]>.field { margin-top:14px; }

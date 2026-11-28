@@ -196,7 +196,7 @@ test('a selected figure can be cleared again, including a restored bonus', async
     localStorage.setItem('remorse-settings-v1', JSON.stringify({ board: '2d', reduce: true, sound: false }))
   })
   await page.goto('/remorse/')
-  await page.getByTestId('mode-hotseat').waitFor()
+  await page.getByTestId('mode-ai').waitFor()
   const game = createMatch({ mode: 'hotseat', human: null, level: null, provenance: 'standard' }, {
     root: createPosition({ pieces: [
       { type: 'king', side: 'white', square: 'h1' },

@@ -1,11 +1,10 @@
 import { readFile } from 'node:fs/promises';
 import type { Page } from '@playwright/test';
-import { activate, beginHunt, board, cell, expect, fitsViewport, menu, mobileIntent, openEnglish, test } from './helpers';
+import { activate, chooseMode, beginHunt, board, cell, expect, fitsViewport, menu, mobileIntent, openEnglish, test } from './helpers';
 
 const huntSave = 'colossus.save.v1';
 const practiceSave = 'colossus.practice.v1';
 const storageValue = (page: Page, key: string) => page.evaluate(key => localStorage.getItem(key), key);
-const mode = (page: Page, name: string) => page.locator('.mode-tabs').getByRole('button', { name, exact: true });
 
 test('damaged hunt and practice saves can be downloaded and are archived before replacement', async ({ page }) => {
   await openEnglish(page);
@@ -26,7 +25,7 @@ test('damaged hunt and practice saves can be downloaded and are archived before 
   expect(await storageValue(page, huntSave)).toBe(damaged[huntSave]);
 
   for (const [name, key] of [['Practice', practiceSave], ['Hunt', huntSave]] as const) {
-    await activate(mode(page, name));
+    await chooseMode(page, name);
     await expect(notice.getByRole('alert')).toContainText('This save could not be opened');
     await expect(continueGame).toHaveCount(0);
     await activate(start);
@@ -35,7 +34,7 @@ test('damaged hunt and practice saves can be downloaded and are archived before 
     expect(JSON.parse((await storageValue(page, key))!).state.mode).toBe(name.toLowerCase());
     if (key === practiceSave) expect(await storageValue(page, huntSave)).toBe(damaged[huntSave]);
     await page.reload();
-    await activate(mode(page, name));
+    await chooseMode(page, name);
     await expect(notice.getByRole('status')).toContainText('A copy of the damaged save');
     await activate(continueGame);
     await expect(board(page)).toBeVisible();
@@ -62,7 +61,7 @@ test('rules show strike values in both languages and a targetless card needs onl
     await activate(dialog.getByRole('button', { name: 'Close / Закрыть', exact: true }));
   }
   await activate(page.locator('.language-switch'));
-  await activate(mode(page, 'Practice'));
+  await chooseMode(page, 'Practice');
   await beginHunt(page);
   await mobileIntent(page, true);
   await activate(page.getByRole('button', { name: 'Position editor', exact: true }));
