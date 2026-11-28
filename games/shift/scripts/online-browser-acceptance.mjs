@@ -102,6 +102,7 @@ function auditServerFrame(frame, roomId, previousScope) {
 }
 
 function instrumentBrowser(options = {}) {
+  if (!['http:', 'https:'].includes(location.protocol)) return;
   const NativeWebSocket = window.WebSocket;
   const NativeAudioContext = window.AudioContext;
   const latency = options.oneWayDelayMs || 0;
@@ -224,20 +225,21 @@ function auditView(view, peer) {
 }
 
 function watchPage(page, name, game) {
-  const peer = { page, name, game, view: null, frames: 0, sockets: 0, errors: [], http: [], receipts: new Map(), receiptCounts: new Map(), commandsSentAt: new Map(), receiptLatencyMs: [], closes: [], roles: new Set(), motions: new Set(), samples: [], recent: new Map(), commandEnvelopes: new Map(), wireCommandEnvelopes: new Map(), wireErrors: [], expectedLifecycleEvents: [], scopeChecks: 0, staleSocketFramesIgnored: 0, memory: { seq: 0, counter: 0, nextDecisionTick: 0, recentRooms: [] }, lastDriveTick: -1, failure: null };
+  const peer = { page, name, game, view: null, frames: 0, sockets: 0, errors: [], http: [], httpEvents: 0, httpRequests: 0, retired: false, receipts: new Map(), receiptCounts: new Map(), commandsSentAt: new Map(), receiptLatencyMs: [], closes: [], roles: new Set(), motions: new Set(), samples: [], recent: new Map(), commandEnvelopes: new Map(), wireCommandEnvelopes: new Map(), wireErrors: [], expectedLifecycleEvents: [], scopeChecks: 0, staleSocketFramesIgnored: 0, memory: { seq: 0, counter: 0, nextDecisionTick: 0, recentRooms: [] }, lastDriveTick: -1, failure: null };
   observedPeers.push(peer);
   page.on('pageerror', error => { peer.errors.push(error.message); });
+  page.on('request', request => { if (new URL(request.url()).pathname.startsWith('/api/platform/')) peer.httpRequests++; });
   page.on('response', response => {
     const path = new URL(response.url()).pathname;
     if (!path.startsWith('/api/platform/')) return;
     const entry = { method: response.request().method(), path, status: response.status() };
-    peer.http.push(entry);
+    peer.httpEvents++; peer.http.push(entry);
     if (response.status() >= 400) void response.json().then(body => {
       if (typeof body?.error?.code === 'string') entry.errorCode = body.error.code.slice(0, 80);
     }).catch(() => {});
     if (peer.http.length > 250) peer.http.shift();
   });
-  page.on('requestfailed', request => { if (new URL(request.url()).pathname.startsWith('/api/platform/')) peer.http.push({ path: new URL(request.url()).pathname, failed: request.failure()?.errorText }); });
+  page.on('requestfailed', request => { if (new URL(request.url()).pathname.startsWith('/api/platform/')) { peer.httpEvents++; peer.http.push({ path: new URL(request.url()).pathname, failed: request.failure()?.errorText }); } });
   page.on('websocket', ws => {
     const url = new URL(ws.url());
     if (!/\/api\/platform\/v1\/rooms\/[^/]+\/live$/.test(url.pathname)) return;
@@ -319,6 +321,7 @@ async function createBrowserPeer(game, name) {
   const context = await browser.newContext({ storageState: profile.storageState(), viewport: { width: 1365, height: 950 }, locale: name === 'pilot' ? 'ru-RU' : 'en-US', reducedMotion: 'reduce' });
   await context.addInitScript(instrumentBrowser, { oneWayDelayMs: game.oneWayDelayMs });
   await context.addInitScript(() => {
+    if (!['http:', 'https:'].includes(location.protocol)) return;
     if (!localStorage.getItem('iva-shift.preferences.v1')) localStorage.setItem('iva-shift.preferences.v1', JSON.stringify({ lang: 'ru', mode: '2d', quality: 'low', reducedMotion: true }));
   });
   const page = await context.newPage(); page.setDefaultTimeout(30000);
@@ -342,6 +345,32 @@ async function lobbyTouchTargets(game) {
     for (const target of targets) assert.ok(target.width >= 44 && target.height >= 44, `844×390 lobby target below 44 px: ${JSON.stringify(target)}`);
     check('844×390 actual lobby select/remove/ready targets are at least 44×44 CSS px', { game: game.label, targets });
   } finally { await Promise.all(game.peers.map(peer => peer.page.setViewportSize({ width: 1365, height: 950 }))); }
+}
+
+async function retireInactivePeer(old, replacement, reason) {
+  const previousSocket = old.activeSocket;
+  assert.ok(previousSocket, 'The retired fixture had a real game socket');
+  await until(() => previousSocket.isClosed(), 'The superseded fixture socket is closed');
+  assert.equal(await bounded(old.page.evaluate(() => window.__shiftAcceptance.active?.readyState), 'Old inactive fixture socket state'), 3);
+  const replacementTick = replacement.view.tick;
+  await bounded(old.page.goto('about:blank', { waitUntil: 'load' }), 'Retire inactive fixture by normal navigation');
+  assert.equal(old.page.url(), 'about:blank');
+  assert.equal(await bounded(old.page.evaluate(() => document.querySelector('.shift-root') === null && window.__shiftAcceptance === undefined), 'Retired fixture has no game document or instrumentation'), true);
+  assert.equal(previousSocket.isClosed(), true);
+  // Observe longer than the ordinary four-second room poll. Count new requests,
+  // not late responses to requests issued before navigation. The old app is gone.
+  const observationsBefore = old.httpEvents;
+  const before = { frames: old.frames, sockets: old.sockets, httpRequests: old.httpRequests };
+  await delay(4300);
+  const after = { frames: old.frames, sockets: old.sockets, httpRequests: old.httpRequests };
+  assert.deepEqual(after, before, 'The retired fixture must not keep polling or open another controller');
+  assert.equal(old.page.url(), 'about:blank');
+  assert.equal(await bounded(replacement.page.evaluate(() => window.__shiftAcceptance.active?.readyState), 'Replacement remains the live controller'), 1);
+  await until(() => replacement.view.phase === 'finished' || replacement.view.tick > replacementTick, 'Replacement keeps receiving advancing snapshots');
+  old.retired = true;
+  const observation = { reason, url: 'about:blank', oldSocketClosed: true, quietWindowMs: 4300, frameDelta: after.frames - before.frames,
+    connectionDelta: after.sockets - before.sockets, apiRequestDelta: after.httpRequests - before.httpRequests, lateApiObservationDelta: old.httpEvents - observationsBefore, replacementSocketOpen: true };
+  check('Retired artificial inactive tab after its takeover proof', { game: old.game.label, ...observation });
 }
 
 async function keyboardAudioInFreshContext(game) {
@@ -379,6 +408,7 @@ async function keyboardAudioInFreshContext(game) {
   check('Fresh authenticated online context unlocks native AudioContext through keyboard before any pointer', {
     game: game.label, before, beforeGameKey, after, classification: 'Browser AudioContext state only; no listening or speaker-output claim',
   });
+  await retireInactivePeer(old, replacement, 'keyboard-audio takeover');
 }
 
 const commandRevisions = new WeakMap();
@@ -534,15 +564,15 @@ async function crashAndTakeover(game) {
   assert.equal(await old.page.evaluate(() => window.__shiftAcceptance.active?.readyState), 3);
   assert.ok(await page.locator('.shift-match-tools').getByRole('button', { name: 'RU', exact: true }).isVisible(), 'Guest keeps EN in takeover tab');
   game.peers[1] = replacement; await automated(replacement);
-  // Keep the first tab visible as an inactive controller. Closing an individual
-  // headless target can stall this local Chromium build; owned process teardown
-  // happens after the batch, separately from gameplay and takeover acceptance.
+  // First prove the old tab is visibly inactive and the replacements work.
+  // Then unload the artificial tab so a later match cannot make it a new owner.
   for (const current of game.peers) {
     const control = await bounded(current.page.evaluate(() => ({ automated: window.__shiftAcceptance.automated, socketState: window.__shiftAcceptance.active?.readyState })), `${game.label} takeover page responsiveness`);
     assert.equal(control.automated, true); assert.equal(control.socketState, 1);
   }
   report.coverage.controllerTakeover = true;
   check('Second-tab controller takeover leaves first tab visibly inactive', { game: game.label, oldEpoch, newEpoch: replacement.view.self.controllerEpoch, sharedEpochChanged: true });
+  await retireInactivePeer(old, replacement, 'second-tab controller takeover');
 }
 
 async function drive(game) {
@@ -688,7 +718,10 @@ try {
     catch (failure) { return { name: peer.name, game: peer.game.label, url: peer.page.url(), observationFailure: failure.message }; }
   }));
   await writeFile(join(directory, 'failure-pages.json'), JSON.stringify(pages, null, 2), { mode: 0o600 });
-  await writeFile(join(directory, 'failure-views.json'), JSON.stringify(observedPeers.map(p => ({ name: p.name, game: p.game.label, view: p.view, failure: p.failure?.message }))), { mode: 0o600 });
+  await writeFile(join(directory, 'failure-views.json'), JSON.stringify(observedPeers.map(p => ({ name: p.name, game: p.game.label,
+    matchId: p.matchId ?? null, liveScope: p.liveScope ?? null, connections: { opened: p.sockets, closes: p.closes.length,
+      currentSocketClosed: p.activeSocket?.isClosed() ?? null, retired: p.retired, staleSocketFramesIgnored: p.staleSocketFramesIgnored },
+    view: p.view, failure: p.failure?.message }))), { mode: 0o600 });
   log({ failure: error.message }); process.exitCode = 1;
 } finally {
   stopping = true;
