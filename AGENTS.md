@@ -4,6 +4,10 @@
 
 The owner rejected the actual Terra screenshot of Knock First and explicitly assigned GPT-6.1 Terra to functional browser acceptance and **GPT-6 Astra (not 6.2)** to a substantial 3D/models/materials/lighting/animation rework. Read [the concrete art and integration contract](docs/iva-games/KNOCK_FIRST_3D_REWORK_2026_11_28.md). These are explicitly coordinated parallel assignments, not a second game implementation. Use isolated branches/worktrees and agree on renderer/input files before overlapping edits. Old asset counts, CPU rig checks and pre-rework functional observations do not accept the new visuals. Preserve rules, privacy, collisions, sound, saves and the current main release; Knock First is not accepted or released by these assignments alone.
 
+The owner subsequently liked the external operative/player model seen on the bot teammate. Preserve that visual design; its clipping, lighting and motion are not thereby accepted. First-person hands are a separate model. Fix clipping and animation discontinuities before cosmetic polish. Keep lesson guidance compact on the right and put skipping inside the released-pointer pause menu, not on the active mouse-look HUD.
+
+For visual audits of this and future games, the coordinator must personally inspect actual game frames and motion, compare them with named references from other games, and find defects beyond the owner's list. Check ordinary movement, stopping, turning, interaction and close geometry. An attractive isolated render, asset counts, rig assertions and a successful build cannot substitute for that review. Do not present visibly broken intermediate demonstrations as a finished improvement.
+
 ## Chess menus — shared player journey, 28 November 2026
 
 Follow [the chess entry contract](docs/iva-games/CHESS_ENTRY_FLOW.md) for all current and future chess variants: New game / Continue, Tutorial, With a friend, Settings. Preserve each game's visual identity. Put rare options behind an explicit disclosure, protect unfinished saves, and verify desktop/mobile RU/EN entry and recovery before release. Do not add another first-screen section for each new feature.
