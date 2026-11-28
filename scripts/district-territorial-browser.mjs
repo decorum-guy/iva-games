@@ -526,13 +526,14 @@ try {
           if (await page.getByRole('button', { name: 'Dismiss news', exact: true }).isVisible()) await page.getByRole('button', { name: 'Dismiss news', exact: true }).click();
           await page.getByRole('button', { name: 'Offer a trade', exact: true }).click();
           const geometry = async p => p.locator('.tb-surface').evaluate(el => { const r=el.getBoundingClientRect(); return {x:r.x,y:r.y,width:r.width,height:r.height,scrollY:window.scrollY}; });
+          await Promise.all(pages.map(p => p.evaluate(() => document.fonts.ready)));
           const beforeGeometry = await Promise.all(pages.map(geometry));
           const resourceName = (r) => r.charAt(0).toUpperCase() + r.slice(1);
           await page.getByRole('button', { name: 'I give + ' + resourceName(give), exact: true }).click();
           await page.getByRole('button', { name: 'I receive + ' + resourceName(take), exact: true }).click();
           await clickAction(page, page.getByRole('button', { name: 'Send offer', exact: true }));
           const otherPage = pages[1 - index];
-          await otherPage.reload();
+          await expect(otherPage.locator('.ta-offer').filter({hasText: nameOfHuman(view)})).toBeVisible();
           await clickAction(
             otherPage,
             otherPage
@@ -547,6 +548,8 @@ try {
           await clickAction(page, page.locator('.ta-offer').filter({hasText: other.players.find(p=>p.participantId===other.you.participantId).displayName}).getByRole('button', {name: /^✓ Trade with/}));
           await expect(page.locator('.ta-offer[data-offer-status=agreed]')).toHaveCount(0);
           for (const [i,p] of pages.entries()) assert.deepEqual(await geometry(p), beforeGeometry[i], 'Offer removal keeps board and page geometry');
+          await mkdir(artifacts, {recursive:true});
+          for (const [i,p] of pages.entries()) await p.screenshot({path:join(artifacts,i ? 'trade-mobile.png' : 'trade-desktop.png')});
           result.tradeGeometry = beforeGeometry;
           result.trade = true;
         } else await post(client, view, action);
