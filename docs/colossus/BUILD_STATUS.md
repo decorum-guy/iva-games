@@ -1,5 +1,19 @@
 # COLOSSUS — implementation state
 
+## Terra findings and audio review — 28 November 2026
+
+This follow-up to the audit of `95cf869765ff2b9541bd858bbc69a10f90c9d4af` incorporates main `a3df8369b269c53aea4c3839fade24e7064a4ce1`. The conflict in the shared build status was resolved by keeping both project records.
+
+- **C-05:** An unreadable hunt or practice save now has a warning and a download. Before a new run is saved, its slot archives the original bytes. If writing the archive fails, the old slot stays intact and the game shows its save error.
+- **C-04:** On short and landscape screens the arena keeps its size while battle controls remain reachable through scrolling. At 390×600 with 130% root text the English 2D board is 335 CSS px with or without the card panel, compared with the audited 180 px while the panel was open. At 844×390 the board is 308 px at both 100% and 130%, compared with 140 and 119 px in the audit. The same touch sequence selected the king and applied Stone Skin in 12 cases across Chromium and WebKit emulation.
+- **C-02 and C-03:** Rules list damage, geometry and range for all six pieces in Russian and English. The displayed numbers share the core's strike definitions. The card instructions describe optional targets, and a ready targetless card prompts the player to apply it.
+- **C-01:** The Vite fixture root uses the physical temporary directory path. Both HMR regressions passed on macOS with its default symlinked `TMPDIR`, including the actual WebSocket update and React Refresh check.
+- **Mobile browser checks:** Home and End scroll the focused bestiary details while keeping its selector fixed. Audio initialization now waits for game entry or an audio control in the menu.
+
+The [local listening demo](README.md#прослушивание-звуков) plays the shipped assets through the game's mixer. All 17 file checksums matched, and native Web Audio started all 17 effects and seven event sequences in both headless Chromium and WebKit. Both browsers also verified mute, local decisions, reload and report download. The owner's listening decision and physical phone play remain open.
+
+Local `npm run check` passed 1,196 tests in 94 files with two Vitest workers and the standard macOS temporary directory. The complete build, workspace and platform HTTP smoke tests, and the targeted board, card and tutorial rerun passed. The current CI checks for the review branch are tracked in [PR #29](https://github.com/decorum-guy/iva-games/pull/29/checks).
+
 ## Current-main integration after UI acceptance — 28 November 2026
 
 UI revision `7f0af70d8db13a66b1c4c7b7e5445060651f5a05` passed all three PR workflows: [Colossus](https://github.com/decorum-guy/iva-games/actions/runs/46076270720) (138 game tests, 83 server tests, 27 browser cases; two mobile animation-observer duplicates intentionally skipped), [platform](https://github.com/decorum-guy/iva-games/actions/runs/46076270743) (1190 tests / 93 files, 47 infrastructure tests and all browser jobs), and [both release images](https://github.com/decorum-guy/iva-games/actions/runs/46076270721) with persisted-volume replacement. This confirms the repeated UI browser run described below.
