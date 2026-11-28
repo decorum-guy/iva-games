@@ -179,7 +179,11 @@ function watchPage(page, name, game) {
   page.on('response', response => {
     const path = new URL(response.url()).pathname;
     if (!path.startsWith('/api/platform/')) return;
-    peer.http.push({ method: response.request().method(), path, status: response.status() });
+    const entry = { method: response.request().method(), path, status: response.status() };
+    peer.http.push(entry);
+    if (response.status() >= 400) void response.json().then(body => {
+      if (typeof body?.error?.code === 'string') entry.errorCode = body.error.code.slice(0, 80);
+    }).catch(() => {});
     if (peer.http.length > 250) peer.http.shift();
   });
   page.on('requestfailed', request => { if (new URL(request.url()).pathname.startsWith('/api/platform/')) peer.http.push({ path: new URL(request.url()).pathname, failed: request.failure()?.errorText }); });

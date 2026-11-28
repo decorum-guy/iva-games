@@ -3,6 +3,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import type { AddressInfo } from 'node:net';
+import { request as httpRequest } from 'node:http';
 import { WebSocket } from 'ws';
 import type { ShiftView } from '@iva-games/shift/core';
 import { createShiftRegistration } from '@iva-games/shift/runtime';
@@ -244,7 +245,29 @@ describe('shared authenticated live gateway with Shift', () => {
     const f = await fixture(), a = await f.signup('rematch_a'), b = await f.signup('rematch_b');
     const room = await f.room(a, b);
     const client = f.connect(a, room); await client.wait(frame => frame.type === 'snapshot');
-    f.shift.runtime.advanceTicks(16_000); await f.platform.reconcile();
+    f.shift.runtime.advanceTicks(16_000);
+    await client.wait(frame => frame.view?.phase === 'finished');
+    // The live runtime finishes before the platform's periodic reconciliation.
+    // A visible final frame alone must not imply that rematch is ready yet.
+    const pending = f.platform.getRoom(a.id, room.roomId);
+    expect(pending.state).toBe('playing');
+    const port = (f.server.address() as AddressInfo).port;
+    const premature = await new Promise<{ status: number; body: unknown }>((resolve, reject) => {
+      const request = httpRequest({ hostname: '127.0.0.1', port, path: `/api/platform/v1/rooms/${room.roomId}/rematch`,
+        method: 'POST', headers: {
+          Host: 'shift.test', Origin: 'http://shift.test', Cookie: `iva_dev_session=${a.token}`,
+          'Content-Type': 'application/json', 'X-CSRF-Token': a.session.csrfToken, 'Idempotency-Key': 'rematch-before-reconciliation',
+        },
+      }, response => {
+        let body = ''; response.setEncoding('utf8'); response.on('data', chunk => { body += String(chunk); });
+        response.on('end', () => { try { resolve({ status: response.statusCode!, body: JSON.parse(body) }); } catch (error) { reject(error); } });
+      });
+      request.on('error', reject); request.end(JSON.stringify({ expectedRevision: pending.revision }));
+    });
+    expect(premature.status).toBe(409);
+    expect(premature.body).toMatchObject({ error: { code: 'MATCH_NOT_FINISHED' } });
+    expect(f.platform.getRoom(a.id, room.roomId).matchId).toBe(room.matchId);
+    await f.platform.reconcile();
     const finished = f.platform.getRoom(a.id, room.roomId);
     expect(finished.state).toBe('finished');
     expect(() => f.platform.rematch(b.id, room.roomId, { expectedRevision: finished.revision })).toThrow();

@@ -23,7 +23,9 @@ synthetic platform accounts.
 After a finished match, the host can call the normal authenticated, CSRF-guarded
 `POST /api/platform/v1/rooms/:id/rematch` with `expectedRevision`. It reopens
 that room with the same participants, resets human readiness, and preserves
-the completed match and receipts in the runtime. A fresh start command creates
+the completed match and receipts in the runtime. The final live view may precede
+platform reconciliation: clients enable rematch only after the room DTO says
+`finished`, and retain the server's revision and state checks. A fresh start command creates
 a new match ID. Old sockets no longer belong to the room's current match.
 
 ## Live channel

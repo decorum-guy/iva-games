@@ -61,11 +61,11 @@ function LocalMatch({ config, preferences, change, exit, rematch }: { config: Lo
   const session = useLocalSession(config);
   return <MatchShell session={session} preferences={preferences} change={change} exit={exit} rematch={rematch} local />;
 }
-export function ShiftOnlineMatch({ roomId, matchId, language, exit, rematch }: { roomId: string; matchId: string; language?: Language; exit: () => void; rematch?: () => void }) {
+export function ShiftOnlineMatch({ roomId, matchId, language, exit, rematch, rematchReady }: { roomId: string; matchId: string; language?: Language; exit: () => void; rematch?: () => void; rematchReady: boolean }) {
   const [p, setP] = usePreferences(language); const session = useOnlineSession(roomId, matchId);
-  return <MatchShell session={session} preferences={p} change={setP} exit={exit} rematch={rematch} />;
+  return <MatchShell session={session} preferences={p} change={setP} exit={exit} rematch={rematch} rematchReady={rematchReady} />;
 }
-function MatchShell({ session, preferences: p, change, exit, rematch, local = false }: { session: ClientSession; preferences: Preferences; change: (p: Preferences) => void; exit: () => void; rematch?: () => void; local?: boolean }) {
+function MatchShell({ session, preferences: p, change, exit, rematch, rematchReady = true, local = false }: { session: ClientSession; preferences: Preferences; change: (p: Preferences) => void; exit: () => void; rematch?: () => void; rematchReady?: boolean; local?: boolean }) {
   const { view } = session; const l = p.lang, t = (ru: string, en: string) => text(l, ru, en);
   const [selected, setSelected] = useState<RoomId | null>(null); const selectedRef = useRef(selected); selectedRef.current = selected;
   const [modal, setModal] = useState<'settings' | 'help' | null>(null); const closeModal = useCallback(() => setModal(null), []);
@@ -157,11 +157,11 @@ function MatchShell({ session, preferences: p, change, exit, rematch, local = fa
       </aside>
     </main>
     {lesson && <section className={`shift-lesson ${session.lesson!.step >= 5 ? 'complete' : ''}`}><div className="shift-lesson-number">{Math.min(5, session.lesson!.step + 1)}<small>/ 5</small></div><div><p>{roleName(l, session.lesson!.role)} · {t('ОБУЧЕНИЕ', 'TRAINING')}</p><h2>{lesson.title}</h2><span>{lesson.body}</span></div><button className="shift-button subtle" onClick={exit}>{session.lesson!.step >= 5 ? t('К практике', 'To practice') : t('Пропустить урок', 'Skip lesson')}</button>{session.lesson!.step >= 5 && <button className="shift-button primary" onClick={rematch}>{t('Повторить', 'Replay')}</button>}</section>}
-    {view.phase === 'finished' && !session.lesson && <Result view={view} lang={l} rematch={rematch} exit={exit} />}
+    {view.phase === 'finished' && !session.lesson && <Result view={view} lang={l} rematch={rematch} rematchReady={rematchReady} exit={exit} />}
     {modal === 'settings' && <Options preferences={p} change={change} close={closeModal} />}{modal === 'help' && <Help lang={l} close={closeModal} />}
   </div>;
 }
-function Result({ view, lang, rematch, exit }: { view: ShiftView; lang: Language; rematch?: () => void; exit: () => void }) {
+function Result({ view, lang, rematch, rematchReady, exit }: { view: ShiftView; lang: Language; rematch?: () => void; rematchReady: boolean; exit: () => void }) {
   const panel = useRef<HTMLElement>(null);
   const t = (ru: string, en: string) => text(lang, ru, en);
   const names = Object.fromEntries(view.seats.map(s => [s.seatId, s.seatId === 'self' ? t('Вы', 'You') : s.displayName]));
@@ -194,6 +194,7 @@ function Result({ view, lang, rematch, exit }: { view: ShiftView; lang: Language
       <p>{t('Последние ключевые действия каждого раунда.', 'The latest key actions from each round.')}</p>
       {view.rounds.map(round => <section key={round.round}><h3>{t('Раунд', 'Round')} {round.round}</h3><ol>{recap.filter(e => e.round === round.round).slice(-8).map(e => <li key={e.id}>{eventCopy(lang, e, names)}</li>)}{!recap.some(e => e.round === round.round) && <li>{round.reason === 'timeout' ? t('Время вышло без доставки', 'Time expired without a delivery') : t('Доставлено', 'Delivered')}</li>}</ol></section>)}
     </details>
-    <div className="shift-result-actions">{rematch ? <button className="shift-button primary" onClick={rematch}>{t('Реванш', 'Rematch')} ↗</button> : <p>{t('Реванш может начать хозяин комнаты', 'The host can start a rematch')}</p>}<button className="shift-button subtle" onClick={exit}>{t('В лобби', 'Back to lobby')}</button></div>
+    {rematch && !rematchReady && <p className="shift-muted" role="status">{t('Подготавливаем комнату к реваншу…', 'Preparing the room for a rematch…')}</p>}
+    <div className="shift-result-actions">{rematch ? <button className="shift-button primary" disabled={!rematchReady} onClick={rematch}>{t('Реванш', 'Rematch')} ↗</button> : <p>{t('Реванш может начать хозяин комнаты', 'The host can start a rematch')}</p>}<button className="shift-button subtle" onClick={exit}>{t('В лобби', 'Back to lobby')}</button></div>
   </section></div>;
 }

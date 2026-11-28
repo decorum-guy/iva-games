@@ -25,7 +25,7 @@ const option = (name, fallback) => {
   return index < 0 ? fallback : args[index + 1];
 };
 if (args.includes('--help')) {
-  process.stdout.write('Usage: node games/shift/scripts/browser-edge-acceptance.mjs [--cycle LABEL] [--browser PATH] [--port 4418]\nRuns three controlled edge fixtures and four role/key recap cases. Requires build:foundation and Playwright Chromium.\n');
+  process.stdout.write('Usage: node games/shift/scripts/browser-edge-acceptance.mjs [--cycle LABEL] [--browser PATH] [--port 4418]\nRuns three controlled edge fixtures, four role/key recap cases, and rematch readiness. Requires build:foundation and Playwright Chromium.\n');
   process.exit(0);
 }
 for (let i = 0; i < args.length; i += 2) assert.ok(['--cycle', '--browser', '--port'].includes(args[i]), `Unknown option ${args[i]}`);
@@ -41,7 +41,7 @@ const portal = join(runDirectory, 'portal');
 await cp(join(ROOT, 'apps/portal/dist'), portal, { recursive: true, dereference: true });
 const hash = bytes => createHash('sha256').update(bytes).digest('hex');
 const report = {
-  classification: 'Controlled checkpoint fixtures in actual built UI over authenticated local HTTP/WS. Three edges plus four role/key recap cases. Zero ordinary matches, personal full matches, physical devices or real audio listening.',
+  classification: 'Controlled checkpoint fixtures in actual built UI over authenticated local HTTP/WS. Three edges, four role/key recap cases, and rematch readiness. Zero ordinary matches, personal full matches, physical devices or real audio listening.',
   cycle, ordinaryMatches: 0, personallyPlayedFullMatches: 0,
   method: 'Existing autoTick:false/advanceTicks drives authoritative ticks. A private entry point compiles unchanged production runtime source; it is not dist-platform/main.js. Checkpoints are prepared with the runtime closed. No production endpoint, altered rule, fake view or forced result.',
   sourceHead: execFileSync('git', ['rev-parse', 'HEAD'], { cwd: ROOT, encoding: 'utf8' }).trim(),
@@ -90,6 +90,7 @@ export async function startControlledServer(directory: string, port: number, por
     clearInterval(timer); platform.stopReconciliation(); await platform.settle(); platform.close(); shift.close(); throw error;
   }
   return { runtime: shift.runtime, platform, origin,
+    async pauseReconciliation() { clearInterval(timer); await platform.settle(); },
     async close() { clearInterval(timer); platform.stopReconciliation(); await server.shutdown(); await platform.settle(); platform.close(); shift.close(); } };
 }
 `);
@@ -105,7 +106,7 @@ function checkpoint(file,matchId,room,hostId,guestId,kind){
   const db=new Database(file);const row=db.prepare('SELECT state FROM shift_matches WHERE match_id=?').get(matchId);assert.ok(row);
   const s=JSON.parse(row.state),host=room.members.find(m=>m.playerId===hostId).participantId,guest=room.members.find(m=>m.playerId===guestId).participantId;
   let initial;
-  if(kind==='draw'){
+  if(kind==='draw'||kind==='rematch'){
     // Build the preceding idle timeouts using actual rules, not invented result rows.
     for(const actor of Object.values(s.actors)){actor.connected=true;actor.disconnectedAtTick=null;actor.input={...stopInput};}
     let ticks=0;while(!(s.round===6&&s.phase==='active'&&s.phaseEndsAtTick-s.tick===1)){stepMatch(s);if(++ticks>20000)throw new Error('Draw seed did not reach last tiebreak tick');}
@@ -258,6 +259,70 @@ async function runCase(kind){
       const text=await first.page.locator('.shift-match').innerText();assert.match(text,/Время вышло/);assert.match(text,/Возвращение через/);assert.equal(await first.page.locator('.shift-hp').getAttribute('aria-label'),'0 / 3 HP');
       result.after={tick:v.tick,phase:v.phase,score:v.score,battery:v.battery,carrier:{...pose(dead),hp:dead.hp,chargeTicks:dead.chargeTicks,carrying:dead.carrying},round:v.rounds.at(-1),events:v.events.filter(e=>['shot','hit','down','drop','delivered','round-end'].includes(e.kind)).map(event=>({kind:event.kind,tick:event.tick,reason:event.reason})),shooterStats:second.view.stats[second.view.self.seatId]};
       result.captures.push(await capture(first,directory,'knockout-timeout-ru'),await capture(second,directory,'knockout-timeout-en'));
+    }else if(kind==='rematch'){
+      // Pause only this fixture's scheduler; manual reconcile remains the ordinary platform method.
+      await service.pauseReconciliation();
+      assert.equal((await host.request(`/rooms/${room.roomId}`)).room.state,'playing');
+      assert.equal(first.view.phaseEndsAtTick-first.view.tick,1);
+      service.runtime.advanceTicks();await syncView(service,peers,room);
+      assert.equal(first.view.phase,'finished');
+      assert.equal((await host.request(`/rooms/${room.roomId}`)).room.state,'playing');
+      await first.page.locator('.shift-result.draw').waitFor();
+      const rematchPosts=[],rematchStatuses=[];
+      const observeRematch=peer=>{
+        peer.page.on('request',request=>{if(request.method()==='POST'&&new URL(request.url()).pathname===`/api/platform/v1/rooms/${room.roomId}/rematch`)rematchPosts.push(true);});
+        peer.page.on('response',response=>{if(response.request().method()==='POST'&&new URL(response.url()).pathname===`/api/platform/v1/rooms/${room.roomId}/rematch`)rematchStatuses.push(response.status());});
+      };
+      observeRematch(first);
+      const ruButton=first.page.locator('.shift-result').getByRole('button',{name:/^Реванш/});
+      assert.equal(await ruButton.isDisabled(),true,'Final WS before room reconciliation must not enable rematch');
+      const reasonRu=await first.page.locator('.shift-result > [role="status"]').innerText();
+      assert.equal(reasonRu,'Подготавливаем комнату к реваншу…');
+      const disabledBox=await ruButton.boundingBox();assert.ok(disabledBox);
+      await first.page.mouse.click(disabledBox.x+disabledBox.width/2,disabledBox.y+disabledBox.height/2);await delay(80);
+      assert.equal(rematchPosts.length,0,'Native disabled button must not issue a premature POST');
+      result.captures.push(await capture(first,directory,'rematch-waiting-ru'));
+      // Reopen the same local host account with EN preferences; the RU context closes first.
+      await bounded(first.context.close(),'RU host context closure',10000);
+      const hostPeer=await openPeer(browser,host,room,'en',errors);hostPeer.playerId=host.user.playerId;peers[0]=hostPeer;
+      observeRematch(hostPeer);
+      await hostPeer.page.locator('.shift-result.draw').waitFor();
+      const enButton=hostPeer.page.locator('.shift-result').getByRole('button',{name:/^Rematch/});
+      assert.equal(await enButton.isDisabled(),true);
+      const reasonEn=await hostPeer.page.locator('.shift-result > [role="status"]').innerText();
+      assert.equal(reasonEn,'Preparing the room for a rematch…');
+      assert.equal((await host.request(`/rooms/${room.roomId}`)).room.state,'playing');
+      result.waiting={runtimePhase:hostPeer.view.phase,roomState:'playing',buttonDisabledRu:true,buttonDisabledEn:true,reasonRu,reasonEn,prematurePosts:rematchPosts.length};
+      result.captures.push(await capture(hostPeer,directory,'rematch-waiting-en'));
+      await service.platform.reconcile();
+      assert.equal((await host.request(`/rooms/${room.roomId}`)).room.state,'finished');
+      // The existing portal polling must propagate readiness without a forced refresh.
+      await until(()=>enButton.isEnabled(),'Ordinary room polling enables reconciled rematch');
+      assert.equal(await hostPeer.page.locator('.shift-result > [role="status"]').count(),0);
+      await enButton.click();
+      await until(()=>rematchStatuses.length===1,'Actual rematch POST response');
+      assert.deepEqual(rematchStatuses,[200]);assert.equal(rematchPosts.length,1);
+      await hostPeer.page.locator('.shift-lobby').waitFor();await second.page.locator('.shift-lobby').waitFor();
+      const lobby=(await host.request(`/rooms/${room.roomId}`)).room;
+      assert.equal(lobby.state,'lobby');assert.equal(lobby.matchId,null);
+      assert.deepEqual(lobby.members.map(member=>member.participantId).sort(),room.members.map(member=>member.participantId).sort());
+      assert.deepEqual(lobby.settings,room.settings);
+      assert.ok(lobby.members.filter(member=>member.controller.kind==='human').every(member=>!member.ready));
+      assert.ok(lobby.members.filter(member=>member.controller.kind==='bot').every(member=>member.ready));
+      result.lobby={sameRoom:lobby.roomId===room.roomId,rosterPreserved:true,settingsPreserved:true,memberCount:lobby.members.length,userAccountReadinessReset:true,botReadinessRetained:true,rematchStatus:200};
+      await hostPeer.page.getByRole('button',{name:/I’m ready/}).click();
+      await until(async()=>(await host.request(`/rooms/${room.roomId}`)).room.members.find(member=>member.playerId===host.user.playerId)?.ready,'Host ready after rematch');
+      await second.page.getByRole('button',{name:/I’m ready/}).click();
+      const startButton=hostPeer.page.getByRole('button',{name:/Start match/});
+      await until(()=>startButton.isEnabled(),'Both local user accounts ready for rematch');
+      await startButton.click();
+      const nextRoom=await until(async()=>{const next=(await host.request(`/rooms/${room.roomId}`)).room;return next.state==='playing'&&next.matchId&&next.matchId!==room.matchId?next:null;},'Distinct authoritative rematch starts');
+      await until(()=>peers.every(peer=>peer.view?.phase==='prepare'&&peer.view.round===1&&peer.view.rounds.length===0),'Both clients receive fresh match');
+      service.runtime.advanceTicks(TIMING.preparation);await syncView(service,peers,nextRoom);
+      assert.ok(peers.every(peer=>peer.view.phase==='active'&&peer.view.round===1));
+      assert.deepEqual(hostPeer.view.score,{teal:0,amber:0});
+      result.after={tick:hostPeer.view.tick,phase:hostPeer.view.phase,round:hostPeer.view.round,score:hostPeer.view.score,distinctMatch:true,sameRoom:nextRoom.roomId===room.roomId};
+      result.captures.push(await capture(hostPeer,directory,'rematch-active-en'));
     }else{
       assert.equal(first.view.round,6);assert.equal(first.view.phaseEndsAtTick-first.view.tick,1);assert.deepEqual(first.view.score,{teal:0,amber:0});
       service.runtime.advanceTicks();await syncView(service,peers,room);assert.equal(first.view.phase,'finished');assert.equal(first.view.winner,null);assert.equal(first.view.rounds.length,6);
@@ -267,7 +332,7 @@ async function runCase(kind){
       // The final view must survive normal authenticated HTTP recovery after reload.
       await first.page.reload();await first.page.locator('.shift-result.draw').waitFor();assert.equal(await first.page.locator('.shift-result h1').innerText(),'Ничья');result.reloadPreserved=true;
     }
-    assert.deepEqual(errors,[]);result.passed=true;result.authenticatedBrowserContexts=2;result.frames=peers.map(p=>p.frames);result.uiCommands=peers.map(p=>p.commands.length);
+    assert.deepEqual(errors,[]);result.passed=true;result.authenticatedBrowserContexts=kind==='rematch'?3:2;result.maxConcurrentAuthenticatedBrowserContexts=2;result.frames=peers.map(p=>p.frames);result.uiCommands=peers.map(p=>p.commands.length);
     log({fixture:kind,cycle,passed:true,tick:result.after?.tick??second.view.tick,method:'checkpoint + controlled authoritative clock + real built UI and authenticated WS'});
     return result;
   }catch(error){result.errors.push(safeError(error));throw error;}finally{
@@ -279,10 +344,10 @@ async function runCase(kind){
 function safeError(error){return String(error?.message??error).replace(/\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi,'<local-id>');}
 function pose(actor){return {spaceId:actor.spaceId,x:actor.x,z:actor.z};}
 try{
-  for(const kind of ['threshold','knockout','draw','keyboard'])await runCase(kind);
-  report.passed=report.fixtures.length===4&&report.fixtures.every(fixture=>fixture.passed&&fixture.errors.length===0);
+  for(const kind of ['threshold','knockout','draw','keyboard','rematch'])await runCase(kind);
+  report.passed=report.fixtures.length===5&&report.fixtures.every(fixture=>fixture.passed&&fixture.errors.length===0);
   assert.equal(report.passed,true,'Every controlled fixture and cleanup must pass');
-  log({completed:true,cycle,edgeFixtures:3,keyboardCases:4,ordinaryMatches:0,report:join(runDirectory,'evidence.json')});
+  log({completed:true,cycle,edgeFixtures:3,keyboardCases:4,rematchReadinessCases:1,ordinaryMatches:0,report:join(runDirectory,'evidence.json')});
 }catch(error){report.errors.push(safeError(error));report.passed=false;log({failure:safeError(error),cycle});process.exitCode=1;}
 finally{
   // Only these sanitized JSON files are suitable for promotion; never upload the QA directory.
