@@ -60,20 +60,21 @@ describe('Territorial trade draft recovery against the real rules core', () => {
     const sent = viewTerritory(state, 'b', 5000).offers[0];
     expect(sent).toMatchObject({ authorId: 'b', targetId: 'a', give: hand({ brick: 2 }), receive: hand({ wood: 2 }) });
     state = play(state, 'a', { type: 'accept', offerId: sent.id });
+    state = play(state, 'b', { type: 'accept', offerId: sent.id });
     const confirmed = viewTerritory(state, 'b', 6000);
-    expect(confirmed.offerHistory?.at(-1)?.status).toBe('accepted');
+    expect(confirmed.offerHistory?.find(offer => offer.id === sent.id)?.status).toBe('accepted');
     expect(confirmed.you.hand).toMatchObject({ wood: 2, brick: 2 });
   });
 
-  it('does not silently select a different counterparty when the active player changes', () => {
+  it('reuses preserved conditions as a broadcast after the active player changes', () => {
     let state = play(table(), 'a', { type: 'offer', targetId: 'c', give: hand({ wood: 1 }), receive: hand({ wool: 1 }) });
     const draft = counterDraft(viewTerritory(state, 'c', 2000).offers[0]);
     state = play(state, 'a', { type: 'end' });
     state = rollWithoutSeven(state, 'b');
     const reused = { ...draft, parentId: null };
     const inspection = inspectTradeDraft(viewTerritory(state, 'c', 3000), reused);
-    expect(inspection.targetAllowed).toBe(false);
-    expect(inspection.ready).toBe(false);
+    expect(inspection.targetAllowed).toBe(true);
+    expect(inspection.ready).toBe(true);
     expect(reused.targetId).toBe('a');
     expect(reused.give.wool).toBe(1);
   });
@@ -83,6 +84,7 @@ describe('Territorial trade draft recovery against the real rules core', () => {
     const draft = counterDraft(viewTerritory(state, 'b', 2000).offers[0]);
     state = play(state, 'a', { type: 'offer', targetId: 'b', give: hand({ ore: 1 }), receive: hand({ brick: 3 }) });
     state = play(state, 'b', { type: 'accept', offerId: state.offers[0].id });
+    state = play(state, 'a', { type: 'accept', offerId: state.offers[0].id });
     const inspection = inspectTradeDraft(viewTerritory(state, 'b', 3000), { ...draft, parentId: null });
     expect(inspection.shortage).toEqual(hand({ brick: 3 }));
     expect(inspection.ready).toBe(false);

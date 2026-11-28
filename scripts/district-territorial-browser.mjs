@@ -318,19 +318,33 @@ async function newsFixtures(clients, pages, guest) {
     }
   }
 }
-async function training(page, roomId) {
+async function training(page, roomId, touch = false) {
   await page.goto(origin + '/district-training?room=' + roomId);
   await page.getByRole('button', { name: 'EN', exact: true }).click();
   const lesson = page.locator('.territory-lesson');
+  let checkedNewsLayout = false;
   for (let step = 0; step < 12; step++) {
     if (await lesson.getByRole('link', { name: 'Play', exact: true }).isVisible()) break;
     const highlighted = page.locator('.tb-target.is-available').first();
-    if (await highlighted.count()) await highlighted.focus().then(() => highlighted.press('Enter'));
-    if (await page.getByRole('button', { name: 'Dismiss news', exact: true }).isVisible()) await page.getByRole('button', { name: 'Dismiss news', exact: true }).click();
+    if (await highlighted.count()) await (touch ? highlighted.tap() : highlighted.focus().then(() => highlighted.press('Enter')));
     const button = lesson.locator('button.primary');
+    const issue = page.locator('.tn-issue');
+    if (!checkedNewsLayout && await issue.isVisible()) {
+      const [lessonBox, issueBox, textBox] = await Promise.all([
+        lesson.boundingBox(), issue.boundingBox(), page.locator('.tn-issue-cards').boundingBox(),
+      ]);
+      assert.ok(lessonBox && issueBox && textBox && textBox.height >= 60, 'Lesson and a readable news area must be present');
+      assert.ok(lessonBox.y + lessonBox.height <= issueBox.y || issueBox.y + issueBox.height <= lessonBox.y,
+        'An open news issue must not cover the current lesson');
+      await lesson.scrollIntoViewIfNeeded();
+      await mkdir(artifacts, { recursive: true });
+      await page.screenshot({ path: join(artifacts, touch ? 'practice-news-mobile.png' : 'practice-news-desktop.png') });
+      checkedNewsLayout = true;
+    }
     result.tutorialSteps.push(await button.innerText());
-    await button.click();
+    if (touch) await button.tap(); else await button.click();
   }
+  assert.ok(checkedNewsLayout, 'The practice news layout was exercised');
   await expect(lesson.getByRole('link', { name: 'Play', exact: true })).toBeVisible();
   await lesson.getByRole('button', { name: 'Prepare for a threat' }).click();
   const forecast = page.locator('.tn-stage-confirmed');
@@ -455,6 +469,7 @@ try {
     boardHeight: Math.round(wide.height),
   });
   await training(pages[0], room.roomId);
+  await training(pages[1], room.roomId, true);
   async function clickAction(page, button) {
     if (await page.getByRole('button', { name: 'Dismiss news', exact: true }).isVisible()) await page.getByRole('button', { name: 'Dismiss news', exact: true }).click();
     const pendingResponse = page.waitForResponse(
@@ -525,14 +540,15 @@ try {
           await page.reload();
           if (await page.getByRole('button', { name: 'Dismiss news', exact: true }).isVisible()) await page.getByRole('button', { name: 'Dismiss news', exact: true }).click();
           await page.getByRole('button', { name: 'Offer a trade', exact: true }).click();
-          const counterpart = view.players.find((p) => p.participantId === other.you.participantId);
-          await page.locator('.ta-trade-editor select').selectOption(counterpart.participantId);
+          const geometry = async p => p.locator('.tb-surface').evaluate(el => { const r=el.getBoundingClientRect(); return {x:r.x,y:r.y,width:r.width,height:r.height,scrollY:window.scrollY}; });
+          await Promise.all(pages.map(p => p.evaluate(() => document.fonts.ready)));
+          const beforeGeometry = await Promise.all(pages.map(geometry));
           const resourceName = (r) => r.charAt(0).toUpperCase() + r.slice(1);
           await page.getByRole('button', { name: 'I give + ' + resourceName(give), exact: true }).click();
           await page.getByRole('button', { name: 'I receive + ' + resourceName(take), exact: true }).click();
           await clickAction(page, page.getByRole('button', { name: 'Send offer', exact: true }));
           const otherPage = pages[1 - index];
-          await otherPage.reload();
+          await expect(otherPage.locator('.ta-offer').filter({hasText: nameOfHuman(view)})).toBeVisible();
           await clickAction(
             otherPage,
             otherPage
@@ -540,6 +556,36 @@ try {
               .filter({ hasText: nameOfHuman(view) })
               .getByRole('button', { name: 'Accept', exact: true }),
           );
+          await expect(page.locator('.ta-offer[data-offer-status=agreed]').first()).toBeVisible();
+          const consentView = await current(client);
+          assert.deepEqual(consentView.you.hand, view.you.hand, 'Consent cannot transfer the author hand');
+          for (const [i,p] of pages.entries()) assert.deepEqual(await geometry(p), beforeGeometry[i], 'Offer appearance/consent keeps board and page geometry');
+          await mkdir(artifacts, {recursive:true});
+          for (const [i,p] of pages.entries()) await p.screenshot({path:join(artifacts,i ? 'trade-mobile.png' : 'trade-desktop.png')});
+          await clickAction(page, page.locator('.ta-offer').filter({hasText: other.players.find(p=>p.participantId===other.you.participantId).displayName}).getByRole('button', {name: /^✓ Trade with/}));
+          await expect(page.locator('.ta-offer[data-offer-status=agreed]')).toHaveCount(0);
+          for (const [i,p] of pages.entries()) assert.deepEqual(await geometry(p), beforeGeometry[i], 'Offer removal keeps board and page geometry');
+          // The common author cross remains actionable after consent, without a transfer.
+          await page.locator('.ta-trade-open').click();
+          if (await page.getByRole('button',{name:'Discard draft',exact:true}).isVisible()) {
+            await page.getByRole('button',{name:'Discard draft',exact:true}).click();
+            await page.getByRole('button',{name:'Discard',exact:true}).click();
+            await page.locator('.ta-trade-open').click();
+          }
+          await page.getByRole('button', {name:'I give + '+resourceName(take),exact:true}).click();
+          await page.getByRole('button', {name:'I receive + '+resourceName(give),exact:true}).click();
+          await clickAction(page,page.getByRole('button',{name:'Send offer',exact:true}));
+          const cancelBaseline=await current(client);
+          const cancellation=cancelBaseline.offers.find(offer=>offer.authorId===view.you.participantId&&offer.targetId===other.you.participantId);
+          await clickAction(otherPage,otherPage.locator(`[data-offer-id="${cancellation.id}"]`).getByRole('button',{name:'Accept',exact:true}));
+          await expect(page.locator(`[data-offer-id="${cancellation.id}"][data-offer-status=agreed]`)).toBeVisible();
+          await clickAction(page,page.getByRole('button',{name:'Withdraw offer for everyone',exact:true}));
+          const cancelled=await current(client);
+          assert.deepEqual(cancelled.you.hand,cancelBaseline.you.hand,'The author cross never transfers consented resources');
+          assert.equal(cancelled.offers.some(offer=>offer.groupId===cancellation.groupId),false);
+          for (const [i,p] of pages.entries()) assert.deepEqual(await geometry(p),beforeGeometry[i],'Group cancellation keeps geometry');
+          result.groupCancel=true;
+          result.tradeGeometry = beforeGeometry;
           result.trade = true;
         } else await post(client, view, action);
       } else await post(client, view, action);
@@ -547,11 +593,13 @@ try {
       played = true;
       break;
     }
+    if (process.env.DISTRICT_TRADE_ONLY === '1' && result.trade) { done = await current(alice); break; }
     // Bots now publish a real, persistent scheduled action. Wait for that
     // action instead of hammering two match endpoints every 8 ms.
     if (!played) await delay(Math.min(1200, Math.max(500,
       (snapshot.botActionAt ?? snapshot.serverNow + 900) - snapshot.serverNow + 50)));
   }
+  if (process.env.DISTRICT_TRADE_ONLY !== '1') {
   assert.ok(done?.outcome?.winnerParticipantIds.length, 'Match did not finish with a winner');
   for (const [index, client] of clients.entries()) {
     const final = await current(client);
@@ -562,15 +610,16 @@ try {
   }
   await checkCoastalMap(bob, pages[1], origin);
   await newsFixtures(clients, pages, guest);
+  }
   assert.deepEqual(errors, []);
-  assert.ok(result.restarted && result.trade);
+  assert.ok(result.trade && (process.env.DISTRICT_TRADE_ONLY === '1' || result.restarted));
   console.log(
     JSON.stringify(
       {
         ...result,
         rounds: done.round,
         revision: done.revision,
-        winners: done.outcome.winnerParticipantIds.length,
+        winners: done.outcome?.winnerParticipantIds.length ?? 0,
         newsMessages: done.news.length,
       },
       null,

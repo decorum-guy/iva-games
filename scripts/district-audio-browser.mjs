@@ -252,10 +252,13 @@ try {
 
   entry = await open('trade-draft');
   await settings(); await closeSettings(); before = await count();
-  const accepted = await post(entry, entry.guestIndex, { type: 'accept', offerId: entry.expected.offerId });
+  const consent = await post(entry, entry.guestIndex, { type: 'accept', offerId: entry.expected.offerId });
+  await observeRevision(entry, consent.revision); await delay(500);
+  assert.equal((await starts()).slice(before).filter(item => item.cue === 'trade').length, 0, 'Consent is not a completed trade');
+  const accepted = await post(entry, entry.hostIndex, { type: 'accept', offerId: entry.expected.offerId });
   await observeRevision(entry, accepted.revision); await expectCue('trade', before); await idle();
   assert.equal((await starts()).slice(before).filter(item => item.cue === 'trade').length, 1);
-  passed('Accepted real player trade plays once, without an offer-closed duplicate');
+  passed('Recipient consent stays silent; author-confirmed trade plays once without an offer-closed duplicate');
 
   entry = await open('seven-discard');
   await settings(); await closeSettings(); before = await count();
