@@ -73,7 +73,11 @@
     "colossus:e2e": "playwright test --config games/chess/colossus/playwright.config.ts",
     "build:colossus": "npm run build --workspace @chess-2/colossus --",
     "check:registry": "node --experimental-strip-types scripts/check-game-registry.mjs",
-    "prebuild:foundation": "npm run check:registry"
+    "prebuild:foundation": "npm run check:registry",
+    "knock-first:test": "vitest run --project knock-first",
+    "knock-first:load": "vitest run --config games/knock-first/vitest.load.config.ts",
+    "knock-first:assets": "python3 games/knock-first/assets-src/generate_media.py",
+    "knock-first:assets:check": "python3 games/knock-first/assets-src/validate_assets.py"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

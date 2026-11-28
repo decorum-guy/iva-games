@@ -1,6 +1,6 @@
 import type { AnchorHTMLAttributes, MouseEvent } from "react";
 
-export type Page = "home" | "chess" | "games" | "login" | "friends" | "rooms" | "invitations" | "profile";
+export type Page = "home" | "chess" | "games" | "knock-first" | "login" | "friends" | "rooms" | "invitations" | "profile";
 export type Route = { page: Page; roomId?: string; invitationId?: string };
 
 export function readRoute(): Route {
@@ -10,6 +10,7 @@ export function readRoute(): Route {
   const bits = path.split("/").filter(Boolean);
   if (["invite", "invites", "invitations"].includes(bits[0] ?? "") && bits[1])
     return { page: "invitations", invitationId: bits[1] };
+  if (bits[0] === "games" && bits[1] === "knock-first") return { page: "knock-first" };
   if (bits[0] === "rooms") return { page: "rooms", roomId: bits[1] };
   if (["login", "verify", "reset"].includes(bits[0] ?? "")) return { page: "login" };
   return { page: ["chess", "games", "friends", "invitations", "profile"].includes(bits[0] ?? "")

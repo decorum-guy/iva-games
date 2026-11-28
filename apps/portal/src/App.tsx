@@ -1,3 +1,5 @@
+import { KnockLanding, KnockSettingsFields, roomSettings as knockRoomSettings } from '@iva-games/knock-first/lobby';
+import type { KnockSettings } from '@iva-games/knock-first';
 import type { DistrictMap } from "@iva-games/district";
 import { AvatarPicker } from "./AvatarPicker";
 import { DISTRICT_ISLAND_MAPS, DISTRICT_MAP_CATALOG, DISTRICT_MAPS, DISTRICT_RULES_VERSION } from "@iva-games/district";
@@ -45,6 +47,8 @@ import type {
 } from "./types";
 
 const TerritorialMatch = lazy(() => import("./TerritorialDistrict").then(module => ({ default: module.TerritorialMatch })));
+
+const KnockFirst = lazy(() => import("@iva-games/knock-first/client"));
 
 const entranceAtLoad = readEntrance();
 const emptySocial: Social = {
@@ -500,6 +504,7 @@ export default function App() {
   const territorialMatch = islandMatch && selectedRoom?.rulesVersion === TERRITORY_RULES;
   const title = {
     home: "Iva Games",
+    "knock-first": t("Сначала постучи", "Knock First"),
     chess: t("Шахматы", "Chess"),
     games: t("Другие игры", "Other games"),
     login: t("Войти", "Sign in"),
@@ -602,7 +607,7 @@ export default function App() {
 
   return (
     <LanguageContext.Provider value={{ lang, t, setLanguage: setLang }}>
-      <div className={`portal ${user && !entrance && !cataloguePage && route.page !== "login" ? "signed-in" : ""}`}>
+      <div className={`portal ${user && !entrance && !cataloguePage && route.page !== "login" && route.page !== "knock-first" ? "signed-in" : ""}`}>
         <div className="language-switch" aria-label={t("Язык", "Language")}>
           <button aria-pressed={lang === "ru"} onClick={() => setLang("ru")}>
             RU
@@ -611,7 +616,7 @@ export default function App() {
             EN
           </button>
         </div>
-        {!user && !entrance && !cataloguePage && (
+        {!user && !entrance && !cataloguePage && route.page !== "knock-first" && (
           <nav
             className="guest-games"
             aria-label={t("Разделы игр", "Game collections")}
@@ -624,7 +629,7 @@ export default function App() {
             </PortalLink>
           </nav>
         )}
-        {user && !entrance && !cataloguePage && route.page !== "login" && (
+        {user && !entrance && !cataloguePage && route.page !== "login" && route.page !== "knock-first" && (
           <a
             className="mobile-account"
             href="#/profile"
@@ -674,6 +679,15 @@ export default function App() {
               {t("Повторить", "Retry")}
             </button>
           </div>
+        ) : route.page === "knock-first" && !entrance ? (
+          <Suspense fallback={<div className="loading-page"><span className="spinner" /></div>}><KnockLanding language={lang} signedIn={!!user} onExit={() => go("games")} onCreate={(settings, capacity) => {
+            if (!user || !verified) { sessionStorage.setItem("iva.knock.return", "1"); go(user ? "profile" : "login"); return; }
+            void perform(async () => {
+              const data = await request<{ room: Room }>("/rooms", { gameId: "knock-first", capacity, title: settings.tutorial ? t("Учебная смена", "Training shift") : t("Архивная смена", "Archive shift"), settings });
+              if (settings.practice) await request(`/rooms/${data.room.roomId}/bots`, { difficulty: "normal", expectedRevision: data.room.revision });
+              await refresh(); go("rooms", data.room.roomId);
+            });
+          }} /></Suspense>
         ) : cataloguePage && !entrance ? (
           <Catalogue page={cataloguePage} games={games} user={user} busy={busy} offline={offline}
             retry={() => void perform(refresh)}
@@ -690,7 +704,8 @@ export default function App() {
             perform={perform}
             onAuthenticated={async () => {
               await refresh();
-              if (readRoute().page === "login" && !entrance) go("home", undefined, true);
+              if (sessionStorage.getItem("iva.knock.return")) { sessionStorage.removeItem("iva.knock.return"); history.replaceState(null, "", "/games/knock-first"); window.dispatchEvent(new PopStateEvent("popstate")); }
+              else if (readRoute().page === "login" && !entrance) go("home", undefined, true);
             }}
             auth={session?.auth}
             entrance={entrance}
@@ -1375,6 +1390,7 @@ function CreateRoom({
   const [districtMap, setDistrictMap] = useState<DistrictMap>(DISTRICT_ISLAND_MAPS[0]);
   const [territorialMap, setTerritorialMap] = useState(territoryMaps[0]);
   const [preset, setPreset] = useState(districtPreset(undefined));
+  const [knockSettings, setKnockSettings] = useState<KnockSettings>(knockRoomSettings({}));
   const territorial = game?.rulesVersion === TERRITORY_RULES;
   return (
     <Modal title={t("Новая комната", "New room")} onClose={close}>
@@ -1385,6 +1401,7 @@ function CreateRoom({
             gameId,
             capacity,
             title: title.trim() || t("Играем вместе", "Playing together"),
+            ...(gameId === "knock-first" ? { settings: { ...knockSettings } } : {}),
             ...(gameId === "district" ? {
               settings: territorial ? { mapId: territorialMap.id, mapVersion: territorialMap.version, newsPreset: preset } :
                 { mapId: districtMap.id, mapVersion: districtMap.version },
@@ -1439,6 +1456,7 @@ function CreateRoom({
             ))}
           </select>
         </label>
+        {gameId === "knock-first" && <div className="kf kf-create-settings"><KnockSettingsFields value={knockSettings} onChange={setKnockSettings} language={lang} /></div>}
         {gameId === "district" && (territorial
           ? <TerritorialSettingsFields map={territorialMap} setMap={setTerritorialMap} preset={preset} setPreset={setPreset} />
           : <DistrictMapSelect value={districtMap.id} version={districtMap.version} onChange={setDistrictMap} />)}
@@ -1513,6 +1531,7 @@ function RoomDetail({
       ["pending", "accepted"].includes(invite.status) &&
       !joinedInvitation(invite),
   );
+  if (room.gameId === "knock-first") return <Suspense fallback={<span className="spinner" />}><KnockFirst room={room} userId={user.playerId} friends={friends} language={lang} request={request} refresh={refresh} onExit={() => go("rooms")} onChooseMission={() => go("knock-first")} /></Suspense>;
   if (room.rulesVersion === TERRITORY_RULES && room.matchId && ["playing", "finished"].includes(room.state)) {
     return <Suspense fallback={<span className="spinner" />}><TerritorialMatch key={room.matchId} room={room} refresh={refresh} /></Suspense>;
   }

@@ -1,13 +1,15 @@
 /** Exercise the built platform over HTTP with isolated data and no external delivery. */
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { createServer } from 'node:net';
 import { mkdtemp, readdir, readFile, rm, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { setTimeout as delay } from 'node:timers/promises';
-import { checkLiveCatalogue, expectedDistrictProfile } from './check-live-catalogue.mjs';
+import { checkLiveCatalogue, expectedDistrictProfile, expectedKnockProfile } from './check-live-catalogue.mjs';
+import { KNOCK_WIRE } from '../games/knock-first/src/core/version.ts';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 for (const path of ['dist-platform/main.js', 'apps/portal/dist/index.html']) {
@@ -33,6 +35,70 @@ async function availablePort() {
 
 const request = (url, options = {}) => fetch(url, { ...options, signal: AbortSignal.timeout(5000) });
 
+async function builtAsset(path, mime) {
+  const response = await request(origin + path);
+  assert.equal(response.status, 200, `Built asset ${path}`);
+  assert.equal(response.headers.get('content-type')?.split(';')[0].trim(), mime, `MIME for ${path}`);
+  const bytes = Buffer.from(await response.arrayBuffer());
+  assert.deepEqual(bytes, await readFile(join(root, 'apps/portal/dist', path.slice(1))), `Built bytes for ${path}`);
+  return bytes;
+}
+
+async function checkKnockAssets() {
+  const manifestBytes = await builtAsset('/knock-first/assets-manifest.json', 'application/json');
+  assert.deepEqual(manifestBytes, await readFile(join(root, 'games/knock-first/public/knock-first/assets-manifest.json')),
+    'The built Knock manifest must match the source asset manifest');
+  const manifest = JSON.parse(manifestBytes.toString('utf8'));
+  assert.equal(manifest.version, 'knock-first-assets@1');
+  assert.ok(Array.isArray(manifest.files));
+  const assets = [
+    ['models/arms.glb', 'model/gltf-binary'],
+    ['models/operative.glb', 'model/gltf-binary'],
+    ['models/listener.glb', 'model/gltf-binary'],
+    ['models/battery.glb', 'model/gltf-binary'],
+    ['audio/knock-1.wav', 'audio/wav'],
+    ['fonts/ibm-plex-mono-regular.woff2', 'font/woff2'],
+    ['fonts/pt-sans-regular.woff2', 'font/woff2'],
+    ['textures/archive-atlas-basecolor.jpg', 'image/jpeg'],
+    ['textures/echo-front-mask.png', 'image/png'],
+  ];
+  for (const [file, mime] of assets) {
+    const path = `/knock-first/${file}`;
+    const entry = manifest.files.find(item => item.url === path);
+    assert.ok(entry, `Manifest entry for ${path}`);
+    const bytes = await builtAsset(path, mime);
+    assert.equal(bytes.length, entry.bytes, `Manifest byte count for ${path}`);
+    assert.equal(createHash('sha256').update(bytes).digest('hex'), entry.sha256, `Manifest SHA-256 for ${path}`);
+  }
+  return { representativeFiles: assets.length, verification: 'mime-byte-sha256',
+    manifestSha256: createHash('sha256').update(manifestBytes).digest('hex') };
+}
+
+function assertKnockPrivateView(view, room, playerId) {
+  const member = room.members.find(item => item.playerId === playerId);
+  assert.ok(member, 'The fixture player must own a Knock seat');
+  assert.equal(view.version, expectedKnockProfile.rulesVersion);
+  assert.equal(view.wireVersion, KNOCK_WIRE);
+  assert.equal(view.levelId, room.settings.route);
+  assert.deepEqual(view.settings, room.settings);
+  assert.equal(view.tutorial, null, 'This must be a normal mission');
+  assert.equal(view.self.id, member.participantId);
+  assert.equal(view.self.kind, 'human');
+  assert.equal(view.self.connected, false, 'An HTTP view must not acquire realtime control');
+  assert.equal(view.self.controllerEpoch, 0);
+  assert.deepEqual(view.team.map(item => item.id).sort(), room.members.map(item => item.participantId).sort());
+  assert.equal(view.team.filter(item => item.kind === 'bot').length, 1);
+  assert.ok(view.team.every(item => !Object.hasOwn(item, 'position')), 'The team roster must not reveal remote positions');
+  for (const key of ['seed', 'random', 'receipts', 'noises', 'resonanceReady']) {
+    assert.equal(Object.hasOwn(view, key), false, `Private mission field ${key}`);
+  }
+  for (const actor of [view.self, ...view.actors]) {
+    for (const key of ['playerId', 'input', 'botTarget', 'botThreat', 'knownBatteries']) {
+      assert.equal(Object.hasOwn(actor, key), false, `Private actor field ${key}`);
+    }
+  }
+}
+
 async function start() {
   const child = spawn(process.execPath, ['dist-platform/main.js'], {
     cwd: root,
@@ -40,7 +106,7 @@ async function start() {
       ...process.env, NODE_ENV: 'development', PLATFORM_HOST: '127.0.0.1', PLATFORM_PORT: String(port),
       PORTAL_ORIGIN: origin, PLATFORM_ALLOWED_HOSTS: `127.0.0.1:${port}`, PLATFORM_ALLOWED_ORIGINS: origin,
       PLATFORM_DATABASE_PATH: join(directory, 'platform.sqlite'), PLATFORM_LAB_DATABASE_PATH: join(directory, 'lab.sqlite'),
-      MAIL_MODE: 'file', MAIL_FILE_DIRECTORY: mailbox, TELEGRAM_ENABLED: 'false',
+      MAIL_MODE: 'file', MAIL_FILE_DIRECTORY: mailbox, TELEGRAM_ENABLED: 'false', TELEGRAM_AUTH_ENABLED: 'false',
       // A leftover value on an existing host must not pin new rooms to the old game.
       DISTRICT_TERRITORIAL_ENABLED: 'false',
       PORTAL_DIST_DIRECTORY: join(root, 'apps/portal/dist'),
@@ -143,7 +209,7 @@ try {
   const html = await page.text();
   assert.equal(page.status, 200);
   assert.equal(html, await readFile(join(root, 'apps/portal/dist/index.html'), 'utf8'));
-  for (const route of ['/chess', '/games']) {
+  for (const route of ['/chess', '/games', '/games/knock-first']) {
     const cataloguePage = await request(origin + route);
     assert.equal(cataloguePage.status, 200, `Public route ${route}`);
     assert.equal(await cataloguePage.text(), html, `SPA entry for ${route}`);
@@ -164,6 +230,7 @@ try {
   assert.equal(assetResponse.status, 200);
   assert.match(assetResponse.headers.get('content-type') ?? '', /javascript/);
   assert.deepEqual(Buffer.from(await assetResponse.arrayBuffer()), await readFile(join(root, 'apps/portal/dist', asset.slice(1))));
+  const knockAssets = await checkKnockAssets();
 
   const alice = new Client();
   const bob = new Client();
@@ -215,6 +282,27 @@ try {
   assert.equal(room.state, 'playing');
   const matchId = room.matchId;
 
+  // Start a normal mission through the shared room API. HTTP reads do not own
+  // a realtime epoch, so no gameplay commands are sent by this smoke check.
+  const knockSettings = { route: 'archive', difficulty: 'normal', practice: false, tutorial: false };
+  let knockRoom = (await alice.request('/rooms', { gameId: 'knock-first', capacity: 2,
+    settings: knockSettings }, 'smoke-knock-room')).room;
+  assert.equal(knockRoom.rulesVersion, expectedKnockProfile.rulesVersion);
+  assert.equal(knockRoom.contentVersion, expectedKnockProfile.contentVersion);
+  assert.deepEqual(knockRoom.settings, knockSettings);
+  knockRoom = (await alice.request(`/rooms/${knockRoom.roomId}/bots`,
+    { difficulty: 'normal', expectedRevision: knockRoom.revision }, 'smoke-knock-bot')).room;
+  knockRoom = (await alice.request(`/rooms/${knockRoom.roomId}/ready`,
+    { ready: true, expectedRevision: knockRoom.revision }, 'smoke-knock-ready')).room;
+  knockRoom = (await alice.request(`/rooms/${knockRoom.roomId}/start`,
+    { expectedRevision: knockRoom.revision }, 'smoke-knock-start')).room;
+  assert.equal(knockRoom.state, 'playing');
+  assert.ok(knockRoom.matchId, 'The built Knock runtime must create a durable match');
+  const knockView = (await alice.request(`/rooms/${knockRoom.roomId}/match`)).view;
+  assertKnockPrivateView(knockView, knockRoom, a.playerId);
+  assert.equal(knockView.listener, null, 'The hidden Listener must not be sent to the cabin view');
+  assert.deepEqual(knockView.batteries, [], 'The cabin view must not reveal battery spawn positions');
+
   for (let round = 1; round <= 3; round++) {
     const initial = (await alice.request(`/rooms/${roomId}/match`)).view;
     const action = { actionId: `built-alice-round-${round}`, expectedRevision: initial.revision, payload: { type: 'choose', value: 2 } };
@@ -228,6 +316,20 @@ try {
       assert.equal(restoredDistrict.phase, placement.phase);
       assert.equal(restoredDistrict.revision, placement.revision);
       assert.deepEqual((await alice.request(`/rooms/${districtRoom.roomId}/actions`, districtAction)).view, placement);
+      const restoredKnockRoom = (await alice.request(`/rooms/${knockRoom.roomId}`)).room;
+      assert.equal(restoredKnockRoom.matchId, knockRoom.matchId, 'Knock must restore the same durable match');
+      assert.equal(restoredKnockRoom.state, 'playing');
+      assert.equal(restoredKnockRoom.rulesVersion, knockRoom.rulesVersion);
+      assert.equal(restoredKnockRoom.contentVersion, knockRoom.contentVersion);
+      assert.deepEqual(restoredKnockRoom.settings, knockSettings);
+      const restoredKnock = (await alice.request(`/rooms/${knockRoom.roomId}/match`)).view;
+      assertKnockPrivateView(restoredKnock, restoredKnockRoom, a.playerId);
+      assert.equal(restoredKnock.self.id, knockView.self.id);
+      assert.deepEqual(restoredKnock.team.map(item => item.id).sort(), knockView.team.map(item => item.id).sort());
+      assert.deepEqual(restoredKnock.sockets, knockView.sockets);
+      assert.equal(restoredKnock.self.timer, knockView.self.timer);
+      assert.ok(restoredKnock.tick >= knockView.tick, 'The restored mission must retain its simulation tick');
+      assert.ok(restoredKnock.revision > knockView.revision, 'Server recovery must advance the durable revision');
     }
     const peer = (await bob.request(`/rooms/${roomId}/match`)).view;
     assert.equal(peer.you.choice, null);
@@ -252,7 +354,9 @@ try {
   assert.equal((await alice.request('/session')).user, null);
   console.log(JSON.stringify({ builtHttpSmoke: 'passed', browser: false, independentClients: 2,
     botSeats: 1, rounds: 3, staticAssets: 'byte-matched', persistentRestart: 'passed',
-    replayAfterRestart: 'passed', districtStaleFlagRoom: 'started-and-played', telegram: 'disabled', externalMessages: 0 }));
+    replayAfterRestart: 'passed', districtStaleFlagRoom: 'started-and-played',
+    knockFirst: { room: 'started', privateView: 'checked', persistentRestart: 'same-match', gameplay: false, assets: knockAssets },
+    telegram: 'disabled', telegramAuth: 'disabled', externalMessages: 0 }));
 } finally {
   await cleanup();
 }

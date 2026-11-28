@@ -253,6 +253,7 @@ export function Modal({
 }
 
 export function GameArt({ kind }: { kind: string }) {
+  if (kind === "knock-first") return <div className="game-art knock-first-art" aria-hidden="true"><img src="/knock-first/cover.webp" alt="" loading="lazy" /><span>№ 017</span><i>⌁</i></div>;
   if (kind === "colossus")
     return (
       <div className="game-art colossus-art" aria-hidden="true">

@@ -79,7 +79,7 @@ export function Catalogue({ page, games, user, busy, offline, retry, onPlay, onA
                   {game.minPlayers === game.maxPlayers ? game.minPlayers : `${game.minPlayers}–${game.maxPlayers}`}
                   {game.supportsBots && <span className="bot-capability"><Icon name="robot" size={17} />{t("Боты", "Bots")}</span>}
                 </span>
-                {launch ? <a className="button small primary" href={launch}>{t("Играть", "Play")}</a>
+                {game.gameId === "knock-first" ? <PortalLink className="button small primary" href="/games/knock-first">{t("Спуститься", "Descend")}</PortalLink> : launch ? <a className="button small primary" href={launch}>{t("Играть", "Play")}</a>
                   : <button className={`button small ${available ? "primary" : "secondary"}`} disabled={busy}
                     onClick={() => available ? onPlay(game) : onAbout(game)}>
                     {available ? !user ? t("Войти и играть", "Sign in to play") : !(user.emailVerified || user.telegramVerified)

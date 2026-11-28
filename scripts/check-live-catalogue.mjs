@@ -3,11 +3,13 @@ import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { TERRITORY_CONTENT, TERRITORY_RULES } from '../games/district/src/territorial/types.ts';
+import { KNOCK_CONTENT, KNOCK_RULES } from '../games/knock-first/src/core/version.ts';
 
 export const expectedDistrictProfile = Object.freeze({
   rulesVersion: TERRITORY_RULES,
   contentVersion: TERRITORY_CONTENT,
 });
+export const expectedKnockProfile = Object.freeze({ rulesVersion: KNOCK_RULES, contentVersion: KNOCK_CONTENT });
 
 export async function checkLiveCatalogue(origin) {
   const base = new URL(origin);
@@ -27,7 +29,14 @@ export async function checkLiveCatalogue(origin) {
   assert.equal(district.supportsBots, true, 'District must support bots');
   assert.deepEqual({ rulesVersion: district.rulesVersion, contentVersion: district.contentVersion },
     expectedDistrictProfile, 'The public District profile must match the delivered release');
-  return { origin: base.origin, gameId: 'district', ...expectedDistrictProfile };
+  const knock = games.find(game => game.gameId === 'knock-first');
+  assert.ok(knock, 'Knock First must be registered');
+  assert.equal(knock.status, 'available');
+  assert.equal(knock.supportsBots, true);
+  assert.equal(knock.minPlayers, 2); assert.equal(knock.maxPlayers, 5);
+  assert.deepEqual({ rulesVersion: knock.rulesVersion, contentVersion: knock.contentVersion },
+    expectedKnockProfile, 'The public Knock First profile must match the delivered release');
+  return { origin: base.origin, gameId: 'district', ...expectedDistrictProfile, knockFirst: expectedKnockProfile };
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

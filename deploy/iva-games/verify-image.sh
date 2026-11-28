@@ -3,9 +3,9 @@
 set -euo pipefail
 umask 077
 script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-read -r district_rules district_content < <(
+read -r district_rules district_content knock_rules knock_content < <(
   cd "$script_dir/../.."
-  node --experimental-strip-types --input-type=module -e 'import { expectedDistrictProfile as profile } from "./scripts/check-live-catalogue.mjs"; console.log(profile.rulesVersion, profile.contentVersion);'
+  node --experimental-strip-types --input-type=module -e 'import { expectedDistrictProfile as profile, expectedKnockProfile as knock } from "./scripts/check-live-catalogue.mjs"; console.log(profile.rulesVersion, profile.contentVersion, knock.rulesVersion, knock.contentVersion);'
 )
 fixture="$(mktemp)"
 cleanup() {
@@ -78,7 +78,7 @@ import { randomUUID } from 'node:crypto';
 import { accessSync, constants, readFileSync, writeFileSync } from 'node:fs';
 import Database from 'better-sqlite3';
 
-const [kind, phase, districtRules, districtContent] = process.argv.slice(2);
+const [kind, phase, districtRules, districtContent, knockRules, knockContent] = process.argv.slice(2);
 assert.ok(['chess', 'platform'].includes(kind));
 assert.ok(['initial', 'restored'].includes(phase));
 assert.equal(process.env.NODE_ENV, 'production');
@@ -142,6 +142,17 @@ if (kind === 'platform') {
   const district = catalogue.games.find(game => game.gameId === 'district');
   assert.equal(district.rulesVersion, districtRules, 'The production image must serve the current District rules despite a stale false flag');
   assert.equal(district.contentVersion, districtContent);
+  const knock = catalogue.games.find(game => game.gameId === 'knock-first');
+  assert.ok(knock && knock.status === 'available' && knock.supportsBots && knock.minPlayers === 2 && knock.maxPlayers === 5);
+  assert.equal(knock.rulesVersion, knockRules); assert.equal(knock.contentVersion, knockContent);
+  for (const [path, mime, signature] of [
+    ['/knock-first/models/battery.glb', 'model/gltf-binary', 'glTF'],
+    ['/knock-first/audio/knock-1.wav', 'audio/wav', 'RIFF'],
+    ['/knock-first/fonts/ibm-plex-mono-regular.woff2', 'font/woff2', 'wOF2'],
+  ]) {
+    const asset = await get(path); assert.ok(asset.headers.get('content-type')?.startsWith(mime));
+    assert.equal(Buffer.from(await asset.arrayBuffer()).subarray(0, 4).toString(), signature);
+  }
   if (phase === 'initial') {
     const response = await get('/api/platform/v1/session');
     assert.match(response.headers.get('set-cookie') ?? '', /__Host-iva_session=/);
@@ -251,7 +262,7 @@ for attempt in {1..30}; do
   sleep 0.1
 done
 test "$client_ready" = true
-docker exec --interactive "$SMOKE_CONTAINER" node --input-type=module - "$IMAGE_KIND" initial "$district_rules" "$district_content" < "$fixture"
+docker exec --interactive "$SMOKE_CONTAINER" node --input-type=module - "$IMAGE_KIND" initial "$district_rules" "$district_content" "$knock_rules" "$knock_content" < "$fixture"
 # The client removes this marker on any response, close, error or exit. Check
 # again after the API/static/SQLite fixture, immediately before sending SIGTERM.
 docker exec "$SMOKE_CONTAINER" test -f /tmp/iva-shutdown-client.ready
@@ -262,6 +273,6 @@ docker rm "$SMOKE_CONTAINER" >/dev/null
 # A new container uses the same named volume; no fixture DB is imported.
 start_runtime
 wait_healthy
-docker exec --interactive "$SMOKE_CONTAINER" node --input-type=module - "$IMAGE_KIND" restored "$district_rules" "$district_content" < "$fixture"
+docker exec --interactive "$SMOKE_CONTAINER" node --input-type=module - "$IMAGE_KIND" restored "$district_rules" "$district_content" "$knock_rules" "$knock_content" < "$fixture"
 docker stop --timeout 60 "$SMOKE_CONTAINER" >/dev/null
 test "$(docker inspect --format '{{.State.ExitCode}}' "$SMOKE_CONTAINER")" = 0

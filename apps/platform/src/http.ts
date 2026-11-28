@@ -9,6 +9,7 @@ import { MAX_PROFILE_BODY } from './avatar-photo.js';
 import type { SessionRecord, TelegramIntegration } from './types.js';
 import type { TelegramAuth } from './telegram/auth.js';
 import { PlatformService, textField } from './service.js';
+import { attachPlatformRealtime } from './realtime.js';
 
 const PREFIX = '/api/platform/v1';
 const MAX_BODY = 16_384;
@@ -127,7 +128,7 @@ export function createPlatformHttpServer(service: PlatformService, options: Http
         if (!candidate.startsWith(`${staticRoot}${sep}`) && candidate !== staticRoot) error('NOT_FOUND', 'Страница не найдена', 404);
         const file = existsSync(candidate) && statSync(candidate).isFile() ? candidate : resolve(staticRoot, 'index.html');
         if (!existsSync(file)) error('NOT_FOUND', 'Сайт пока недоступен', 404);
-        const mime: Record<string, string> = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png', '.webp': 'image/webp', '.woff2': 'font/woff2', '.ico': 'image/x-icon', '.wav': 'audio/wav' };
+        const mime: Record<string, string> = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.webp': 'image/webp', '.woff2': 'font/woff2', '.ico': 'image/x-icon', '.wav': 'audio/wav', '.glb': 'model/gltf-binary', '.json': 'application/json' };
         response.setHeader('Content-Type', mime[extname(file)] ?? 'application/octet-stream');
         if (extname(file) !== '.html') response.setHeader('Cache-Control', 'public, max-age=3600');
         if (method === 'HEAD') response.end();
@@ -283,7 +284,7 @@ export function createPlatformHttpServer(service: PlatformService, options: Http
       else if ((groups = match(/^\/blocks\/([\w-]+)\/remove$/))) {
         const id = groups[1]; result = mutate([], () => { service.unblockPlayer(actor, id); return { ok: true }; });
       } else if (route === '/rooms') result = mutate(['gameId', 'capacity', 'title', 'settings'], () => ({ room: service.createRoom(actor, body) }));
-      else if ((groups = match(/^\/rooms\/([\w-]+)\/(ready|settings|transfer-host|leave|cancel|kick|bots|join|start|invitations|actions)$/))) {
+      else if ((groups = match(/^\/rooms\/([\w-]+)\/(ready|settings|transfer-host|leave|cancel|kick|bots|join|start|rematch|invitations|actions)$/))) {
         const [, id, action] = groups;
         if (action === 'ready') result = mutate(['ready', 'expectedRevision'], () => ({ room: service.setReady(actor, id, body) }));
         else if (action === 'settings') result = mutate(['capacity', 'title', 'settings', 'expectedRevision'], () => ({ room: service.changeSettings(actor, id, body) }));
@@ -294,6 +295,7 @@ export function createPlatformHttpServer(service: PlatformService, options: Http
         else if (action === 'kick') result = mutate(['participantId', 'expectedRevision'], () => ({ room: service.kick(actor, id, body) }));
         else if (action === 'bots') result = mutate(['difficulty', 'expectedRevision'], () => ({ room: service.addBot(actor, id, body) }));
         else if (action === 'invitations') result = mutate(['playerId'], () => ({ invitation: service.invite(actor, id, body.playerId) }));
+        else if (action === 'rematch') result = mutate(['expectedRevision'], () => ({ room: service.rematch(actor, id, body) }));
         else if (action === 'start') {
           mutate(['expectedRevision'], () => service.startRoom(actor, id, body)); await service.reconcile(); result = { room: service.getRoom(actor, id) };
         } else {
@@ -320,8 +322,16 @@ export function createPlatformHttpServer(service: PlatformService, options: Http
     }
   }); });
   const lifecycle = createHttpLifecycle(server, options.shutdownGraceMs);
+  const live = attachPlatformRealtime(server, service, { origin, hosts, cookieName, clientAddress, stopping: () => lifecycle.stopping });
   server.requestTimeout = 15_000;
   server.headersTimeout = 10_000;
   server.keepAliveTimeout = 5_000;
-  return Object.assign(server, { shutdown: () => lifecycle.close() });
+  let shutdownPromise: Promise<void> | undefined;
+  return Object.assign(server, { shutdown: () => {
+    if (!shutdownPromise) {
+      const httpClosed = lifecycle.close();
+      shutdownPromise = (async () => { await live.close(); await httpClosed; })();
+    }
+    return shutdownPromise;
+  } });
 }
