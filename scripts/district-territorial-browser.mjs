@@ -550,6 +550,26 @@ try {
           await clickAction(page, page.locator('.ta-offer').filter({hasText: other.players.find(p=>p.participantId===other.you.participantId).displayName}).getByRole('button', {name: /^✓ Trade with/}));
           await expect(page.locator('.ta-offer[data-offer-status=agreed]')).toHaveCount(0);
           for (const [i,p] of pages.entries()) assert.deepEqual(await geometry(p), beforeGeometry[i], 'Offer removal keeps board and page geometry');
+          // The common author cross remains actionable after consent, without a transfer.
+          await page.locator('.ta-trade-open').click();
+          if (await page.getByRole('button',{name:'Discard draft',exact:true}).isVisible()) {
+            await page.getByRole('button',{name:'Discard draft',exact:true}).click();
+            await page.getByRole('button',{name:'Discard',exact:true}).click();
+            await page.locator('.ta-trade-open').click();
+          }
+          await page.getByRole('button', {name:'I give + '+resourceName(take),exact:true}).click();
+          await page.getByRole('button', {name:'I receive + '+resourceName(give),exact:true}).click();
+          await clickAction(page,page.getByRole('button',{name:'Send offer',exact:true}));
+          const cancelBaseline=await current(client);
+          const cancellation=cancelBaseline.offers.find(offer=>offer.authorId===view.you.participantId&&offer.targetId===other.you.participantId);
+          await clickAction(otherPage,otherPage.locator(`[data-offer-id="${cancellation.id}"]`).getByRole('button',{name:'Accept',exact:true}));
+          await expect(page.locator(`[data-offer-id="${cancellation.id}"][data-offer-status=agreed]`)).toBeVisible();
+          await clickAction(page,page.getByRole('button',{name:'Withdraw offer for everyone',exact:true}));
+          const cancelled=await current(client);
+          assert.deepEqual(cancelled.you.hand,cancelBaseline.you.hand,'The author cross never transfers consented resources');
+          assert.equal(cancelled.offers.some(offer=>offer.groupId===cancellation.groupId),false);
+          for (const [i,p] of pages.entries()) assert.deepEqual(await geometry(p),beforeGeometry[i],'Group cancellation keeps geometry');
+          result.groupCancel=true;
           result.tradeGeometry = beforeGeometry;
           result.trade = true;
         } else await post(client, view, action);
