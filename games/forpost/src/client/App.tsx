@@ -31,6 +31,14 @@ const lessonCopy = [
 function initialOptions(): PracticeOptions { return { mapId: 'FP01', teamSize: 1, mode: 'training', displayName: 'Командир', botLevel: 'normal', weapon: 'carbine', tool: 'barrier' } }
 function readLast(): { matchId: string; roomId?: string; options?: PracticeOptions } | null { try { return JSON.parse(localStorage.getItem(LAST_MATCH) ?? 'null') } catch { return null } }
 function writeLast(value: ReturnType<typeof readLast>): void { try { if (value) localStorage.setItem(LAST_MATCH, JSON.stringify(value)); else localStorage.removeItem(LAST_MATCH) } catch { /* The current session remains playable without browser storage. */ } }
+async function discardCreatedPractice(matchId: string): Promise<void> {
+  // A cancelled create can already own a real server room. Finish the request
+  // and release exactly that result; aborting it would lose the cleanup identity.
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try { await abandonPractice(matchId); return } catch { /* The owned endpoint is idempotent; retry one failed delivery. */ }
+  }
+  console.warn('forpost: cancelled practice cleanup could not be confirmed')
+}
 function pinnedRoute(info: JoinInfo, query: Record<string, string>): boolean {
   if (!info.route) return false
   const route = new URL(info.route, location.origin)
@@ -49,7 +57,7 @@ export function App() {
   const [confirmation, setConfirmation] = useState<{ action: Action; message: string } | null>(null), [lesson, setLesson] = useState<LessonProgress | null>(null), [tutorialChooser, setTutorialChooser] = useState(false)
   const [sessionRoom, setSessionRoom] = useState<string | null>(null), [last, setLast] = useState(readLast)
   const commandState: CommandState = { screen, status, phase: view?.phase ?? null, modalOpen: settingsOpen || helpOpen || exitOpen || tutorialChooser, confirmationOpen: !!confirmation }
-  const session = useRef<SessionClient | null>(null), controls = useRef<Controls | null>(null), audio = useRef<ForpostAudio | null>(null), eventCursor = useRef(-1), current = useRef({ view, selected, settings, preview, screen, commandState })
+  const session = useRef<SessionClient | null>(null), controls = useRef<Controls | null>(null), audio = useRef<ForpostAudio | null>(null), eventCursor = useRef(-1), navigation = useRef(0), current = useRef({ view, selected, settings, preview, screen, commandState })
   current.current = { view, selected, settings, preview, screen, commandState }
   const lang = settings.language, t = (ru: string, en: string) => text(lang, ru, en), me = view?.participants.find(p => p.id === view.you), fighter = view?.units.find(u => u.ownerId === view.you && u.kind === 'fighter')
   const commandReason = commandBlockReason(commandState), uiBlocked = commandReason !== null, commandDisabled = busy || uiBlocked
@@ -75,7 +83,7 @@ export function App() {
     })
     controls.current = controller
     const timer = setInterval(() => { controller.value.assist = current.current.settings.assist; session.current?.input({ ...controller.value }) }, 1000 / 30)
-    return () => { clearInterval(timer); controller.destroy(); session.current?.close(); void audio.current?.dispose() }
+    return () => { navigation.current++; clearInterval(timer); controller.destroy(); const previous = session.current; session.current = null; previous?.close(); void audio.current?.dispose() }
   }, [])
   useEffect(() => { controls.current?.setDisabled(uiBlocked || screen !== 'game'); if (uiBlocked) session.current?.input({ moveX: 0, moveZ: 0, aimX: 1, aimZ: 0, fireHeld: false, firePressSeq: controls.current?.value.firePressSeq ?? 0 }) }, [uiBlocked, screen, status])
   useEffect(() => { const query = new URLSearchParams(location.search), roomId = query.get('room'), resumeId = query.get('resume'); if (roomId) void joinRoom(roomId); else if (resumeId) void resume(resumeId, null) }, [])
@@ -94,31 +102,70 @@ export function App() {
   }
   function connection(next: ConnectionState, code?: string) { setStatus(next); if (next === 'reconnecting' || next === 'paused') { controls.current?.neutral(); eventCursor.current = -1; audio.current?.clear() }; if (code) notify(errorText(code, current.current.settings.language)) }
   function resetControlInput() { controls.current?.neutral(); if (controls.current) controls.current.value.firePressSeq = 0 }
-  function resetGameUi() { resetControlInput(); setSelected([]); setPreview(null); setOrderTarget(null); setCameraTarget(null); setZoom(1); setAim(null); setInspectorOpen(window.innerWidth >= 1024); setMessage(''); eventCursor.current = -1; setLesson(null) }
+  function resetGameUi() { resetControlInput(); setBusy(false); setSelected([]); setPreview(null); setOrderTarget(null); setCameraTarget(null); setZoom(1); setAim(null); setInspectorOpen(window.innerWidth >= 1024); setMessage(''); eventCursor.current = -1; setLesson(null) }
   async function startPractice() {
-    if (busy) return; setBusy(true); void unlockAudio()
-    try { if (last && !last.roomId) { session.current?.close(); session.current = null; await abandonPractice(last.matchId).catch((error: Error) => { if (!['NOT_FOUND', 'AUTH_REQUIRED', 'MATCH_NOT_FOUND', 'MATCH_UNAVAILABLE'].includes(error.message)) throw error }); writeLast(null); setLast(null) }; const info = await createPractice({ ...options, displayName: options.displayName.trim() || t('Командир', 'Commander') }); const next = { matchId: info.matchId, options }; writeLast(next); setLast(next); if (pinnedRoute(info, { resume: info.matchId })) return; session.current?.close(); resetGameUi(); setSessionRoom(null); setView(null); setScreen('game'); session.current = new OnlineSession(info, () => practiceTicket(info.matchId), receive, connection, resetControlInput) }
-    catch (error) { notify(errorText(error instanceof Error ? error.message : 'NETWORK', lang)) } finally { setBusy(false) }
+    if (busy) return
+    const intent = ++navigation.current, active = () => navigation.current === intent
+    setBusy(true); void unlockAudio()
+    try {
+      if (last && !last.roomId) {
+        session.current?.close(); session.current = null
+        await abandonPractice(last.matchId).catch((error: Error) => { if (!['NOT_FOUND', 'AUTH_REQUIRED', 'MATCH_NOT_FOUND', 'MATCH_UNAVAILABLE'].includes(error.message)) throw error })
+        if (!active()) return
+        writeLast(null); setLast(null)
+      }
+      const info = await createPractice({ ...options, displayName: options.displayName.trim() || t('Командир', 'Commander') })
+      if (!active()) { await discardCreatedPractice(info.matchId); return }
+      const next = { matchId: info.matchId, options }; writeLast(next); setLast(next)
+      if (pinnedRoute(info, { resume: info.matchId })) return
+      session.current?.close(); resetGameUi(); setSessionRoom(null); setView(null); setScreen('game')
+      session.current = new OnlineSession(info, () => practiceTicket(info.matchId), next => { if (active()) receive(next) }, (next, code) => { if (active()) connection(next, code) }, () => { if (active()) resetControlInput() })
+    } catch (error) { if (active()) notify(errorText(error instanceof Error ? error.message : 'NETWORK', lang)) }
+    finally { if (active()) setBusy(false) }
   }
   async function joinRoom(roomId: string) {
+    const intent = ++navigation.current, active = () => navigation.current === intent
     setBusy(true)
-    try { const info = await roomTicket(roomId); const next = { matchId: info.matchId, roomId }; writeLast(next); setLast(next); if (pinnedRoute(info, { room: roomId })) return; session.current?.close(); resetGameUi(); setSessionRoom(roomId); setView(null); setScreen('game'); session.current = new OnlineSession(info, () => roomTicket(roomId), receive, connection, resetControlInput) }
-    catch (error) { notify(errorText(error instanceof Error ? error.message : 'NETWORK', lang)) } finally { setBusy(false) }
+    try {
+      const info = await roomTicket(roomId)
+      if (!active()) return
+      const next = { matchId: info.matchId, roomId }; writeLast(next); setLast(next)
+      if (pinnedRoute(info, { room: roomId })) return
+      session.current?.close(); resetGameUi(); setSessionRoom(roomId); setView(null); setScreen('game')
+      session.current = new OnlineSession(info, () => roomTicket(roomId), next => { if (active()) receive(next) }, (next, code) => { if (active()) connection(next, code) }, () => { if (active()) resetControlInput() })
+    } catch (error) { if (active()) notify(errorText(error instanceof Error ? error.message : 'NETWORK', lang)) }
+    finally { if (active()) setBusy(false) }
   }
   async function resume(matchId = last?.matchId, roomId: string | null | undefined = last?.roomId) {
-    if (!matchId) return; void unlockAudio(); if (roomId) { await joinRoom(roomId); return }; setBusy(true)
-    try { const info = await practiceTicket(matchId); const next = { matchId, ...(last?.matchId === matchId && last.options ? { options: last.options } : {}) }; writeLast(next); setLast(next); if (pinnedRoute(info, { resume: matchId })) return; session.current?.close(); resetGameUi(); setSessionRoom(null); if (next.options) setOptions(next.options); setView(null); setScreen('game'); session.current = new OnlineSession(info, () => practiceTicket(matchId), receive, connection, resetControlInput) }
-    catch (error) { notify(errorText(error instanceof Error ? error.message : 'NETWORK', lang)) } finally { setBusy(false) }
+    if (!matchId) return
+    void unlockAudio(); if (roomId) { await joinRoom(roomId); return }
+    const intent = ++navigation.current, active = () => navigation.current === intent
+    setBusy(true)
+    try {
+      const info = await practiceTicket(matchId)
+      if (!active()) return
+      const next = { matchId, ...(last?.matchId === matchId && last.options ? { options: last.options } : {}) }; writeLast(next); setLast(next)
+      if (pinnedRoute(info, { resume: matchId })) return
+      session.current?.close(); resetGameUi(); setSessionRoom(null); if (next.options) setOptions(next.options); setView(null); setScreen('game')
+      session.current = new OnlineSession(info, () => practiceTicket(matchId), next => { if (active()) receive(next) }, (next, code) => { if (active()) connection(next, code) }, () => { if (active()) resetControlInput() })
+    } catch (error) { if (active()) notify(errorText(error instanceof Error ? error.message : 'NETWORK', lang)) }
+    finally { if (active()) setBusy(false) }
   }
-  function startLesson(index: number, resumeLesson = false) { void unlockAudio(); session.current?.close(); resetGameUi(); setSessionRoom(null); setScreen('game'); setTutorialChooser(false); setStatus('connected'); session.current = new TutorialSession(index, receive, setLesson, resumeLesson) }
-  function menu() { controls.current?.neutral(); session.current?.close(); session.current = null; audio.current?.clear(); setScreen('menu'); setView(null); setLesson(null); setExitOpen(false); setOrderTarget(null); setPreview(null); if (location.search) history.replaceState(null, '', location.pathname) }
+  function startLesson(index: number, resumeLesson = false) {
+    const intent = ++navigation.current, active = () => navigation.current === intent
+    void unlockAudio(); session.current?.close(); resetGameUi(); setSessionRoom(null); setView(null); setScreen('game'); setTutorialChooser(false); setStatus('connecting')
+    const unavailable = () => { if (active()) { menu(); notify(t('Не удалось запустить обучение. Сохранённый прогресс можно открыть повторно.', 'Training could not start. You can reopen your saved progress.')) } }
+    try { session.current = new TutorialSession(index, next => { if (active()) { setStatus('connected'); receive(next) } }, progress => { if (active()) setLesson(progress) }, resumeLesson, unavailable) } catch { unavailable() }
+  }
+  function menu() { navigation.current++; controls.current?.neutral(); session.current?.close(); session.current = null; audio.current?.clear(); setBusy(false); setScreen('menu'); setView(null); setLesson(null); setExitOpen(false); setOrderTarget(null); setPreview(null); if (location.search) history.replaceState(null, '', location.pathname) }
   async function act(action: Action, fromConfirmation = false): Promise<boolean> {
     if (!session.current || commandBlockReason(current.current.commandState, fromConfirmation)) return false
+    const actingSession = session.current
     if (action.type === 'mode') controls.current?.neutral()
     setBusy(true); void unlockAudio()
-    try { const result = await session.current.action(action); if (!result.ok) { audio.current?.play('error'); notify(errorText(result.code, current.current.settings.language)); throw new Error(result.code) }; if (action.type !== 'reload') audio.current?.play('order'); if (result.refund) notify(`${text(current.current.settings.language, action.type === 'sell' || action.type === 'cancelBuild' && !!view?.buildOrders.find(o => o.id === action.orderId)?.buildingId ? 'Расчётный возврат после продажи' : 'Зачислено', action.type === 'sell' || action.type === 'cancelBuild' && !!view?.buildOrders.find(o => o.id === action.orderId)?.buildingId ? 'Estimated sale refund' : 'Credited')}: ${result.refund.credited} ¤`); setConfirmation(null); return true }
-    catch (error) { if (error instanceof Error) notify(errorText(error.message, current.current.settings.language)); return false }
-    finally { setBusy(false) }
+    try { const result = await actingSession.action(action); if (session.current !== actingSession) return false; if (!result.ok) { audio.current?.play('error'); notify(errorText(result.code, current.current.settings.language)); throw new Error(result.code) }; if (action.type !== 'reload') audio.current?.play('order'); if (result.refund) notify(`${text(current.current.settings.language, action.type === 'sell' || action.type === 'cancelBuild' && !!view?.buildOrders.find(o => o.id === action.orderId)?.buildingId ? 'Расчётный возврат после продажи' : 'Зачислено', action.type === 'sell' || action.type === 'cancelBuild' && !!view?.buildOrders.find(o => o.id === action.orderId)?.buildingId ? 'Estimated sale refund' : 'Credited')}: ${result.refund.credited} ¤`); setConfirmation(null); return true }
+    catch (error) { if (session.current === actingSession && error instanceof Error) notify(errorText(error.message, current.current.settings.language)); return false }
+    finally { if (session.current === actingSession) setBusy(false) }
   }
   function selectUnit(id: string) { const v = current.current.view; if (!v) return; setSelected([id]); setInspectorOpen(true); const unit = v.units.find(u => u.id === id); if (unit?.kind !== 'fighter' && unit?.ownerId === v.you && v.participants.find(p => p.id === v.you)?.mode !== 'tactics') void act({ type: 'mode', mode: 'tactics' }) }
   function useTool(source?: ToolInputSource) {

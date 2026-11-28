@@ -54,14 +54,15 @@ export function TerritorialTurn({ view, lang }: { view: TerritoryView; lang: Lan
   const mine = view.activeParticipantId === view.you.participantId;
   const seconds = Math.max(0, Math.ceil(((view.deadlineAt ?? view.serverNow) - view.serverNow) / 1000));
   const clock = `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
-  const actor = playerName(view, view.botParticipantId ?? view.activeParticipantId);
+  const actor = playerName(view, view.activeParticipantId);
+  const activeBotThinking = view.botActionAt && view.botParticipantId === view.activeParticipantId;
   return <div className={'territory-phase' + (mine ? ' is-yours' : '')}>
     <div className="territory-phase-heading"><strong>{view.outcome ? (ru ? 'Итог' : 'Result') : mine ? (ru ? 'Ваш ход' : 'Your turn') : actor}</strong>
       <span>{view.turn === 0 ? (ru ? 'Расстановка' : 'Setup') : `${ru ? 'Круг' : 'Round'} ${view.round + 1}`}</span>
       {!view.outcome && <time className="territory-clock" aria-label={(ru ? 'На действие осталось ' : 'Time left ') + clock}>{clock}</time>}
     </div>
     <p>{view.outcome ? (view.outcome.winnerParticipantIds.length ? (ru ? 'Победитель: ' : 'Winner: ') + view.outcome.winnerParticipantIds.map(id=>playerName(view,id)).join(', ') : phaseText(view,lang)) : phaseText(view, lang)}</p>
-    <small>{view.botActionAt && !view.outcome ? `${actor} ${ru ? 'обдумывает действие' : 'is considering a move'}`
+    <small>{activeBotThinking && !view.outcome ? (ru ? 'Бот выбирает ход' : 'Bot is choosing a move')
       : view.legal.end ? (ru ? 'Можно завершить ход' : 'You can end your turn')
         : view.phase === 'finished' ? (ru ? 'Карта и журналы доступны' : 'The map and journals remain available')
           : !mine && !view.you.discard ? (ru ? 'Ход другого игрока' : 'Another player is taking their turn')
@@ -126,7 +127,7 @@ const actions: Record<TerritoryHistoryEntry['kind'], [string, string]> = {
 };
 const closed = {
   accepted: ['Согласие: обмен исполнен', 'Accepted: trade completed'], declined: ['Отклонено', 'Declined'],
-  withdrawn: ['Отозвано', 'Withdrawn'], expired: ['Ход закончился', 'Turn ended'], replaced: ['Заменено новыми условиями', 'Replaced by new terms'],
+  'response-timeout': ['Нет ответа за 10 секунд', 'No response in 10 seconds'], withdrawn: ['Отозвано', 'Withdrawn'], expired: ['Ход закончился', 'Turn ended'], replaced: ['Заменено новыми условиями', 'Replaced by new terms'],
   'player-left': ['Участник вышел', 'Player left'], 'match-finished': ['Партия закончилась', 'Match ended'],
 };
 const cardNames = { patrol: ['Патруль','Patrol'], survey: ['Подряд','Survey'], supply: ['Снабжение','Supply'], charter: ['Грамота','Charter'] };
@@ -140,7 +141,7 @@ export function historyTitle(entry: TerritoryHistoryEntry, view: TerritoryView, 
   if (entry.cardKind) title += ' · ' + cardNames[entry.cardKind][i];
   if (entry.kind === 'block' && entry.reason) title += ' · ' + (entry.reason === 'patrol' ? cardNames.patrol[i] : lang === 'ru' ? 'семёрка' : 'seven');
   if (entry.reason === 'consent') return lang === 'ru' ? 'Согласие на обмен · ждёт выбора' : 'Trade consent · awaiting selection';
-  if (entry.offerStatus && !['accept', 'decline', 'cancel'].includes(entry.kind)) title += ' · ' + closed[entry.offerStatus][i];
+  if (entry.offerStatus && !['accept', 'decline', 'cancel'].includes(entry.kind)) title += ' · ' + closed[entry.reason === 'response-timeout' ? 'response-timeout' : entry.offerStatus][i];
   if (entry.targetId) title += ' · ' + playerName(view, entry.targetId);
   return title;
 }

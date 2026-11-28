@@ -16,6 +16,7 @@ import type { Peer } from './runtime.js';
 import type { FrozenParticipant, StoredMatch } from './store.js';
 import { retainedClientDirectory } from './content.js';
 import type { CapacityProfile } from './capacity.js';
+import { compatibilityInventory } from './retention.js';
 
 export interface RealtimeOptions {
   databasePath: string; signingKeyPath: string; trustedKeys?: Record<string, string>; publicOrigin: string;
@@ -95,6 +96,11 @@ export function createRealtimeServer(options: RealtimeOptions) {
       }
       if (closing) throw new Error('SERVER_BUSY');
       await runtime.ready;
+      if (path === '/api/realtime/v1/compatibility' && method === 'GET') {
+        const manifests = await runtime.store.call<unknown[]>('compatibilityManifests');
+        send(response, 200, compatibilityInventory(manifests, options.buildRevision ?? 'unknown', runtime.options.artifactId, options.contentId ?? ''));
+        return;
+      }
       if (path.startsWith('/maintenance/realtime/v1/')) {
         const token = Buffer.from(typeof request.headers['x-iva-maintenance'] === 'string' ? request.headers['x-iva-maintenance'] : '');
         if (method !== 'POST' || !['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(request.socket.remoteAddress ?? '') || token.length !== maintenanceToken.length || !timingSafeEqual(token, maintenanceToken)) throw new Error('AUTH_REQUIRED');

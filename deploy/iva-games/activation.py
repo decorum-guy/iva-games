@@ -16,6 +16,7 @@ import tempfile
 import time
 import urllib.error
 import urllib.request
+import uuid
 
 CONFIG = Path('/etc/iva-games')
 STATE = Path('/var/lib/iva-games/activation')
@@ -389,6 +390,56 @@ def verify_untouched(release, expected):
     return current
 
 
+def realtime_preflight(candidate, actual_release, allow_empty=False):
+    """Check candidate readers/bytes against the actual volume without writes or network.
+
+    An HTTP404 during image preparation never grants allow_empty. Only first
+    provisioning does; the CLI still requires that mounted directory to be empty.
+    """
+    info = candidate['services']['realtime']
+    image = info['image']
+    if not re.fullmatch(r'ghcr\.io/decorum-guy/iva-games-realtime@sha256:[0-9a-f]{64}', image) or not SHA.fullmatch(info['sha']):
+        raise RuntimeError('Realtime preflight requires a pinned repository image')
+    labels = json.loads(command('docker', 'image', 'inspect', image, '--format', '{{json .Config.Labels}}'))
+    if labels.get('org.opencontainers.image.source') != f'https://github.com/{REPOSITORY}' or labels.get('org.opencontainers.image.revision') != info['sha']:
+        raise RuntimeError('Realtime preflight image labels differ')
+    configuration = json.loads(compose(actual_release, 'config', '--format', 'json'))
+    volume = configuration.get('volumes', {}).get('realtime-data', {})
+    name = volume.get('name', '')
+    if volume.get('external') is not True or not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_.-]{0,127}', name):
+        raise RuntimeError('Realtime persistent volume is not explicitly configured')
+    # docker run would silently create a missing named volume. Refuse first.
+    if command('docker', 'volume', 'inspect', name, '--format', '{{.Name}}') != name:
+        raise RuntimeError('Realtime persistent volume is missing')
+    containers = compose(actual_release, 'ps', '--all', '--quiet', 'realtime').splitlines()
+    if len(containers) > 1 or not containers and not allow_empty:
+        raise RuntimeError('Cannot identify the existing realtime data mount')
+    if containers:
+        mounts = json.loads(command('docker', 'inspect', '--format', '{{json .Mounts}}', containers[0]))
+        data_mounts = [mount for mount in mounts if mount.get('Destination') == '/data']
+        if len(data_mounts) != 1 or data_mounts[0].get('Type') != 'volume' or data_mounts[0].get('Name') != name:
+            raise RuntimeError('Configured realtime volume differs from the running service')
+    verifier = 'iva-realtime-preflight-' + uuid.uuid4().hex
+    try:
+        result = command('docker', 'run', '--rm', '--name', verifier, '--network', 'none', '--read-only',
+            '--tmpfs', '/tmp:rw,noexec,nosuid,size=64m',
+            '--cap-drop', 'ALL', '--security-opt', 'no-new-privileges', '--pids-limit', '64', '--memory', '512m',
+            '--mount', f'type=volume,src={name},dst=/data,readonly,volume-nocopy', '--entrypoint', 'node', image,
+            '/app/dist-realtime/retention-cli.js', 'check-store', '--database', '/data/realtime.sqlite',
+            '--revision', info['sha'], *(['--allow-empty-store'] if allow_empty else []), timeout=180)
+        report = json.loads(result)
+        if report.get('ok') is not True or report.get('operation') != 'check-store' or report.get('buildRevision') != info['sha'] or not DIGEST.fullmatch(report.get('bundleSeal', '')):
+            raise RuntimeError('Realtime compatibility check was not confirmed')
+        return report
+    finally:
+        # A timeout of the Docker client must not leave our verifier behind.
+        # This unique name never addresses a service container or its volume.
+        try:
+            command('docker', 'rm', '--force', verifier)
+        except RuntimeError:
+            pass
+
+
 def activate():
     state = load(STATE / 'state.json', {})
     if state.get('status') == 'ACTIVE':
@@ -416,7 +467,20 @@ def activate():
             write_state('WAITING_CONFIG', 'SMTP TLS connection or authentication failed', dns, release)
             return
         compose(release, 'config', '--quiet')
-        up(release, *release['services'])
+        already_running = False
+        try:
+            if 'realtime' in release['services']:
+                already_running = running(release, 'realtime')
+                if already_running:
+                    compose(release, 'exec', '-T', 'realtime', 'node', '/app/scripts/realtime-control.mjs', 'drain', timeout=30)
+                realtime_preflight(release, release, allow_empty=not already_running)
+            up(release, *release['services'])
+        except Exception:
+            if already_running:
+                compose(release, 'exec', '-T', 'realtime', 'node', '/app/scripts/realtime-control.mjs', 'resume', timeout=30)
+            raise
+        if already_running:
+            compose(release, 'exec', '-T', 'realtime', 'node', '/app/scripts/realtime-control.mjs', 'resume', timeout=30)
         # DNS can change during SMTP, pull-free startup, or database checks.
         report, sample = dns_sample(cfg['ipv4'])
         if sample is None or sample != load(STATE / 'dns.json')['signature']:
@@ -491,14 +555,17 @@ def promote(candidate, previous):
                if candidate['services'][name]['image'] != previous['services'].get(name, {}).get('image')]
     untouched = container_snapshot(previous, [name for name in services if name not in changed] + ['caddy'])
     drained = 'realtime' in previous['services'] and bool(set(changed) & {'platform', 'realtime'})
-    if drained:
-        compose(previous, 'exec', '-T', 'realtime', 'node', '/app/scripts/realtime-control.mjs', 'drain', timeout=30)
     # Capture both databases for each changed service before replacing anything.
     stamp = time.strftime('%Y%m%dT%H%M%SZ', time.gmtime())
     backups = [name for name in changed if name in previous['services']]
     if drained:
         backups = sorted(set(backups) | {'platform', 'realtime'})
     try:
+        if drained:
+            compose(previous, 'exec', '-T', 'realtime', 'node', '/app/scripts/realtime-control.mjs', 'drain', timeout=30)
+        if 'realtime' in changed:
+            realtime_preflight(candidate, previous if 'realtime' in previous['services'] else candidate,
+                               allow_empty='realtime' not in previous['services'])
         for service in backups:
             command(str(RUNTIME / 'backup.sh'), service,
                     f'/srv/iva-games-backups/{stamp}-{candidate["sha"][:12]}-{service}',
@@ -524,8 +591,21 @@ def promote(candidate, previous):
     except RuntimeError:
         # Incompatible migrations or protocols must be fixed forward. Never
         # replace a live volume with the pre-update snapshot.
-        if changed and all(name in previous['services'] and candidate['services'][name]['compatibility']
-                           == previous['services'][name]['compatibility'] for name in changed):
+        if changed and all(name in previous['services'] and (name == 'realtime' or candidate['services'][name]['compatibility']
+                           == previous['services'][name]['compatibility']) for name in changed):
+            rollback_drain = False
+            if 'realtime' in changed:
+                try:
+                    rollback_drain = running(candidate, 'realtime')
+                    if rollback_drain:
+                        compose(candidate, 'exec', '-T', 'realtime', 'node', '/app/scripts/realtime-control.mjs', 'drain', timeout=30)
+                    # Check the database as it exists now, after candidate writes.
+                    # Do not restore the pre-update backup to make old code fit.
+                    realtime_preflight(previous, candidate)
+                except Exception:
+                    if rollback_drain:
+                        compose(candidate, 'exec', '-T', 'realtime', 'node', '/app/scripts/realtime-control.mjs', 'resume', timeout=30)
+                    raise
             up(previous, *changed)
             if drained and 'realtime' not in changed:
                 compose(previous, 'exec', '-T', 'realtime', 'node', '/app/scripts/realtime-control.mjs', 'resume', timeout=30)

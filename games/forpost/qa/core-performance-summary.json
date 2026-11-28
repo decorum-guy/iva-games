@@ -521,5 +521,14 @@
     ".qa/core-profile-v1/compare.mjs": "5720d6e3b9a0fe74c52996b2735154b7f05dbfea2262b44ea097a3d4d75daaa7",
     ".qa/core-profile-v1/mixed-compare.mjs": "207afeb8f2a9b37417a4d3bf568cd0518a948e99f2b42c54432bde30c3df96fc",
     ".qa/core-profile-v1/run.mjs": "178828b3adfb7a6110cc0375556f6cda3bbb8085f0ea042991f2056e086a5f22"
+  },
+  "subsequentSeriesEvidence": {
+    "path": "core-series-r5.json",
+    "sourceSha256": "14d49d29954d0f7f427feea026beb23113699ff8ecb36ec4480f61f339a61e68",
+    "series": "R5",
+    "matches": 72,
+    "finished": 72,
+    "technicalErrors": 0,
+    "note": "Executed after the performance report in a separate CPU window. Does not replace the failed maximum-scene gate. Original history and metrics above retained."
   }
 }

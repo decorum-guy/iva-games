@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test'
 import type { Locator, Page } from '@playwright/test'
 import type { World } from '../src/core/types'
-import { installDiagnostics } from './diagnostics'
+import { installDiagnostics, type TimingProbe } from './diagnostics'
 
 installDiagnostics(test)
 
@@ -174,7 +174,7 @@ test('movement, aim, reload and modal neutral input complete the first lesson th
   await expect(page.locator('.fp-lesson h2')).toHaveText('Укрытие и защита')
 })
 
-test('construction cancel, queued refund and disabled reasons use visible controls', async ({ page }) => {
+test('construction cancel, queued refund, rebuild and disabled reasons finish the infrastructure lesson', async ({ page }) => {
   await startLesson(page, 3)
   await page.locator('.fp-mode-switch').click()
   await selectPad(page, 'L-13')
@@ -202,6 +202,8 @@ test('construction cancel, queued refund and disabled reasons use visible contro
   const refunds = await openDetails(page, /^Возвраты средств/)
   await expect(refunds).toContainText('120 ¤')
   await expect(refunds).toContainText('Сверх лимита')
+  await confirmBuild(page, 'L-01', 'Экстрактор')
+  await expect(page.locator('.fp-lesson')).toContainText('Задача выполнена', { timeout: 30_000 })
 })
 
 test('power priority, sale cancellation and generator finish the power lesson', async ({ page }) => {
@@ -292,23 +294,47 @@ test('final lesson reaches an operation result and starts a separate live practi
   expect(completed.phase).toBe('finished')
   expect(completed.operations).toHaveLength(1)
   await expect(page.locator('.fp-result')).toHaveCount(0)
-  await page.getByRole('button', { name: 'Начать тренировку', exact: true }).click()
-  await expect(page.locator('.fp-game')).toBeVisible()
-  await expect(page.locator('.fp-lesson')).toHaveCount(0)
-  await expect(page.locator('.fp-network')).toContainText('На связи', { timeout: 30_000 })
-  const ordinary = await page.evaluate(() => JSON.parse(localStorage.getItem('iva.forpost.last-match.v1') ?? 'null'))
-  expect(ordinary?.matchId).toBeTruthy()
-  expect(ordinary.matchId).not.toBe(completed.matchId)
-  await page.getByRole('button', { name: 'Меню партии', exact: true }).click()
-  await page.getByRole('button', { name: 'В главное меню', exact: true }).click()
-  await expect(page.getByRole('button', { name: 'Продолжить партию', exact: true })).toBeVisible()
-  await page.getByRole('button', { name: /Научиться играть/ }).click()
-  await page.getByRole('button', { name: 'Продолжить сохранённый урок', exact: true }).click()
-  await expect(page.locator('.fp-lesson')).toContainText('Задача выполнена')
-  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('iva.forpost.last-match.v1') ?? 'null')?.matchId)).toBe(ordinary.matchId)
+  let createdMatchId: string | null = null, primaryFailed = false, fixtureCleanupFailed = false
+  const created = page.waitForResponse(response => new URL(response.url()).pathname === '/api/realtime/v1/practice' && response.request().method() === 'POST', { timeout: 15_000 }).then(async response => {
+    const result = await response.json()
+    if (typeof result.matchId === 'string') createdMatchId = result.matchId
+    return response.status()
+  }).catch(() => null)
+  try {
+    await page.getByRole('button', { name: 'Начать тренировку', exact: true }).click()
+    expect(await created).toBe(201)
+    await expect(page.locator('.fp-game')).toBeVisible()
+    await expect(page.locator('.fp-lesson')).toHaveCount(0)
+    await expect(page.locator('.fp-network')).toContainText('На связи', { timeout: 30_000 })
+    const ordinary = await page.evaluate(() => JSON.parse(localStorage.getItem('iva.forpost.last-match.v1') ?? 'null'))
+    expect(ordinary?.matchId).toBeTruthy()
+    expect(ordinary.matchId).not.toBe(completed.matchId)
+    await page.getByRole('button', { name: 'Меню партии', exact: true }).click()
+    await page.getByRole('button', { name: 'В главное меню', exact: true }).click()
+    await expect(page.getByRole('button', { name: 'Продолжить партию', exact: true })).toBeVisible()
+    await page.getByRole('button', { name: /Научиться играть/ }).click()
+    await page.getByRole('button', { name: 'Продолжить сохранённый урок', exact: true }).click()
+    await expect(page.locator('.fp-lesson')).toContainText('Задача выполнена')
+    expect(await page.evaluate(() => JSON.parse(localStorage.getItem('iva.forpost.last-match.v1') ?? 'null')?.matchId)).toBe(ordinary.matchId)
+  } catch (error) {
+    primaryFailed = true
+    throw error
+  } finally {
+    await created
+    // Release only this test's real fixture, after all persistence assertions.
+    // The context's own HttpOnly cookie supplies ownership; capacity stays real.
+    if (createdMatchId) {
+      const cleanup = await page.request.post(`/api/realtime/v1/practice/${encodeURIComponent(createdMatchId)}/abandon`, { data: {}, headers: { Origin: new URL(page.url()).origin }, timeout: 5000 }).catch(() => null)
+      if (!cleanup?.ok()) {
+        fixtureCleanupFailed = true
+        console.log(JSON.stringify({ automatedFixtureCleanup: 'final-lesson-practice', outcome: 'failed', httpStatus: cleanup?.status() ?? null, primaryFailed }))
+      }
+    }
+  }
+  expect(fixtureCleanupFailed, 'OWN_PRACTICE_CLEANUP_FAILED').toBe(false)
 })
 
-test('switching browser tabs while firing releases input and does not resume old shots', async ({ page, context }) => {
+test('switching browser tabs while firing releases input and does not resume old shots', async ({ page, context, browserName }) => {
   await startLesson(page, 0)
   await aimAtLessonPoint(page, 30, 5)
   const ammo = page.locator('.fp-ammo strong')
@@ -316,8 +342,18 @@ test('switching browser tabs while firing releases input and does not resume old
   let other: Page | undefined
   try {
     await expect(ammo).not.toHaveText('24/24')
+    const beforeFocus = await page.evaluate(() => ({ sequence: (window as Window & { __forpostQaTiming?: TimingProbe }).__forpostQaTiming?.focusEvents.at(-1)?.seq ?? 0, hidden: document.hidden, hasFocus: document.hasFocus() }))
     other = await context.newPage()
     await other.goto('about:blank'); await other.bringToFront()
+    try {
+      await expect.poll(() => page.evaluate(before => {
+        const events = (window as Window & { __forpostQaTiming?: TimingProbe }).__forpostQaTiming?.focusEvents ?? []
+        return !before.hidden && document.hidden || before.hasFocus && !document.hasFocus() || events.some(event => event.seq > before.sequence && (event.type === 'blur' || event.type === 'visibilitychange' && event.hidden))
+      }, beforeFocus), { timeout: 3000, message: 'BROWSER_FOCUS_LOSS_UNAVAILABLE: tab activation must produce real focus or visibility loss before fire-release acceptance.' }).toBe(true)
+    } catch (error) {
+      console.log(JSON.stringify({ automatedCapabilityFailure: 'BROWSER_FOCUS_LOSS_UNAVAILABLE', browserName }))
+      throw error
+    }
     await other.waitForTimeout(500)
     await page.bringToFront()
     await page.waitForTimeout(100)
@@ -325,5 +361,5 @@ test('switching browser tabs while firing releases input and does not resume old
     expect(released).not.toBe('0/24')
     await page.waitForTimeout(850)
     await expect(ammo).toHaveText(released)
-  } finally { await page.mouse.up(); await other?.close() }
+  } finally { await page.mouse.up().catch(() => {}); await other?.close().catch(() => {}) }
 })

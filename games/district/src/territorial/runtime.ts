@@ -3,7 +3,7 @@ import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { canonicalJson, SessionError } from '@iva-games/session-kit';
 import type { ActionEnvelope, GameRuntime, StartMatchRequest } from '@iva-games/session-kit';
 import { chooseTerritoryBot } from './bot';
-import { currentId, advanceTerritory, applyTerritory, createTerritory, fallbackTerritory, parseTerritoryAction, phaseIdOf, viewTerritory } from './core';
+import { currentId, TRADE_RESPONSE_MS, tradeResponseDeadline, advanceTerritory, applyTerritory, createTerritory, fallbackTerritory, parseTerritoryAction, phaseIdOf, viewTerritory } from './core';
 import { getTerritoryMap, territoryMaps } from './maps';
 import { newsCatalogVersion, newsProfiles } from './news-catalog';
 import type { NewsPreset } from './news-catalog';
@@ -13,7 +13,6 @@ import { DistrictError } from '../types';
 
 export const territorialId = (id: string) => id.startsWith('d4-');
 const hash = (input: unknown) => createHash('sha256').update(canonicalJson(input)).digest('hex');
-const HUMAN_TRADE_WINDOW_MS = 40_000;
 
 /** A separate deterministic pacing domain never consumes gameplay random draws. */
 function botDelay(state: TerritoryState, botSeed: string, participantId: string, action: TerritoryAction) {
@@ -150,18 +149,25 @@ export class TerritoryRuntime implements GameRuntime {
         // Keep a real response window, including when a client refreshes or the process restarts.
         const responseUntil = id === active ? Math.max(0, ...state.offers.filter(offer => offer.authorId === id && offer.agreedAt === undefined &&
           !state.left.includes(offer.targetId) && state.participants.some(member => member.participantId === offer.targetId && member.controller.kind === 'human'))
-          .map(offer => (offer.offeredAt ?? now - HUMAN_TRADE_WINDOW_MS) + HUMAN_TRADE_WINDOW_MS)) : 0;
+          .map(offer => tradeResponseDeadline(offer,state.deadlineAt))) : 0;
         const view = viewTerritory(state, id, now, false);
         const difficulty = p.controller.kind === 'bot' ? p.controller.difficulty : 'normal';
         const safe = fallbackTerritory(view);
         const action = chooseTerritoryBot(view, difficulty, `${botSeed}:${state.revision}:${id}`) ?? safe;
         if (!action) continue;
+        // Reply slots are anchored to this quote, not to the latest revision or
+        // the completion of another bot's delay. Three recipients fit well inside 10 s.
+        const reply = state.offers.find(offer => offer.targetId === id && offer.agreedAt === undefined &&
+          ((action.type === 'accept' || action.type === 'decline') && action.offerId === offer.id || action.type === 'offer' && action.parentId === offer.id));
+        const replyAt = reply ? Math.min((reply.offeredAt ?? (reply.responseDeadlineAt ?? now + TRADE_RESPONSE_MS) - TRADE_RESPONSE_MS) +
+          800 + p.seatIndex * 500 + Number.parseInt(hash([botSeed, reply.id, id]).slice(0,8),16) % 401,
+          tradeResponseDeadline(reply,state.deadlineAt) - 1) : undefined;
         const result = this.db.transaction(() => {
           const { state: current } = this.read(matchId);
           if (current.revision !== state.revision) return 'changed';
           let schedule = current.botSchedule;
           if (schedule?.revision !== current.revision || schedule.participantId !== id) {
-            const desired = Math.max(now + botDelay(current, botSeed, id, action), action.type === 'accept' ? 0 : responseUntil);
+            const desired = replyAt ?? Math.max(now + botDelay(current, botSeed, id, action), action.type === 'accept' ? 0 : responseUntil);
             schedule = { revision: current.revision, participantId: id,
               at: current.deadlineAt === null ? desired : Math.min(desired, current.deadlineAt) };
             current.botSchedule = schedule;

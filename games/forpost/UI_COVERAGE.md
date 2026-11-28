@@ -85,3 +85,19 @@ Evidence: [job 141027294468](https://github.com/decorum-guy/iva-games/actions/ru
 | R01 | FP03 reached two operation results and a 1:1 score before a transition click race failed | Third operation, full match result, replay and return |
 
 Round 1's select-locator and mobile-menu failures were replayed successfully where listed above. FP01/FP02 paused before battle and the construction lesson advanced only about two simulation seconds during its timeout; those failures require further diagnosis. The corrected operation-transition scenario and the new interaction suite are prepared for a later build and are not counted here as passed.
+
+## Observed automated subcases, CI round 3
+
+Build `d0e1833c75685ce51612b58bac3db2e555cdf1f5`, PR head `5cc963b84aa8401e24621e595beca9ed16f9e0ae`. Chromium: 13 PASS / 4 FAIL across 17 scenarios; WebKit: 9 PASS / 1 FAIL across 10. [Exact evidence](qa/ci-round-3.json) preserves failures/timings. No inventory row is accepted across every applicable state.
+
+| Rows | Additional actually observed subcases | Limits |
+|---|---|---|
+| M02–M06 | Map keyboard/hover selection, all team sizes/bot levels/nine loadout choices, empty/bounded/escaped callsign | Menu choices; not all lobby sizes or complete loadout matches |
+| M11, H01–H02, H05–H08 | Focus trap/restoration, Escape, persistence, both checkbox states, independent sliders, RU→EN, text scale, neutral input during modal | Actual listening and all gameplay/error translations unverified |
+| F01–F04, U01–U03 | Movement, aim, shots, reload, wall detour/barrier; six lessons completed in 2D | Default-3D construction failed; 2D infrastructure case checked refund rather than completion |
+| B01–B04, B07–B08, B10 | Disabled reasons, preview cancel, queued refund, power priority, sale confirm/cancel, generator, drone production/refund/escort | All eight modules and every queue/limit/error/visual state remain unaccepted |
+| F05–F06, F11 | Fighter/tactics switches, own drone selection, escort, real delivery/unloading exercise | Full online match and every order/selection mode remain unaccepted |
+| T01–T03, H05 | Native Chromium-emulated two-finger movement/aim, fire threshold, touchCancel, released input stability, reload, landscape Fire/menu | No physical phone; combinations/orientations not exhausted |
+| F02, S01 | Chromium tab-switch fire stayed stopped; map pauses showed saved state | WebKit case failed without a recorded focus-loss precondition. All online maps failed with SERVER_BUSY |
+
+Prepared additions — infrastructure rebuild/completion, explicit focus-loss precondition and separate 2D full-map passages — do not change these observations. A 2D pass is not 3D performance acceptance.

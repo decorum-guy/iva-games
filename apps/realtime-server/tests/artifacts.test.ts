@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
-import { retainRuntimeArtifact, retainedWorkerDirectory } from '../src/artifacts';
+import { copyRuntimeArtifact, retainRuntimeArtifact, retainedWorkerDirectory } from '../src/artifacts';
 const temporary: string[] = [];
 afterEach(() => { for (const path of temporary.splice(0)) rmSync(path, { recursive: true, force: true }); });
 function fixture() {
@@ -28,5 +28,18 @@ describe('saved simulation artifact retention', () => {
     writeFileSync(join(fileURLToPath(first.workerDirectory), 'simulation-worker.js'), '// changed after checkpoint');
     expect(() => retainedWorkerDirectory(f.root, first.artifactId)).toThrow('INVALID_RUNTIME_ARTIFACT');
     expect(() => retainedWorkerDirectory(f.root, '../outside')).toThrow('UNSUPPORTED_SAVED_RUNTIME');
+  });
+  it('keeps legacy format1 archives readable while including new checkpoint and CLI entries in current identity', () => {
+    const f = fixture(), legacy = retainRuntimeArtifact(f.url, f.root);
+    const copied = copyRuntimeArtifact(f.root, join(f.source, 'copied'), legacy.artifactId);
+    expect(readFileSync(new URL('simulation-worker.js', copied), 'utf8')).toBe('// artifact archive unit fixture: simulation-worker.js');
+    writeFileSync(join(f.source, 'checkpoint-worker.js'), '// checkpoint fixture v1');
+    writeFileSync(join(f.source, 'retention-cli.js'), '// retention CLI fixture');
+    const current = retainRuntimeArtifact(f.url, f.root);
+    expect(current.artifactId).not.toBe(legacy.artifactId);
+    expect(JSON.parse(readFileSync(new URL('manifest.json', current.workerDirectory), 'utf8')).files).toContain('checkpoint-worker.js');
+    writeFileSync(join(f.source, 'checkpoint-worker.js'), '// checkpoint fixture v2');
+    expect(retainRuntimeArtifact(f.url, f.root).artifactId).not.toBe(current.artifactId);
+    expect(() => retainedWorkerDirectory(f.root, legacy.artifactId)).not.toThrow();
   });
 });

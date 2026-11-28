@@ -1,7 +1,7 @@
 import type { Page, test as PlaywrightTest } from '@playwright/test'
 
 const pageFailures = new WeakMap<Page, string[]>()
-type TimingProbe = { start: number; frames: number; frameGaps: number[]; timerGaps: number[]; maxFrameGapMs: number; maxTimerGapMs: number; longTasks: number; longTaskMs: number; maxLongTaskMs: number; supportsLongTasks: boolean }
+export type TimingProbe = { start: number; frames: number; frameGaps: number[]; timerGaps: number[]; maxFrameGapMs: number; maxTimerGapMs: number; longTasks: number; longTaskMs: number; maxLongTaskMs: number; supportsLongTasks: boolean; focusEvents: { seq: number; type: string; elapsedMs: number; hidden: boolean; hasFocus: boolean }[] }
 async function boundedDiagnostic<T>(operation: Promise<T>, unavailable: string): Promise<T | string> {
   let timer: ReturnType<typeof setTimeout> | undefined
   try {
@@ -28,8 +28,16 @@ export function installDiagnostics(test: typeof PlaywrightTest): void {
     })
     // Observational instrumentation only: no game clock, input, world or storage mutation.
     await page.addInitScript(() => {
-      const probe: TimingProbe = { start: performance.now(), frames: 0, frameGaps: [], timerGaps: [], maxFrameGapMs: 0, maxTimerGapMs: 0, longTasks: 0, longTaskMs: 0, maxLongTaskMs: 0, supportsLongTasks: false }
+      const probe: TimingProbe = { start: performance.now(), frames: 0, frameGaps: [], timerGaps: [], maxFrameGapMs: 0, maxTimerGapMs: 0, longTasks: 0, longTaskMs: 0, maxLongTaskMs: 0, supportsLongTasks: false, focusEvents: [] }
       ;(window as Window & { __forpostQaTiming?: TimingProbe }).__forpostQaTiming = probe
+      let focusSequence = 0
+      const recordFocus = (type: string) => {
+        probe.focusEvents.push({ seq: ++focusSequence, type, elapsedMs: performance.now() - probe.start, hidden: document.hidden, hasFocus: document.hasFocus() })
+        if (probe.focusEvents.length > 40) probe.focusEvents.shift()
+      }
+      recordFocus('initial')
+      for (const type of ['blur', 'focus', 'pagehide']) window.addEventListener(type, () => recordFocus(type))
+      document.addEventListener('visibilitychange', () => recordFocus('visibilitychange'))
       const sample = (list: number[], gap: number) => { list.push(gap); if (list.length > 600) list.shift() }
       let lastFrame = 0, lastTimer = performance.now()
       const frame = (now: number) => { if (lastFrame) { sample(probe.frameGaps, now - lastFrame); probe.maxFrameGapMs = Math.max(probe.maxFrameGapMs, now - lastFrame) } lastFrame = now; probe.frames++; requestAnimationFrame(frame) }
@@ -51,7 +59,7 @@ export function installDiagnostics(test: typeof PlaywrightTest): void {
         const summary = (samples: number[]) => { const sorted = [...samples].sort((a, b) => a - b); return { samples: sorted.length, p50Ms: sorted[Math.ceil(sorted.length * .5) - 1] ?? null, p95Ms: sorted[Math.ceil(sorted.length * .95) - 1] ?? null, maxMs: sorted.at(-1) ?? null } }
         const canvas = document.querySelector<HTMLCanvasElement>('.fp-stage canvas'), gl = canvas?.getContext('webgl2')
         const debug = gl?.getExtension('WEBGL_debug_renderer_info')
-        return { visible: !document.hidden, viewport: [innerWidth, innerHeight], pixelRatio: devicePixelRatio, build: document.querySelector('[data-build]')?.getAttribute('data-build'), renderer: gl ? { version: gl.getParameter(gl.VERSION), vendor: gl.getParameter(debug?.UNMASKED_VENDOR_WEBGL ?? gl.VENDOR), renderer: gl.getParameter(debug?.UNMASKED_RENDERER_WEBGL ?? gl.RENDERER), width: canvas!.width, height: canvas!.height } : 'no WebGL2 stage context', ...(probe ? { elapsedMs: performance.now() - probe.start, frames: probe.frames, maxFrameGapMs: probe.maxFrameGapMs, maxTimerGapMs: probe.maxTimerGapMs, recentFrameGaps: summary(probe.frameGaps), recentTimerGaps: summary(probe.timerGaps), longTasks: probe.supportsLongTasks ? { count: probe.longTasks, totalMs: probe.longTaskMs, maxMs: probe.maxLongTaskMs } : 'unsupported' } : {}) }
+        return { visible: !document.hidden, hasFocus: document.hasFocus(), viewport: [innerWidth, innerHeight], pixelRatio: devicePixelRatio, build: document.querySelector('[data-build]')?.getAttribute('data-build'), stageMetrics: JSON.parse(document.querySelector('.fp-stage')?.getAttribute('data-render-metrics') ?? 'null'), renderer: gl ? { version: gl.getParameter(gl.VERSION), vendor: gl.getParameter(debug?.UNMASKED_VENDOR_WEBGL ?? gl.VENDOR), renderer: gl.getParameter(debug?.UNMASKED_RENDERER_WEBGL ?? gl.RENDERER), width: canvas!.width, height: canvas!.height } : 'no WebGL2 stage context', ...(probe ? { elapsedMs: performance.now() - probe.start, frames: probe.frames, maxFrameGapMs: probe.maxFrameGapMs, maxTimerGapMs: probe.maxTimerGapMs, recentFrameGaps: summary(probe.frameGaps), recentTimerGaps: summary(probe.timerGaps), focusEvents: probe.focusEvents, longTasks: probe.supportsLongTasks ? { count: probe.longTasks, totalMs: probe.longTaskMs, maxMs: probe.maxLongTaskMs } : 'unsupported' } : {}) }
       }), '[timing unavailable within 3500 ms]'),
     ])
     console.log(JSON.stringify({ automatedUiFailure: info.title, path: new URL(page.url()).pathname, browserName, browserVersion: browser.version(), pageErrors: pageFailures.get(page) ?? [], timing, runtimeHealth, visibleText: body.slice(0, 12_000) }))

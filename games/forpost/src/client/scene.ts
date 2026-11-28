@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { animateForpostModel, applyForpostModelState, cloneForpostModel, makeForpostTeamMarker, type ForpostAnimationState, type ForpostModelState } from '../art/models'
 import { getMap } from '../core/maps'
 import { BUILDINGS, RULES, VISION, WEAPONS } from '../core/constants'
@@ -28,13 +29,17 @@ export interface StageState {
   selected: string[]; hover: string | null; preview: { padId: string; kind: BuildingKind } | null
   zoom: number; target: Point | null; aim: Point | null; focus: Point[]
 }
+export interface StageMetrics {
+  frames: number; elapsed: number; drawCalls: number; triangles: number
+  renderWall?: { samples: number; p50Ms: number; p95Ms: number; maxMs: number }
+}
 export interface Stage {
   setView(view: WorldView): void
   setSettings(settings: Settings): void
   setState(state: StageState): void
   worldPoint(clientX: number, clientY: number): Point
   destroy(): void
-  metrics(): { frames: number; elapsed: number; drawCalls: number; triangles: number }
+  metrics(): StageMetrics
 }
 function rectangleMesh(rect: Rect, height: number, material: THREE.Material, y = 0): THREE.Mesh {
   const mesh = new THREE.Mesh(new THREE.BoxGeometry(rect.x2 - rect.x1, height, rect.z2 - rect.z1), material)
@@ -110,6 +115,35 @@ export function forpostGroundGeometry(map: MapData): THREE.BufferGeometry {
   return new THREE.ShapeGeometry(shape).rotateX(-Math.PI / 2)
 }
 
+/** Same static segments/triangles and materials, with one draw per layer. */
+export function forpostStaticMapLayers(map: MapData): { pads: THREE.LineSegments; roads: THREE.Mesh; kerbs: THREE.Mesh } {
+  const padPoints: THREE.Vector3[] = [], roads: THREE.BufferGeometry[] = [], kerbs: THREE.BufferGeometry[] = []
+  for (const { rect: r } of map.pads) {
+    for (const [x1, z1, x2, z2] of [[r.x1, r.z1, r.x2, r.z1], [r.x2, r.z1, r.x2, r.z2], [r.x2, r.z2, r.x1, r.z2], [r.x1, r.z2, r.x1, r.z1]]) padPoints.push(new THREE.Vector3(x1, .04, z1), new THREE.Vector3(x2, .04, z2))
+  }
+  for (const side of ['L', 'R'] as const) for (const route of ['N', 'S'] as const) {
+    const path = map.routes[side][route]
+    for (let i = 1; i < path.length; i++) {
+      const p = path[i - 1], q = path[i]
+      const geometry = new THREE.PlaneGeometry(Math.hypot(q.x - p.x, q.z - p.z), 3)
+      const rotation = new THREE.Quaternion().setFromEuler(new THREE.Euler(-Math.PI / 2, 0, -Math.atan2(q.z - p.z, q.x - p.x)))
+      geometry.applyMatrix4(new THREE.Matrix4().compose(new THREE.Vector3((p.x + q.x) / 2, .018, (p.z + q.z) / 2), rotation, new THREE.Vector3(1, 1, 1)))
+      roads.push(geometry)
+    }
+  }
+  for (const r of [{ x1: 0, z1: 0, x2: map.width, z2: .5 }, { x1: 0, z1: map.height - .5, x2: map.width, z2: map.height }, { x1: 0, z1: .5, x2: .5, z2: map.height - .5 }, { x1: map.width - .5, z1: .5, x2: map.width, z2: map.height - .5 }]) kerbs.push(new THREE.BoxGeometry(r.x2 - r.x1, .4, r.z2 - r.z1).translate((r.x1 + r.x2) / 2, .2, (r.z1 + r.z2) / 2))
+  const merge = (parts: THREE.BufferGeometry[]): THREE.BufferGeometry => {
+    const result = mergeGeometries(parts)
+    for (const part of parts) part.dispose()
+    if (!result) throw new Error('forpost:invalid-static-map-geometry')
+    return result
+  }
+  const pads = new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(padPoints), new THREE.LineBasicMaterial({ color: '#d7d1b4', transparent: true, opacity: .75, depthWrite: false }))
+  const roadMesh = new THREE.Mesh(merge(roads), new THREE.MeshStandardMaterial({ color: '#4f615c', roughness: .96 })); roadMesh.receiveShadow = true
+  const kerbMesh = new THREE.Mesh(merge(kerbs), new THREE.MeshStandardMaterial({ color: '#bfc9bc', roughness: .85 })); kerbMesh.receiveShadow = true
+  return { pads, roads: roadMesh, kerbs: kerbMesh }
+}
+
 function sprite(text: string, color: string, width = 1, team?: Team): THREE.Sprite {
   const [tag, controller] = text.split(' · ')
   const canvas = document.createElement('canvas'); canvas.width = team ? controller ? 320 : 128 : 256; canvas.height = 96
@@ -165,6 +199,7 @@ export class ThreeStage implements Stage {
   private fogContours: Point[][] | null = null
   private hazardKey = ''
   private frames = 0
+  private renderWallTimes = new Float64Array(120)
   private started = performance.now()
   private previousTime = performance.now()
   private lastViewAt = 0
@@ -228,6 +263,7 @@ export class ThreeStage implements Stage {
     for (let x = 1; x < map.width; x += 4) seam(true, x, map.height - 1)
     for (let z = 1; z < map.height; z += 4) seam(false, z, map.width - 1)
     this.mapGroup.add(new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(seamPoints), new THREE.LineBasicMaterial({ color: '#62736b', transparent: true, opacity: .65 })))
+    const staticLayers = forpostStaticMapLayers(map); this.mapGroup.add(staticLayers.pads, staticLayers.roads, staticLayers.kerbs)
     for (const water of map.water) {
       this.mapGroup.add(rectangleMesh(water, .08, new THREE.MeshStandardMaterial({ color: map.id === 'FP02' ? '#1d5762' : '#27636a', roughness: .35, metalness: .3 }), -.23))
       this.mapGroup.add(line([{ x: water.x1, z: water.z1 }, { x: water.x2, z: water.z1 }, { x: water.x2, z: water.z2 }, { x: water.x1, z: water.z2 }], '#ced2bd', .04, true))
@@ -237,11 +273,6 @@ export class ThreeStage implements Stage {
       this.mapGroup.add(rectangleMesh(map.protected[side], .025, new THREE.MeshStandardMaterial({ color: team === 'A' ? '#376b73' : '#886d44', roughness: .8 }), 0))
       for (const route of ['N', 'S'] as const) {
         const path = map.routes[side][route]
-        for (let i = 1; i < path.length; i++) {
-          const p = path[i - 1], q = path[i], length = Math.hypot(q.x - p.x, q.z - p.z)
-          const road = new THREE.Mesh(new THREE.PlaneGeometry(length, 3), new THREE.MeshStandardMaterial({ color: '#4f615c', roughness: .96 }))
-          road.rotation.x = -Math.PI / 2; road.rotation.z = -Math.atan2(q.z - p.z, q.x - p.x); road.position.set((p.x + q.x) / 2, .018, (p.z + q.z) / 2); road.receiveShadow = true; this.mapGroup.add(road)
-        }
         const marks = line(path, team === 'A' ? '#88bfc4' : '#e4b779', .03, false, true)
         const material = marks.material as THREE.LineDashedMaterial; material.dashSize = .7; material.gapSize = 1.3; this.mapGroup.add(marks)
       }
@@ -249,9 +280,6 @@ export class ThreeStage implements Stage {
       this.addModel(base, 'respawn', { team, powered: true }, new THREE.Vector3(1.6, 1.1, 1.6))
       this.mapGroup.add(circle(map.bases[side].x, map.bases[side].z, 3, COLORS[team]))
       const depot = new THREE.Group(); depot.position.set(map.depots[side].x, 0, map.depots[side].z); this.mapGroup.add(depot); this.addModel(depot, 'depot', { team, powered: true })
-    }
-    for (const pad of map.pads) {
-      const r = pad.rect; this.mapGroup.add(line([{ x: r.x1, z: r.z1 }, { x: r.x2, z: r.z1 }, { x: r.x2, z: r.z2 }, { x: r.x1, z: r.z2 }], '#d7d1b4', .04, true))
     }
     // Bake pad numbers and service paint into one local texture, so tactical readability does not cost a draw call per label.
     const paintCanvas = document.createElement('canvas'); paintCanvas.width = this.settings.quality === 'low' ? 1024 : 2048; paintCanvas.height = Math.round(paintCanvas.width * map.height / map.width)
@@ -270,9 +298,6 @@ export class ThreeStage implements Stage {
       this.addModel(group, 'station', { powered: false }, undefined, () => this.updateStations())
     }
     const complex = new THREE.Group(); complex.position.set(map.complex.x, 0, map.complex.z); this.mapGroup.add(complex); this.addModel(complex, 'complex', { powered: true })
-    const kerb = new THREE.MeshStandardMaterial({ color: '#bfc9bc', roughness: .85 })
-    for (const rect of [{ x1: 0, z1: 0, x2: map.width, z2: .5 }, { x1: 0, z1: map.height - .5, x2: map.width, z2: map.height }, { x1: 0, z1: .5, x2: .5, z2: map.height - .5 }, { x1: map.width - .5, z1: .5, x2: map.width, z2: map.height - .5 }]) this.mapGroup.add(rectangleMesh(rect, .4, kerb.clone()))
-    kerb.dispose()
     const fog = new THREE.Mesh(new THREE.PlaneGeometry(map.width, map.height), new THREE.MeshBasicMaterial({ map: this.fogTexture, transparent: true, depthWrite: false }))
     fog.rotation.x = -Math.PI / 2; fog.position.set(map.width / 2, .045, map.height / 2); fog.renderOrder = 1; fog.userData.keepTexture = true; this.mapGroup.add(fog)
     this.center.set(map.width / 2, 0, map.height / 2)
@@ -600,7 +625,10 @@ export class ThreeStage implements Stage {
       }
     }
     this.retiring = this.retiring.filter(r => time - r.start < r.duration)
-    this.renderer.render(this.scene, this.camera); this.frames++; this.raf = requestAnimationFrame(this.frame)
+    const renderStart = performance.now()
+    this.renderer.render(this.scene, this.camera)
+    this.renderWallTimes[this.frames % this.renderWallTimes.length] = performance.now() - renderStart
+    this.frames++; this.raf = requestAnimationFrame(this.frame)
   }
   setSettings(settings: Settings): void {
     const qualityChanged = settings.quality !== this.settings.quality
@@ -612,7 +640,10 @@ export class ThreeStage implements Stage {
     const rect = this.host.getBoundingClientRect(); this.raycaster.setFromCamera(new THREE.Vector2((clientX - rect.left) / rect.width * 2 - 1, -(clientY - rect.top) / rect.height * 2 + 1), this.camera)
     const target = new THREE.Vector3(); this.raycaster.ray.intersectPlane(this.plane, target); return { x: target.x, z: target.z }
   }
-  metrics(): { frames: number; elapsed: number; drawCalls: number; triangles: number } { return { frames: this.frames, elapsed: performance.now() - this.started, drawCalls: this.renderer.info.render.calls, triangles: this.renderer.info.render.triangles } }
+  metrics(): StageMetrics {
+    const times = Array.from(this.renderWallTimes.subarray(0, Math.min(this.frames, this.renderWallTimes.length))).sort((a, b) => a - b)
+    return { frames: this.frames, elapsed: performance.now() - this.started, drawCalls: this.renderer.info.render.calls, triangles: this.renderer.info.render.triangles, renderWall: { samples: times.length, p50Ms: times[Math.ceil(times.length * .5) - 1] ?? 0, p95Ms: times[Math.ceil(times.length * .95) - 1] ?? 0, maxMs: times.at(-1) ?? 0 } }
+  }
   private disposeObject(object: THREE.Object3D): void {
     object.traverse(child => {
       if (child instanceof THREE.Mesh || child instanceof THREE.Line || child instanceof THREE.Sprite) {

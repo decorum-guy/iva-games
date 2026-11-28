@@ -43,7 +43,7 @@ SPEC = {
         'build': 'build:realtime',
         'files': ['Dockerfile.realtime', 'apps/realtime-server', 'games/forpost/src', 'games/forpost/public',
                   'games/forpost/vite.config.ts', 'games/forpost/index.html', 'packages/realtime-kit',
-                  'deploy/iva-games/realtime-control.mjs'],
+                  'deploy/iva-games/realtime-control.mjs', 'deploy/iva-games/prepare-realtime-image.py'],
         'compatibility': ['apps/realtime-server/src/store.ts', 'packages/realtime-kit/src',
                           'games/forpost/src/core'],
     },

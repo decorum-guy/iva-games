@@ -3,15 +3,26 @@
 set -euo pipefail
 umask 077
 fixture="$(mktemp)"
+preflight_container="${SMOKE_CONTAINER}-preflight"
 cleanup() {
   local result=$?
   if [[ "$result" != 0 ]]; then docker logs --tail 100 "$SMOKE_CONTAINER" >&2 || true; fi
   docker rm -f "$SMOKE_CONTAINER" >/dev/null 2>&1 || true
+  docker rm -f "$preflight_container" >/dev/null 2>&1 || true
   docker volume rm "$SMOKE_VOLUME" >/dev/null 2>&1 || true
   rm -f -- "$fixture"
 }
 trap cleanup EXIT
 docker volume create "$SMOKE_VOLUME" >/dev/null
+preflight() {
+  # The verifier uses the real image USER and actual store, without network or
+  # write access. Empty-store permission is explicit and only used before start.
+  docker run --rm --name "$preflight_container" --network none --read-only \
+    --tmpfs /tmp:rw,noexec,nosuid,size=64m --cap-drop ALL --security-opt no-new-privileges \
+    --mount "type=volume,src=$SMOKE_VOLUME,dst=/data,readonly,volume-nocopy" \
+    --entrypoint node "$IMAGE_TAG" /app/dist-realtime/retention-cli.js check-store \
+    --database /data/realtime.sqlite "$@"
+}
 start() {
   docker run --detach --name "$SMOKE_CONTAINER" --init --network none --read-only --tmpfs /tmp \
     --mount "type=volume,src=$SMOKE_VOLUME,dst=/data" --health-interval 2s --health-start-period 5s \
@@ -58,17 +69,35 @@ writeFileSync('/data/smoke.json', JSON.stringify(fixture), { mode: 0o600 });
 ws.close(); await once(ws, 'close');
 const db = new Database('/data/realtime.sqlite', { readonly: true });
 assert.equal(db.pragma('quick_check', { simple: true }), 'ok');
-assert.equal(db.pragma('journal_mode', { simple: true }), 'wal'); db.close();
-console.log(`Realtime ${phase}: authentic admission, private view, real client HTML and SQLite passed.`);
+assert.equal(db.pragma('journal_mode', { simple: true }), 'wal');
+const stored = db.prepare("SELECT DISTINCT json_extract(record_json,'$.manifest') AS manifest FROM rt_matches WHERE expires_at>? OR phase NOT IN ('finished','abandoned')").all(Date.now()).map(row => JSON.parse(row.manifest));
+db.close();
+const inventoryResponse = await fetch(base + '/api/realtime/v1/compatibility');
+assert.equal(inventoryResponse.status, 200);
+assert.equal(inventoryResponse.headers.get('cache-control'), 'no-store');
+const inventory = await inventoryResponse.json();
+const bundle = JSON.parse(readFileSync('/app/retention/bundle.json', 'utf8'));
+assert.deepEqual(Object.keys(inventory).sort(), ['buildRevision', 'current', 'format', 'manifests']);
+assert.equal(inventory.format, 1); assert.equal(inventory.buildRevision, process.env.IVA_BUILD_SHA);
+assert.deepEqual(inventory.current, bundle.current); assert.equal(inventory.manifests.length, 1);
+const fields = ['runtime', 'rules', 'content', 'protocol', 'serializer', 'bot', 'map', 'physics', 'prng', 'client'].sort();
+for (const manifest of inventory.manifests) assert.deepEqual(Object.keys(manifest).sort(), fields);
+assert.deepEqual(inventory.manifests, stored);
+assert.ok(!JSON.stringify(inventory).includes(fixture.matchId));
+console.log(`Realtime ${phase}: authentic admission, private view, real client HTML, SQLite and sanitized actual-store inventory passed.`);
 NODE
+preflight --allow-empty-store
 start
 docker exec -i "$SMOKE_CONTAINER" node --input-type=module - initial < "$fixture"
 docker exec "$SMOKE_CONTAINER" node /app/scripts/realtime-control.mjs drain
+preflight
 docker exec "$SMOKE_CONTAINER" node /app/scripts/realtime-control.mjs resume
 docker stop --timeout 60 "$SMOKE_CONTAINER" >/dev/null
 test "$(docker inspect --format '{{.State.ExitCode}}' "$SMOKE_CONTAINER")" = 0
 docker rm "$SMOKE_CONTAINER" >/dev/null
 start
 docker exec -i "$SMOKE_CONTAINER" node --input-type=module - restored < "$fixture"
+docker exec "$SMOKE_CONTAINER" node /app/scripts/realtime-control.mjs drain
+preflight
 docker stop --timeout 60 "$SMOKE_CONTAINER" >/dev/null
 test "$(docker inspect --format '{{.State.ExitCode}}' "$SMOKE_CONTAINER")" = 0

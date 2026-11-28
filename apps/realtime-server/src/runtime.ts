@@ -61,6 +61,7 @@ export class RealtimeRuntime {
   private nextAdmissionAt = 0;
   private nextRoom = 0;
   private lastCapacityDecision: CapacityDecision | null = null;
+  private writerMetrics: Record<string, unknown> | null = null;
   private readonly resyncReasons = { requested: 0, staleEpoch: 0, backpressure: 0 };
   private readonly loopDelay = monitorEventLoopDelay({ resolution: 10 });
   private timer: ReturnType<typeof setInterval> | null = null;
@@ -248,8 +249,9 @@ export class RealtimeRuntime {
     const start = performance.now();
     room.journalPendingAt ??= start;
     try {
-      const confirmation = await this.store.call<{ batchSize?: number } | undefined>('commit', { match: publication.match, leaseOwner: this.leaseOwner, journal, receipts, result });
+      const confirmation = await this.store.call<{ batchSize?: number; writer?: Record<string, unknown> } | undefined>('commit', { match: publication.match, leaseOwner: this.leaseOwner, journal, receipts, result });
       if (confirmation?.batchSize) this.samples.maxCommitBatchSize = Math.max(this.samples.maxCommitBatchSize, confirmation.batchSize);
+      if (confirmation?.writer) this.writerMetrics = confirmation.writer;
     }
     catch (error) { this.failRoom(room); throw error; }
     room.published = publication;
@@ -499,7 +501,7 @@ export class RealtimeRuntime {
       resources: this.options.resourceSample?.() ?? this.resourceProbe.sample() }, metrics: { ...this.samples, ...ages, resyncReasons: { ...this.resyncReasons },
       stepP99Ms: this.stepTiming.p99(), commitP99Ms: this.commitTiming.p99(), eventLoopDelayP99Ms: this.loopDelay.percentile(99) / 1e6,
       stepWorkP99Ms: this.stepWorkTiming.p99(), stepWorkCpuP99Ms: this.stepCpuTiming.p99(),
-      processCpuMs: (cpu.user + cpu.system) / 1000, processElapsedMs: now - this.processStartedAt,
+      processCpuMs: (cpu.user + cpu.system) / 1000, processElapsedMs: now - this.processStartedAt, writer: this.writerMetrics,
       byGame: { forpost: { stepP99Ms: this.stepTiming.p99(), stepWorkP99Ms: this.stepWorkTiming.p99(),
         stepWorkCpuP99Ms: this.stepCpuTiming.p99(), commitP99Ms: this.commitTiming.p99(), ...ages } },
       rssBytes: process.memoryUsage().rss, heapUsedBytes: process.memoryUsage().heapUsed,

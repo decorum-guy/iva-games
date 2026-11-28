@@ -103,4 +103,15 @@ describe('grouped durable writer', () => {
     expect(sizes).toEqual([2]); expect(replies.map(reply => reply.id)).toEqual([1, 2, 3]);
     expect(replies[2].value).toMatchObject({ journalSeq: 1, phase: 'finished' });
   });
+  it('keeps later requests behind an asynchronous lifecycle barrier', async () => {
+    vi.useFakeTimers(); let release!: () => void;
+    const barrier = new Promise<void>(resolve => { release = resolve; });
+    const order: string[] = [];
+    const queue = new StoreQueue(() => barrier, () => { order.push('commit'); return [{}]; }, reply => order.push('reply-' + reply.id));
+    queue.enqueue({ id: 1, op: 'close-checkpointer', args: [] });
+    queue.enqueue({ id: 2, op: 'commit', args: [{}] });
+    await vi.advanceTimersByTimeAsync(2); expect(order).toEqual([]);
+    release(); await vi.advanceTimersByTimeAsync(0);
+    expect(order).toEqual(['reply-1', 'commit', 'reply-2']);
+  });
 });

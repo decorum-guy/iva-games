@@ -21,10 +21,14 @@ export function StageView({ view, settings, state, onFallback, onLoadError, onMo
   const callbacks = useRef({ onFallback, onLoadError, getPrediction, onMove }); callbacks.current = { onFallback, onLoadError, getPrediction, onMove }
   useEffect(() => {
     if (!host.current) return
+    const element = host.current
     const options = { onFallback: () => callbacks.current.onFallback(), onLoadError: (asset: string) => callbacks.current.onLoadError(asset), getPrediction: () => callbacks.current.getPrediction() }
     try { stage.current = settings.renderer === '2d' ? new CanvasStage(host.current, settings, options) : new ThreeStage(host.current, settings, options) }
     catch { callbacks.current.onFallback(); stage.current = new CanvasStage(host.current, settings, options) }
-    return () => { stage.current?.destroy(); stage.current = null }
+    // Read-only presentation counters; no game state or mutation handle is exposed.
+    const publishMetrics = () => { if (stage.current) element.setAttribute('data-render-metrics', JSON.stringify({ backend: stage.current instanceof ThreeStage ? 'webgl' : 'canvas2d', ...stage.current.metrics() })) }
+    publishMetrics(); const metricsTimer = setInterval(publishMetrics, 1000)
+    return () => { clearInterval(metricsTimer); element.removeAttribute('data-render-metrics'); stage.current?.destroy(); stage.current = null }
   }, [settings.renderer])
   useEffect(() => { stage.current?.setView(view) }, [view, settings.renderer])
   useEffect(() => { stage.current?.setSettings(settings) }, [settings])

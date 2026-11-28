@@ -8,7 +8,7 @@ const revision = process.env.IVA_BUILD_SHA ?? execFileSync('git', ['rev-parse', 
 const browserName = process.env.FORPOST_BROWSER === 'webkit' ? 'webkit' : 'chromium'
 
 export default defineConfig({
-  testDir: './e2e', fullyParallel: false, workers: 3, timeout: 60_000,
+  testDir: './e2e', fullyParallel: false, workers: 1, timeout: 60_000,
   expect: { timeout: 10_000 }, reporter: [['list']],
   use: { baseURL: origin, browserName, headless: true, trace: 'off', video: 'off', screenshot: 'off', actionTimeout: 15_000, navigationTimeout: 30_000,
     viewport: { width: 1440, height: 900 },

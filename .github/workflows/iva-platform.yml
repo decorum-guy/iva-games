@@ -25,6 +25,7 @@ jobs:
           cache: npm
       - run: npm ci --no-audit --no-fund
       - run: npm run check
+      - run: node --test apps/realtime-server/tests/profiling-scripts.test.mjs
       - run: python3 -B -m unittest discover -s deploy/iva-games -p 'test_*.py'
       - run: npx vite build --config games/district/vite.territorial-simulation.config.ts
       - run: node .qa/territorial-runner/simulate.mjs --bot-audit --map=azure-bay --samples=6
@@ -39,6 +40,7 @@ jobs:
       - run: npm run district:browser
       - run: node scripts/district-interface-browser.mjs
       - run: node scripts/district-trade-browser.mjs
+      - run: node scripts/district-compact-trade-browser.mjs
       - run: node scripts/district-audio-browser.mjs
       - run: node scripts/district-territorial-browser.mjs
       # QA output stays in the job logs. No upload-artifact or video/trace storage.
@@ -65,7 +67,14 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        scenario: [interface, FP01, FP02, FP03]
+        include:
+          - { scenario: interface, renderer: '3d' }
+          - { scenario: FP01, renderer: '3d' }
+          - { scenario: FP02, renderer: '3d' }
+          - { scenario: FP03, renderer: '3d' }
+          - { scenario: FP01, renderer: '2d' }
+          - { scenario: FP02, renderer: '2d' }
+          - { scenario: FP03, renderer: '2d' }
     steps:
       - uses: actions/checkout@v6
         with:
@@ -105,6 +114,7 @@ jobs:
         if: steps.changes.outputs.required == 'true'
         env:
           FORPOST_SCENARIO: ${{ matrix.scenario }}
+          FORPOST_MAP_RENDERER: ${{ matrix.renderer }}
         run: |
           # Each map has its own real server/database/browser process tree. This
           # tests UI outcomes; the independent four-room load probe tests capacity.
@@ -143,6 +153,68 @@ jobs:
         env:
           FORPOST_PERF: '1'
         run: npx vitest run --config games/forpost/vitest.config.ts games/forpost/tests/core-load.test.ts --maxWorkers=1
+
+  forpost-four-room-hour:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    permissions:
+      contents: read
+      packages: read
+    env:
+      IMAGE_TAG: iva-forpost-load:${{ github.run_id }}-${{ github.run_attempt }}
+      FORPOST_QA_OUTPUT_DIRECTORY: ${{ runner.temp }}/forpost-load-${{ github.run_id }}-${{ github.run_attempt }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 2
+          persist-credentials: false
+      - name: Check whether load inputs changed
+        id: load-changes
+        run: |
+          python3 - <<'PY'
+          import json, os, re, subprocess
+          with open(os.environ['GITHUB_EVENT_PATH']) as stream:
+              event = json.load(stream)
+          base = event.get('pull_request', {}).get('base', {}).get('sha') or event.get('before')
+          required = True
+          if isinstance(base, str) and re.fullmatch('[0-9a-f]{40}', base) and base != '0' * 40:
+              if subprocess.run(['git', 'cat-file', '-e', base], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode:
+                  subprocess.run(['git', 'fetch', '--no-tags', '--depth=1', 'origin', base], check=True)
+              files = subprocess.check_output(['git', 'diff', '--name-only', '-z', base, 'HEAD']).decode().split('\0')
+              prefixes = ('games/forpost/', 'apps/realtime-server/', 'packages/realtime-kit/',
+                          'packages/session-kit/', 'packages/game-registry/', 'deploy/iva-games/')
+              exact = {'package.json', 'package-lock.json', 'tsconfig.json', 'tsconfig.platform.json',
+                       'Dockerfile.realtime', '.github/workflows/iva-platform.yml'}
+              required = any(path.startswith(prefixes) or path in exact for path in files)
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as stream:
+              stream.write('required=' + str(required).lower() + '\n')
+          PY
+      - uses: actions/setup-node@v7
+        if: steps.load-changes.outputs.required == 'true'
+        with:
+          node-version: '24'
+      - name: Prepare the retained runtime and client build input
+        if: steps.load-changes.outputs.required == 'true'
+        env:
+          REGISTRY_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          trap 'docker logout ghcr.io >/dev/null 2>&1 || true' EXIT
+          printf '%s\n' "$REGISTRY_TOKEN" | docker login ghcr.io -u "$GITHUB_REPOSITORY_OWNER" --password-stdin
+          python3 -B deploy/iva-games/prepare-realtime-image.py
+      - name: Build the exact production runtime and client
+        if: steps.load-changes.outputs.required == 'true'
+        run: |
+          docker build --pull --build-arg VCS_REF="$(git rev-parse HEAD)" \
+            --build-context "realtime-retained=$GITHUB_WORKSPACE/deploy/iva-games/retained-input/current" \
+            --file Dockerfile.realtime --tag "$IMAGE_TAG" .
+      - name: Measure four rooms for a real hour within two CPUs and two GiB
+        if: steps.load-changes.outputs.required == 'true'
+        run: bash apps/realtime-server/scripts/profile-image.sh --seconds=3600 --rooms=4
+      # The runtime uses an explicit test-fixture admission profile for this
+      # measurement. No production capacity profile is inferred or emitted.
+      # The capped container has no external network or extra capabilities.
+      # Sanitized measurements stay in logs; raw databases/reports are not uploaded.
 
   forpost-webkit:
     runs-on: ubuntu-latest

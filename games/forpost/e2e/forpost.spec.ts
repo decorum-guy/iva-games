@@ -137,10 +137,20 @@ test.describe('mobile controls', () => {
 
 test.describe('three complete network matches through visible controls', () => {
   test.describe.configure({ mode: 'parallel' })
-  for (const map of ['FP01', 'FP02', 'FP03']) test(`${map}: lobby, direct input, squad escort, match result and return`, async ({ page }) => {
+  const renderer = process.env.FORPOST_MAP_RENDERER === '2d' ? '2d' : '3d'
+  for (const map of ['FP01', 'FP02', 'FP03']) test(`${map}: lobby, direct input, squad escort, match result and return [${renderer}]`, async ({ page }) => {
     test.setTimeout(1_300_000)
     const errors: string[] = []; page.on('pageerror', error => errors.push(error.message)); const latest = observeView(page)
     await account(page, map.toLowerCase())
+    if (renderer === '2d') {
+      // An additional supported-renderer passage, separate from the unchanged
+      // default-3D jobs. Selecting it never counts as 3D performance acceptance.
+      await page.goto('/play/forpost/')
+      await page.getByRole('button', { name: 'Настройки', exact: true }).click()
+      const settings = page.getByRole('dialog', { name: 'Настройки', exact: true })
+      await settings.getByRole('combobox', { name: /^Отображение/ }).selectOption('2d')
+      await settings.getByRole('button', { name: 'Готово', exact: true }).click()
+    }
     await page.goto('/rooms?game=forpost')
     const createDialog = page.getByRole('dialog', { name: 'Новая комната', exact: true })
     await expect(createDialog).toBeVisible()

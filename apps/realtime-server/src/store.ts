@@ -3,6 +3,7 @@ import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { hash } from './crypto.js';
 import { LIMITS } from '@iva-games/realtime-kit';
+import { TimingHistogram } from './timing.js';
 
 export interface FrozenParticipant { participantId: string; playerId: string | null; displayName: string; team: 'A' | 'B'; controller: 'human' | 'bot' }
 export interface Control { generation: number; connectionId: string | null; lastActivity: number; lastInputAt: number; inputSeq: number; consumed: number; temporaryBot: boolean }
@@ -25,10 +26,16 @@ export interface StoredStart {
 export class RealtimeStore {
   readonly db: Database.Database;
   private readonly statements = new Map<string, Database.Statement>();
-  constructor(path: string) {
+  private readonly transactionTiming = new TimingHistogram();
+  private readonly bodyTiming = new TimingHistogram();
+  private readonly finalizeTiming = new TimingHistogram();
+  private batchBodyMs = 0;
+  private writerSamples = { batches: 0, maxTransactionMs: 0, maxWorldBytes: 0, maxRecordBytes: 0, maxJournalBytes: 0 };
+  constructor(path: string, options: { separateCheckpoint?: boolean } = {}) {
     mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
     this.db = new Database(path);
     this.db.pragma('journal_mode = WAL'); this.db.pragma('synchronous = FULL'); this.db.pragma('foreign_keys = ON'); this.db.pragma('busy_timeout = 3000');
+    if (options.separateCheckpoint) { this.db.pragma('wal_autocheckpoint = 0'); this.db.pragma('journal_size_limit = 16777216'); }
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS rt_matches (
         match_id TEXT PRIMARY KEY, start_id TEXT UNIQUE NOT NULL, fingerprint TEXT NOT NULL,
@@ -113,6 +120,10 @@ export class RealtimeStore {
   }
   status() { return { journalMode: this.db.pragma('journal_mode', { simple: true }), synchronous: this.db.pragma('synchronous', { simple: true }), integrity: this.db.pragma('quick_check', { simple: true }) }; }
   list(): StoredMatch[] { return (this.statement("SELECT record_json FROM rt_matches WHERE expires_at>? OR phase NOT IN ('finished','abandoned')").all(Date.now()) as {record_json: string}[]).map(r => JSON.parse(r.record_json) as StoredMatch); }
+  compatibilityManifests(): unknown[] {
+    return (this.statement("SELECT DISTINCT json_extract(record_json,'$.manifest') AS manifest FROM rt_matches WHERE expires_at>? OR phase NOT IN ('finished','abandoned')")
+      .all(Date.now()) as { manifest: string }[]).map(row => JSON.parse(row.manifest) as unknown);
+  }
   get(matchId: string): StoredMatch | null {
     const row = this.statement('SELECT record_json,world_hash FROM rt_matches WHERE match_id=?').get(matchId) as {record_json: string; world_hash: string} | undefined;
     if (!row) return null;
@@ -163,25 +174,32 @@ export class RealtimeStore {
     }).immediate();
   }
   private writeCommit(value: Commit): void {
+      const started = performance.now();
       const { match } = value;
       if (hash(match.world) !== match.worldHash) throw new Error('STATE_CHECKSUM');
+      const record = JSON.stringify(match), journal = JSON.stringify(value.journal);
+      this.writerSamples.maxWorldBytes = Math.max(this.writerSamples.maxWorldBytes, Buffer.byteLength(match.world));
+      this.writerSamples.maxRecordBytes = Math.max(this.writerSamples.maxRecordBytes, Buffer.byteLength(record));
+      this.writerSamples.maxJournalBytes = Math.max(this.writerSamples.maxJournalBytes, Buffer.byteLength(journal));
       const changed = this.statement('UPDATE rt_matches SET record_json=?,world_hash=?,journal_seq=?,lease_until=?,expires_at=?,phase=? WHERE match_id=? AND owner_epoch=? AND lease_owner=?')
-        .run(JSON.stringify(match), match.worldHash, match.journalSeq, Date.now() + 15_000, match.expiresAt, match.phase, match.matchId, match.ownerEpoch, value.leaseOwner);
+        .run(record, match.worldHash, match.journalSeq, Date.now() + 15_000, match.expiresAt, match.phase, match.matchId, match.ownerEpoch, value.leaseOwner);
       if (changed.changes !== 1) throw new Error('LEASE_LOST');
-      this.statement('INSERT INTO rt_journal VALUES (?,?,?,?,?)').run(match.matchId, match.journalSeq, match.tick, JSON.stringify(value.journal), match.worldHash);
+      this.statement('INSERT INTO rt_journal VALUES (?,?,?,?,?)').run(match.matchId, match.journalSeq, match.tick, journal, match.worldHash);
       for (const receipt of value.receipts) this.statement('INSERT INTO rt_actions VALUES (?,?,?,?,?)').run(receipt.matchId, receipt.actionId, receipt.participantId, receipt.payloadHash, JSON.stringify(receipt));
       if (match.tick % 60 === 0 || match.phase !== 'running') {
-        this.statement('INSERT OR REPLACE INTO rt_checkpoints VALUES (?,?,?,?)').run(match.matchId, match.journalSeq, JSON.stringify(match), match.worldHash);
+        this.statement('INSERT OR REPLACE INTO rt_checkpoints VALUES (?,?,?,?)').run(match.matchId, match.journalSeq, record, match.worldHash);
         this.statement('DELETE FROM rt_checkpoints WHERE match_id=? AND seq NOT IN (SELECT seq FROM rt_checkpoints WHERE match_id=? ORDER BY seq DESC LIMIT 2)').run(match.matchId, match.matchId);
       }
       if (value.result) this.statement('INSERT OR IGNORE INTO rt_outbox VALUES (?,?,?,NULL)').run(value.result.resultId, match.matchId, JSON.stringify(value.result.outcome));
+      this.batchBodyMs += performance.now() - started;
   }
   commit(value: Commit): void {
     this.db.transaction(() => this.writeCommit(value)).immediate();
   }
   /** One durable barrier for a group; a fenced/corrupt room cannot poison peers. */
   commitBatch(values: Commit[]): { error?: string }[] {
-    return this.db.transaction(() => values.map(value => {
+    const started = performance.now(); this.batchBodyMs = 0;
+    const results = this.db.transaction(() => values.map(value => {
       try {
         // A nested transaction is a savepoint. Logical per-room failures roll
         // back that complete transition; an I/O failure aborts the whole group.
@@ -193,7 +211,14 @@ export class RealtimeStore {
         throw error;
       }
     })).immediate();
+    const elapsed = performance.now() - started;
+    this.writerSamples.batches++; this.writerSamples.maxTransactionMs = Math.max(this.writerSamples.maxTransactionMs, elapsed);
+    this.transactionTiming.record(elapsed); this.bodyTiming.record(this.batchBodyMs); this.finalizeTiming.record(Math.max(0, elapsed - this.batchBodyMs));
+    return results;
   }
+  writerMetrics() { return { ...this.writerSamples, transactionP99Ms: this.transactionTiming.p99(), bodyP99Ms: this.bodyTiming.p99(),
+    finalizeP99Ms: this.finalizeTiming.p99(), walAutoCheckpoint: this.db.pragma('wal_autocheckpoint', { simple: true }),
+    synchronous: this.db.pragma('synchronous', { simple: true }) }; }
   receipt(matchId: string, actionId: string): Receipt | null {
     const row = this.statement('SELECT record_json FROM rt_actions WHERE match_id=? AND action_id=?').get(matchId, actionId) as {record_json: string} | undefined;
     return row ? JSON.parse(row.record_json) as Receipt : null;
