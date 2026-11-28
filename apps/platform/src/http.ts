@@ -60,6 +60,7 @@ export function createPlatformHttpServer(service: PlatformService, options: Http
   const clientAddress = createClientAddressReader(options.trustedProxyIps);
   const secure = options.secureCookies ?? origin.startsWith('https:');
   const cookieName = secure ? '__Host-iva_session' : 'iva_dev_session';
+  const deviceCookieName = secure ? '__Host-iva_telegram_device' : 'iva_dev_telegram_device';
   const staticRoot = options.serveDirectory ? resolve(options.serveDirectory) : null;
   if (options.telegram && (!options.telegramWebhookSecret || !/^[A-Za-z0-9_-]{32,256}$/.test(options.telegramWebhookSecret))) throw new Error('Telegram webhook secret is required');
   const setCookie = (res: ServerResponse, token: string, expires: number): void => {
@@ -67,6 +68,10 @@ export function createPlatformHttpServer(service: PlatformService, options: Http
     res.setHeader('Set-Cookie', `${cookieName}=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAge}${secure ? '; Secure' : ''}`);
   };
   const clearCookie = (res: ServerResponse): void => { res.setHeader('Set-Cookie', `${cookieName}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0${secure ? '; Secure' : ''}`); };
+  const rememberDevice = (res: ServerResponse, playerId: string, previous: string | undefined): void => {
+    const token = options.telegramAuth?.rememberDevice(playerId, previous);
+    if (token) res.appendHeader('Set-Cookie', `${deviceCookieName}=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${180 * 86400}${secure ? '; Secure' : ''}`);
+  };
   const replacementSession = (res: ServerResponse, previous: SessionRecord | null, playerId: string | null): SessionRecord => {
     if (previous) service.revokeSession(previous.sessionHash);
     const created = service.createSession(playerId);
@@ -143,6 +148,7 @@ export function createPlatformHttpServer(service: PlatformService, options: Http
       let session = service.getSession(cookieValue(request, cookieName));
       if (method === 'GET' && route === '/session') {
         if (!session) { service.rateLimit(`bootstrap:${client}`, 60); session = replacementSession(response, null, null); }
+        if (session.playerId) rememberDevice(response, session.playerId, cookieValue(request, deviceCookieName));
         service.rateLimit(`read:${session.sessionHash}`, 300);
         send(response, 200, { user: session.playerId ? service.account(session.playerId) : null, csrfToken: session.csrfToken,
           auth: { email: service.emailDeliveryEnabled, telegram: !!options.telegramAuth } }); return;
@@ -168,14 +174,15 @@ export function createPlatformHttpServer(service: PlatformService, options: Http
           if (!options.telegramAuth) error('TELEGRAM_NOT_CONFIGURED', 'Telegram пока недоступен', 503);
           const current = session!;
           if (route.endsWith('/start')) {
-            only(body, ['locale']);
+            only(body, ['locale', 'otherAccount']);
             service.rateLimit(`telegram-signin:${client}`, 20, 10 * 60_000);
-            send(response, 201, options.telegramAuth.start(current, body.locale));
+            send(response, 201, await options.telegramAuth.start(current, body.locale, cookieValue(request, deviceCookieName), body.otherAccount === true));
           } else {
             only(body, ['attemptId', 'code', 'handle', 'displayName']);
             const result = options.telegramAuth.finish(current, body);
             if ('token' in result) {
               setCookie(response, result.token, result.session.expiresAt);
+              rememberDevice(response, result.session.playerId!, cookieValue(request, deviceCookieName));
               send(response, 200, { user: result.user });
             } else send(response, 200, result);
           }
