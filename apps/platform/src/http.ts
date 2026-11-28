@@ -5,6 +5,7 @@ import { createReadStream, existsSync, statSync } from 'node:fs';
 import { extname, resolve, sep } from 'node:path';
 import { createClientAddressReader, createHttpLifecycle } from '@iva-games/session-kit/http';
 import { PlatformError } from './types.js';
+import { MAX_PROFILE_BODY } from './avatar-photo.js';
 import type { SessionRecord, TelegramIntegration } from './types.js';
 import type { TelegramAuth } from './telegram/auth.js';
 import { PlatformService, textField } from './service.js';
@@ -153,7 +154,8 @@ export function createPlatformHttpServer(service: PlatformService, options: Http
         if (typeof request.headers.origin !== 'string' || !origins.has(request.headers.origin)) error('ORIGIN_NOT_ALLOWED', 'Обновите страницу и попробуйте снова', 403);
         if (!session) error('SESSION_REQUIRED', 'Обновите страницу и повторите действие', 401);
         service.checkCsrf(session, request.headers['x-csrf-token']);
-        body = await jsonBody(request);
+        if (route === '/profile' && !session.playerId) error('UNAUTHENTICATED', 'Войдите в аккаунт', 401);
+        body = await jsonBody(request, route === '/profile' ? MAX_PROFILE_BODY : MAX_BODY);
         // Body upload is asynchronous. A reset/logout while it is arriving must revoke this
         // request too; the pre-upload session object is not an authorization snapshot.
         session = service.getSession(cookieValue(request, cookieName));
@@ -220,6 +222,12 @@ export function createPlatformHttpServer(service: PlatformService, options: Http
         if (route === '/invitations') { send(response, 200, { invitations: service.listInvitations(actor) }); return; }
         if (route === '/telegram') { send(response, 200, options.telegram?.getStatus(actor) ?? { available: false, linked: false, reason: 'not_configured' }); return; }
         let groups: RegExpMatchArray | null;
+        if ((groups = match(/^\/avatars\/([a-f0-9-]{36})$/))) {
+          const photo = service.avatarPhoto(groups[1], actor);
+          if (!photo) error('NOT_FOUND', 'Фото не найдено', 404);
+          response.writeHead(200, { 'Content-Type': 'image/jpeg', 'Content-Length': photo.length });
+          response.end(photo); return;
+        }
         if ((groups = match(/^\/telegram\/link-attempts\/([\w-]+)$/))) {
           if (!options.telegram) error('TELEGRAM_NOT_CONFIGURED', 'Telegram пока недоступен', 503);
           send(response, 200, options.telegram.getAttemptStatus(session, groups[1])); return;
@@ -262,7 +270,10 @@ export function createPlatformHttpServer(service: PlatformService, options: Http
       };
       let result: unknown;
       let groups: RegExpMatchArray | null;
-      if (route === '/profile') result = mutate(['displayName', 'avatar'], () => ({ user: service.updateProfile(actor, body) }));
+      if (route === '/profile') {
+        if (body.avatarPhoto !== undefined) service.rateLimit(`avatar-photo:${actor}`, 20, 60_000);
+        result = mutate(['displayName', 'avatar', 'avatarPhoto'], () => ({ user: service.updateProfile(actor, body) }));
+      }
       else if (route === '/friend-requests') result = mutate(['playerId'], () => service.requestFriend(actor, body.playerId));
       else if ((groups = match(/^\/friend-requests\/([\w-]+)\/(accept|decline|cancel)$/))) {
         const [, id, action] = groups; result = mutate([], () => { service.respondFriend(actor, id, action as 'accept' | 'decline' | 'cancel'); return { ok: true }; });

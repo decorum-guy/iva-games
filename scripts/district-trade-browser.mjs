@@ -54,6 +54,40 @@ async function openTrade(page) {
   if (await toggle.getAttribute('aria-expanded') !== 'true') await toggle.click();
   await expect(page.locator('.ta-trade-window')).toBeVisible();
 }
+function tradeCount(page, side, resource) {
+  return page.locator('.ta-trade-editor').getByRole('group', { name: side, exact: true })
+    .locator(`[data-resource="${resource}"] .ta-trade-count`);
+}
+async function setTradeCount(page, side, resource, amount) {
+  const count = tradeCount(page, side, resource);
+  const current = Number((await count.allTextContents())[0] ?? 0);
+  const step = amount > current ? '+' : '−';
+  const control = page.locator('.ta-trade-editor').getByRole('button', { name: `${side} ${step} ${name(resource)}`, exact: true });
+  for (let index = 0; index < Math.abs(amount - current); index++) await control.click();
+  if (amount) await expect(count).toHaveText(String(amount));
+  else await expect(count).toHaveCount(0);
+}
+async function expectTradeHistory(page, text, repeatedStatus) {
+  const tabs = page.locator('.territory-tabs');
+  await tabs.getByRole('button', { name: 'Turn history', exact: true }).click();
+  const history = page.getByRole('region', { name: 'Turn history', exact: true });
+  await history.getByRole('button', { name: 'Trading', exact: true }).click();
+  const entry = history.getByRole('listitem').filter({ hasText: text }).first();
+  await expect(entry).toBeVisible();
+  if (repeatedStatus) await expect(entry).not.toContainText(repeatedStatus);
+  await tabs.getByRole('button', { name: /Actions/ }).click();
+}
+async function expectTradeArrowCentered(terms) {
+  await expect(terms).toBeVisible();
+  const gaps = await terms.evaluate(element => {
+    const [give, receive] = [...element.querySelectorAll('.ta-resources')].map(group => group.getBoundingClientRect());
+    const arrow = element.querySelector('.ta-offer-arrow').getBoundingClientRect();
+    return { left: arrow.left - give.right, right: receive.left - arrow.right,
+      centers: [give, arrow, receive].map(rect => rect.top + rect.height / 2) };
+  });
+  assert.ok(gaps.left > 0 && gaps.right > 0 && Math.abs(gaps.left - gaps.right) <= 1, JSON.stringify(gaps));
+  assert.ok(Math.max(...gaps.centers) - Math.min(...gaps.centers) <= 1, JSON.stringify(gaps));
+}
 async function enterPlay(entry, index) {
   let current = await action(pages[index], pages[index].getByRole('button', { name: 'Roll dice', exact: true }));
   if (current.phase === 'discard') {
@@ -174,7 +208,7 @@ try {
   result.browser = browser.version();
   for (const [index, account] of harness.manifest.accounts.entries()) {
     const context = await browser.newContext({ storageState: account.storageState,
-      viewport: index ? { width: 390, height: 844 } : { width: 1440, height: 900 }, hasTouch: !!index });
+      viewport: index ? { width: 390, height: 844 } : { width: 1280, height: 720 }, hasTouch: !!index });
     context.setDefaultTimeout(15_000);
     context.setDefaultNavigationTimeout(20_000);
     await context.addInitScript(() => {
@@ -189,32 +223,66 @@ try {
   }
 
   let entry = await open('trade-draft');
+  const desktop = pages[0], desktopEditor = desktop.locator('.ta-trade-editor');
+  await openTrade(desktop);
+  await expect(desktopEditor.getByRole('spinbutton')).toHaveCount(0);
+  await expect(desktopEditor.locator('.ta-trade-count')).toHaveCount(0);
+  const desktopLayout = await desktop.locator('.ta-trade-window').evaluate(element => ({
+    width: element.clientWidth, height: element.clientHeight, scrollHeight: element.scrollHeight,
+    recipientWidth: element.querySelector('.ta-draft-target select').getBoundingClientRect().width,
+  }));
+  assert.ok(desktopLayout.width <= 340 && desktopLayout.recipientWidth < desktopLayout.width * .65, JSON.stringify(desktopLayout));
+  assert.ok(desktopLayout.scrollHeight <= desktopLayout.height + 1, JSON.stringify(desktopLayout));
+  assert.ok((await touchPoint(desktopEditor.getByRole('button', { name: 'I receive + Ore', exact: true }))).receivesPointer);
+  await expect(desktopEditor.getByRole('button', { name: 'Send offer', exact: true })).toBeInViewport();
+  await desktop.screenshot({ path: join(harness.directory, 'trade-editor-1280x720.png') });
+  await desktop.keyboard.press('Escape');
+  await expect(desktopEditor).toHaveCount(0);
+  await expect(desktop.getByRole('button', { name: 'Offer a trade', exact: true })).toBeFocused();
+  result.desktopTrade = desktopLayout;
+  passed('compact 1280×720 editor fits all controls, has no zero inputs and supports Escape with focus restored');
+
   const handPage=pages[entry.hostIndex];
   await handPage.locator('.territory-hand').getByRole('button',{name:'Give Wood',exact:true}).click();
   const handEditor=handPage.locator('.ta-trade-editor');
-  await expect(handEditor.getByRole('spinbutton',{name:'I give · Wood',exact:true})).toHaveValue('1');
+  await expect(tradeCount(handPage, 'I give', 'wood')).toHaveText('1');
   await handPage.locator('.territory-hand').getByRole('button',{name:'Give Wood',exact:true}).click();
-  await expect(handEditor.getByRole('spinbutton',{name:'I give · Wood',exact:true})).toHaveValue('2');
-  await handEditor.getByRole('button',{name:'I give − Wood',exact:true}).click();
-  await expect(handEditor.getByRole('spinbutton',{name:'I give · Wood',exact:true})).toHaveValue('1');
-  await handEditor.getByRole('button',{name:'Collapse',exact:true}).click();
-  passed('clicking the real hand adds resources; clicking the selected resource removes one unit');
+  await expect(tradeCount(handPage, 'I give', 'wood')).toHaveText('2');
+  const removeWood = handEditor.getByRole('button', { name: 'I give − Wood', exact: true });
+  await removeWood.press('Enter');
+  await expect(tradeCount(handPage, 'I give', 'wood')).toHaveText('1');
+  await removeWood.press('Space');
+  await expect(tradeCount(handPage, 'I give', 'wood')).toHaveCount(0);
+  const addWood = handEditor.getByRole('button', { name: 'I give + Wood', exact: true });
+  await expect(addWood).toBeFocused();
+  await addWood.press('Enter');
+  await expect(tradeCount(handPage, 'I give', 'wood')).toHaveText('1');
+  await handPage.getByRole('button', { name: 'Close trade', exact: true }).click();
+  passed('hand adds resources, keyboard adjusts quantities and retains focus when the last unit is removed');
   const authorIndex = entry.hostIndex, receiverIndex = entry.guestIndex;
   const author = pages[authorIndex], receiver = pages[receiverIndex];
+  await expect(author.locator('.territory-players')).toContainText('Awaiting reply');
+  await expect(receiver.locator('.territory-players')).toContainText('Offers a trade');
   await receiver.getByRole('button', { name: 'Counteroffer', exact: true }).click();
-  await receiver.getByRole('spinbutton', { name: 'I give · Brick', exact: true }).fill('2');
-  await receiver.getByRole('spinbutton', { name: 'I receive · Wood', exact: true }).fill('3');
+  await setTradeCount(receiver, 'I give', 'brick', 2);
+  await setTradeCount(receiver, 'I receive', 'wood', 3);
   await action(author, author.getByRole('button', { name: 'End turn', exact: true }));
   const editor = receiver.locator('.ta-trade-editor');
   await expect(editor).toContainText('Closed: the turn ended');
-  await expect(receiver.getByRole('spinbutton', { name: 'I give · Brick', exact: true })).toHaveValue('2');
-  await expect(receiver.getByRole('spinbutton', { name: 'I receive · Wood', exact: true })).toHaveValue('3');
+  await expect(tradeCount(receiver, 'I give', 'brick')).toHaveText('2');
+  await expect(tradeCount(receiver, 'I receive', 'wood')).toHaveText('3');
+  await expect(author.locator('.ta-offers-panel')).toBeHidden();
+  await expect(receiver.locator('.ta-offers-panel')).toBeHidden();
   await receiver.reload();
+  await expect(receiver.locator(`[data-offer-id="${entry.expected.offerId}"]`)).toHaveCount(0);
+  await expectTradeHistory(receiver, /Offer closed · Turn ended/);
+  await expect(receiver.locator('.territory-player-trade')).toHaveCount(0);
+  await expect(receiver.locator('.territory-action-receipt')).toHaveCount(0);
   await expect(editor).toContainText('Closed: the turn ended');
-  await expect(receiver.getByRole('spinbutton', { name: 'I give · Brick', exact: true })).toHaveValue('2');
-  await expect(receiver.getByRole('spinbutton', { name: 'I receive · Wood', exact: true })).toHaveValue('3');
+  await expect(tradeCount(receiver, 'I give', 'brick')).toHaveText('2');
+  await expect(tradeCount(receiver, 'I receive', 'wood')).toHaveText('3');
   await expect(receiver.getByRole('button', { name: 'Send offer', exact: true })).toBeDisabled();
-  await editor.locator('.ta-draft-heading').scrollIntoViewIfNeeded();
+  await editor.locator('.ta-reuse-draft').scrollIntoViewIfNeeded();
   await receiver.screenshot({ path: join(harness.directory, 'trade-expired-mobile.png') });
   await receiver.getByRole('button', { name: 'Use as a new offer', exact: true }).click();
   await enterPlay(entry, receiverIndex);
@@ -230,7 +298,7 @@ try {
   await receiver.getByRole('button', { name: 'Send offer', exact: true }).click();
   await expect(receiver.getByRole('button', { name: 'Sending…', exact: true })).toBeVisible();
   await expect(editor).toBeVisible();
-  await expect(receiver.getByRole('spinbutton', { name: 'I give · Brick', exact: true })).toHaveValue('2');
+  await expect(tradeCount(receiver, 'I give', 'brick')).toHaveText('2');
   releaseHeldRequest();
   releaseHeldRequest = undefined;
   const sendingAccepted = await sendingResponse;
@@ -246,37 +314,61 @@ try {
   const accepted = await action(author, author.locator(`[data-offer-id="${sent.id}"]`).getByRole('button', { name: 'Accept', exact: true }));
   assert.equal(accepted.you.hand.wood, before.you.hand.wood - 3);
   assert.equal(accepted.you.hand.brick, before.you.hand.brick + 2);
-  await expect(receiver.locator(`[data-offer-id="${sent.id}"][data-offer-status="accepted"]`)).toContainText('Accepted · trade completed');
   await expect(author.locator('.ta-section-heading h4')).toBeFocused();
-  passed('counteroffer survives turn expiry and reload, explicit lawful reuse, waits for real acknowledgement, exact accepted transfer on both clients');
+  await expect(receiver.locator('.ta-offers-panel')).toBeHidden();
+  await expect(author.locator('.ta-offers-panel')).toBeHidden();
+  await receiver.reload();
+  await expect(receiver.locator(`[data-offer-id="${sent.id}"]`)).toHaveCount(0);
+  await expectTradeHistory(receiver, /Trade completed/, '· Accepted: trade completed');
+  await expectTradeHistory(author, /Trade completed.*Paid:.*Received:/);
+  for (const page of [author, receiver]) {
+    await expect(page.locator('.territory-player-trade')).toHaveCount(0);
+    await expect(page.locator('.territory-action-receipt')).toHaveCount(0);
+  }
+  passed('counteroffer survives expiry and reload, commits the exact transfer once, then disappears from the panel and remains in history');
 
   entry = await open('trade-draft');
   const counterPage = pages[entry.guestIndex], initialAuthorPage = pages[entry.hostIndex];
   await counterPage.getByRole('button', { name: 'Counteroffer', exact: true }).click();
-  await counterPage.getByRole('spinbutton', { name: 'I give · Brick', exact: true }).fill('2');
-  await counterPage.getByRole('spinbutton', { name: 'I receive · Wood', exact: true }).fill('3');
+  await setTradeCount(counterPage, 'I give', 'brick', 2);
+  await setTradeCount(counterPage, 'I receive', 'wood', 3);
   const counterSent = await action(counterPage, counterPage.getByRole('button', { name: 'Send offer', exact: true }));
   const counter = counterSent.offers.find(offer => offer.authorId === entry.expected.otherId);
   assert.ok(counter);
   assert.equal(counter.parentId, entry.expected.offerId);
   assert.deepEqual(counter.give, stock({ brick: 2 })); assert.deepEqual(counter.receive, stock({ wood: 3 }));
   assert.equal(counterSent.offerHistory.find(offer => offer.id === entry.expected.offerId)?.status, 'replaced');
-  await expect(counterPage.locator(`[data-offer-id="${entry.expected.offerId}"]`)).toContainText('Replaced by new terms');
+  await expect(counterPage.locator(`[data-offer-id="${entry.expected.offerId}"]`)).toHaveCount(0);
+  await expect(counterPage.locator(`[data-offer-id="${counter.id}"]`)).toBeVisible();
+  await expectTradeHistory(counterPage, /Offer closed · Replaced by new terms/);
+  await expect(counterPage.locator('.territory-action-receipt')).toHaveCount(0);
   await expect(initialAuthorPage.locator(`[data-offer-id="${counter.id}"]`).getByRole('button', { name: 'Accept', exact: true })).toBeEnabled();
   const beforeCounterAccepted = await view(entry, entry.hostIndex);
   const afterCounterAccepted = await action(initialAuthorPage, initialAuthorPage.locator(`[data-offer-id="${counter.id}"]`).getByRole('button', { name: 'Accept', exact: true }));
   assert.equal(afterCounterAccepted.you.hand.wood, beforeCounterAccepted.you.hand.wood - 3);
   assert.equal(afterCounterAccepted.you.hand.brick, beforeCounterAccepted.you.hand.brick + 2);
-  await expect(counterPage.locator(`[data-offer-id="${counter.id}"]`)).toHaveAttribute('data-offer-status', 'accepted');
-  passed('a live counteroffer retains parentId, replaces the original visibly and executes only after its chosen recipient accepts');
+  await expect(counterPage.locator(`[data-offer-id="${counter.id}"]`)).toHaveCount(0);
+  passed('a live counteroffer retains parentId, replaces the original in the active panel and executes only after its chosen recipient accepts');
+
+  entry = await open('trade-draft');
+  const unequal = await post(entry, entry.hostIndex, { type: 'offer', targetId: entry.expected.otherId,
+    give: stock({ wood: 1, grain: 2, wool: 3, ore: 2 }), receive: stock({ brick: 1 }) });
+  const offerId = unequal.offers[0].id;
+  for (const page of pages) await expectTradeArrowCentered(page.locator(`[data-offer-id="${offerId}"] .ta-offer-terms`));
+  const narrow = pages[1];
+  await narrow.setViewportSize({ width: 320, height: 720 });
+  await expectTradeArrowCentered(narrow.locator(`[data-offer-id="${offerId}"] .ta-offer-terms`));
+  await narrow.screenshot({ path: join(harness.directory, 'offer-unequal-320x720.png') });
+  await narrow.setViewportSize({ width: 390, height: 844 });
+  passed('the offer arrow is centered on both clients between one and four resource stacks, including when they wrap on a narrow screen');
 
   entry = await open('trade-draft');
   const lostPage = pages[entry.hostIndex];
   await openTrade(lostPage);
   await lostPage.locator('.ta-trade-editor').getByLabel('Trade with', { exact: true }).selectOption(entry.expected.otherId);
   for (const resource of resources) {
-    await lostPage.getByRole('spinbutton', { name: 'I give · ' + name(resource), exact: true }).fill(resource === 'wood' ? '2' : '0');
-    await lostPage.getByRole('spinbutton', { name: 'I receive · ' + name(resource), exact: true }).fill(resource === 'brick' ? '1' : '0');
+    await setTradeCount(lostPage, 'I give', resource, resource === 'wood' ? 2 : 0);
+    await setTradeCount(lostPage, 'I receive', resource, resource === 'brick' ? 1 : 0);
   }
   const lostPattern = `**/api/platform/v1/rooms/${entry.roomId}/actions`;
   let lostOnce = false, committedOfferView;
@@ -303,12 +395,24 @@ try {
 
   entry = await open('trade-draft');
   await action(pages[entry.guestIndex], pages[entry.guestIndex].getByRole('button', { name: 'Decline', exact: true }));
-  await expect(pages[entry.hostIndex].locator(`[data-offer-id="${entry.expected.offerId}"]`)).toHaveAttribute('data-offer-status', 'declined');
-  passed('decline is visible to both parties');
+  for (const page of pages) {
+    await expect(page.locator(`[data-offer-id="${entry.expected.offerId}"]`)).toHaveCount(0);
+    await expect(page.locator('.territory-player-trade')).toHaveCount(0);
+    await expectTradeHistory(page, /Trade declined/, '· Declined');
+  }
+  passed('declined offers disappear automatically and both parties see the decision in history');
   entry = await open('trade-draft');
   await action(pages[entry.hostIndex], pages[entry.hostIndex].getByRole('button', { name: 'Withdraw', exact: true }));
-  await expect(pages[entry.guestIndex].locator(`[data-offer-id="${entry.expected.offerId}"]`)).toHaveAttribute('data-offer-status', 'withdrawn');
-  passed('withdrawal is visible to both parties');
+  for (const page of pages) {
+    await page.reload();
+    await expect(page.locator('.territory-match')).toBeVisible();
+    await expect(page.locator(`[data-offer-id="${entry.expected.offerId}"]`)).toHaveCount(0);
+    await expect(page.locator('.ta-offers-panel')).toBeHidden();
+    await expectTradeHistory(page, /Offer withdrawn/, '· Withdrawn');
+    await expect(page.locator('.territory-player-trade')).toHaveCount(0);
+    await expect(page.locator('.territory-action-receipt')).toHaveCount(0);
+  }
+  passed('withdrawn offers stay out of the panel after reload and both parties see the decision in history');
 
   entry = await open('trade-draft');
   await post(entry, entry.hostIndex, { type: 'offer', targetId: entry.expected.otherId, give: stock({ wood: 4 }), receive: stock({ brick: 1 }) });
@@ -475,7 +579,8 @@ try {
     const receiver = mobile[entry.guestIndex], sender = mobile[entry.hostIndex];
     const offer = receiver.locator(`[data-offer-id="${entry.expected.offerId}"]`);
     const layout = await visibleSheet(receiver, '.ta-offers-panel', receiver.getByRole('button', { name: 'Свернуть сделки', exact: true }));
-    for (const locator of [offer.locator('.ta-exchange'), ...['Принять', 'Другие условия', 'Отклонить'].map(name => offer.getByRole('button', { name, exact: true }))]) {
+    await expectTradeArrowCentered(offer.locator('.ta-offer-terms'));
+    for (const locator of [offer.locator('.ta-offer-terms'), ...['Принять', 'Другие условия', 'Отклонить'].map(name => offer.getByRole('button', { name, exact: true }))]) {
       await expect(locator).toBeInViewport({ ratio: 1 });
       assert.ok((await touchPoint(locator)).receivesPointer, 'Terms and all decisions must be visible together without internal scrolling');
     }
@@ -500,8 +605,9 @@ try {
     const trade = receiver.locator('.ta-trade-window'), closeTrade = receiver.getByRole('button', { name: 'Закрыть торговлю', exact: true });
     await visibleSheet(receiver, '.ta-trade-window', closeTrade);
     const addWood = receiver.getByRole('button', { name: 'Получаю + Древесина', exact: true });
-    // Exercise the CI failure position deliberately: after reaching the bottom,
-    // the quantity control may need an upward scroll out from under the tabs.
+    const endTrade = receiver.getByRole('button', { name: 'Отправить', exact: true });
+    await expect(trade.getByRole('spinbutton')).toHaveCount(0);
+    // On short screens, the sticky header remains reachable through real scrolling.
     let tradeBottom;
     if (height === 600) {
       for (let gesture = 0; gesture < 12; gesture++) {
@@ -509,7 +615,10 @@ try {
         await visibleSheet(receiver, '.ta-trade-window', closeTrade);
       }
       tradeBottom = await scrollBounds(trade);
-      assert.ok(tradeBottom.max > 0 && tradeBottom.max - tradeBottom.top <= 1, 'Real touch must reach the trade scroll boundary');
+      assert.ok(tradeBottom.max - tradeBottom.top <= 1, 'Real touch must reach the trade scroll boundary');
+      assert.ok((await touchPoint(endTrade)).receivesPointer, 'The trade submit must be reachable at the bottom of a short sheet');
+    } else {
+      assert.equal((await scrollBounds(trade)).max, 0, 'The normal-height mobile trade fits without scrolling');
     }
     let quantityGestures = 0;
     for (; !(await touchPoint(addWood)).receivesPointer && quantityGestures < 12; quantityGestures++) {
@@ -517,8 +626,7 @@ try {
       const center = await trade.evaluate(element => {
         const box = element.getBoundingClientRect();
         const header = element.querySelector('.ta-trade-tabs').getBoundingClientRect();
-        const footer = element.querySelector('.ta-trade-editor > .ta-buttons').getBoundingClientRect();
-        return (Math.max(box.top, header.bottom) + Math.min(box.bottom, footer.top)) / 2;
+        return (Math.max(box.top, header.bottom) + box.bottom) / 2;
       });
       const direction = target.y < center ? -1 : 1;
       assert.ok(await nativeSwipe(receiver, trade, { direction, distance: Math.max(35, Math.abs(target.y - center) + 20) }),
@@ -526,22 +634,32 @@ try {
       await visibleSheet(receiver, '.ta-trade-window', closeTrade);
     }
     await nativeTap(receiver, addWood);
-    await expect(receiver.getByRole('spinbutton', { name: 'Получаю · Древесина', exact: true })).toHaveValue('2');
+    await expect(tradeCount(receiver, 'Получаю', 'wood')).toHaveText('2');
+    await nativeTap(receiver, receiver.getByRole('button', { name: 'Получаю − Древесина', exact: true }));
+    await expect(tradeCount(receiver, 'Получаю', 'wood')).toHaveText('1');
+    await receiver.screenshot({ path: join(harness.directory, `trade-editor-ru130-390x${height}.png`) });
     await nativeTap(receiver, receiver.getByRole('button', { name: 'Банк', exact: true }));
     await expect(receiver.locator('.ta-bank')).toBeVisible();
     await visibleSheet(receiver, '.ta-trade-window', closeTrade);
     await nativeTap(receiver, closeTrade);
     await expect(trade).toBeHidden();
+    await nativeTap(sender, sender.getByRole('button', { name: 'Свернуть сделки', exact: true }));
     const response = receiver.waitForResponse(response => response.request().method() === 'POST' && response.url().endsWith('/actions'));
     await nativeTap(receiver, offer.getByRole('button', { name: height === 600 ? 'Принять' : 'Отклонить', exact: true }));
     const answered = await response; assert.equal(answered.status(), 200);
     const outcome = (await answered.json()).view;
     assert.equal(outcome.offerHistory.find(item => item.id === entry.expected.offerId).status, height === 600 ? 'accepted' : 'declined');
-    // Collapsing a receipt does not suppress a newly arriving offer.
-    await nativeTap(receiver, receiver.getByRole('button', { name: 'Свернуть сделки', exact: true }));
+    await expect(receiver.locator('.ta-offers-panel')).toBeHidden();
+    await expect(sender.getByRole('button', { name: 'Показать сделки', exact: true })).toBeHidden();
+    await expect(receiver.locator('.territory-player-trade')).toHaveCount(0);
+    await expect(sender.locator('.territory-player-trade')).toHaveCount(0);
+    // An empty or collapsed panel does not suppress a newly arriving offer.
+    if (height === 844) await receiver.screenshot({ path: join(harness.directory, 'trade-closed-ru130-390x844.png') });
     const newOffer = await post(entry, entry.hostIndex, { type: 'offer', targetId: entry.expected.otherId, give: stock({ wood: 1 }), receive: stock({ brick: 1 }) });
-    await expect(receiver.locator('.ta-offers-panel')).toBeVisible();
-    await expect(receiver.locator(`[data-offer-id="${newOffer.offers[0].id}"]`)).toBeVisible();
+    for (const page of [receiver, sender]) {
+      await expect(page.locator('.ta-offers-panel')).toBeVisible();
+      await expect(page.locator(`[data-offer-id="${newOffer.offers[0].id}"]`)).toBeVisible();
+    }
 
     entry = await harness.reset('patrol');
     await Promise.all(mobile.map(page => page.goto(entry.url)));

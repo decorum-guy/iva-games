@@ -1,12 +1,12 @@
 import type { DistrictMap } from "@iva-games/district";
-import { AVATARS } from "./types";
+import { AvatarPicker } from "./AvatarPicker";
 import { DISTRICT_ISLAND_MAPS, DISTRICT_MAP_CATALOG, DISTRICT_MAPS, DISTRICT_RULES_VERSION } from "@iva-games/district";
 import { DistrictPanel } from "./District";
 import { TERRITORY_RULES, territoryMaps } from "@iva-games/district/territorial";
 import { districtPreset, TerritorialLobby, TerritorialSettingsFields } from "./TerritorialLobby";
 import { districtBotName } from "./districtCopy";
 import { DistrictMapSelect, DistrictLobbyMap } from "./DistrictMap";
-import type { AvatarStyle } from "./types";
+import type { AvatarChoice } from "./types";
 import { friendRequestFeedback } from "./socialFeedback";
 import { Catalogue } from "./Catalogue";
 import { gameDescription, gameTitle } from "./gameCopy";
@@ -62,6 +62,7 @@ const errorCopy: Record<string, [string, string]> = {
     "Почта или пароль не подходят.",
     "The email or password is incorrect.",
   ],
+  INVALID_AVATAR_PHOTO: ["Не удалось сохранить фото. Выберите другое изображение.", "Could not save the photo. Choose another image."],
   EMAIL_NOT_VERIFIED: [
     "Сначала подтвердите почту — ссылка в письме.",
     "Please confirm your email using the link in your inbox.",
@@ -2209,17 +2210,15 @@ function Profile({
 }) {
   const { t } = useLanguage();
   const [name, setName] = useState(user.displayName);
-  const [avatar, setAvatar] = useState<AvatarStyle | "">(user.avatar ?? "");
-  const avatarLabel: Record<AvatarStyle, string> = {
-    king: t("Король", "King"), queen: t("Ферзь", "Queen"), rook: t("Ладья", "Rook"),
-    bishop: t("Слон", "Bishop"), knight: t("Конь", "Knight"), pawn: t("Пешка", "Pawn"),
-  };
+  const [avatar, setAvatar] = useState<AvatarChoice | "">(user.avatar ?? "");
+  const [photo, setPhoto] = useState<string | null>(null);
+  const [photoProcessing, setPhotoProcessing] = useState(false);
   const [password, setPassword] = useState("");
   return (
     <div className="profile-grid">
       <section className="profile-card">
         <div className="profile-identity">
-          <Avatar player={{ ...user, avatar: avatar || undefined }} large />
+          <Avatar player={{ ...user, displayName: name || user.displayName, avatar: avatar || undefined }} large photoPreview={photo ?? undefined} />
           <div>
             <h2>{user.displayName}</h2>
             <p>@{user.handle}</p>
@@ -2230,9 +2229,9 @@ function Profile({
             event.preventDefault();
             void mutate(
               "/profile",
-              { displayName: name, avatar: avatar || null },
+              { displayName: name, avatar: avatar || null, ...(avatar === "photo" && photo ? { avatarPhoto: photo } : {}) },
               t("Профиль сохранён.", "Profile saved."),
-            );
+            ).then(saved => { if (saved) setPhoto(null); });
           }}
         >
           <label>
@@ -2244,15 +2243,8 @@ function Profile({
               required
             />
           </label>
-          <label>
-            {t("Аватар", "Avatar")}
-            <select value={avatar} onChange={(event) => setAvatar(event.target.value as AvatarStyle | "")}>
-              <option value="">{t("Инициалы", "Initials")}</option>
-              {(Object.keys(AVATARS) as AvatarStyle[]).map(style => (
-                <option key={style} value={style}>{AVATARS[style]} {avatarLabel[style]}</option>
-              ))}
-            </select>
-          </label>
+          <AvatarPicker user={user} avatar={avatar} photo={photo} choose={setAvatar}
+            choosePhoto={value => { setPhoto(value); setAvatar("photo"); }} onProcessing={setPhotoProcessing}/>
           {user.telegramVerified ? (
             <div className="profile-email">
               <span>Telegram</span>
@@ -2269,7 +2261,7 @@ function Profile({
           </div>}
           <button
             className="button primary"
-            disabled={busy || (name.trim() === user.displayName && avatar === (user.avatar ?? ""))}
+            disabled={busy || photoProcessing || !name.trim() || (!photo && name.trim() === user.displayName && avatar === (user.avatar ?? ""))}
           >
             {t("Сохранить профиль", "Save profile")}
           </button>
