@@ -26,6 +26,7 @@ export interface TelegramMessage {
   chatId: string;
   text: string;
   button?: { text: string; url: string };
+  copyCode?: { value: string; offset: number; buttonText: string };
 }
 interface HttpResult { status: number; body: string }
 export type TelegramHttpRequest = (input: { path: string; body: string; agent: Agent; timeoutMs: number }) => Promise<HttpResult>;
@@ -63,7 +64,17 @@ export function createTelegramTransport(options: { botToken: string; proxyUrl: s
     close() { agent.destroy(); },
     async sendMessage(message: TelegramMessage): Promise<{ outcome: 'accepted'; messageId: string }> {
       if (!/^[1-9]\d{0,18}$/.test(message.chatId) || !message.text || message.text.length > 4096) throw new TelegramTransportError('INVALID_CONFIGURATION', 'Некорректное сообщение.');
-      let markup: { inline_keyboard: Array<Array<{ text: string; url: string }>> } | undefined;
+      let markup: { inline_keyboard: Array<Array<{ text: string; url: string } | { text: string; copy_text: { text: string } }>> } | undefined;
+      let entities: Array<{ type: 'code'; offset: number; length: number }> | undefined;
+      if (message.copyCode) {
+        const { value, offset, buttonText } = message.copyCode;
+        if (message.button || !value || value.length > 256 || !buttonText || buttonText.length > 100 ||
+          !Number.isSafeInteger(offset) || offset < 0 || message.text.slice(offset, offset + value.length) !== value) {
+          throw new TelegramTransportError('INVALID_CONFIGURATION', 'Некорректный код для копирования.');
+        }
+        entities = [{ type: 'code', offset, length: value.length }];
+        markup = { inline_keyboard: [[{ text: buttonText, copy_text: { text: value } }]] };
+      }
       if (message.button) {
         let target: URL;
         try { target = new URL(message.button.url); } catch { throw new TelegramTransportError('INVALID_CONFIGURATION', 'Некорректная ссылка приглашения.'); }
@@ -73,7 +84,8 @@ export function createTelegramTransport(options: { botToken: string; proxyUrl: s
       let response: HttpResult;
       try {
         response = await send({ path: `/bot${options.botToken}/sendMessage`, agent, timeoutMs,
-          body: JSON.stringify({ chat_id: message.chatId, text: message.text, link_preview_options: { is_disabled: true }, ...(markup ? { reply_markup: markup } : {}) }) });
+          body: JSON.stringify({ chat_id: message.chatId, text: message.text, link_preview_options: { is_disabled: true },
+            ...(entities ? { entities } : {}), ...(markup ? { reply_markup: markup } : {}) }) });
       } catch {
         // Request may have reached Telegram; never label a timeout as certainly unsent.
         throw new TelegramTransportError('DELIVERY_UNKNOWN', 'Результат доставки не подтверждён.');

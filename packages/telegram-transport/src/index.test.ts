@@ -29,6 +29,21 @@ describe('mandatory explicit Telegram proxy', () => {
     catch (error) { expect(error).toMatchObject({ code: 'DELIVERY_UNKNOWN' }); expect(String(error)).not.toContain(config.botToken); expect(String(error)).not.toContain('secret'); }
     expect(request).toHaveBeenCalledTimes(1); transport.close();
   });
+  it('sends a native copy button and code entity without permitting a mismatched code or invitation', async () => {
+    const request = vi.fn().mockResolvedValue({ status: 200, body: JSON.stringify({ ok: true, result: { message_id: 18 } }) });
+    const transport = createTelegramTransport({ ...config, request });
+    const prefix = 'Код подключения: ';
+    const value = 'ABCDEFG2';
+    await transport.sendMessage({ chatId: '10001', text: `${prefix}${value}\nВведите код`,
+      copyCode: { value, offset: prefix.length, buttonText: 'Скопировать код' } });
+    const body = JSON.parse(request.mock.calls[0][0].body);
+    expect(body.entities).toEqual([{ type: 'code', offset: prefix.length, length: value.length }]);
+    expect(body.reply_markup.inline_keyboard).toEqual([[{ text: 'Скопировать код', copy_text: { text: value } }]]);
+    await expect(transport.sendMessage({ chatId: '10001', text: `${prefix}${value}`,
+      copyCode: { value, offset: 0, buttonText: 'Скопировать код' } })).rejects.toMatchObject({ code: 'INVALID_CONFIGURATION' });
+    expect(request).toHaveBeenCalledTimes(1);
+    transport.close();
+  });
   it('distinguishes rate limits, blocked recipients and uncertain upstream outcomes', async () => {
     const request = vi.fn(); const transport = createTelegramTransport({ ...config, request });
     request.mockResolvedValueOnce({ status: 429, body: '{"ok":false,"parameters":{"retry_after":7}}' });

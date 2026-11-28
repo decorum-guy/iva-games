@@ -108,11 +108,16 @@ export class TelegramAuth {
     }).immediate();
     if (!attempt) return { ok: true };
     const code = this.code(attempt);
+    const prefix = attempt.locale === 'en' ? 'Iva Games code: ' : 'Код Iva Games: ';
     return {
-      method: 'sendMessage', chat_id: telegramId, protect_content: true,
-      text: attempt.locale === 'en'
-        ? `Iva Games code: ${code}\nEnter it on iva-games.pro in the browser where you requested it. Never share this code.`
-        : `Код Iva Games: ${code}\nВведите его на iva-games.pro в браузере, где вы запросили код. Никому его не сообщайте.`,
+      method: 'sendMessage', chat_id: telegramId,
+      text: `${prefix}${code}\n${attempt.locale === 'en'
+        ? 'Enter it on iva-games.pro in the browser where you requested it. Never share this code.'
+        : 'Введите его на iva-games.pro в браузере, где вы запросили код. Никому его не сообщайте.'}`,
+      entities: [{ type: 'code', offset: prefix.length, length: code.length }],
+      reply_markup: { inline_keyboard: [[{
+        text: attempt.locale === 'en' ? 'Copy code' : 'Скопировать код', copy_text: { text: code },
+      }]] },
     };
   }
 
