@@ -68,6 +68,7 @@ it.each([
     socket?.close();
     await server?.close();
     vi.unstubAllGlobals();
-    await rm(root, { recursive: true, force: true });
+    // A cold optimizer can still finish a cache write while Vite is closing.
+    await rm(root, { recursive: true, force: true, maxRetries: 4, retryDelay: 100 });
   }
 }, 30_000);
