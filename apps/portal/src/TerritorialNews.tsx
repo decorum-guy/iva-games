@@ -53,7 +53,7 @@ function changeText(change: AppliedChange, view: TerritoryView, lang: Language) 
   switch (change.kind) {
     case 'level': return place + ' · ' + change.before + ' → ' + change.after;
     case 'protected': return place + (ru ? ' · защита сработала' : ' · protection held');
-    case 'modifier': return place + (ru ? ' · действует правило новости' : ' · event rule applied');
+    case 'modifier': return place + (ru ? ' · затронут событием' : ' · affected by event');
   }
 }
 

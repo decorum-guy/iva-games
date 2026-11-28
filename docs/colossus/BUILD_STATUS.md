@@ -12,6 +12,8 @@ The six audition checksums matched the served files. Headless Chromium and WebKi
 
 This follow-up to the audit of `95cf869765ff2b9541bd858bbc69a10f90c9d4af` incorporates main `a3df8369b269c53aea4c3839fade24e7064a4ce1`. The conflict in the shared build status was resolved by keeping both project records.
 
+The branch also incorporates main `b04479dc9e6aab784a24c9e9c54aa240080a5624` from [PR #32](https://github.com/decorum-guy/iva-games/pull/32). The platform workspace keeps both the shared game registry and the JPEG decoder for profile avatars.
+
 - **C-05:** An unreadable hunt or practice save now has a warning and a download. Before a new run is saved, its slot archives the original bytes. If writing the archive fails, the old slot stays intact and the game shows its save error.
 - **C-04:** On short and landscape screens the arena keeps its size while battle controls remain reachable through scrolling. At 390×600 with 130% root text the English 2D board is 335 CSS px with or without the card panel, compared with the audited 180 px while the panel was open. At 844×390 the board is 308 px at both 100% and 130%, compared with 140 and 119 px in the audit. The same touch sequence selected the king and applied Stone Skin in 12 cases across Chromium and WebKit emulation.
 - **C-02 and C-03:** Rules list damage, geometry and range for all six pieces in Russian and English. The displayed numbers share the core's strike definitions. The card instructions describe optional targets, and a ready targetless card prompts the player to apply it.

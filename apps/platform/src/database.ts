@@ -94,6 +94,14 @@ export function openPlatformDatabase(path: string): Database.Database {
       player_id TEXT PRIMARY KEY REFERENCES players(player_id),
       avatar TEXT NOT NULL CHECK(avatar IN ('king','queen','rook','bishop','knight','pawn'))
     );
+    -- Additive storage preserves the existing six-figure table and old accounts.
+    CREATE TABLE IF NOT EXISTS player_avatar_extra (
+      player_id TEXT PRIMARY KEY REFERENCES players(player_id),
+      avatar TEXT NOT NULL CHECK(avatar IN ('fox','cat','owl','robot','astronaut','dragon','dice','comet','photo')),
+      photo BLOB, photo_version TEXT,
+      CHECK((avatar='photo' AND photo IS NOT NULL AND photo_version IS NOT NULL) OR
+            (avatar<>'photo' AND photo IS NULL AND photo_version IS NULL))
+    );
     CREATE TABLE IF NOT EXISTS telegram_login_accounts (
       bot_id TEXT NOT NULL, telegram_user_id TEXT NOT NULL, player_id TEXT NOT NULL UNIQUE REFERENCES players(player_id),
       PRIMARY KEY(bot_id,telegram_user_id)

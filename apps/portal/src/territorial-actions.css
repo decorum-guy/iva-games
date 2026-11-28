@@ -67,11 +67,17 @@
 .ta-amounts label > small { color: #617b73; font-size: calc(10px * var(--table-text-scale, 1)); }
 .ta-offer { border: 1px solid #acc8c8; border-radius: 9px; padding: 10px; background: #edf6f5; }
 .ta-offer.is-outgoing { background: #f6f3e8; border-color: #d0c6a6; }
-.ta-offer.is-closed { background: #f5f8f3; border-color: #d1ddd2; }
-.ta-offer[data-offer-status=accepted] { border-color: #78ab94; }
 .ta-offer header { display: grid; gap: 4px; }
 .ta-offer-status { font-size: calc(11px * var(--table-text-scale, 1)); color: #527572; }
-.ta-offer[data-offer-status=accepted] .ta-offer-status { color: #28714d; font-weight: 750; }
+.ta-offer-terms { display: grid; grid-template-columns: minmax(0,1fr) 20px minmax(0,1fr); gap: 2px 9px; align-items: center; }
+.ta-offer-terms > small { grid-row: 1; color: #526c68; font-size: calc(11px * var(--table-text-scale, 1)); }
+.ta-offer-terms > :is(.ta-resources,.ta-free) { grid-row: 2; }
+.ta-offer-terms > :nth-child(-n+2) { grid-column: 1; justify-self: end; text-align: right; }
+.ta-offer-terms > :nth-child(n+4) { grid-column: 3; justify-self: start; }
+.ta-offer-terms .ta-offer-arrow { grid-area: 2 / 2; width: 18px; justify-self: center; color: #527d72; }
+.ta-offer-terms .ta-resources { gap: 2px 7px; }
+.ta-offer-terms .ta-resources:nth-child(2) { justify-content: flex-end; }
+.ta-offer-terms .ta-resource-name { display: none; }
 .ta-exchange { display: grid; grid-template-columns: minmax(0,1fr) 20px minmax(0,1fr); align-items: center; gap: 5px; }
 .ta-exchange > div { min-width: 0; display: grid; gap: 5px; }
 .ta-exchange > div > small { color: #5b7874; font-size: calc(11px * var(--table-text-scale, 1)); }
@@ -79,12 +85,31 @@
 .ta-exchange .ta-resources > span { gap: 3px; flex-wrap: wrap; }
 .ta-exchange .ta-resource-name { font-size: calc(10px * var(--table-text-scale, 1)); }
 .ta-exchange-sign { text-align: center; color: #62877e; font-size: 22px; }
-.ta-draft-sides { display: grid; gap: 12px; }
-.ta-trade-editor { border: 1px solid #86b0b7; border-radius: 9px; padding: 12px; background: #f3f9f7; }
-.ta-draft-heading { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 4px 7px; }
-.ta-draft-heading small { color: #5e7e78; font-size: calc(10px * var(--table-text-scale, 1)); }
+.ta-trade-editor { padding: 10px 12px 12px; }
+.territorial-actions .ta-draft-target { display: flex; flex: 0 1 auto; align-items: center; gap: 8px; max-width: 100%; }
+.ta-draft-target > span { white-space: nowrap; }
+.ta-draft-target select { width: auto; max-width: 11.5rem; height: 44px; padding: 4px 7px; text-overflow: ellipsis; }
+.ta-trade-side { min-width: 0; padding: 0; margin: 0; border: 0; }
+.ta-trade-side legend { padding: 0; margin-block-end: 4px; font-weight: 750; }
+.ta-trade-palette { display: grid; grid-template-columns: repeat(5,minmax(0,1fr)); gap: 4px; }
+.ta-trade-stack { display: flex; min-width: 0; border: 1px solid #ceded5; border-radius: 8px; background: #f1f6ef; }
+.ta-trade-stack[data-selected] { border-color: #8eafa0; background: #dfede2; }
+.territorial-actions .ta-trade-stack button { min-width: 0; min-height: 44px; padding: 0; border: 0; border-radius: 7px; background: transparent; }
+.territorial-actions .ta-trade-stack button:hover:not(:disabled,[aria-disabled=true]) { background: #dbece0; }
+.territorial-actions .ta-trade-stack button[aria-disabled=true] { opacity: .5; background: transparent; cursor: default; }
+.territorial-actions .ta-trade-stack[data-selected] .ta-pick-add[aria-disabled=true] { opacity: 1; }
+.territorial-actions .ta-trade-stack button:focus-visible { position: relative; z-index: 1; outline-offset: 1px; }
+.ta-pick-add { display: grid; flex: 1 1 0; justify-items: center; align-content: center; line-height: 1; }
+.ta-pick-add .ta-resource-art { width: 28px; max-width: 100%; height: 25px; }
+.ta-pick-add > span,.ta-trade-count { font-size: calc(11px * var(--table-text-scale, 1)); font-variant-numeric: tabular-nums; }
+.ta-pick-add > span { color: #53756c; }
+.territorial-actions .ta-trade-stack[data-selected] .ta-pick-add { border-radius: 7px 0 0 7px; }
+.territorial-actions .ta-trade-stack .ta-pick-minus { flex: 0 0 min(25px, 48%); border-inline-start: 1px solid #b9d1c4; border-radius: 0 7px 7px 0; font-size: 16px; }
+.ta-trade-footer { display: flex; justify-content: space-between; align-items: center; gap: 7px; }
+.ta-trade-footer .ta-primary { flex-shrink: 0; margin-inline-start: auto; }
 .ta-feedback { border-left: 3px solid #a79265; background: #f3eddb; padding: 9px 10px; display: grid; gap: 7px; font-size: calc(12px * var(--table-text-scale, 1)); }
 .ta-feedback.ta-success { border-color: #5e9c7b; background: #e7f2e6; color: #286146; }
+.ta-reuse-draft { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; }
 .ta-trade-open { justify-self: stretch; }
 .ta-rate { padding-block: 3px; }
 .ta-bank-stock { padding-top: 5px; }
@@ -112,6 +137,6 @@
   .ta-resource-cards { gap: 5px; }
   .ta-resource-cards .ta-resource-name,.ta-amounts label > span { font-size: calc(8px * var(--table-text-scale, 1)); }
   .ta-amounts { gap: 4px; }
-  .ta-trade-editor { padding: 9px; }
+  .ta-trade-editor { padding-inline: 9px; }
 }
 @media (prefers-reduced-motion: reduce) { .ta-resource-cards * { transition: none; } }

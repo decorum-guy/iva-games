@@ -147,7 +147,7 @@ export function TerritorialMatch({ room, refresh }: { room: Room; refresh: () =>
   const couponRoads = selectedCouponId ? view.legal.couponRoutes?.[selectedCouponId] ?? [] : [];
   const ownClosed = [...(view.offerHistory ?? [])].reverse()[0];
   const incoming = view.offers.filter(offer => offer.targetId === view.you.participantId);
-  const receipt = [...(view.history ?? [])].reverse().find(entry => !['end','distribution','offer-closed'].includes(entry.kind));
+  const receipt = [...(view.history ?? [])].reverse().find(entry => !['end','distribution'].includes(entry.kind));
   const classes = 'territory-match territory-map-first' + (preferences.reduceMotion ? ' territory-reduce-motion' : '') + (preferences.compactPanels ? ' territory-compact' : '') + (preferences.highContrast ? ' territory-contrast' : '');
   return <section ref={tableRef} className={classes} style={{ '--table-text-scale': preferences.textSize / 100 } as CSSProperties}
     aria-label={t("Территориальная партия Района", "District territorial match")}>
@@ -187,7 +187,7 @@ export function TerritorialMatch({ room, refresh }: { room: Room; refresh: () =>
             {selection?.kind === 'tile' && selection.id === view.blockedTileId && <div className="territory-blockade"><strong>{t('Производство заблокировано', 'Production blocked')}</strong><p>{blockadeText(view.blockade,view,lang)}</p></div>}
             <TerritorialActions view={view} lang={lang} selection={selection} busy={busy || Boolean(pending) || loadError || Boolean(left)} onAction={act}
               selectedCouponId={selectedCouponId} onShowCouponRoutes={showCoupon}/>
-            {receipt && <div className="territory-action-receipt"><small>{t('Последнее действие', 'Latest action')} · {playerName(view,receipt.actorId)}</small><strong>{historyTitle(receipt,view,lang)}</strong>
+            {receipt && !['offer','accept','decline','cancel','offer-closed'].includes(receipt.kind) && <div className="territory-action-receipt"><small>{t('Последнее действие', 'Latest action')} · {playerName(view,receipt.actorId)}</small><strong>{historyTitle(receipt,view,lang)}</strong>
               {receipt.paid && Object.values(receipt.paid).some(Boolean) && <span>{t('Списано: ', 'Paid: ')}<ResourceStock stock={receipt.paid} lang={lang}/></span>}
               {receipt.received && Object.values(receipt.received).some(Boolean) && <span>{t('Получено: ', 'Received: ')}<ResourceStock stock={receipt.received} lang={lang}/></span>}
             </div>}
@@ -220,8 +220,7 @@ function TerritorialPlayers({ view, lang }: { view: TerritoryView; lang: Languag
     const offer = view.offers.find(item => item.authorId === id || item.targetId === id && item.authorId === view.you.participantId);
     if (offer?.agreedAt !== undefined) return ru ? 'Согласие получено' : 'Agreed';
     if (offer) return offer.authorId === view.you.participantId ? (ru ? 'Ждём ответа' : 'Awaiting reply') : (ru ? 'Предлагает обмен' : 'Offers a trade');
-    const previous = [...(view.offerHistory ?? [])].reverse().find(item => item.authorId === id || item.targetId === id);
-    return previous?.closedTurn === view.turn ? historyTradeNotice(previous.status, lang) : '';
+    return '';
   };
   return <ul className="territory-players">
     {view.players.map(player => <li key={player.participantId} className={player.participantId === view.activeParticipantId && !view.outcome ? "is-active" : ""}>
@@ -287,7 +286,10 @@ export function TerritorialPractice() {
         <TerritorialBoard map={view.map} buildings={view.buildings} routes={view.routes} players={view.players} lang={lang}
           blockedTileId={view.blockedTileId} selection={selection} onSelect={setSelection} candidates={candidates}
           newsArea={territorialNewsArea(news)} />
-      </div><div className="territory-hand"><ResourceStock stock={view.you.hand} lang={lang} showZero appearance="cards"/></div></div>
+      </div><section className="territory-hand" aria-label={t('Ваша рука', 'Your hand')}>
+        <div className="territory-hand-heading"><strong>{t('Ваши ресурсы', 'Your resources')}</strong><small>{Object.values(view.you.hand).reduce((a,b) => a+b,0)} {t('в руке', 'in hand')}</small></div>
+        <ResourceStock stock={view.you.hand} lang={lang} showZero appearance="cards"/>
+      </section></div>
       <aside className="territory-inspector">
         <div className="territory-panel-scroll">
         <article className="territory-lesson">

@@ -527,8 +527,8 @@ try {
           const counterpart = view.players.find((p) => p.participantId === other.you.participantId);
           await page.locator('.ta-trade-editor select').selectOption(counterpart.participantId);
           const resourceName = (r) => r.charAt(0).toUpperCase() + r.slice(1);
-          await page.getByRole('spinbutton', { name: 'I give · ' + resourceName(give), exact: true }).fill('1');
-          await page.getByRole('spinbutton', { name: 'I receive · ' + resourceName(take), exact: true }).fill('1');
+          await page.getByRole('button', { name: 'I give + ' + resourceName(give), exact: true }).click();
+          await page.getByRole('button', { name: 'I receive + ' + resourceName(take), exact: true }).click();
           await clickAction(page, page.getByRole('button', { name: 'Send offer', exact: true }));
           const otherPage = pages[1 - index];
           await otherPage.reload();

@@ -1,5 +1,6 @@
 import { registration } from '@iva-games/game-registry';
 import { AVATARS } from "./types";
+import { AvatarArt, CHARACTER_AVATARS } from "./AvatarArt";
 import { createContext, useContext, useEffect, useRef } from "react";
 import type { ReactNode } from "react";
 import type { Language, PublicPlayer } from "./types";
@@ -136,10 +137,12 @@ export function Avatar({
   player,
   bot = false,
   large = false,
+  photoPreview,
 }: {
-  player: Pick<PublicPlayer, "displayName" | "handle" | "avatar">;
+  player: Pick<PublicPlayer, "displayName" | "handle" | "avatar" | "avatarVersion"> & { playerId?: string | null };
   bot?: boolean;
   large?: boolean;
+  photoPreview?: string;
 }) {
   const color =
     [...player.handle].reduce((sum, char) => sum + char.charCodeAt(0), 0) % 5;
@@ -150,9 +153,13 @@ export function Avatar({
     >
       {bot ? (
         <Icon name="robot" />
-      ) : (
-        (player.avatar && AVATARS[player.avatar]) || (player.displayName || player.handle).slice(0, 2).toLocaleUpperCase()
-      )}
+      ) : player.avatar === "photo" && (photoPreview || player.playerId) ? (
+        <img className="avatar-photo" src={photoPreview ?? `/api/platform/v1/avatars/${encodeURIComponent(player.playerId!)}?v=${encodeURIComponent(player.avatarVersion ?? "")}`} alt="" />
+      ) : player.avatar && player.avatar !== "photo" && CHARACTER_AVATARS.includes(player.avatar) ? (
+        <AvatarArt style={player.avatar} />
+      ) : player.avatar && player.avatar !== "photo" ? (
+        <span className="avatar-piece">{AVATARS[player.avatar]}</span>
+      ) : (player.displayName || player.handle).slice(0, 2).toLocaleUpperCase()}
     </span>
   );
 }
