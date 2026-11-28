@@ -113,9 +113,6 @@ export function openPlatformDatabase(path: string): Database.Database {
     );
     CREATE INDEX IF NOT EXISTS telegram_auth_expiry ON telegram_auth_attempts(expires_at);
     CREATE INDEX IF NOT EXISTS telegram_auth_recipient ON telegram_auth_attempts(bot_id,telegram_user_id,reply_at);
-    CREATE TABLE IF NOT EXISTS telegram_auth_devices (
-      token_hash TEXT PRIMARY KEY, bot_id TEXT NOT NULL, telegram_user_id TEXT NOT NULL, expires_at INTEGER NOT NULL
-    );
     -- A player's room-list cleanup never deletes rooms or other participants' history.
     CREATE TABLE IF NOT EXISTS room_list_hidden (
       player_id TEXT NOT NULL REFERENCES players(player_id),

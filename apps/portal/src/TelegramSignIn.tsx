@@ -4,7 +4,7 @@ import type { Perform } from "./Auth";
 import { request } from "./api";
 import { useLanguage } from "./ui";
 
-type Attempt = { attemptId: string; deepLink: string; delivery: "sent" | "open_bot" | "failed" };
+type Attempt = { attemptId: string; deepLink: string };
 
 export function TelegramSignIn({ busy, perform, onAuthenticated }: {
   busy: boolean;
@@ -17,8 +17,8 @@ export function TelegramSignIn({ busy, perform, onAuthenticated }: {
   const [profileRequired, setProfileRequired] = useState(false);
   const [handle, setHandle] = useState("");
   const [displayName, setDisplayName] = useState("");
-  const start = (otherAccount = false) => void perform(async () => {
-    const next = await request<Attempt>("/auth/telegram/start", { locale: lang, otherAccount });
+  const start = () => void perform(async () => {
+    const next = await request<Attempt>("/auth/telegram/start", { locale: lang });
     setAttempt(next);
     setCode("");
     setProfileRequired(false);
@@ -42,7 +42,7 @@ export function TelegramSignIn({ busy, perform, onAuthenticated }: {
   if (!attempt) return (
     <div className="telegram-sign-in">
       <p>{t("Один код для регистрации и входа. Бот пришлёт его в личный чат.", "Use a code to sign up or sign in. The bot sends it in a private chat.")}</p>
-      <button className="button primary wide" type="button" disabled={busy} onClick={() => start()}>
+      <button className="button primary wide" type="button" disabled={busy} onClick={start}>
         {t("Продолжить через Telegram", "Continue with Telegram")}
       </button>
     </div>
@@ -51,14 +51,10 @@ export function TelegramSignIn({ busy, perform, onAuthenticated }: {
     <div className="telegram-sign-in">
       {!profileRequired && (
         <>
-          <p>{attempt.delivery === "sent"
-            ? t("Код отправлен в Telegram. Введите его здесь.", "The code was sent to Telegram. Enter it here.")
-            : attempt.delivery === "failed"
-              ? t("Не удалось отправить код. Откройте бота и нажмите «Старт».", "Could not send the code. Open the bot and press Start.")
-              : t("Откройте бота, нажмите «Старт» и введите код здесь.", "Open the bot, press Start, and enter the code here.")}</p>
-          {attempt.delivery !== "sent" && <a className="button secondary wide" href={attempt.deepLink} target="_blank" rel="noreferrer">
+          <p>{t("Откройте бота, нажмите «Старт» и введите код здесь.", "Open the bot, press Start, and enter the code here.")}</p>
+          <a className="button secondary wide" href={attempt.deepLink} target="_blank" rel="noreferrer">
             {t("Открыть бота", "Open the bot")}
-          </a>}
+          </a>
         </>
       )}
       <form onSubmit={finish}>
@@ -85,12 +81,9 @@ export function TelegramSignIn({ busy, perform, onAuthenticated }: {
           {profileRequired ? t("Создать аккаунт", "Create account") : t("Подтвердить код", "Confirm code")}
         </button>
       </form>
-      <button className="text-button" type="button" disabled={busy} onClick={() => start()}>
-        {t("Отправить код ещё раз", "Send code again")}
+      <button className="text-button" type="button" disabled={busy} onClick={start}>
+        {t("Запросить новый код", "Request another code")}
       </button>
-      {attempt.delivery === "sent" && <button className="text-button" type="button" disabled={busy} onClick={() => start(true)}>
-        {t("Войти в другой аккаунт", "Sign in to another account")}
-      </button>}
     </div>
   );
 }

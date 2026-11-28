@@ -24,12 +24,7 @@ const telegram = config.telegram && telegramTransport ? new TelegramService({
   proofEncryptionKey: config.telegram.proofEncryptionKey, transport: telegramTransport, sendTimeoutMs: 10_000,
 }) : undefined;
 if (telegram) platform.setInvitationDelivery(invitationId => telegram.enqueueInvitation(invitationId));
-const authSenderConfig = config.telegramAuth?.botToken && config.telegramAuth.proxyUrl
-  ? { botToken: config.telegramAuth.botToken, proxyUrl: config.telegramAuth.proxyUrl }
-  : config.telegram && config.telegram.botId === config.telegramAuth?.botId
-    ? { botToken: config.telegram.botToken, proxyUrl: config.telegram.proxyUrl } : undefined;
-const authTransport = authSenderConfig ? createTelegramTransport({ ...authSenderConfig, portalOrigin: config.publicOrigin }) : undefined;
-const telegramAuth = config.telegramAuth ? new TelegramAuth(platform, config.telegramAuth, Date.now, authTransport) : undefined;
+const telegramAuth = config.telegramAuth ? new TelegramAuth(platform, config.telegramAuth) : undefined;
 const server = createPlatformHttpServer(platform, {
   publicOrigin: config.publicOrigin, allowedOrigins: config.allowedOrigins,
   trustedProxyIps: config.trustedProxyIps,
@@ -70,7 +65,7 @@ const stop = (): void => {
     // Accepted HTTP handlers can start adapter work while they drain. Only now
     // is the runtime-work set stable; a response timeout is not cancellation.
     await Promise.all([platform.settle(), telegramWork]);
-    authTransport?.close(); telegramTransport?.close(); platform.close(); lab.close(); district.close();
+    telegramTransport?.close(); platform.close(); lab.close(); district.close();
   })().then(() => {
     clearTimeout(deadline); process.exit(0);
   }, () => {
