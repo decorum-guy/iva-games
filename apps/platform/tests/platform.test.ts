@@ -141,6 +141,33 @@ async function webhook(f: Fixture, body: unknown, secret = WEBHOOK_SECRET): Prom
 }
 
 describe('Iva Games platform: independent HTTP clients and persistent authority', () => {
+  it('permits packaged WebAssembly compilation without enabling JavaScript eval or relaxing HTTP guards', async () => {
+    const f = await fixture();
+    const reply = await f.client().request('/session');
+    expect(reply.status).toBe(200);
+    const policy = reply.headers.get('Content-Security-Policy'); expect(policy).not.toBeNull();
+    const directives = new Map(policy!.split(';').map(value => {
+      const [name, ...sources] = value.trim().split(/\s+/); return [name, sources] as const;
+    }));
+    const scripts = directives.get('script-src');
+    expect(scripts).toContain("'wasm-unsafe-eval'");
+    expect(scripts).not.toContain("'unsafe-eval'");
+    expect(scripts).not.toContain("'unsafe-inline'");
+    expect(scripts).toEqual(["'self'", "'wasm-unsafe-eval'"]);
+    expect(directives.get('default-src')).toEqual(["'self'"]);
+    expect(directives.get('connect-src')).toEqual(["'self'"]);
+    expect(directives.get('style-src')).toEqual(["'self'", "'unsafe-inline'"]);
+    expect(directives.get('img-src')).toEqual(["'self'", 'data:']);
+    expect(directives.get('font-src')).toEqual(["'self'"]);
+    expect(directives.get('frame-ancestors')).toEqual(["'none'"]);
+    expect(directives.get('base-uri')).toEqual(["'none'"]);
+    expect(directives.get('form-action')).toEqual(["'self'"]);
+    expect(reply.headers.get('X-Frame-Options')).toBe('DENY');
+    expect(reply.headers.get('X-Content-Type-Options')).toBe('nosniff');
+    expect(reply.headers.get('Cross-Origin-Resource-Policy')).toBe('same-origin');
+    expect(reply.headers.get('Referrer-Policy')).toBe('no-referrer');
+  });
+
   it('keeps signup and recovery limits separate for clients behind the trusted edge proxy', async () => {
     const f = await fixture({ trustedProxyIps: ['127.0.0.1'] });
     const alice = f.client(), bob = f.client();

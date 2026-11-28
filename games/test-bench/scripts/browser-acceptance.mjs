@@ -44,7 +44,7 @@ const report = {
   directGameplayApiCommands: 0, externalMessages: 0, fullCups: 0, tutorial: 'not started',
   gitHead: execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim(),
   workingTreeDirty: !!execFileSync('git', ['status', '--porcelain'], { cwd: root, encoding: 'utf8' }).trim(),
-  scenarios: [], cups: [], metrics: [], layouts: [], browserErrors: [], failedAssets: [], expectedOfflineAssetFailures: [], actionErrors: [], observedGameActions: {},
+  scenarios: [], cups: [], metrics: [], layouts: [], browserErrors: [], consoleErrors: [], consoleErrorsDropped: 0, failedAssets: [], expectedOfflineAssetFailures: [], actionErrors: [], observedGameActions: {},
   controls: { keyboardEvents: 0, touchGestures: 0, acceptedUiActions: 0 },
   transport: { path: latencyMs ? 'Owned loopback TCP delay relay for HTTP and WebSocket bytes' : 'Direct owned loopback', configuredPerDirectionMs: latencyMs, publicInternetMeasurement: false },
   openCoverage: ['Actual listening', 'Physical touch hardware', 'Human browser play'],
@@ -136,6 +136,18 @@ function observe(player, page) {
   player.page = page; player.snapshot = null; player.receivedAt = 0;
   page.setDefaultTimeout(8000);
   page.on('pageerror', error => report.browserErrors.push({ profile: player.name, message: error.message }));
+  page.on('console', message => {
+    if (message.type() !== 'error') return;
+    const location = message.location();
+    const text = message.text().slice(0, 1400);
+    const scenario = report.scenarios.at(-1)?.name ?? 'setup';
+    const previous = report.consoleErrors.find(value => value.profile === player.name && value.message === text && value.scenario === scenario);
+    if (previous) { previous.occurrences++; return; }
+    if (report.consoleErrors.length >= 30) { report.consoleErrorsDropped++; return; }
+    // These are evidence for review, separate from uncaught exceptions: this
+    // suite deliberately loses a WebGL context and disconnects a profile.
+    report.consoleErrors.push({ profile: player.name, scenario, message: text, textTruncated: message.text().length > 1400, source: location.url ? new URL(location.url, origin).pathname : null, line: location.lineNumber, column: location.columnNumber, occurrences: 1 });
+  });
   const assetPath = url => { const p = new URL(url).pathname; return !p.startsWith('/api/') && (p.startsWith('/test-bench/') || p.startsWith('/assets/')); };
   page.on('requestfailed', request => {
     if (assetPath(request.url()) && request.failure()?.errorText !== 'net::ERR_ABORTED') {

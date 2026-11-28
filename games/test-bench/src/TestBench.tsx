@@ -62,7 +62,7 @@ export function LocalDrive({blueprint,track,preferences,onBack,externalPause=fal
       if(cancelled){world.dispose();return;}physics.current=world;setLane(world.snapshot());
       const animate=(now:number)=>{if(cancelled)return;const elapsed=previous?Math.min(0.1,(now-previous)/1000):0;previous=now;if(!pause.current){accumulator+=elapsed;while(accumulator>=1/60){world.step(input.current);accumulator-=1/60;}setLane(world.snapshot());}frame=requestAnimationFrame(animate);};
       frame=requestAnimationFrame(animate);
-    }).catch(()=>setError(true));
+    }).catch(failure=>{if(!cancelled){console.error('Test Bench physics initialization failed',failure);setError(true);}});
     return()=>{cancelled=true;cancelAnimationFrame(frame);physics.current?.dispose();physics.current=null;};
   },[trackKey,buildKey,serial,workshop]);
   useEffect(()=>{updateSound(audio??null,lane,track,input.current,!paused&&!externalPause);},[audio,lane,track,paused,externalPause]);
