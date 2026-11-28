@@ -1,5 +1,17 @@
 import type { TerritoryMap } from '@iva-games/district/territorial';
 
+const firstHeathForm: Record<string, number> = { longwater: 1, 'lantern-strait': 2, 'kite-isles': 3 };
+
+/** Vary only the landscape illustration. Stable tile IDs survive snapshot reordering. */
+export function coastalHeathForms(map: TerritoryMap) {
+  const forms = new Map<string, number>();
+  const first = firstHeathForm[map.id];
+  if (map.projection !== 'regular-hex' || !first) return forms;
+  const ids = map.tiles.filter(tile => tile.resource === null).map(tile => tile.id).sort();
+  ids.forEach((id, index) => forms.set(id, 1 + (first - 1 + index) % 3));
+  return forms;
+}
+
 type Point = { x: number; y: number };
 export type RoadHitLine = { x1: number; y1: number; x2: number; y2: number };
 

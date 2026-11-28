@@ -1,7 +1,7 @@
 import { useId, useMemo, useRef, useState } from 'react';
 import type { FocusEvent, KeyboardEvent, MouseEvent, PointerEvent } from 'react';
 import type { TerritoryBlockade, TerritoryMap, TerritoryView } from '@iva-games/district/territorial';
-import { distanceToRoad, houseOutline, roadHitLine, coastPath as traceCoast, territoryCoastLoops } from './territorialBoardGeometry';
+import { coastalHeathForms, distanceToRoad, houseOutline, roadHitLine, coastPath as traceCoast, territoryCoastLoops } from './territorialBoardGeometry';
 import { TerritorialCoast } from './TerritorialCoast';
 import './territorial-board.css';
 
@@ -208,6 +208,7 @@ export function TerritorialBoard({ map, lang, buildings, routes, players, blocke
   const available = new Set(candidates);
   const rolled = new Set(rolledTileIds);
   const couponRoads = new Set(highlightedRoadIds);
+  const heathForms = useMemo(() => coastalHeathForms(map), [map]);
   const coastLoops = useMemo(() => territoryCoastLoops(map), [map]);
   const coastPath = useMemo(() => coastLoops.map(traceCoast).join(' '), [coastLoops]);
   const tiles = useMemo(() => map.tiles.map(tile => ({...tile, points:asPoints(tile.nodeIds.map(id=>nodeMap.get(id)!))})), [map.tiles,nodeMap]);
@@ -349,7 +350,7 @@ export function TerritorialBoard({ map, lang, buildings, routes, players, blocke
           <title>{label}</title><polygon data-tile-origin={tile.id} points={tile.points} fill={'url(#'+paintId(kind)+')'} stroke="#696b51" strokeOpacity=".32" strokeWidth={unit}/>
           <g transform={`translate(${tile.x} ${tile.y}) scale(${unit})`} pointerEvents="none">
             {map.projection === 'regular-hex' && <g transform="translate(0 -4)"><CoastalTerrain kind={kind} variant={index}/></g>}
-            <TerrainDetail kind={kind} variant={index}/><g transform={`translate(${index%2===0?1:-1} -6) scale(${index%3===0?.91:1})`}><TerrainArt kind={kind} heathForm={map.landmasses}/></g>
+            <TerrainDetail kind={kind} variant={index}/><g transform={`translate(${index%2===0?1:-1} -6) scale(${index%3===0?.91:1})`}><TerrainArt kind={kind} heathForm={heathForms.get(tile.id) ?? map.landmasses}/></g>
             {tile.number!==null?<g transform="translate(0 12)" className="tb-number-token"><circle cy="1.8" r="10" fill="#726f58"/>
               <circle className="tb-roll-halo" r="12.4" fill="none" strokeWidth="2"/>
               <circle r="10" fill={blocked?'#33484a':'#fbefd2'} stroke="#7d8067" strokeWidth="1.1"/>
