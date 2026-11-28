@@ -3,9 +3,12 @@
 The source builds damped modal stone/bronze voices, filtered deterministic noise,
 and short tuned motifs. Output is mono 32 kHz / 16-bit PCM with headroom, DC
 removal, a zero-crossing envelope at both ends, and a measured manifest.
+The two owner-selected auditions are copied byte-for-byte after checksum checks;
+the remaining fifteen cues retain their v2 synthesis and random seeds.
 """
 from pathlib import Path
 import hashlib
+import io
 import json
 import math
 import random
@@ -13,7 +16,13 @@ import struct
 import wave
 
 ROOT = Path(__file__).resolve().parents[1] / 'public/assets/colossus/audio'
+VARIANTS = Path(__file__).resolve().parents[1] / 'src/audio-review/variants'
+SELECTED = {
+    'armour': ('armour-a', '64203aea15ad5b9a58eaadcb54be16688276127b3b8c887137cbf90a7709d852'),
+    'shield': ('shield-a', 'fb2f6236305db6799ccde1d20287bc801dfeb31e9da89f16cd32b0200d5cdc7b'),
+}
 SR = 32_000
+# Preserve the v2 source parameters. SELECTED overrides its two historical cues.
 SPECS = {
     'move': (.20, .46), 'stone': (.44, .54), 'armour': (.54, .50),
     'wound': (.38, .48), 'shield': (.68, .46), 'card': (.58, .42),
@@ -117,20 +126,41 @@ def synth(name, duration):
     return out
 
 
+def selected_samples():
+    """Validate every approved source before writing any game-bank file."""
+    selected = {}
+    for name, (variant, expected_hash) in SELECTED.items():
+        blob = (VARIANTS / (variant + '.wav')).read_bytes()
+        if hashlib.sha256(blob).hexdigest() != expected_hash:
+            raise ValueError('Owner-selected audio checksum changed: ' + variant)
+        with wave.open(io.BytesIO(blob), 'rb') as wav:
+            if (wav.getnchannels(), wav.getsampwidth(), wav.getframerate(), wav.getcomptype()) != (1, 2, SR, 'NONE'):
+                raise ValueError('Unexpected owner-selected audio format: ' + variant)
+            frames = wav.getnframes()
+            pcm = struct.unpack('<' + 'h' * frames, wav.readframes(frames))
+        selected[name] = (blob, pcm, frames / SR)
+    return selected
+
+
 def main():
+    selected = selected_samples()
     ROOT.mkdir(parents=True, exist_ok=True)
     sounds = {}
     for name, (duration, target_peak) in SPECS.items():
-        values = synth(name, duration)
-        gain = target_peak / max(abs(value) for value in values)
-        pcm = [round(value * gain * 32767) for value in values]
-        assert max(abs(value) for value in pcm) < 32767
         path = ROOT / (name + '.wav')
-        with wave.open(str(path), 'wb') as wav:
-            wav.setnchannels(1)
-            wav.setsampwidth(2)
-            wav.setframerate(SR)
-            wav.writeframes(struct.pack('<' + 'h' * len(pcm), *pcm))
+        if name in selected:
+            blob, pcm, duration = selected[name]
+            path.write_bytes(blob)
+        else:
+            values = synth(name, duration)
+            gain = target_peak / max(abs(value) for value in values)
+            pcm = [round(value * gain * 32767) for value in values]
+            assert max(abs(value) for value in pcm) < 32767
+            with wave.open(str(path), 'wb') as wav:
+                wav.setnchannels(1)
+                wav.setsampwidth(2)
+                wav.setframerate(SR)
+                wav.writeframes(struct.pack('<' + 'h' * len(pcm), *pcm))
         blob = path.read_bytes()
         peak = max(abs(value) for value in pcm) / 32768
         rms = math.sqrt(sum((value / 32768) ** 2 for value in pcm) / len(pcm))
@@ -139,7 +169,7 @@ def main():
                         'peakDbFS': round(20 * math.log10(peak), 2), 'rmsDbFS': round(20 * math.log10(rms), 2)}
     (ROOT / 'manifest.json').write_text(json.dumps({
         'source': 'Original deterministic modal synthesis; no third-party recordings or samples',
-        'generator': 'scripts/generate-colossus-audio.py', 'version': 2, 'sounds': sounds,
+        'generator': 'scripts/generate-colossus-audio.py', 'version': 3, 'sounds': sounds,
     }, indent=2) + '\n')
     print(json.dumps({'sounds': len(sounds), 'bytes': sum(x['bytes'] for x in sounds.values()),
                       'maxPeakDbFS': max(x['peakDbFS'] for x in sounds.values())}))

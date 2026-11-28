@@ -1,10 +1,20 @@
 # COLOSSUS — implementation state
 
-## Owner audio decisions — 28 November 2026
+## Owner-selected armor and shield — 28 November 2026
 
-The owner approved 15 of 17 cues in Safari for sound bank v2. The two open cues are **Armor hit** (`armour`) and **Shield or invulnerability** (`shield`). The armor hit needs a contact closer to a strike on a shield. The owner requested several new shield cues for comparison.
+The owner supplied `colossus-armor-and-shield-review.md`, selecting **A / Round shield / Круглый щит** for `armour` and **A / Soft block / Мягкий блок** for `shield`. These choices close the two remaining sound decisions. The [decision record](AUDIO_SELECTION_2026_11_28.md) preserves the source, exact SHA-256 values and validation boundaries; this is the owner's listening decision, not a new listening claim by the implementing agent.
 
-The [second listening demo](README.md#прослушивание-звуков) compares the current versions with three original candidates for each cue. Each option can play on its own or inside the same game cue sequence. The six audition files live beside the demo sources. The 17 original game files are byte identical to the reviewed bank. The owner will choose the two replacements in a later listening pass.
+Sound bank **v3** installs the two existing audition WAV files byte-for-byte. The other 15 WAV files, mixer gain, voice limit and event order are unchanged. The bank generator validates both selected source checksums before writing and retains the previous synthesis for all other cues. Both game audio and the review manifest use the same versioned URLs, so immutable browser caching cannot retain the previous bank under the new client. The comparison files, hash-based decisions and browser storage keys remain intact.
+
+Validation passed: regeneration to a temporary directory and all 17 manifest/PCM checks; 11 existing audio-feedback tests; Colossus TypeScript and targeted ESLint; the production client and both audio-demo builds. Both built outputs contain the same verified manifest and all 17 WAV hashes. These are file and software checks; the listening choices come from the owner attachment.
+
+This change is prepared from main `e997952ef0fabc952d1a9b6ef0fa75d23a3342cb`; its public delivery is established separately by the resulting main release log. Physical-phone gameplay remains a separate acceptance item.
+
+## Previous listening pass — 28 November 2026
+
+The owner approved 15 of 17 cues in Safari for sound bank v2. At that checkpoint, the two open cues were **Armor hit** (`armour`) and **Shield or invulnerability** (`shield`). The armor hit needed a contact closer to a strike on a shield. The owner requested several new shield cues for comparison.
+
+The [second listening demo](README.md#прослушивание-звуков) compares the current versions with three original candidates for each cue. Each option can play on its own or inside the same game cue sequence. The six audition files live beside the demo sources. All 17 game files were unchanged during that comparison stage. The later owner selections are now recorded above.
 
 The six audition checksums matched the served files. Headless Chromium and WebKit each exercised eight solo plays and eight battle sequences with the game mixer. Both verified selection, reload, report download and preservation of the original review decisions.
 

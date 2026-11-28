@@ -1,7 +1,7 @@
 {
   "source": "Original deterministic modal synthesis; no third-party recordings or samples",
   "generator": "scripts/generate-colossus-audio.py",
-  "version": 2,
+  "version": 3,
   "sounds": {
     "move": {
       "file": "move.wav",
@@ -25,13 +25,13 @@
     },
     "armour": {
       "file": "armour.wav",
-      "bytes": 34604,
-      "sha256": "f1f8bb7b1e7d7e2ec4aafa18235ec9e9e491fac6c0975867468385c76725336b",
-      "seconds": 0.54,
+      "bytes": 23084,
+      "sha256": "64203aea15ad5b9a58eaadcb54be16688276127b3b8c887137cbf90a7709d852",
+      "seconds": 0.36,
       "sampleRate": 32000,
       "channels": 1,
-      "peakDbFS": -6.02,
-      "rmsDbFS": -20.01
+      "peakDbFS": -6.66,
+      "rmsDbFS": -20.5
     },
     "wound": {
       "file": "wound.wav",
@@ -45,13 +45,13 @@
     },
     "shield": {
       "file": "shield.wav",
-      "bytes": 43564,
-      "sha256": "dc8b10f3826f41cd884ec58062f3d0e5be237bac62245b175b7a6e9dd01d1152",
-      "seconds": 0.68,
+      "bytes": 25004,
+      "sha256": "fb2f6236305db6799ccde1d20287bc801dfeb31e9da89f16cd32b0200d5cdc7b",
+      "seconds": 0.39,
       "sampleRate": 32000,
       "channels": 1,
-      "peakDbFS": -6.75,
-      "rmsDbFS": -20.23
+      "peakDbFS": -8.75,
+      "rmsDbFS": -20.5
     },
     "card": {
       "file": "card.wav",

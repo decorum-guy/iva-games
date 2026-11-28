@@ -1,5 +1,7 @@
 import type { GameEvent, GameState } from '../core/types';
 
+// Shared with the review manifest URL; /assets responses are immutable-cached.
+export const SOUND_BANK_VERSION = 3;
 export const SOUND_NAMES = [
   'move', 'stone', 'armour', 'wound', 'shield', 'card', 'fire', 'victory', 'defeat',
   'capture', 'armor-break', 'promotion-minor', 'promotion-rook', 'promotion-queen',
@@ -21,7 +23,7 @@ let enabled = false;
 let generation = 0;
 let context: AudioContext | null = null;
 let lifecycleInstalled = false;
-const samplePath = (name: SoundName) => '/assets/colossus/audio/' + name + '.wav';
+const samplePath = (name: SoundName) => '/assets/colossus/audio/' + name + '.wav?v=' + SOUND_BANK_VERSION;
 
 function cancelPlayback() {
   generation++;
