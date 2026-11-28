@@ -349,10 +349,12 @@ async function lobbyTouchTargets(game) {
 
 async function retireInactivePeer(old, replacement, reason) {
   const previousSocket = old.activeSocket;
+  const replacementSocket = replacement.activeSocket, replacementScope = { ...replacement.liveScope };
+  const replacementEpoch = replacement.view.self.controllerEpoch, replacementTick = replacement.view.tick, replacementFrames = replacement.frames;
   assert.ok(previousSocket, 'The retired fixture had a real game socket');
+  assert.ok(replacementSocket && !replacementSocket.isClosed(), 'The replacement already has an actual open game socket');
   await until(() => previousSocket.isClosed(), 'The superseded fixture socket is closed');
   assert.equal(await bounded(old.page.evaluate(() => window.__shiftAcceptance.active?.readyState), 'Old inactive fixture socket state'), 3);
-  const replacementTick = replacement.view.tick;
   await bounded(old.page.goto('about:blank', { waitUntil: 'load' }), 'Retire inactive fixture by normal navigation');
   assert.equal(old.page.url(), 'about:blank');
   assert.equal(await bounded(old.page.evaluate(() => document.querySelector('.shift-root') === null && window.__shiftAcceptance === undefined), 'Retired fixture has no game document or instrumentation'), true);
@@ -361,16 +363,49 @@ async function retireInactivePeer(old, replacement, reason) {
   // not late responses to requests issued before navigation. The old app is gone.
   const observationsBefore = old.httpEvents;
   const before = { frames: old.frames, sockets: old.sockets, httpRequests: old.httpRequests };
-  await delay(4300);
-  const after = { frames: old.frames, sockets: old.sockets, httpRequests: old.httpRequests };
-  assert.deepEqual(after, before, 'The retired fixture must not keep polling or open another controller');
-  assert.equal(old.page.url(), 'about:blank');
-  assert.equal(await bounded(replacement.page.evaluate(() => window.__shiftAcceptance.active?.readyState), 'Replacement remains the live controller'), 1);
-  await until(() => replacement.view.phase === 'finished' || replacement.view.tick > replacementTick, 'Replacement keeps receiving advancing snapshots');
-  old.retired = true;
-  const observation = { reason, url: 'about:blank', oldSocketClosed: true, quietWindowMs: 4300, frameDelta: after.frames - before.frames,
-    connectionDelta: after.sockets - before.sockets, apiRequestDelta: after.httpRequests - before.httpRequests, lateApiObservationDelta: old.httpEvents - observationsBefore, replacementSocketOpen: true };
-  check('Retired artificial inactive tab after its takeover proof', { game: old.game.label, ...observation });
+  const hud = replacement.page.locator('.shift-scoreboard');
+  let stage = 'visible HUD before quiet window', hudBefore;
+  try {
+    // Ownership is observed through the actual browser WebSocket. UI liveness
+    // is a separate DOM assertion: network events alone could hide a stuck UI.
+    assert.equal(await bounded(hud.isVisible(), 'Replacement scoreboard is visible'), true);
+    hudBefore = await bounded(hud.innerText({ timeout: 8000 }), 'Replacement HUD before quiet window');
+    stage = 'quiet window'; await delay(4300);
+    const after = { frames: old.frames, sockets: old.sockets, httpRequests: old.httpRequests };
+    assert.deepEqual(after, before, 'The retired fixture must not keep polling or open another controller');
+    assert.equal(old.page.url(), 'about:blank');
+    stage = 'fresh controller snapshot after quiet window';
+    const framesAfterQuiet = replacement.frames;
+    await until(() => replacement.frames > framesAfterQuiet && (replacement.view.phase === 'finished' || replacement.view.tick > replacementTick), 'Replacement receives a fresh advancing snapshot after the quiet window', 4000);
+    const assertController = () => {
+      assert.equal(replacement.activeSocket, replacementSocket, 'The same replacement socket retains control');
+      assert.equal(replacementSocket.isClosed(), false, 'The replacement browser socket stays open');
+      assert.deepEqual(replacement.liveScope, replacementScope, 'The replacement retains its exact authenticated shared scope');
+      assert.equal(replacement.view.self.controllerEpoch, replacementEpoch, 'The replacement retains its core controller epoch');
+      assert.deepEqual(replacement.errors, [], 'The replacement has no browser or wire error');
+      if (replacement.failure) throw replacement.failure;
+    };
+    assertController();
+    stage = 'visible HUD progression';
+    assert.equal(await bounded(hud.isVisible(), 'Replacement scoreboard remains visible'), true);
+    const hudAfter = await bounded(hud.innerText({ timeout: 8000 }), 'Replacement HUD after quiet window');
+    assert.notEqual(hudAfter, hudBefore, 'The visible replacement scoreboard must advance during the quiet window');
+    assertController();
+    old.retired = true;
+    const observation = { reason, url: 'about:blank', oldSocketClosed: true, quietWindowMs: 4300, frameDelta: after.frames - before.frames,
+      connectionDelta: after.sockets - before.sockets, apiRequestDelta: after.httpRequests - before.httpRequests, lateApiObservationDelta: old.httpEvents - observationsBefore,
+      replacementSocketOpen: true, replacementSocketUnchanged: true, replacementScopeUnchanged: true, replacementCoreEpochUnchanged: true,
+      replacementFramesAdvanced: replacement.frames - replacementFrames, replacementTicksAdvanced: replacement.view.tick - replacementTick, hudBefore, hudAfter };
+    check('Retired artificial inactive tab after its takeover proof', { game: old.game.label, ...observation });
+  } catch (error) {
+    // Keep evidence in CI's ordinary log even when a renderer RPC cannot answer.
+    log({ retirementFailure: { game: old.game.label, reason, stage, message: error.message, oldUrl: old.page.url(), oldSocketClosed: previousSocket.isClosed(),
+      oldBefore: before, oldAfter: { frames: old.frames, sockets: old.sockets, httpRequests: old.httpRequests },
+      replacementSocketUnchanged: replacement.activeSocket === replacementSocket, replacementSocketClosed: replacementSocket.isClosed(),
+      replacementScope, currentScope: replacement.liveScope, replacementEpoch, currentEpoch: replacement.view.self.controllerEpoch,
+      replacementTick, currentTick: replacement.view.tick, replacementFrames, currentFrames: replacement.frames, hudBefore } });
+    throw error;
+  }
 }
 
 async function keyboardAudioInFreshContext(game) {
