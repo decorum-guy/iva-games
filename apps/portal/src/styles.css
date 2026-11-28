@@ -3522,3 +3522,5 @@ button {
 }
 
 .knock-first-art{position:relative;background:#10242e;overflow:hidden}.knock-first-art img{width:100%;height:100%;object-fit:cover;filter:brightness(.85)}.knock-first-art span{position:absolute;top:18px;left:20px;color:#e2c7a0;font-family:monospace;font-size:12px;letter-spacing:.14em}.knock-first-art i{position:absolute;bottom:15px;right:22px;font-size:65px;line-height:1;color:#b5e4ec;font-style:normal;text-shadow:0 0 20px #91d7ec}.kf-create-settings{padding:18px;margin:14px -10px;border-radius:4px}.kf-active .sidebar{visibility:hidden}.kf-active .workspace{padding:0}
+
+.desktop-only-notice{max-width:560px;margin:clamp(48px,12vh,120px) auto;padding:32px 24px;text-align:center}.desktop-only-notice h1{font-size:clamp(28px,6vw,42px);line-height:1.15}.desktop-only-notice p{margin:16px 0 24px}
