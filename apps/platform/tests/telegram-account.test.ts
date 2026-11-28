@@ -4,6 +4,7 @@ import { request as httpRequest } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import Database from 'better-sqlite3';
 import { decode, encode } from 'jpeg-js';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { loadPlatformConfig } from '../src/config.js';
@@ -225,6 +226,7 @@ describe('Telegram accounts and the private bot menu', () => {
     });
     expect((await webhook(command(72031, '/name Alice Again'))).body.text).toContain('Alice Again');
     expect((await alice.client.session()).user.avatar).toBe('photo');
+    expect((await boris.client.post('/profile', { displayName: 'Boris', avatar: 'queen' })).status).toBe(200);
 
     const dir = mkdtempSync(join(tmpdir(), 'iva-avatar-test-'));
     try {
@@ -235,6 +237,11 @@ describe('Telegram accounts and the private bot menu', () => {
         expect(reopened.account(alice.user.playerId)).toMatchObject({ avatar: 'photo', avatarVersion: saved.body.user.avatarVersion });
         expect(reopened.avatarPhoto(alice.user.playerId)).toEqual(photo.bytes);
       } finally { reopened.close(); }
+      const legacy = new Database(path);
+      try { legacy.exec('DROP TABLE player_avatar_extra'); } finally { legacy.close(); }
+      const migrated = new PlatformService({ databasePath: path, publicOrigin: ORIGIN });
+      try { expect(migrated.account(boris.user.playerId)).toMatchObject({ displayName: 'Boris', avatar: 'queen' }); }
+      finally { migrated.close(); }
     } finally { rmSync(dir, { recursive: true, force: true }); }
 
     for (const invalid of ['data:image/svg+xml;base64,PHN2Zz4=', 'data:image/jpeg;base64,AAAA', `data:image/jpeg;base64,${'A'.repeat(174_800)}`]) {
