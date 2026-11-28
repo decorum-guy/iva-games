@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { catalogueDefaults, chessEntryForPath, chessRegistrations, gameRegistry, launchUrls, validateRegistry } from '../src/index';
+import { catalogueDefaults, chessEntryForPath, chessRegistrations, gameRegistry, isGameAvailableOnDevice, isMobileDevice, launchUrls, validateRegistry } from '../src/index';
 import type { Registry } from '../src/index';
 
 function future(): Registry {
@@ -36,6 +36,57 @@ describe('declarative game registration', () => {
     expect(chessEntryForPath('/colossus/')).toBe('colossus/index.html');
     expect(catalogueDefaults().find(game => game.gameId === 'colossus')?.status).toBe('unavailable');
     expect(catalogueDefaults().some(game => game.gameId === 'platform-lab')).toBe(false);
+  });
+  it('opts into mouse advice per registration without changing launch or room capabilities', () => {
+    const registry = future();
+    registry.games.at(-1)!.inputRecommendation = 'mouse';
+    expect(validateRegistry(registry).games.at(-1)?.inputRecommendation).toBe('mouse');
+    expect(launchUrls({ registry })['future-chess']).toBe('https://chess.iva-games.pro/future-chess/');
+    expect(catalogueDefaults(registry).at(-1)?.status).toBe('unavailable');
+  });
+  it.each([true, false, null, 'required', 'touch', { mouse: true }])('rejects unsupported input recommendation %j', inputRecommendation => {
+    const registry = future();
+    Object.assign(registry.games.at(-1)!, { inputRecommendation });
+    expect(() => validateRegistry(registry)).toThrow('Invalid input recommendation');
+  });
+  it('keeps device availability independent from mouse comfort advice', () => {
+    const registry = future();
+    registry.games.at(-1)!.deviceAvailability = 'desktop-only';
+    expect(validateRegistry(registry).games.at(-1)?.inputRecommendation).toBeUndefined();
+    expect(registry.games.at(-1)?.deviceAvailability).toBe('desktop-only');
+  });
+  it.each([true, false, null, 'mobile', 'mouse', ['desktop']])('rejects unsupported device availability %j', deviceAvailability => {
+    const registry = future();
+    Object.assign(registry.games.at(-1)!, { deviceAvailability });
+    expect(() => validateRegistry(registry)).toThrow('Invalid device availability');
+  });
+  it.each([
+    [{ userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) Mobile Safari' }, true],
+    [{ userAgent: 'Mozilla/5.0 (iPad; CPU OS 18_0 like Mac OS X) Safari' }, true],
+    [{ userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15) Version/18.0 Safari', platform: 'MacIntel', maxTouchPoints: 5 }, true],
+    [{ userAgent: 'Mozilla/5.0 (Linux; Android 15; Pixel 9) Chrome Mobile' }, true],
+    [{ userAgent: 'Mozilla/5.0 (Linux; Android 15; Tablet) Chrome Safari' }, true],
+    [{ userAgent: 'Unknown', userAgentData: { mobile: true } }, true],
+    [{ userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome Safari', maxTouchPoints: 10 }, false],
+    [{ userAgent: 'Mozilla/5.0 (X11; Linux x86_64) Chrome Safari', maxTouchPoints: 10 }, false],
+    [{ userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15) Version/18.0 Safari', platform: 'MacIntel', maxTouchPoints: 0 }, false],
+    [{}, false],
+  ])('identifies mobile devices without using window size or touchscreen alone: %j', (device, expected) => {
+    expect(isMobileDevice(device)).toBe(expected);
+  });
+  it('does not gate unmarked games or turn mouse advice into a device requirement', () => {
+    const game = gameRegistry.games[0];
+    const original = { inputRecommendation: game.inputRecommendation, deviceAvailability: game.deviceAvailability };
+    const mobile = { userAgent: 'iPhone Mobile' };
+    try {
+      game.inputRecommendation = 'mouse';
+      delete game.deviceAvailability;
+      expect(isGameAvailableOnDevice(game.gameId, mobile)).toBe(true);
+      game.deviceAvailability = 'desktop-only';
+      expect(isGameAvailableOnDevice(game.gameId, mobile)).toBe(false);
+      expect(isGameAvailableOnDevice(game.gameId, { userAgent: 'Windows NT', maxTouchPoints: 10 })).toBe(true);
+      expect(isGameAvailableOnDevice('unregistered-game', mobile)).toBe(true);
+    } finally { Object.assign(game, original); }
   });
   it.each(['route', 'source', 'gameId', 'traversal', 'protocol'] as const)('rejects %s collisions or unsafe manifest values', kind => {
     const registry = future();
