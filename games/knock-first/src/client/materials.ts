@@ -1,54 +1,20 @@
 import * as THREE from 'three';
 
 /** Repeatable close-range surface art; source remains editable with the renderer. */
-function surfaceTexture(kind: 'concrete' | 'metal' | 'archive' | 'floor'): THREE.CanvasTexture {
-  const canvas = document.createElement('canvas'); canvas.width = canvas.height = 256;
-  const ctx = canvas.getContext('2d')!;
-  const bases = { concrete: '#53646a', metal: '#3b5559', archive: '#425354', floor: '#465559' };
-  ctx.fillStyle = bases[kind]; ctx.fillRect(0, 0, 256, 256);
-  let seed = kind.length * 8121;
-  const random = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
-  for (let i = 0; i < 7000; i++) {
-    const light = random() > 0.5;
-    ctx.fillStyle = light ? `rgba(209,216,204,${random() * 0.11})` : `rgba(4,15,21,${random() * 0.16})`;
-    ctx.fillRect(random() * 256, random() * 256, 0.5 + random() * 2, 0.6 + random() * 3);
-  }
-  if (kind === 'metal') {
-    ctx.strokeStyle = 'rgba(13,27,30,.7)'; ctx.lineWidth = 3;
-    for (let x = 32; x < 256; x += 64) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, 256); ctx.stroke(); }
-    ctx.fillStyle = '#1c3035';
-    for (let x = 8; x < 256; x += 64) for (const y of [8, 248]) { ctx.beginPath(); ctx.arc(x, y, 2.5, 0, Math.PI * 2); ctx.fill(); }
-  } else if (kind === 'archive') {
-    ctx.fillStyle = 'rgba(26,38,39,.32)'; ctx.fillRect(0, 160, 256, 96);
-    ctx.fillStyle = '#7c7659'; ctx.fillRect(0, 156, 256, 3);
-    for (let i = 0; i < 45; i++) {
-      ctx.fillStyle = `rgba(155,105,65,${random() * 0.3})`;
-      ctx.fillRect(random() * 256, 150 + random() * 80, 1 + random() * 4, 5 + random() * 40);
-    }
-  } else if (kind === 'floor') {
-    ctx.strokeStyle = '#253b40'; ctx.lineWidth = 3; ctx.strokeRect(1.5, 1.5, 253, 253);
-    ctx.strokeStyle = 'rgba(166,165,135,.18)'; ctx.lineWidth = 1; ctx.strokeRect(7, 7, 242, 242);
-    for (let i = 0; i < 14; i++) {
-      ctx.strokeStyle = 'rgba(19,33,37,.28)'; ctx.beginPath();
-      const x = random() * 256, y = random() * 256; ctx.moveTo(x, y); ctx.lineTo(x + random() * 70 - 35, y + random() * 20); ctx.stroke();
-    }
-  } else {
-    ctx.strokeStyle = 'rgba(18,29,31,.28)'; ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.moveTo(44, 0); ctx.lineTo(53, 60); ctx.lineTo(47, 89); ctx.lineTo(62, 118); ctx.stroke();
-    ctx.fillStyle = 'rgba(32,63,60,.16)'; ctx.fillRect(0, 200, 256, 56);
-  }
-  const texture = new THREE.CanvasTexture(canvas); texture.colorSpace = THREE.SRGBColorSpace;
-  texture.wrapS = texture.wrapT = THREE.RepeatWrapping; texture.anisotropy = 4;
-  return texture;
-}
-
 export function createWorldMaterials(): Record<string, THREE.MeshStandardMaterial> {
-  const concrete = surfaceTexture('concrete'), metal = surfaceTexture('metal'), archive = surfaceTexture('archive'), floor = surfaceTexture('floor');
+  const loader = new THREE.TextureLoader();
+  const surface = (kind: 'concrete' | 'metal' | 'archive' | 'floor', metalness: number) => {
+    const load = (suffix: string, color = false) => {
+      const texture=loader.load(`/knock-first/textures/${kind}-${suffix}`);
+      texture.wrapS=texture.wrapT=THREE.RepeatWrapping; texture.anisotropy=4;
+      if(color) texture.colorSpace=THREE.SRGBColorSpace;
+      return texture;
+    };
+    return new THREE.MeshStandardMaterial({map:load('color.jpg',true), normalMap:load('normal.png'), normalScale:new THREE.Vector2(.6,.6), roughnessMap:load('roughness.png'), roughness:1,metalness});
+  };
   return {
-    concrete: new THREE.MeshStandardMaterial({ color: '#61747b', map: concrete, roughness: 0.94, metalness: 0.03 }),
-    metal: new THREE.MeshStandardMaterial({ color: '#536e70', map: metal, roughness: 0.71, metalness: 0.6 }),
-    archive: new THREE.MeshStandardMaterial({ color: '#7c887c', map: archive, roughness: 0.96, metalness: 0.04 }),
-    floor: new THREE.MeshStandardMaterial({ color: '#8c9a91', map: floor, roughness: 0.88, metalness: 0.06 }),
+    concrete: surface('concrete', .02), metal: surface('metal', .45),
+    archive: surface('archive', .03), floor: surface('floor', .1),
     water: new THREE.MeshStandardMaterial({ color: '#24464b', roughness: 0.28, metalness: 0.28, transparent: true, opacity: 0.75 }),
     bronze: new THREE.MeshStandardMaterial({ color: '#8c6f49', roughness: 0.64, metalness: 0.68 }),
     dark: new THREE.MeshStandardMaterial({ color: '#182c32', roughness: 0.73, metalness: 0.45 }),
@@ -83,4 +49,22 @@ export function createEchoMaterial(): THREE.ShaderMaterial {
       if(alpha<.005)discard; vec3 tint=mix(vec3(.35,.69,.77),vec3(.76,.94,1.),exp(-age*12.));gl_FragColor=vec4(tint,alpha);}`,
     transparent: true, depthTest: true, depthWrite: false, blending: THREE.AdditiveBlending,
   });
+}
+
+/** Enamel label with thickness, rolled rim and fasteners; not a floating HUD. */
+export function makePhysicalSign(text: string, small = '', color = '#e9dcc3', width = 1.7): THREE.Group {
+  const root=new THREE.Group(); const height=width*192/512;
+  const face=makeSign(text,small,color); const map=face.material.map;
+  face.material.dispose();
+  const panelMaterial=new THREE.MeshStandardMaterial({color:'#25383d',metalness:.35,roughness:.66});
+  const ink=new THREE.MeshStandardMaterial({map,roughness:.78,metalness:.1});
+  const panel=new THREE.Mesh(new THREE.BoxGeometry(width+.025,height+.025,.035),panelMaterial);
+  panel.castShadow=panel.receiveShadow=true;root.add(panel);
+  const printed=new THREE.Mesh(new THREE.PlaneGeometry(width,height),ink);printed.position.z=.0185;root.add(printed);face.geometry.dispose();
+  const screwMaterial=new THREE.MeshStandardMaterial({color:'#8f9994',metalness:.7,roughness:.55});
+  for(const x of [-1,1]) for(const y of [-1,1]){
+    const screw=new THREE.Mesh(new THREE.CylinderGeometry(.006,.006,.008,8),screwMaterial);
+    screw.rotation.x=Math.PI/2;screw.position.set(x*(width/2-.018),y*(height/2-.017),.022);root.add(screw);
+  }
+  return root;
 }

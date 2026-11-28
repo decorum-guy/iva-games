@@ -110,6 +110,8 @@
     {
       "gameId": "knock-first",
       "collectionId": "other",
+      "inputRecommendation": "mouse",
+      "deviceAvailability": "desktop-only",
       "title": {
         "ru": "Сначала постучи",
         "en": "Knock First"

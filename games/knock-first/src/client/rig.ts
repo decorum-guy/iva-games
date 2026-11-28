@@ -40,9 +40,24 @@ function solveTwoBone(root: THREE.Object3D, upper: THREE.Object3D, fore: THREE.O
 }
 
 /** Rotate the authored shoulder/elbow chain, preserving segment lengths and hand skinning. */
-export function solveArmGrip(root: THREE.Object3D, side: 'left' | 'right', target: THREE.Vector3): void {
+export function solveArmGrip(root: THREE.Object3D, side: 'left' | 'right', target: THREE.Vector3, orientation?: THREE.Quaternion): void {
   const upper = root.getObjectByName(`${side}_upper_arm`), fore = root.getObjectByName(`${side}_forearm`), hand = root.getObjectByName(`${side}_hand`);
-  if (upper && fore && hand) solveTwoBone(root, upper, fore, hand, target, new THREE.Vector3(side === 'left' ? -0.5 : 0.5, -1, 0));
+  if (upper && fore && hand) {
+    if(orientation) remember(root,[hand]);
+    solveTwoBone(root, upper, fore, hand, target, new THREE.Vector3(side === 'left' ? -0.5 : 0.5, -1, 0));
+    if(orientation && hand.parent){root.updateWorldMatrix(true,true);hand.quaternion.copy(hand.parent.getWorldQuaternion(new THREE.Quaternion()).invert().multiply(orientation));}
+  }
+}
+
+/** Match a physical palm contact frame, not merely the wrist joint. */
+export function solvePalmGrip(root: THREE.Object3D, side: 'left'|'right', target: THREE.Vector3, orientation: THREE.Quaternion): boolean {
+  const grip=root.getObjectByName(side==='left'?'PalmGrip_L':'PalmGrip_R');
+  const hand=root.getObjectByName(`${side}_hand`);
+  if(!grip || !hand || grip.parent!==hand) return false;
+  const handOrientation=orientation.clone().multiply(grip.quaternion.clone().invert());
+  const wrist=target.clone().sub(grip.position.clone().applyQuaternion(handOrientation));
+  solveArmGrip(root,side,wrist,handOrientation);root.updateWorldMatrix(true,true);
+  return true;
 }
 
 /** The uphill carrier crouches to the level handles; knees bend while boots stay on the floor. */
@@ -63,4 +78,32 @@ export function solveCarryStance(root: THREE.Object3D, lowering: number, ankleHe
     const parentRotation = leg.foot.parent!.getWorldQuaternion(new THREE.Quaternion());
     leg.foot.quaternion.copy(parentRotation.invert().multiply(leg.orientation));
   }
+}
+
+/** Bring the actual tool face to a permitted surface; fingers retain their grasp. */
+export function solveToolContact(root: THREE.Object3D, tool: THREE.Object3D, target: THREE.Vector3, normal: THREE.Vector3, amount: number): void {
+  const hand = root.getObjectByName('right_hand'), upper = root.getObjectByName('right_upper_arm');
+  const fore = root.getObjectByName('right_forearm'), tip = tool.getObjectByName('StrikeTip'), rear = tool.getObjectByName('StrikeRear');
+  if (!hand || !upper || !fore || !tip || !rear || amount <= 0) return;
+  root.updateWorldMatrix(true, true);
+  const tipWorld = tip.getWorldPosition(new THREE.Vector3());
+  const axis = tipWorld.clone().sub(rear.getWorldPosition(new THREE.Vector3())).normalize();
+  const handOrientation = hand.getWorldQuaternion(new THREE.Quaternion());
+  const facing = new THREE.Quaternion().setFromUnitVectors(axis, normal.clone().negate()).multiply(handOrientation);
+  const orientation = handOrientation.clone().slerp(facing, amount);
+  const localTip = hand.worldToLocal(tipWorld.clone());
+  const wrist = tipWorld.lerp(target, amount).sub(localTip.applyQuaternion(orientation));
+  const shoulder = upper.getWorldPosition(new THREE.Vector3());
+  const reach = shoulder.distanceTo(fore.getWorldPosition(new THREE.Vector3())) + fore.getWorldPosition(new THREE.Vector3()).distanceTo(hand.getWorldPosition(new THREE.Vector3()));
+  const toward = wrist.clone().sub(shoulder);
+  // A small clavicle/body lean, preserving both arm segment lengths. No camera
+  // or authoritative player movement is introduced to make the contact reach.
+  const lean = Math.min(.34, Math.max(0, toward.length() - reach + .002));
+  if (lean > 0 && upper.parent) {
+    remember(root, [upper]);
+    upper.position.copy(upper.parent.worldToLocal(shoulder.addScaledVector(toward.normalize(), lean)));
+    root.updateWorldMatrix(true, true);
+  }
+  solveArmGrip(root, 'right', wrist, orientation);
+  root.updateWorldMatrix(true, true);
 }

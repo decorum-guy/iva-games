@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { getLevel } from '../core/level';
 import type { Difficulty, KnockSettings, Locale, RouteId } from '../core/types';
 import { BOT_NAMES, BOT_NAMES_EN, copy, DIFFICULTY_COPY, label, ROUTE_COPY } from './copy';
+import { HudIcon } from './HudIcon';
 import './knock-first.css';
 
 export interface KnockRoom {
@@ -18,7 +19,7 @@ export const roomSettings = (value: Record<string, unknown>): KnockSettings => (
   practice: value.practice === true, tutorial: value.tutorial === true,
 });
 
-export function RoutePlan({ route, discovered, current }: { route: RouteId | 'tutorial'; discovered?: string[]; current?: string }) {
+export function RoutePlan({ route, discovered, current, viewerYaw }: { route: RouteId | 'tutorial'; discovered?: string[]; current?: string; viewerYaw?: number }) {
   const level = getLevel(route), known = (id: string) => !discovered || discovered.includes(id);
   const centers = level.zones.map(z => z.center);
   const minX = Math.min(...centers.map(p => p.x)) - 8, minZ = Math.min(...centers.map(p => p.z)) - 8;
@@ -30,7 +31,12 @@ export function RoutePlan({ route, discovered, current }: { route: RouteId | 'tu
     })}
     {level.zones.filter(z => known(z.id)).map(z => <g key={z.id}>
       <rect x={z.center.x - 4} y={z.center.z - 4} width={8} height={8} rx={0.8} fill={z.safe ? '#d9a46e' : current === z.id ? '#91d7ec' : '#1b343d'} stroke={z.safe ? '#eacb98' : '#91d7ec'} strokeWidth={0.5} />
-      <text x={z.center.x} y={z.center.z + 1.5} textAnchor="middle" fontSize={4.3} fill={z.safe || current === z.id ? '#10212a' : '#d4e6e9'}>{z.id}</text>
+      {current === z.id && viewerYaw !== undefined ? <>
+        <g transform={'translate(' + z.center.x + ' ' + z.center.z + ') rotate(' + (-viewerYaw * 180 / Math.PI) + ')'}>
+          <path d="M0-2.6 1.8 1.8 0 .9-1.8 1.8Z" fill="#10212a" stroke="#f2e5c8" strokeWidth=".15" />
+        </g>
+        <text x={z.center.x} y={z.center.z + 7} textAnchor="middle" fontSize={2.6} fill="#ead7b6">{z.id}</text>
+      </> : <text x={z.center.x} y={z.center.z + 1.5} textAnchor="middle" fontSize={4.3} fill={z.safe || current === z.id ? '#10212a' : '#d4e6e9'}>{z.id}</text>}
       {z.center.y > 0 && <text x={z.center.x + 5} y={z.center.z - 3} fontSize={2.7} fill="#e0a15c">+{z.center.y}</text>}
     </g>)}
   </svg>;
@@ -66,7 +72,7 @@ export function KnockLanding({ language, signedIn, onCreate, onExit }: { languag
       <div className="kf-expedition-footer"><label>{t('Мест в лифте', 'Places in the lift')}<select aria-label={t('Мест в лифте', 'Places in the lift')} value={capacity} onChange={e => setCapacity(Number(e.target.value))}>{[2, 3, 4, 5].map(n => <option key={n}>{n}</option>)}</select></label>
         <button className="kf-button" onClick={() => onCreate({ ...settings, practice: true, tutorial: false }, 2)}>{t('Практика с ботом', 'Practice with a bot')}</button>
         <button className="kf-button primary" onClick={() => onCreate({ ...settings, practice: false, tutorial: false }, capacity)}>{t('Создать комнату', 'Create a room')} →</button>
-      </div><p className="kf-device-note">{t('Клавиатура и мышь или сенсорный экран. Нужен WebGL 2. Звук можно заменить направленными подписями.', 'Keyboard and mouse or touch. Requires WebGL 2. Directional captions can replace sound.')}</p>
+      </div><p className="kf-device-note">{t('Мышь и клавиатура. Нужен WebGL 2. Звук можно заменить направленными подписями.', 'Mouse and keyboard. Requires WebGL 2. Directional captions can replace sound.')}</p>
     </section>
   </div>;
 }
@@ -98,7 +104,7 @@ export function KnockLobby({ room, userId, friends, language, request, refresh, 
     <div className="kf-lobby-grid"><section className="kf-panel kf-route-section"><div className="kf-section-title"><h2>{t('Куда спускаемся', 'Where we descend')}</h2><span>{settings.tutorial ? t('Урок', 'Lesson') : settings.practice ? t('Практика', 'Practice') : t('Вылазка', 'Mission')}</span></div>
       {settings.tutorial ? <div className="kf-lesson-preview"><RoutePlan route="tutorial" /><h3>{t('Учебный отсек', 'Training Annex')}</h3><p>{t('Шаг, стук, дверь, две рукояти и помощь. Всё проверите своими руками.', 'Walking, knocking, a door, two handles and a rescue. Try each action yourself.')}</p></div> : <KnockSettingsFields value={draft} onChange={setDraft} language={language} disabled={!editable} />}
       {host && !settings.tutorial && <div className="kf-lobby-edit"><label>{t('Мест в лифте', 'Lift capacity')}<select value={capacity} onChange={e => setCapacity(Number(e.target.value))} disabled={!editable}>{[2, 3, 4, 5].map(n => <option key={n} disabled={n < minimumCapacity}>{n}</option>)}</select></label>{dirty && <button className="kf-button" disabled={!editable} onClick={() => void act('/settings', { settings: draft, capacity, title: room.title, expectedRevision: room.revision })}>{t('Сохранить маршрут', 'Save route')}</button>}</div>}
-      <p className="kf-route-advice">{label(ROUTE_COPY[draft.route].detail, language)}</p><button className="kf-button kf-sound-check" onClick={onSound}>◖ {t('Проверить звук и подписи', 'Check audio and captions')}</button>
+      <p className="kf-route-advice">{label(ROUTE_COPY[draft.route].detail, language)}</p><button className="kf-button kf-sound-check" onClick={onSound}><HudIcon kind="audio" />{t('Проверить звук и подписи', 'Check audio and captions')}</button>
     </section><section className="kf-panel kf-crew-section"><div className="kf-section-title"><h2>{t('Состав смены', 'Shift crew')}</h2><span>{room.members.length}/{room.capacity}</span></div>
       <div className="kf-crew-list">{Array.from({ length: room.capacity }, (_, index) => {
         const m = room.members.find(member => member.seatIndex === index);

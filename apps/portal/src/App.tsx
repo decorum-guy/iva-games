@@ -1,3 +1,4 @@
+import { isGameAvailableOnDevice } from '@iva-games/game-registry';
 import { KnockLanding, KnockSettingsFields, roomSettings as knockRoomSettings } from '@iva-games/knock-first/lobby';
 import type { KnockSettings } from '@iva-games/knock-first';
 import type { DistrictMap } from "@iva-games/district";
@@ -45,6 +46,11 @@ import type {
   TelegramStatus,
   User,
 } from "./types";
+
+function DesktopOnly({ onBack, rooms = false }: { onBack: () => void; rooms?: boolean }) {
+  const { t } = useLanguage();
+  return <section className="desktop-only-notice"><h1>{t("Играйте на компьютере", "Play on a computer")}</h1><p>{t("Для игры нужны мышь и клавиатура.", "Use a mouse and keyboard to play.")}</p><button className="button primary" onClick={onBack}>{rooms ? t("К комнатам", "Back to rooms") : t("К играм", "Back to games")}</button></section>;
+}
 
 const TerritorialMatch = lazy(() => import("./TerritorialDistrict").then(module => ({ default: module.TerritorialMatch })));
 
@@ -680,7 +686,7 @@ export default function App() {
             </button>
           </div>
         ) : route.page === "knock-first" && !entrance ? (
-          <Suspense fallback={<div className="loading-page"><span className="spinner" /></div>}><KnockLanding language={lang} signedIn={!!user} onExit={() => go("games")} onCreate={(settings, capacity) => {
+          !isGameAvailableOnDevice("knock-first", navigator) ? <DesktopOnly onBack={() => go("games")} /> : <Suspense fallback={<div className="loading-page"><span className="spinner" /></div>}><KnockLanding language={lang} signedIn={!!user} onExit={() => go("games")} onCreate={(settings, capacity) => {
             if (!user || !verified) { sessionStorage.setItem("iva.knock.return", "1"); go(user ? "profile" : "login"); return; }
             void perform(async () => {
               const data = await request<{ room: Room }>("/rooms", { gameId: "knock-first", capacity, title: settings.tutorial ? t("Учебная смена", "Training shift") : t("Архивная смена", "Archive shift"), settings });
@@ -1392,11 +1398,13 @@ function CreateRoom({
   const [preset, setPreset] = useState(districtPreset(undefined));
   const [knockSettings, setKnockSettings] = useState<KnockSettings>(knockRoomSettings({}));
   const territorial = game?.rulesVersion === TERRITORY_RULES;
+  const deviceBlocked = !!game && !isGameAvailableOnDevice(game.gameId, navigator);
   return (
     <Modal title={t("Новая комната", "New room")} onClose={close}>
       <form
         onSubmit={(event) => {
           event.preventDefault();
+          if (deviceBlocked) return;
           void create({
             gameId,
             capacity,
@@ -1456,7 +1464,8 @@ function CreateRoom({
             ))}
           </select>
         </label>
-        {gameId === "knock-first" && <div className="kf kf-create-settings"><KnockSettingsFields value={knockSettings} onChange={setKnockSettings} language={lang} /></div>}
+        {deviceBlocked && <p role="status">{t("Играйте на компьютере. Нужны мышь и клавиатура.", "Play on a computer with a mouse and keyboard.")}</p>}
+        {gameId === "knock-first" && !deviceBlocked && <div className="kf kf-create-settings"><KnockSettingsFields value={knockSettings} onChange={setKnockSettings} language={lang} /></div>}
         {gameId === "district" && (territorial
           ? <TerritorialSettingsFields map={territorialMap} setMap={setTerritorialMap} preset={preset} setPreset={setPreset} />
           : <DistrictMapSelect value={districtMap.id} version={districtMap.version} onChange={setDistrictMap} />)}
@@ -1474,7 +1483,7 @@ function CreateRoom({
         </p>
         <button
           className="button primary wide"
-          disabled={busy || !game}
+          disabled={busy || !game || deviceBlocked}
           type="submit"
         >
           {t("Создать комнату", "Create room")}
@@ -1531,6 +1540,7 @@ function RoomDetail({
       ["pending", "accepted"].includes(invite.status) &&
       !joinedInvitation(invite),
   );
+  if (!isGameAvailableOnDevice(room.gameId, navigator)) return <DesktopOnly rooms onBack={() => go("rooms")} />;
   if (room.gameId === "knock-first") return <Suspense fallback={<span className="spinner" />}><KnockFirst room={room} userId={user.playerId} friends={friends} language={lang} request={request} refresh={refresh} onExit={() => go("rooms")} onChooseMission={() => go("knock-first")} /></Suspense>;
   if (room.rulesVersion === TERRITORY_RULES && room.matchId && ["playing", "finished"].includes(room.state)) {
     return <Suspense fallback={<span className="spinner" />}><TerritorialMatch key={room.matchId} room={room} refresh={refresh} /></Suspense>;
