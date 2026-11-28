@@ -209,6 +209,32 @@ function finish(s:MissionState,kind:'full'|'partial'|'defeat',reason:string):voi
 
 function botInput(s:MissionState,a:Actor,move:{x:number;z:number},options:{run?:boolean;quiet?:boolean;hand?:boolean;yaw?:number}={}):void {setInput(s,a.id,{seq:a.input.seq+1,controllerEpoch:a.controllerEpoch,moveX:move.x,moveZ:move.z,yaw:options.yaw??(Math.hypot(move.x,move.z)>0.05?Math.atan2(-move.x,-move.z):a.yaw),pitch:0,run:options.run??false,quiet:options.quiet??false,hand:options.hand??false});}
 function botCommand(s:MissionState,a:Actor,payload:CommandPayload):CommandReceipt {return applyCommand(s,a.id,{actionId:`bot-${a.id}-${s.tick}-${s.nextEvent}`,controllerEpoch:a.controllerEpoch,payload});}
+/** An idle follower gives a nearby visible learner room to step back. No pushing or teleporting. */
+function yieldToHuman(s:MissionState,level:KnockLevel,a:Actor):boolean {
+ if(a.carrying||a.hold||a.botThreat||a.botRescue||!['follow','yield'].includes(a.botIntent))return false;
+ const radius=a.botIntent==='yield'?1.4:0.95;
+ const human=s.actors.filter(other=>other.kind==='human'&&other.connected&&!other.assistant&&other.status==='active'
+   &&Math.abs(other.position.y-a.position.y)<0.9&&distanceXZ(other.position,a.position)<radius
+   &&isVisible(s,level,a,other.position,1.2)).sort((left,right)=>distanceXZ(left.position,a.position)-distanceXZ(right.position,a.position))[0];
+ if(!human){
+  if(a.botIntent!=='yield')return false;
+  a.botIntent='follow';a.botTarget=null;botInput(s,a,{x:0,z:0});return true;
+ }
+ if(a.botIntent!=='yield'||!a.botTarget){
+  const away=normalize(a.position.x-human.position.x,a.position.z-human.position.z);
+  const directions=[1,-1].map(sign=>normalize(away.x*0.45+away.z*sign,away.z*0.45-away.x*sign));
+  directions.push(away);
+  const target=directions.map(dir=>moveCapsule(level,s.doors,a.position,dir.x*0.85,dir.z*0.85)).find(point=>
+    distanceXZ(point,a.position)>0.35&&distanceXZ(point,human.position)>distanceXZ(a.position,human.position)+0.2
+    &&!s.actors.some(other=>other.id!==a.id&&other.id!==human.id&&other.status!=='returning'
+      &&Math.abs(other.position.y-point.y)<0.9&&isVisible(s,level,a,other.position,1.2)&&distanceXZ(point,other.position)<0.6));
+  if(!target)return false;
+  a.botTarget=target;a.botIntent='yield';
+ }
+ if(distanceXZ(a.position,a.botTarget)<0.12){a.botTarget=null;a.botIntent='follow';botInput(s,a,{x:0,z:0});return true;}
+ const direction=normalize(a.botTarget.x-a.position.x,a.botTarget.z-a.position.z);
+ botInput(s,a,direction,{quiet:true,yaw:a.yaw});return true;
+}
 function steerBot(s:MissionState,level:KnockLevel,a:Actor,target:Vec3,run=false):void {
  const next=nextWaypoint(level,a.position,target,s.doors,false,s.discoveredZones);
  if(!next){botInput(s,a,{x:0,z:0});a.botIntent='blocked';a.botTarget=null;return;}
@@ -251,10 +277,17 @@ function escapePosition(s:MissionState,level:KnockLevel,a:Actor,hazard:Vec3):Vec
 }
 function advanceBots(s:MissionState,level:KnockLevel):void {
  for(const a of s.actors){
+  // A lesson waits for its learner; an autonomous substitute must not consume
+  // the object they are currently learning to release. Ordinary missions keep assistants.
+  if(s.settings.tutorial&&a.kind==='human'){
+   if(a.assistant){a.assistant=false;a.input=NEUTRAL(a.controllerEpoch,a.input.seq);a.hold=null;a.botIntent='';}
+   continue;
+  }
   if(a.kind==='human'&&!a.connected&&!a.assistant&&a.disconnectedAt!==null&&s.time-a.disconnectedAt>=10){a.assistant=true;a.input=NEUTRAL(a.controllerEpoch,a.input.seq);a.botNextAt=s.time+0.6;addEvent(s,'assistantJoined',{actorId:a.id});}
   if(a.kind!=='bot'&&!a.assistant)continue;
   if(a.status!=='active'){botInput(s,a,{x:0,z:0});continue;}
   if(s.phase==='preparation'){a.ready=true;botInput(s,a,{x:0,z:0});continue;}
+  if(yieldToHuman(s,level,a))continue;
   if(s.time<a.botNextAt){if(a.hold)botInput(s,a,{x:0,z:0},{hand:true});continue;}
   a.botNextAt=s.time+(s.settings.difficulty==='calm'?0.8:s.settings.difficulty==='tense'?0.45:0.65);
   const battery=heldBattery(s,a);
@@ -314,6 +347,9 @@ function advanceTutorial(s:MissionState,level:KnockLevel):void {
  else if(t.step===3&&s.events.some(e=>e.type==='doorOpened'))t.step=4;
  else if(t.step===4&&human.zoneId==='T')t.step=5;
  else if(t.step===5&&t.hadPair)t.step=6;
+ // Recover a course saved by the older auto-helper after it installed the
+ // held battery. Retry the remaining real carry exercise; never award release.
+ else if(t.step===6&&!human.carrying&&!t.released&&s.batteries.some(b=>!b.installed)){t.step=5;t.hadPair=false;}
  else if(t.step===6&&t.released){t.step=7;if(bot){releaseHandle(s,bot);const nearby=snapToFloor(level,{x:human.position.x+0.65,y:human.position.y,z:human.position.z});if(nearby&&canOccupy(level,s.doors,nearby))bot.position=nearby;bot.zoneId=zoneAt(level,bot.position);downActor(s,bot);bot.downedRemaining=90;}}
  else if(t.step===7&&s.events.some(e=>e.type==='revived'&&e.actorId===human.id)){t.step=8;t.lastEvent=null;}
  else if(t.step===8&&t.lastEvent==='knock'){t.step=9;t.lastEvent=null;}
