@@ -145,10 +145,10 @@ export class TerritoryRuntime implements GameRuntime {
       let changed = false;
       for (const p of eligible) {
         const id = p.participantId;
-        if (id !== active && !state.discard[id] && !state.offers.some(offer => offer.targetId === id && offer.agreedAt === undefined)) continue;
+        if (id !== active && !state.discard[id] && !state.offers.some(offer => offer.targetId === id && offer.agreedAt === undefined || offer.authorId === id && offer.agreedAt !== undefined)) continue;
         const now = this.now();
         // Keep a real response window, including when a client refreshes or the process restarts.
-        const responseUntil = id === active ? Math.max(0, ...state.offers.filter(offer => offer.authorId === id &&
+        const responseUntil = id === active ? Math.max(0, ...state.offers.filter(offer => offer.authorId === id && offer.agreedAt === undefined &&
           !state.left.includes(offer.targetId) && state.participants.some(member => member.participantId === offer.targetId && member.controller.kind === 'human'))
           .map(offer => (offer.offeredAt ?? now - HUMAN_TRADE_WINDOW_MS) + HUMAN_TRADE_WINDOW_MS)) : 0;
         const view = viewTerritory(state, id, now, false);
@@ -161,7 +161,7 @@ export class TerritoryRuntime implements GameRuntime {
           if (current.revision !== state.revision) return 'changed';
           let schedule = current.botSchedule;
           if (schedule?.revision !== current.revision || schedule.participantId !== id) {
-            const desired = Math.max(now + botDelay(current, botSeed, id, action), responseUntil);
+            const desired = Math.max(now + botDelay(current, botSeed, id, action), action.type === 'accept' ? 0 : responseUntil);
             schedule = { revision: current.revision, participantId: id,
               at: current.deadlineAt === null ? desired : Math.min(desired, current.deadlineAt) };
             current.botSchedule = schedule;
@@ -171,8 +171,14 @@ export class TerritoryRuntime implements GameRuntime {
           try { this.write(applyTerritory(current, id, action, this.now())); }
           catch (error) {
             if (!(error instanceof DistrictError)) throw error;
-            if (!safe) return 'none';
-            this.write(applyTerritory(current, id, safe, this.now()));
+            // Consent may become unaffordable before the author chooses it. A bot
+            // withdraws its stale group through the same public action rather than
+            // repeatedly replacing another participant's scheduled timer.
+            const recovery = action.type === 'accept' && current.offers.some(offer =>
+              offer.id === action.offerId && offer.authorId === id && offer.agreedAt !== undefined)
+              ? { type: 'cancel' as const, offerId: action.offerId } : safe;
+            if (!recovery) return 'none';
+            this.write(applyTerritory(current, id, recovery, this.now()));
           }
           return 'changed';
         }).immediate();

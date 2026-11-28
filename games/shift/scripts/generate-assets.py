@@ -354,21 +354,24 @@ def artwork():
 
 def manifest(model_info, sound_info):
     assets = []
+    metadata = {**{('models/' + name + '.glb', 'model'): info for name, info in model_info.items()},
+                **{('audio/' + name + '.wav', 'audio'): info for name, info in sound_info.items()}}
+    asset_types = {('models', '.glb'): 'model', ('audio', '.wav'): 'audio', ('art', '.svg'): 'vector',
+                   ('fonts', '.ttf'): 'font', ('fonts', '.txt'): 'license'}
     for path in sorted(OUT.rglob('*')):
         if not path.is_file() or path.name.startswith('.'):
             continue
-        rel = path.relative_to(OUT).as_posix()
+        relative_path = path.relative_to(OUT)
+        rel = relative_path.as_posix()
+        asset_type = asset_types[(relative_path.parts[0], path.suffix.lower())]
         font = rel.startswith('fonts/')
         source = 'https://github.com/google/fonts/tree/main/ofl/' + ('russoone' if 'Russo' in path.name or 'russo' in path.name else 'onest') if font else 'games/shift/scripts/generate-assets.py'
-        item = {'id': path.stem, 'path': '/shift-assets/' + rel, 'bytes': path.stat().st_size, 'sha256': hashlib.sha256(path.read_bytes()).hexdigest(),
+        item = {'id': ':'.join(relative_path.parts), 'type': asset_type, 'path': '/shift-assets/' + rel, 'bytes': path.stat().st_size, 'sha256': hashlib.sha256(path.read_bytes()).hexdigest(),
                 'author': ('Jovanny Lemonad' if 'Russo' in path.name or 'russo' in path.name else 'The Onest Project Authors') if font else 'Iva Games / Shift procedural workshop',
                 'source': source, 'license': 'OFL-1.1' if font else 'LicenseRef-IvaGames-Original',
                 'modification': 'Unmodified upstream font or license' if font else 'Original reproducible procedural geometry, vector artwork or synthesized PCM; no external samples',
                 'version': 'upstream pinned by SHA-256' if font else 'shift-assets@1'}
-        if path.stem in model_info:
-            item.update(model_info[path.stem])
-        if path.stem in sound_info:
-            item.update(sound_info[path.stem])
+        item.update(metadata.get((rel, asset_type), {}))
         assets.append(item)
     doc = {'version': 'shift-assets@1', 'coordinates': {'units': 'metres', 'up': '+Y', 'droneForward': '+X'},
            'originalLicense': 'Created for Iva Games. No third-party model, texture or audio rights are required; reuse is subject to the project owner\'s terms.',

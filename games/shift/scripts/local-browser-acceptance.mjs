@@ -14,7 +14,7 @@ for (const arg of args) if (!['--all', '--ui', '--lessons', '--touch', '--matrix
 const label = process.env.SHIFT_QA_LABEL || 'diagnostic';
 const folder = resolve(root, '.qa/shift-local', label);
 await mkdir(folder, { recursive: true });
-const report = { label, build: {}, method: 'Headless Chromium automation at normal 30 Hz. Reads only the filtered ShiftView passed to the renderer; every gameplay action uses pointer, keyboard or visible buttons. No application-state writes, timer acceleration or account data changes.', tests: [], defects: [], errors: [], screenshots: [], captureWarnings: [], matches: [] };
+const report = { label, build: {}, method: 'Headless Chromium automation with the normal30Hz scheduled tick, no acceleration; observed rates are recorded separately. Reads only the filtered ShiftView passed to the renderer; every gameplay action uses pointer, keyboard or visible buttons. No application-state writes, timer acceleration or account data changes.', tests: [], defects: [], errors: [], screenshots: [], captureWarnings: [], matches: [] };
 const sourceDist = resolve(root, 'apps/portal/dist');
 const dist = resolve(folder, 'built');
 await rm(dist, { recursive: true, force: true });
@@ -55,18 +55,59 @@ async function bounded(action, milliseconds) { let timer; try { return await Pro
 async function closeContext(context) { try { await bounded(() => context.close(), 4000); } catch { console.log(JSON.stringify({ harnessWarning: 'Context teardown exceeded4sec; browser process will be closed at run end.' })); } }
 const log = (name, details = {}) => { report.tests.push({ name, ...details }); console.log(JSON.stringify({ test: name, ...details })); };
 const defect = (name, details) => { report.defects.push({ name, details }); console.log(JSON.stringify({ defect: name, details })); };
-async function snap(page, name) { if (await page.locator('.shift-match').count()) { console.log(JSON.stringify({ captureSkipped: name, reason: 'Headless canvas capture timed out in diagnostics; gameplay and DOM observations continue. Separate renderer fixtures provide visual evidence.' })); return; } const file = resolve(folder, `${name}.png`); try { await page.screenshot({ path: file, fullPage: !!(await page.locator('.shift-home').count()), timeout: 15000 }); report.screenshots.push(file); } catch (error) { const warning = { name, message: error.message }; report.captureWarnings.push(warning); console.log(JSON.stringify({ captureWarning: name, message: error.message })); } }
-async function view(page) {
-  return page.evaluate(() => {
+async function snap(page, name) { if (await page.locator('.shift-match').count()) {
+  const capture = await page.evaluate(() => { const host = document.querySelector('.shift-scene [data-shift-renderer]'); const canvas = host?.querySelector('canvas'); return { image: host?.getAttribute('data-shift-renderer') === '2d' && canvas ? canvas.toDataURL('image/png') : null, text: document.querySelector('.shift-match')?.innerText || '' }; });
+  await writeFile(resolve(folder, `${name}-ui.txt`), capture.text);
+  if (capture.image) { const file = resolve(folder, `${name}-canvas.png`); await writeFile(file, Buffer.from(capture.image.split(',')[1], 'base64')); report.screenshots.push(file); }
+  console.log(JSON.stringify({ capture: name, method: capture.image ? 'Actual rendered2D canvas export plus separate DOMtext; not a full-page screenshot.' : 'DOM text; see separate renderer3D visual audit.' })); return;
+} const file = resolve(folder, `${name}.png`); try { await page.screenshot({ path: file, fullPage: !!(await page.locator('.shift-home').count()), timeout: 15000 }); report.screenshots.push(file); } catch (error) { const warning = { name, message: error.message }; report.captureWarnings.push(warning); console.log(JSON.stringify({ captureWarning: name, message: error.message })); } }
+async function view(page, withPresentation = false) {
+  return page.evaluate(withPresentation => {
     const host = document.querySelector('.shift-scene [data-shift-renderer]'); if (!host) return null;
     let fiber = host[Object.keys(host).find(key => key.startsWith('__reactFiber$'))];
-    while (fiber) { if (fiber.memoizedProps?.view?.wireVersion === 'shift-wire@1') { const views = [fiber.memoizedProps.view, fiber.alternate?.memoizedProps?.view].filter(v => v?.wireVersion === 'shift-wire@1'); return structuredClone(views.sort((a, b) => b.tick - a.tick)[0]); } fiber = fiber.return; }
+    while (fiber) {
+      if (fiber.memoizedProps?.view?.wireVersion === 'shift-wire@1') {
+        const views = [fiber.memoizedProps.view, fiber.alternate?.memoizedProps?.view].filter(v => v?.wireVersion === 'shift-wire@1');
+        const permitted = structuredClone(views.sort((a, b) => b.tick - a.tick)[0]);
+        if (!withPresentation) return permitted;
+        const recap = document.querySelector('.shift-round-recap');
+        return { view: permitted, batteryHud: document.querySelector('.shift-pilot-status > span')?.textContent, batteryOrder: document.querySelector('.shift-command-panel .shift-order > p')?.textContent, recap: recap ? { open: recap.open, summaryHeight: recap.querySelector('summary')?.getBoundingClientRect().height, hasMap: !!recap.querySelector('svg[role="img"]'), lines: [...recap.querySelectorAll('.shift-round-recap__path')].map(line => ['x1', 'y1', 'x2', 'y2'].map(key => Number(line.getAttribute(key)))), events: [...recap.querySelectorAll('.shift-round-recap__events li')].map(item => item.textContent) } : null };
+      }
+      fiber = fiber.return;
+    }
     return null;
-  });
+  }, withPresentation);
+}
+function checkBatteryPresentation(observed, language) {
+  const v = observed.view, actor = v.actors.find(a => a.seatId === v.self.seatId);
+  if (v.self.role !== 'pilot' || v.phase === 'finished') return null;
+  const ru = language === 'ru', battery = v.battery;
+  const team = battery.team === 'teal' ? (ru ? 'Бирюза' : 'Teal') : battery.team === 'amber' ? (ru ? 'Янтарь' : 'Amber') : '—';
+  const space = battery.spaceId === 'west' ? (ru ? 'западном шлюзе' : 'west airlock') : battery.spaceId === 'east' ? (ru ? 'восточном шлюзе' : 'east airlock') : battery.spaceId;
+  const objective = battery.mode === 'carried' ? `${ru ? 'Батарея у команды' : 'Team carrying'}: ${team}` : `${ru ? 'Батарея в' : 'Battery in'} ${space}`;
+  const expectedHud = actor?.carrying ? (ru ? 'Батарея у вас · к своим воротам' : 'You have the battery · reach your gate') : objective;
+  const expectedOrder = actor?.carrying ? (ru ? 'Удержитесь на своих воротах до полной зарядки.' : 'Hold on your gate until charging completes.') : objective;
+  if ((!actor?.respawnAtTick && observed.batteryHud !== expectedHud) || observed.batteryOrder !== expectedOrder) return { tick: v.tick, permittedBattery: battery, actorCarrying: actor?.carrying, respawnAtTick: actor?.respawnAtTick, expectedHud, actualHud: observed.batteryHud, expectedOrder, actualOrder: observed.batteryOrder };
+  return null;
+}
+function checkRoundPresentation(observed) {
+  const { view: v, recap } = observed;
+  if (!v.roundRecap || !recap?.hasMap || recap.summaryHeight < 44) return { problem: 'Missing permitted recap, schematic or44px summary', round: v.round, phase: v.phase, recap };
+  if (v.phase === 'finished' && !recap.open) return { problem: 'Final battery route is not expanded', round: v.round };
+  const trace = v.roundRecap.batteryTrace;
+  const near = (a, b) => Math.abs(a - b) < .000001;
+  // Every displayed line must connect consecutive permitted observations; a gap cannot supply either endpoint.
+  const unexpected = recap.lines.find(line => !trace.some((point, index) => {
+    const next = trace[index + 1];
+    return !point.gap && next && !next.gap && near(line[0], point.worldX) && near(line[1], point.worldZ) && near(line[2], next.worldX) && near(line[3], next.worldZ);
+  }));
+  if (unexpected) return { problem: 'Schematic joins unobserved coordinates or a visibility gap', round: v.round, line: unexpected };
+  if (recap.events.length > 3) return { problem: 'More than three latest events', round: v.round, events: recap.events };
+  return null;
 }
 async function setupPage(options = {}) {
   const context = await browser.newContext({ viewport: { width: 1366, height: 768 }, ...options });
-  const page = await context.newPage(); page.setDefaultTimeout(6000);
+  const page = await context.newPage(); page.setDefaultTimeout(20000);
   page.on('pageerror', error => report.errors.push({ url: page.url(), message: error.message }));
   await page.goto('http://127.0.0.1:5299/shift'); await page.locator('.shift-home').waitFor();
   return { context, page };
@@ -74,10 +115,11 @@ async function setupPage(options = {}) {
 async function settings(page, mode = '2d', language) {
   await page.getByRole('button', { name: /^(Настройки|Settings)$/ }).click();
   await page.getByLabel(/Вид этажа|Floor view/).selectOption(mode);
-  if (language) await page.getByLabel(/^(Язык|Language)$/).selectOption(language);
+  if (language) await page.getByLabel(/Язык|Language/).selectOption(language);
   await page.keyboard.press('Escape');
 }
 async function focusScene(page) { await page.locator('.shift-scene [data-shift-renderer]').focus(); }
+async function clickLive(page, locator) { try { const box = await locator.boundingBox({ timeout: 500 }); if (!box || !(await locator.isEnabled({ timeout: 500 }))) return false; await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2); return true; } catch { return false; } }
 async function aimAt(page, point) {
   const box = await page.locator('.shift-scene [data-shift-renderer]').boundingBox();
   if (!box) return;
@@ -100,19 +142,26 @@ async function lesson(page, role) {
   await settings(page, '2d');
   await page.getByRole('button', { name: role === 'pilot' ? /Урок пилота|Pilot lesson/ : /Урок штурмана|Navigator lesson/ }).click();
   await page.locator('.shift-match').waitFor(); await focusScene(page);
-  const seen = new Set(), started = Date.now(); let lastStep = -1, lastActionTick = -1000, rideObserved = false;
+  const seen = new Set(), started = Date.now(); let lastStep = -1, lastActionTick = -1000, rideObserved = false, arrowFocusChecked = false;
   while (Date.now() - started < 120000) {
     const v = await view(page); if (!v) { await sleep(40); continue; }
-    const complete = await page.locator('.shift-lesson.complete').count();
-    if (complete) { await stop(page); await snap(page, `${role}-lesson-complete`); log(`${role} lesson completed`, { wallSeconds: (Date.now() - started) / 1000, tick: v.tick, steps: [...seen], rideObserved }); return; }
-    const title = await page.locator('.shift-lesson h2').textContent();
-    const step = Number((await page.locator('.shift-lesson-number').textContent()).match(/\d+/)?.[0]) - 1;
+    const displayed = await page.locator('.shift-lesson').evaluate(node => ({ complete: node.classList.contains('complete'), title: node.querySelector('h2')?.textContent, number: node.querySelector('.shift-lesson-number')?.textContent }));
+    if (displayed.complete) { await stop(page); await snap(page, `${role}-lesson-complete`); log(`${role} lesson completed`, { wallSeconds: (Date.now() - started) / 1000, tick: v.tick, steps: [...seen], rideObserved }); return; }
+    const title = displayed.title;
+    const step = Number(displayed.number.match(/\d+/)?.[0]) - 1;
     seen.add(title);
     if (step !== lastStep) { console.log(JSON.stringify({ lesson: role, step, title, tick: v.tick })); lastStep = step; if (step === 0) { await stop(page); await snap(page, `${role}-lesson-step-${step}`); } }
-    if (v.motion) rideObserved = true;
+    if (v.motion && !rideObserved) { rideObserved = true; await snap(page, `${role}-lesson-room-moving`); }
     if (role === 'navigator') {
       await stop(page);
-      if (step === 0) { await page.keyboard.press('ArrowUp'); }
+      if (step === 0) {
+        if (!arrowFocusChecked) {
+          await page.locator('.shift-room-keys').getByRole('button', { name: 'A', exact: true }).click(); await page.keyboard.press('ArrowUp'); await page.keyboard.press('Enter');
+          const until = Date.now() + 2000; let after = await view(page); while ((after.stats[after.self.seatId]?.shifts || 0) === 0 && Date.now() < until) { await sleep(50); after = await view(page); }
+          if ((after.stats[after.self.seatId]?.shifts || 0) === 0) { defect('Navigator Enter does not confirm arrow-selected room', 'Focus roomA, pressArrowUp to selectO, thenEnter: no shift accepted.'); await focusScene(page); await page.keyboard.press('ArrowUp'); }
+          arrowFocusChecked = true;
+        } else await page.keyboard.press('ArrowUp');
+      }
       else if (step === 1 && !v.motion && v.tick - lastActionTick > 15) { await focusScene(page); await page.keyboard.press('Enter'); lastActionTick = v.tick; }
       else if (step === 3 && !v.motion) {
         const option = v.shiftOptions.find(o => o.allowed);
@@ -192,7 +241,7 @@ async function uiSweep() {
 async function fullMatch({ arena, teamSize, role, language, viewport }) {
   const { page, context } = await setupPage({ viewport });
   const title = { foundry: /Крановый цех|Crane Foundry/, calibration: /Калибровка|Calibration/, depot: /Склад модулей|Module Depot/ }[arena];
-  const id = `${arena}-${teamSize}v${teamSize}-${role}`;
+  const id = `${arena}-${teamSize}v${teamSize}-${role}`; console.log(JSON.stringify({ startingMatch: id }));
   try {
     await settings(page, '2d', language);
     await page.locator('.shift-arena-picker button').filter({ hasText: title }).click();
@@ -200,17 +249,36 @@ async function fullMatch({ arena, teamSize, role, language, viewport }) {
     await page.locator('.shift-role-picker button').filter({ hasText: role === 'pilot' ? /Пилот|Pilot/ : /Штурман|Navigator/ }).click();
     await page.getByRole('button', { name: /Начать практику|Start practice/ }).click(); await page.locator('.shift-match').waitFor(); await focusScene(page);
     const memory = { seq: 0, counter: 0, nextDecisionTick: 0, recentRooms: [] }, started = Date.now();
+    const actions = { inputDecisions: 0, fireDecisions: 0, interactPresses: 0, shiftClicks: 0 }, rolesSeen = new Set(), presentationFailures = new Set(), recapRoundsChecked = new Set(), batteryModesChecked = new Set(); let hiddenSamples = 0, observedSamples = 0, batterySamplesChecked = 0;
     let priorRound = 0, lastInteract = -100, lastShift = -100, lastRole, maxTick = 0, shiftsObserved = 0, previousMotionId;
     while (Date.now() - started < 540000) {
-      const v = await view(page); if (!v) { await sleep(40); continue; }
-      maxTick = Math.max(maxTick, v.tick);
+      const observed = await view(page, true), v = observed?.view; if (!v) { await sleep(40); continue; }
+      maxTick = Math.max(maxTick, v.tick); rolesSeen.add(v.self.role); observedSamples++; if (await page.evaluate(() => document.hidden)) hiddenSamples++;
+      if (v.self.role === 'pilot' && v.phase !== 'finished') {
+        batterySamplesChecked++; batteryModesChecked.add(`${v.battery.mode}:${v.battery.team || v.battery.spaceId || 'hidden'}`);
+        const issue = checkBatteryPresentation(observed, language);
+        if (issue && !presentationFailures.has('battery')) { defect('Battery HUD disagrees with permitted view', { id, ...issue }); presentationFailures.add('battery'); }
+      }
+      if (['intermission', 'finished'].includes(v.phase) && !recapRoundsChecked.has(`${v.round}:${v.phase}`)) {
+        const issue = checkRoundPresentation(observed);
+        if (issue) defect('Round schematic presentation failed', { id, ...issue });
+        recapRoundsChecked.add(`${v.round}:${v.phase}`);
+      }
       if (v.round !== priorRound) { console.log(JSON.stringify({ match: id, round: v.round, role: v.self.role, score: v.score, tick: v.tick })); priorRound = v.round; }
       if (v.self.role !== lastRole) { await stop(page); await focusScene(page); lastRole = v.self.role; memory.nextDecisionTick = 0; }
       if (v.motion && `${v.motion.startTick}:${v.motion.roomId}` !== previousMotionId) { shiftsObserved++; previousMotionId = `${v.motion.startTick}:${v.motion.roomId}`; }
       if (v.phase === 'finished') {
         await stop(page); await page.locator('.shift-result').waitFor(); await snap(page, `match-${id}-result`);
-        const result = { id, arena, teamSize, initialRole: role, language, viewport, normalClock: true, wallSeconds: (Date.now() - started) / 1000, tick: v.tick, score: v.score, rounds: v.rounds, stats: v.stats, shiftsObserved, documentHidden: await page.evaluate(() => document.hidden) };
+        if (!v.rounds.some(r => r.reason === 'delivery')) throw new Error('Normal browser match ended without a delivery');
+        const resultText = await page.locator('.shift-result').innerText();
+        for (const label of language === 'ru' ? ['Доставки', 'Перехваты', 'Попадания', 'Сдвиги', 'Перевозки союзников', 'Перевозки батареи', 'Новые стыки'] : ['Deliveries', 'Interceptions', 'Hits', 'Shifts', 'Ally rides', 'Battery rides', 'New connections']) if (!resultText.includes(label)) defect('Result contribution missing', { id, label });
+        await page.locator('.shift-recap summary').click();
+        if (!(await page.locator('.shift-recap').evaluate(el => el.open))) defect('Tactical recap did not expand', id);
+        for (let n = 0; n < 8; n++) await page.keyboard.press('Tab');
+        if (!(await page.evaluate(() => !!document.activeElement?.closest('.shift-result')))) defect('Result focus escaped dialog', id);
+        const result = { id, arena, teamSize, initialRole: role, language, viewport, unacceleratedClock: true, targetTickHz: 30, observedAverageTickHz: Number((v.tick / ((Date.now() - started) / 1000)).toFixed(2)), rolesSeen: [...rolesSeen], actions, hiddenSamples, observedSamples, batterySamplesChecked, batteryModesChecked: [...batteryModesChecked], recapRoundsChecked: [...recapRoundsChecked], wallSeconds: (Date.now() - started) / 1000, tick: v.tick, score: v.score, rounds: v.rounds, stats: v.stats, shiftsObserved, documentHidden: await page.evaluate(() => document.hidden) };
         report.matches.push(result); log('Full browser practice match finished', result);
+        if (arena === 'foundry' && teamSize === 2) { await page.locator('.shift-result').getByRole('button', { name: /В лобби|Back to lobby/ }).click(); await page.locator('.shift-home').waitFor(); return; }
         await page.getByRole('button', { name: /Реванш|Rematch/ }).click(); await page.locator('.shift-result').waitFor({ state: 'hidden' });
         const rematch = await view(page); if (rematch.round !== 1 || rematch.score.teal || rematch.score.amber) defect('Rematch did not reset', id);
         await page.getByRole('button', { name: /В меню|Back to menu/ }).click();
@@ -219,16 +287,17 @@ async function fullMatch({ arena, teamSize, role, language, viewport }) {
       if (v.phase !== 'active') { await stop(page); await sleep(80); continue; }
       const commands = chooseBotCommands(v, memory), move = commands.find(c => c.type === 'input');
       if (move) {
+        actions.inputDecisions++; if (move.fireHeld) actions.fireDecisions++;
         const actor = v.actors.find(a => a.seatId === v.self.seatId);
         if (actor) { const point = worldPosition(v.board, actor, v.motion, v.tick); await aimAt(page, { x: point.x + Math.cos(move.aim) * 6, z: point.z + Math.sin(move.aim) * 6 }); }
         await keysFor(page, move.moveX, move.moveZ, move.fireHeld);
       }
-      if (commands.some(c => c.type === 'interact') && v.tick - lastInteract >= 5) { await page.keyboard.press('e'); lastInteract = v.tick; }
+      if (commands.some(c => c.type === 'interact') && v.tick - lastInteract >= 5) { await page.keyboard.press('e'); actions.interactPresses++; lastInteract = v.tick; }
       const shift = commands.find(c => c.type === 'shift');
       if (shift && v.tick - lastShift >= 15) {
         const button = page.locator('.shift-room-keys').getByRole('button', { name: shift.roomId, exact: true });
-        await button.click(); const act = page.locator('.shift-order').getByRole('button', { name: /Сдвинуть|Shift room/ });
-        if (await act.isEnabled()) await act.click(); await focusScene(page); lastShift = v.tick;
+        await clickLive(page, button); const act = page.locator('.shift-order').getByRole('button', { name: /Сдвинуть|Shift room/ });
+        if (await clickLive(page, act)) actions.shiftClicks++; await focusScene(page); lastShift = v.tick;
       }
       await sleep(40);
     }
@@ -247,9 +316,15 @@ async function touchSweep() {
     await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y, id: 1 }] }); await sleep(450); await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] }); await sleep(100);
     const after = await view(page), actorAfter = after.actors.find(a => a.seatId === 'self');
     if (actorBefore.x === actorAfter.x && actorBefore.z === actorAfter.z && actorBefore.spaceId === actorAfter.spaceId) defect('Touch movement did not move actor', { actorBefore, actorAfter });
+    const aim = await page.getByRole('group', { name: 'Прицел', exact: true }).boundingBox();
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: aim.x + aim.width / 2, y: aim.y + aim.height * .8, id: 3 }] }); await sleep(150); await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    const aimed = await view(page); const aimingActor = aimed.actors.find(a => a.seatId === 'self');
+    if (aimingActor && Math.abs(aimingActor.aim - Math.PI / 2) > .25) defect('Touch aim stick did not turn actor', aimingActor.aim);
     const fire = await page.getByRole('button', { name: 'Выстрел', exact: true }).boundingBox();
     await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: fire.x + fire.width / 2, y: fire.y + fire.height / 2, id: 2 }] }); await sleep(450); await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    const fired = await view(page); if (!fired.events.some(e => e.kind === 'shot' && e.seatId === 'self')) defect('Touch fire did not produce visible shot', { tick: fired.tick, role: fired.self.role });
     await page.getByRole('button', { name: 'Поставить метку', exact: true }).tap(); await page.getByRole('button', { name: 'Взять или сбросить батарею', exact: true }).tap();
+    await page.getByRole('button', { name: 'Пауза', exact: true }).tap();
     await page.getByRole('button', { name: /План этажа/ }).click(); await page.getByRole('button', { name: /План этажа/ }).click();
     const metrics = await page.evaluate(() => ({ width: innerWidth, height: innerHeight, scrollWidth: document.documentElement.scrollWidth, scrollHeight: document.documentElement.scrollHeight, buttons: [...document.querySelectorAll('.shift-touch-controls button')].map(e => ({ label: e.getAttribute('aria-label'), w: e.getBoundingClientRect().width, h: e.getBoundingClientRect().height, bottom: e.getBoundingClientRect().bottom })), fps: document.querySelector('.shift-scene [data-fps]')?.getAttribute('data-fps') }));
     if (metrics.buttons.some(b => b.w < 44 || b.h < 44 || b.bottom > metrics.height)) defect('Touch controls miss44px orviewport constraint', metrics);
@@ -265,8 +340,12 @@ try {
   if (args.has('--touch') || args.has('--all')) await touchSweep().catch(error => defect('Touch sweep failed', error.message));
   if (args.has('--matrix') || args.has('--all')) {
     const cases = ['foundry', 'calibration', 'depot'].flatMap((arena, i) => [2, 3].map((teamSize, j) => ({ arena, teamSize, role: j ? 'navigator' : 'pilot', language: i % 2 ? 'en' : 'ru', viewport: { width: j ? 1920 : 1366, height: j ? 1080 : 768 } })));
-    const results = await Promise.allSettled(cases.map(fullMatch));
-    results.forEach((result, i) => { if (result.status === 'rejected') defect('Full browser match failed', { case: cases[i], error: result.reason?.message }); });
+    const concurrency = Math.min(6, Math.max(1, Number(process.env.SHIFT_QA_CONCURRENCY || 2)));
+    for (let offset = 0; offset < cases.length; offset += concurrency) {
+      const group = cases.slice(offset, offset + concurrency);
+      const results = await Promise.allSettled(group.map(fullMatch));
+      results.forEach((result, i) => { if (result.status === 'rejected') defect('Full browser match failed', { case: group[i], error: result.reason?.message }); });
+    }
   }
 } finally {
   await writeFile(resolve(folder, 'results.json'), JSON.stringify(report, null, 2));

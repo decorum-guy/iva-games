@@ -15,7 +15,7 @@ export interface ShiftRoomSettings extends ShiftSettings {
 interface MatchRow { match_id: string; room_id: string; start_command_id: string; request_hash: string; roster: string; state: string; finished: number }
 interface ReceiptRow { request_hash: string; response: string }
 interface Pending { seatId: string; command: ShiftCommandPayload; hash: string; resolve(value: Receipt): void; reject(error: unknown): void; promise: Promise<Receipt> }
-interface Resident { state: ShiftState; roster: Participant[]; queue: Pending[]; pending: Map<string, Pending>; inputs: Map<string, InputCommand>; checkpointTick: number; failed: boolean }
+interface Resident { state: ShiftState; roster: Participant[]; queue: Pending[]; pending: Map<string, Pending>; inputs: Map<string, InputCommand>; checkpointTick: number; failed: boolean; connections: number }
 const identifier = (value: unknown): value is string => typeof value === 'string' && /^[A-Za-z0-9:_-]{1,128}$/.test(value);
 const fingerprint = (value: unknown): string => createHash('sha256').update(canonicalJson(value)).digest('hex');
 function fail(code: string, message = 'Действие сейчас недоступно', status = 409): never { throw new SessionError(code, message, status); }
@@ -198,15 +198,18 @@ export class ShiftRuntime implements GameRuntime {
     const state = createMatch(settings, seatsFor(settings, input.participants), randomBytes(4).readUInt32LE());
     const roster = structuredClone(input.participants);
     this.db.prepare('INSERT INTO shift_matches VALUES (?,?,?,?,?,?,0)').run(matchId, input.roomId, input.startCommandId, hash, JSON.stringify(roster), JSON.stringify(state));
-    this.matches.set(matchId, { state, roster, queue: [], pending: new Map(), inputs: new Map(), checkpointTick: state.tick, failed: false });
+    this.matches.set(matchId, { state, roster, queue: [], pending: new Map(), inputs: new Map(), checkpointTick: state.tick, failed: false, connections: 0 });
     return { matchId };
   }
 
   private restore(row: MatchRow): Resident {
     const state = JSON.parse(row.state) as ShiftState;
     if (state.rulesVersion !== RULES_VERSION || state.contentVersion !== CONTENT_VERSION || state.wireVersion !== WIRE_VERSION) fail('INCOMPATIBLE_VERSION', 'Не удалось открыть эту партию');
-    const entry: Resident = { state, roster: JSON.parse(row.roster) as Participant[], queue: [], pending: new Map(), inputs: new Map(), checkpointTick: state.tick, failed: false };
-    this.matches.set(row.match_id, entry); return entry;
+    const entry: Resident = { state, roster: JSON.parse(row.roster) as Participant[], queue: [], pending: new Map(), inputs: new Map(), checkpointTick: state.tick, failed: false, connections: 0 };
+    // Completed HTTP reads use the durable final state without populating the
+    // simulation clock's resident map. A live result page acquires its own lease.
+    if (state.phase !== 'finished') this.matches.set(row.match_id, entry);
+    return entry;
   }
   private resident(matchId: string): Resident {
     if (this.closed) fail('SERVER_RESTARTING', 'Игра обновляется', 503);
@@ -219,6 +222,11 @@ export class ShiftRuntime implements GameRuntime {
   private human(entry: Resident, playerId: string): string {
     const p = entry.roster.find(seat => seat.playerId === playerId && seat.controller.kind === 'human');
     return p?.participantId ?? fail('FORBIDDEN', 'Вы не участник этой партии', 403);
+  }
+  private releaseFinished(matchId: string, entry: Resident): void {
+    if (entry.state.phase === 'finished' && entry.connections === 0 && entry.pending.size === 0 && this.matches.get(matchId) === entry) {
+      entry.inputs.clear(); this.matches.delete(matchId);
+    }
   }
   private persist(matchId: string, entry: Resident, settled: { pending: Pending; receipt: Receipt }[] = []): void {
     this.db.transaction(() => {
@@ -234,7 +242,8 @@ export class ShiftRuntime implements GameRuntime {
   advanceTicks(count = 1): void {
     if (this.closed) return;
     for (let i = 0; i < count; i++) for (const [matchId, entry] of this.matches) {
-      if (entry.failed || (entry.state.phase === 'finished' && !entry.queue.length)) continue;
+      if (entry.failed) continue;
+      if (entry.state.phase === 'finished' && !entry.queue.length) { this.releaseFinished(matchId, entry); continue; }
       const pending = entry.queue.splice(0);
       const queue: QueuedCommand[] = [...entry.inputs].map(([seatId, command]) => ({ seatId, command }));
       entry.inputs.clear();
@@ -251,6 +260,7 @@ export class ShiftRuntime implements GameRuntime {
         for (const { pending: item, receipt } of settled) {
           entry.pending.delete(`${item.seatId}:${receipt.actionId}`); item.resolve(receipt);
         }
+        this.releaseFinished(matchId, entry);
       } catch (error) {
         entry.failed = true;
         for (const item of pending) item.reject(error);
@@ -280,9 +290,11 @@ export class ShiftRuntime implements GameRuntime {
       if (row.request_hash !== hash) fail('ACTION_CONFLICT', 'Повторите действие');
       return Promise.resolve(JSON.parse(row.response) as Receipt);
     }
+    // Terminal matches never accept a new action ID. Previously acknowledged
+    // actions above still replay durably, including after eviction or restart.
+    if (entry.state.phase === 'finished') fail('MATCH_FINISHED', 'Матч завершён');
     const key = `${seatId}:${actionId}`, previous = entry.pending.get(key);
     if (previous) { if (previous.hash !== hash) fail('ACTION_CONFLICT'); return previous.promise; }
-    if (entry.state.recoveryTicksRemaining > 0) fail('RECOVERING', 'Дождитесь продолжения матча');
     if (entry.queue.filter(item => item.seatId === seatId).length >= 8) fail('COMMAND_RATE');
     let resolve!: (value: Receipt) => void, reject!: (error: unknown) => void;
     const promise = new Promise<Receipt>((yes, no) => { resolve = yes; reject = no; });
@@ -295,6 +307,8 @@ export class ShiftRuntime implements GameRuntime {
     const epoch = connectSeat(entry.state, seatId);
     entry.inputs.delete(seatId);
     this.persist(matchId, entry);
+    entry.connections++;
+    this.matches.set(matchId, entry);
     let closed = false;
     const current = (): boolean => !closed && !this.closed && !entry.failed && entry.state.actors[seatId]?.controllerEpoch === epoch;
     return {
@@ -316,8 +330,9 @@ export class ShiftRuntime implements GameRuntime {
       },
       close: () => {
         if (closed) return;
-        closed = true;
+        closed = true; entry.connections--;
         if (!this.closed && !entry.failed) { disconnectSeat(entry.state, seatId, epoch); this.persist(matchId, entry); }
+        this.releaseFinished(matchId, entry);
       },
     };
   }
@@ -327,7 +342,7 @@ export class ShiftRuntime implements GameRuntime {
     if (this.timer) clearInterval(this.timer);
     this.advanceTicks();
     for (const [matchId, entry] of this.matches) if (!entry.failed) this.persist(matchId, entry);
-    this.closed = true; this.db.close();
+    this.closed = true; this.matches.clear(); this.db.close();
   }
 }
 

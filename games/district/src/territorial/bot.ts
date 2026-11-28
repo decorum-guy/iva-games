@@ -28,13 +28,15 @@ export function chooseTerritoryBot(view: TerritoryView, difficulty: BotDifficult
   }
   const value = (resource: Resource) => (9 + (income[resource] < 3 ? 4 : 0)) / (1 + you.hand[resource] * 0.65);
   const handValue = (stock: Stock) => RESOURCES.reduce((p, r) => p + stock[r] * value(r), 0);
+  const agreed = view.offers.find(offer => offer.authorId === id && offer.agreedAt !== undefined && offer.canAccept !== false);
+  if (agreed && legal.trade) return { type: 'accept', offerId: agreed.id };
   const incoming = view.offers.find(offer => offer.targetId === id && offer.agreedAt === undefined);
   if (incoming && legal.trade) {
     if (incoming.canAccept !== false && covers(you.hand, incoming.receive) && handValue(incoming.give) >= handValue(incoming.receive) * (difficulty === 'hard' ? 1.15 : 0.75))
       return { type: 'accept', offerId: incoming.id };
     // A bad but affordable offer can receive one smaller counterproposal.
     // Never counter an already-countered or grouped offer, or an invalid sender stock.
-    if (difficulty !== 'easy' && !incoming.parentId && !incoming.groupId && incoming.unavailableReason !== 'author-resources') {
+    if (difficulty !== 'easy' && !incoming.parentId && incoming.unavailableReason !== 'author-resources') {
       const give = {...incoming.receive};
       for (const resource of [...RESOURCES].sort((a,b)=>value(b)-value(a))) {
         if (!give[resource]) continue;

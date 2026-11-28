@@ -2,9 +2,10 @@ import { getArena, ROOM_IDS } from './arenas';
 import { correctPose, getDoors, goalPosition, lineOfSight, movePose, rayObstacles, wallFraction, worldPosition, DRONE_RADIUS } from './geometry';
 import type { Rect } from './geometry';
 import { CONTENT_VERSION, RULES_VERSION, WIRE_VERSION } from './types';
-import type { Actor, BatteryView, GameEvent, InputCommand, InteractCommand, PingCommand, Pose, QueuedCommand, Receipt, RejectReason, Role, RoomId, Seat, ShiftCommand, ShiftCommandPayload, ShiftSettings, ShiftState, ShiftView, Stats, TeamId, TickResult, VisibleActor } from './types';
+import type { Actor, BatteryTracePoint, BatteryView, GameEvent, InputCommand, InteractCommand, PingCommand, Pose, QueuedCommand, Receipt, RejectReason, Role, RoomId, Seat, ShiftCommand, ShiftCommandPayload, ShiftSettings, ShiftState, ShiftView, Stats, TeamId, TickResult, VisibleActor } from './types';
 export const TIMING = { preparation: 210, round: 2250, suddenDeath: 1350, intermission: 240, shift: 17, cooldown: 180, reverseLock: 60, respawn: 78, shield: 36, shot: 11, delivery: 20, batteryReturn: 210, lastSeen: 60, inputTimeout: 8, substitute: 300, recovery: 150 } as const;
 const TEAMS: TeamId[] = ['teal', 'amber'];
+const RECAP_EVENTS = new Set<GameEvent['kind']>(['round-start', 'shift-start', 'pickup', 'drop', 'return', 'delivered', 'round-end', 'match-end', 'recovery']);
 const EMPTY_INPUT = { moveX: 0, moveZ: 0, aim: 0, fireHeld: false };
 const zeroStats = (): Stats => ({ deliveries: 0, interceptions: 0, hits: 0, shifts: 0, allyTransfers: 0, batteryTransfers: 0, openedDoors: 0 });
 export function normalizeSettings(value: unknown): ShiftSettings {
@@ -26,12 +27,24 @@ function emit(state: ShiftState, value: Omit<GameEvent, 'id' | 'tick' | 'round'>
   // Full-match archive is reserved for completed games. Never send it during play.
   state.events.push(event);
   if (state.events.length > 2400) state.events.splice(0, state.events.length - 2400);
+  if (RECAP_EVENTS.has(event.kind)) {
+    state.matchKeyEvents ??= {};
+    const roundEvents = state.matchKeyEvents[state.round] ??= [];
+    roundEvents.push(structuredClone(event));
+    if (roundEvents.length > 128) roundEvents.splice(16, roundEvents.length - 128);
+  }
   for (const team of audience) {
     state.teamEventCounter ??= { teal: 0, amber: 0 };
     const delivered = { ...event, id: `v:${team}:${++state.teamEventCounter[team]}` };
     if (delivered.kind === 'delivered' && delivered.seatId && state.actors[delivered.seatId].team !== team && !state.visible[team].includes(delivered.seatId)) delete delivered.seatId;
     state.teamEvents[team].push(delivered);
     if (state.teamEvents[team].length > 96) state.teamEvents[team].shift();
+    const recap = state.teamRoundRecaps?.[team];
+    if (recap && RECAP_EVENTS.has(delivered.kind)) {
+      recap.events.push(structuredClone(delivered));
+      // Preserve the opening decisions as well as the latest chain under spam.
+      if (recap.events.length > 256) recap.events.splice(32, recap.events.length - 256);
+    }
   }
   return event;
 }
@@ -45,10 +58,12 @@ function spawnActor(state: ShiftState, actor: Actor): void {
   actor.chargeTicks = 0; actor.nextShotTick = state.tick; actor.input = { ...EMPTY_INPUT, aim: actor.aim }; actor.lastInputTick = state.tick;
 }
 function beginRound(state: ShiftState): void {
+  state.pendingMatchEnd = false;
   state.board = [...getArena(state.settings.arena).board]; state.boardRevision++; state.motion = null; state.previousMotion = null;
   state.priority = state.round % 2 === 1 ? 'teal' : 'amber'; state.cooldownUntilTick = { teal: 0, amber: 0 };
   state.battery = { mode: 'pedestal', spaceId: 'O', x: 0, z: 0, carrierId: null, returnAtTick: null };
   state.phase = 'prepare'; state.phaseEndsAtTick = state.tick + TIMING.preparation; state.roundStartedAtTick = state.phaseEndsAtTick;
+  state.teamRoundRecaps = { teal: { round: state.round, events: [], batteryTrace: [] }, amber: { round: state.round, events: [], batteryTrace: [] } };
   state.pings = []; state.ghosts = { teal: {}, amber: {} }; state.visible = { teal: [], amber: [] }; state.teamEvents = { teal: [], amber: [] };
   for (const seat of state.seats) { const actor = state.actors[seat.seatId]; actor.role = roleForSeat(state, seat); spawnActor(state, actor); state.botMemory[seat.seatId] = { seq: actor.lastAcceptedSeq, counter: 0, nextDecisionTick: 0, recentRooms: [] }; }
   emit(state, { kind: 'round-start' });
@@ -70,7 +85,7 @@ export function createMatch(settingsInput: unknown, roster: Seat[], seed = 1): S
     state.actors[seat.seatId] = { seatId: seat.seatId, team: seat.team, role: seat.initialRole, spaceId: teamGoal(seat.team, 1), x: 0, z: 0, hp: 3, aim: 0, shieldUntilTick: 0, respawnAtTick: null, nextShotTick: 0, input: { ...EMPTY_INPUT }, lastInputTick: 0, lastAcceptedSeq: -1, controllerEpoch: 1, connected: seat.bot, disconnectedAtTick: seat.bot ? null : 0, substitute: false, chargeTicks: 0 };
     state.stats[seat.seatId] = zeroStats(); state.pingTicks[seat.seatId] = [];
   }
-  beginRound(state); updateVisibility(state);
+  beginRound(state); updateVisibility(state); captureRoundRecap(state);
   return state;
 }
 export function connectSeat(state: ShiftState, seatId: string): number {
@@ -155,6 +170,12 @@ function updateVisibility(state: ShiftState, obstacles?: Rect[]): void {
     for (const [id, ghost] of Object.entries(state.ghosts[team])) if (state.tick - ghost.seenAtTick >= TIMING.lastSeen) delete state.ghosts[team][id];
   }
 }
+function finishMatch(state: ShiftState): void {
+  state.pendingMatchEnd = false;
+  state.phase = 'finished'; state.phaseEndsAtTick = state.tick;
+  state.winner = state.score.teal > state.score.amber ? 'teal' : state.score.amber > state.score.teal ? 'amber' : null;
+  emit(state, { kind: 'match-end', ...(state.winner ? { team: state.winner } : {}), reason: state.winner ? 'score' : 'draw' });
+}
 function completeRound(state: ShiftState, winner: TeamId | null): void {
   const reason = winner ? 'delivery' : 'timeout';
   if (winner) state.score[winner]++;
@@ -162,11 +183,13 @@ function completeRound(state: ShiftState, winner: TeamId | null): void {
   emit(state, { kind: 'round-end', ...(winner ? { team: winner } : {}), reason });
   for (const actor of Object.values(state.actors)) actor.input = { ...EMPTY_INPUT, aim: actor.aim };
   const end = state.score.teal >= 3 || state.score.amber >= 3 || (state.round >= 5 && state.score.teal !== state.score.amber) || state.round >= 6;
-  if (end) {
-    state.phase = 'finished'; state.phaseEndsAtTick = state.tick;
-    state.winner = state.score.teal > state.score.amber ? 'teal' : state.score.amber > state.score.teal ? 'amber' : null;
-    emit(state, { kind: 'match-end', ...(state.winner ? { team: state.winner } : {}), reason: state.winner ? 'score' : 'draw' });
-  } else { state.phase = 'intermission'; state.phaseEndsAtTick = state.tick + TIMING.intermission; }
+  if (end && !state.motion) finishMatch(state);
+  else {
+    // Combat has ended, but an acknowledged room move still reaches its destination.
+    // The result waits at most the remaining17 ticks; scores and round time are final.
+    state.pendingMatchEnd = end; state.phase = 'intermission';
+    state.phaseEndsAtTick = end ? state.motion!.endTick : state.tick + TIMING.intermission;
+  }
 }
 function validateInput(command: InputCommand): boolean {
   return Number.isSafeInteger(command.seq) && command.seq >= 0 && [command.moveX, command.moveZ, command.aim].every(Number.isFinite) && Math.abs(command.moveX) <= 1 && Math.abs(command.moveZ) <= 1 && Math.abs(command.aim) <= Math.PI * 100 && typeof command.fireHeld === 'boolean';
@@ -190,7 +213,7 @@ function doPing(state: ShiftState, actor: Actor, command: PingCommand): RejectRe
   emit(state, { kind: 'ping', team: actor.team, seatId: actor.seatId, pose: { ...pose }, ...(command.roomId ? { roomId: command.roomId } : {}) }, [actor.team]);
   return undefined;
 }
-function batteryView(state: ShiftState, team: TeamId): BatteryView {
+function batteryView(state: ShiftState, team: TeamId, obstacles?: Rect[]): BatteryView {
   const b = state.battery;
   if (b.mode === 'carried') {
     const carrier = state.actors[b.carrierId!];
@@ -199,8 +222,31 @@ function batteryView(state: ShiftState, team: TeamId): BatteryView {
   }
   const known: BatteryView = { mode: b.mode, spaceId: b.spaceId, returnAtTick: b.returnAtTick };
   const observers = Object.values(state.actors).filter(a => a.team === team && a.role === 'pilot' && a.hp > 0);
-  if (state.phase === 'prepare' || state.phase === 'finished' || observers.some(a => lineOfSight(state.settings.arena, state.board, a, b, state.motion, state.tick, 13))) { known.x = b.x; known.z = b.z; }
+  if (state.phase === 'prepare' || state.phase === 'finished' || observers.some(a => lineOfSight(state.settings.arena, state.board, a, b, state.motion, state.tick, 13, obstacles))) { known.x = b.x; known.z = b.z; }
   return known;
+}
+/** Persist only observations this team is entitled to remember, in fixed world coordinates. */
+function captureRoundRecap(state: ShiftState, obstacles?: Rect[]): void {
+  if (!state.teamRoundRecaps) return; // Compatibility with older local checkpoints.
+  for (const team of TEAMS) {
+    const recap = state.teamRoundRecaps[team], visible = batteryView(state, team, obstacles);
+    const last = recap.batteryTrace.at(-1);
+    let point: BatteryTracePoint;
+    if (visible.spaceId === undefined || visible.x === undefined || visible.z === undefined) {
+      if (last?.gap) continue;
+      point = { tick: state.tick, gap: true, reason: 'hidden' };
+    } else {
+      const world = worldPosition(state.board, { spaceId: visible.spaceId, x: visible.x, z: visible.z }, state.motion, state.tick);
+      const changedMode = !last || last.gap || last.mode !== visible.mode || last.team !== visible.team;
+      if (!changedMode && (state.tick - last.tick < 6 || Math.hypot(last.worldX - world.x, last.worldZ - world.z) < 0.04)) continue;
+      point = { tick: state.tick, worldX: world.x, worldZ: world.z, mode: visible.mode, ...(visible.team ? { team: visible.team } : {}) };
+    }
+    recap.batteryTrace.push(point);
+    if (recap.batteryTrace.length > 600) {
+      const first = recap.batteryTrace[0], rest = recap.batteryTrace.slice(-598);
+      recap.batteryTrace = [first, { tick: rest[0].tick, gap: true, reason: 'history-limit' }, ...rest];
+    }
+  }
 }
 export function viewForSeat(state: ShiftState, seatId: string): ShiftView {
   const self = state.actors[seatId]; if (!self) throw new Error('UNKNOWN_SEAT');
@@ -217,7 +263,8 @@ export function viewForSeat(state: ShiftState, seatId: string): ShiftView {
     seats: state.seats.map(s => ({ ...s, role: state.actors[s.seatId].role, substitute: state.actors[s.seatId].substitute })), board: [...state.board], boardRevision: state.boardRevision, motion: state.motion ? { ...state.motion } : null, previousMotion: state.previousMotion ? { ...state.previousMotion } : null,
     priority: state.priority, cooldownUntilTick: { ...state.cooldownUntilTick }, score: { ...state.score }, actors, ghosts: Object.values(state.ghosts[self.team]).filter(g => state.tick - g.seenAtTick < TIMING.lastSeen && !state.visible[self.team].includes(g.seatId)).map(g => ({ ...g })),
     battery: batteryView(state, self.team), pings: state.pings.filter(p => p.team === self.team).map(p => ({ ...p })), events: state.teamEvents[self.team].slice(-36).map(e => structuredClone(e)),
-    ...(state.phase === 'finished' ? { journal: state.events.filter(e => e.kind !== 'shot' && e.kind !== 'hit').slice(-200).map(e => structuredClone(e)) } : {}),
+    ...((state.phase === 'intermission' || state.phase === 'finished') && state.teamRoundRecaps?.[self.team] ? { roundRecap: structuredClone(state.teamRoundRecaps[self.team]) } : {}),
+    ...(state.phase === 'finished' ? { journal: (state.matchKeyEvents ? Object.values(state.matchKeyEvents).flat() : state.events.filter(e => RECAP_EVENTS.has(e.kind))).map(e => structuredClone(e)) } : {}),
     doors: getDoors(state.board, state.motion, state.tick), shiftOptions, rounds: state.rounds.map(r => ({ ...r })), winner: state.winner,
     stats: Object.fromEntries(Object.entries(state.stats).filter(([id]) => state.phase === 'finished' || state.actors[id].team === self.team).map(([id, stats]) => {
       if (state.phase === 'finished') return [id, { ...stats }];
@@ -235,17 +282,19 @@ export function stepMatch(state: ShiftState, incoming: QueuedCommand[] = []): Ti
   if (!wasRecovery && state.phase !== 'finished') state.tick++;
   if (wasRecovery) state.recoveryTicksRemaining--;
   const checkpointTick = state.tick % 60 === 0;
+  if (!wasRecovery && state.phase !== 'finished' && state.motion && state.tick >= state.motion.endTick) {
+    const m = state.motion; state.board[m.from] = null; state.board[m.to] = m.roomId; state.motion = null; state.boardRevision++; state.previousMotion = { roomId: m.roomId, untilTick: state.tick + TIMING.reverseLock };
+    emit(state, { kind: 'shift-end', team: m.team, seatId: m.seatId, roomId: m.roomId });
+    updateVisibility(state);
+  }
   if (!wasRecovery && state.phase === 'prepare' && state.tick >= state.phaseEndsAtTick) {
     state.phase = 'active'; state.roundStartedAtTick = state.tick; state.phaseEndsAtTick = state.tick + (state.round === 6 ? TIMING.suddenDeath : TIMING.round);
     for (const a of Object.values(state.actors)) { a.shieldUntilTick = state.tick + TIMING.shield; a.lastInputTick = state.tick; }
     emit(state, { kind: 'round-start', reason: 'active' });
-  } else if (!wasRecovery && state.phase === 'intermission' && state.tick >= state.phaseEndsAtTick) { state.round++; beginRound(state); }
+  } else if (!wasRecovery && state.phase === 'intermission' && state.tick >= state.phaseEndsAtTick) { if (state.pendingMatchEnd) finishMatch(state); else { state.round++; beginRound(state); } }
+  let frameObstacles: Rect[] | undefined;
   const active = state.phase === 'active' && !wasRecovery;
   if (active) {
-    if (state.motion && state.tick >= state.motion.endTick) {
-      const m = state.motion; state.board[m.from] = null; state.board[m.to] = m.roomId; state.motion = null; state.boardRevision++; state.previousMotion = { roomId: m.roomId, untilTick: state.tick + TIMING.reverseLock };
-      emit(state, { kind: 'shift-end', team: m.team, seatId: m.seatId, roomId: m.roomId });
-    }
     if (state.battery.mode === 'floor' && state.battery.returnAtTick !== null && state.tick >= state.battery.returnAtTick) {
       state.battery = { mode: 'pedestal', spaceId: 'O', x: 0, z: 0, carrierId: null, returnAtTick: null }; emit(state, { kind: 'return', roomId: 'O' });
     }
@@ -292,7 +341,7 @@ export function stepMatch(state: ShiftState, incoming: QueuedCommand[] = []): Ti
       if (magnitude > 0) Object.assign(actor, movePose(state.settings.arena, state.board, actor, input.moveX / Math.max(1, magnitude) * speed / 30, input.moveZ / Math.max(1, magnitude) * speed / 30, state.motion));
       if (actor.spaceId !== teamGoal(actor.team, state.round)) actor.shieldUntilTick = 0;
     }
-    const obstacles = rayObstacles(state.settings.arena, state.board, state.motion, state.tick);
+    const obstacles = frameObstacles = rayObstacles(state.settings.arena, state.board, state.motion, state.tick);
     updateVisibility(state, obstacles);
     // Interactions share the post-movement world, with nearest-first and rotated seat tie-break.
     const allSeats = state.seats.map(s => s.seatId), rotation = (state.round - 1) % allSeats.length;
@@ -354,6 +403,7 @@ export function stepMatch(state: ShiftState, incoming: QueuedCommand[] = []): Ti
     if (state.phase === 'active' && state.tick >= state.phaseEndsAtTick) completeRound(state, null);
     updateVisibility(state, obstacles);
   }
+  if (!wasRecovery) captureRoundRecap(state, frameObstacles);
   state.pings = state.pings.filter(p => p.expiresAtTick > state.tick);
   const events = state.events.filter(e => e.id && Number(e.id.slice(1)) > startCounter);
   const critical = events.some(e => !['shot', 'hit', 'ping'].includes(e.kind));

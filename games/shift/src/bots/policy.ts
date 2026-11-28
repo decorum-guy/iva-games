@@ -30,6 +30,18 @@ export function pilotWaypoint(view: ShiftView, from: Pose, destination: Pose): V
   if (from.spaceId === 'west' || from.spaceId === 'east') return target;
   const covers = getArena(view.settings.arena).covers[from.spaceId], margin = DRONE_RADIUS + 0.045;
   const obstacles = covers.map(c => ({ minX: c.x - c.width / 2 - margin, maxX: c.x + c.width / 2 + margin, minZ: c.z - c.depth / 2 - margin, maxZ: c.z + c.depth / 2 + margin }));
+  // A human or a quantized input can stop inside the planner's extra clearance
+  // while remaining physically valid. Step out before asking the route graph;
+  // otherwise every graph edge starts inside an obstacle and direct fallback jams.
+  const overlap = obstacles.find(r => from.x > r.minX && from.x < r.maxX && from.z > r.minZ && from.z < r.maxZ);
+  if (overlap) {
+    const escapes = [
+      { x: overlap.minX - 0.16, z: from.z }, { x: overlap.maxX + 0.16, z: from.z },
+      { x: from.x, z: overlap.minZ - 0.16 }, { x: from.x, z: overlap.maxZ + 0.16 },
+    ].filter(p => Math.abs(p.x) < 3.65 && Math.abs(p.z) < 3.65 && obstacles.every(r => !(p.x > r.minX && p.x < r.maxX && p.z > r.minZ && p.z < r.maxZ)));
+    escapes.sort((a, b) => Math.hypot(a.x - from.x, a.z - from.z) - Math.hypot(b.x - from.x, b.z - from.z));
+    if (escapes[0]) return escapes[0];
+  }
   const clear = (a: Vec2, b: Vec2) => obstacles.every(r => segmentRect(a, b, r) === null);
   if (clear(from, target)) return target;
   const nodes: Vec2[] = [{ x: from.x, z: from.z }, target];

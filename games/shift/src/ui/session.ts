@@ -103,7 +103,10 @@ export function useOnlineSession(roomId: string, matchId: string): ClientSession
           sentInputs.current = next.recoveryTicksRemaining ? [] : sentInputs.current.filter(frame => frame.seq > next.self.lastAcceptedSeq);
           current.current = next; setView(next); setConnected(true); setStatus('connected'); retries = 0;
         } else if (message.type === 'receipt' && message.result) { setReceipt(message.result); if (message.actionId) pending.current.delete(message.actionId); }
-        else if (message.type === 'error') { setStatus(message.code || 'CONNECTION'); }
+        else if (message.type === 'error') {
+          if (message.code === 'MATCH_FINISHED' && message.actionId) pending.current.delete(message.actionId);
+          setStatus(message.code || 'CONNECTION');
+        }
       };
       ws.onclose = event => {
         if (!live) return;
@@ -118,7 +121,7 @@ export function useOnlineSession(roomId: string, matchId: string): ClientSession
     connect();
     const timer = window.setInterval(() => {
       const v = current.current, ws = socket.current;
-      if (!v || ws?.readyState !== WebSocket.OPEN || ws.bufferedAmount > 32_768) return;
+      if (!v || v.self.role !== 'pilot' || v.phase !== 'active' || v.recoveryTicksRemaining > 0 || ws?.readyState !== WebSocket.OPEN || ws.bufferedAmount > 32_768) return;
       const sequence = ++seq.current;
       const currentInput = { ...input.current };
       ws.send(JSON.stringify({ type: 'input', version: WIRE_VERSION, payload: { type: 'input', ...currentInput, seq: sequence, roundId: v.round, controllerEpoch: v.self.controllerEpoch } }));

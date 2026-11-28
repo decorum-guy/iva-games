@@ -73,6 +73,28 @@ describe('authoritative Shift geometry and transport', () => {
     Object.assign(s.actors.amber1, { spaceId: 'O', x: 0, z: 1 }); s.actors.teal1.nextShotTick = 0;
     stepMatch(s, [input(s, 'teal1', { aim: Math.PI / 2, fireHeld: true })]); expect(s.actors.amber1.hp).toBe(2);
   });
+  it('finishes an acknowledged move during intermission after the round timer expires', () => {
+    const s = match(); s.phaseEndsAtTick = s.tick + 1;
+    stepMatch(s, [cmd(s, 'teal0', { type: 'shift', actionId: 'last-tick-move', roomId: 'O', expectedBoardRevision: s.boardRevision })]);
+    expect(s.phase).toBe('intermission'); expect(s.rounds[0].reason).toBe('timeout');
+    const roundEndTick = s.tick; ticks(s, TIMING.shift);
+    expect(s.tick).toBe(roundEndTick + TIMING.shift); expect(s.motion).toBeNull();
+    expect(s.board[7]).toBe('O'); expect(s.board[4]).toBeNull();
+    expect(s.events.filter(e => e.kind === 'shift-end')).toHaveLength(1);
+    expect(getDoors(s.board).some(d => d.spaceId === 'O' && d.open)).toBe(true);
+  });
+  it('keeps a final delivery final while the accepted room move settles through recovery', () => {
+    const s = match(); s.score.teal = 2; Object.assign(s.actors.teal1, { spaceId: 'west', x: -0.7, z: 0, chargeTicks: 19 }); carry(s, 'teal1');
+    stepMatch(s, [cmd(s, 'teal0', { type: 'shift', actionId: 'winning-tick-move', roomId: 'O', expectedBoardRevision: s.boardRevision })]);
+    expect(s.score.teal).toBe(3); expect(s.phase).toBe('intermission'); expect(s.pendingMatchEnd).toBe(true);
+    const scoredTick = s.tick, roundTime = s.rounds[0].ticks;
+    const restored = JSON.parse(JSON.stringify(s)) as ShiftState; recoverMatch(restored); ticks(restored, TIMING.recovery);
+    expect(restored.tick).toBe(scoredTick); expect(restored.score.teal).toBe(3);
+    ticks(restored, TIMING.shift);
+    expect(restored.phase).toBe('finished'); expect(restored.winner).toBe('teal'); expect(restored.motion).toBeNull(); expect(restored.board[7]).toBe('O');
+    expect(restored.score.teal).toBe(3); expect(restored.stats.teal1.deliveries).toBe(1); expect(restored.rounds[0].ticks).toBe(roundTime);
+    expect(restored.events.filter(e => e.kind === 'match-end')).toHaveLength(1);
+  });
   it('preserves moving-room phase and timer through a 5-second recovery freeze', () => {
     const s = match(); stepMatch(s, [cmd(s, 'teal0', { type: 'shift', actionId: 'recovery', roomId: 'O', expectedBoardRevision: s.boardRevision })]); ticks(s, 5);
     const restored = JSON.parse(JSON.stringify(s)) as ShiftState, tick = restored.tick, end = restored.phaseEndsAtTick, moveEnd = restored.motion?.endTick;

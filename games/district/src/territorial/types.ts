@@ -66,7 +66,7 @@ export interface TerritoryPlayer {
 export interface TerritoryOffer {
   id: string; authorId: string; targetId: string; give: Stock; receive: Stock; parentId?: string; offeredAt?: number;
   groupId?: string; agreedAt?: number;
-  canAccept?: boolean; unavailableReason?: 'author-resources' | 'target-resources';
+  canAccept?: boolean; unavailableReason?: 'author-resources' | 'target-resources' | 'inactive-pair';
 }
 export type TerritoryOfferStatus = 'accepted' | 'declined' | 'withdrawn' | 'expired' | 'replaced' | 'player-left' | 'match-finished';
 export interface TerritoryClosedOffer extends TerritoryOffer {

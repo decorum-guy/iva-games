@@ -28,6 +28,8 @@ export interface Ghost extends Pose { seatId: string; team: TeamId; seenAtTick: 
 export interface Ping extends Pose { id: string; seatId: string; team: TeamId; kind: 'shift' | 'look' | 'battery'; roomId?: RoomId; expiresAtTick: number; }
 export interface Shot { id: string; seatId: string; from: Vec2; to: Vec2; hit: 'wall' | 'drone' | 'none'; tick: number; }
 export interface GameEvent { id: string; tick: number; round: number; kind: 'shift-start' | 'shift-end' | 'shot' | 'hit' | 'down' | 'respawn' | 'pickup' | 'drop' | 'return' | 'delivered' | 'round-end' | 'round-start' | 'match-end' | 'ping' | 'recovery' | 'control'; team?: TeamId; seatId?: string; roomId?: RoomId; pose?: Pose; shot?: Shot; value?: number; reason?: string; }
+export type BatteryTracePoint = { tick: number; worldX: number; worldZ: number; mode: Battery['mode']; team?: TeamId; gap?: false } | { tick: number; gap: true; reason: 'hidden' | 'history-limit' };
+export interface RoundRecap { round: number; events: GameEvent[]; batteryTrace: BatteryTracePoint[]; }
 export interface RoundResult { round: number; winner: TeamId | null; reason: 'delivery' | 'timeout'; ticks: number; }
 export type RejectReason = 'PHASE' | 'ROLE' | 'STALE_ROUND' | 'STALE_EPOCH' | 'STALE_SEQUENCE' | 'INVALID_INPUT' | 'INVALID_ACTION' | 'REVISION' | 'MOVING' | 'NOT_ADJACENT' | 'COOLDOWN' | 'REVERSE_LOCK' | 'PRIORITY' | 'DEAD' | 'OUT_OF_REACH' | 'TAKEN' | 'PING_LIMIT' | 'NOT_VISIBLE' | 'ACTION_CONFLICT' | 'UNKNOWN_SEAT';
 export interface Receipt { actionId: string; seatId: string; accepted: boolean; tick: number; boardRevision: number; reason?: RejectReason; }
@@ -44,9 +46,9 @@ export interface ShiftState {
   settings: ShiftSettings; seats: Seat[]; seed: number; tick: number; round: number; phase: Phase; phaseEndsAtTick: number; roundStartedAtTick: number;
   board: (RoomId | null)[]; boardRevision: number; motion: ShiftMotion | null; previousMotion: { roomId: RoomId; untilTick: number } | null;
   priority: TeamId; cooldownUntilTick: Record<TeamId, number>; score: Record<TeamId, number>; actors: Record<string, Actor>; battery: Battery;
-  events: GameEvent[]; teamEvents: Record<TeamId, GameEvent[]>; teamEventCounter: Record<TeamId, number>; ghosts: Record<TeamId, Record<string, Ghost>>; visible: Record<TeamId, string[]>;
+  events: GameEvent[]; matchKeyEvents?: Record<string, GameEvent[]>; teamRoundRecaps?: Record<TeamId, RoundRecap>; teamEvents: Record<TeamId, GameEvent[]>; teamEventCounter: Record<TeamId, number>; ghosts: Record<TeamId, Record<string, Ghost>>; visible: Record<TeamId, string[]>;
   pings: Ping[]; pingTicks: Record<string, number[]>; receipts: Record<string, { fingerprint: string; receipt: Receipt }>; stats: Record<string, Stats>;
-  rounds: RoundResult[]; winner: TeamId | null; eventCounter: number; recoveryTicksRemaining: number; botMemory: Record<string, BotMemory>;
+  rounds: RoundResult[]; winner: TeamId | null; pendingMatchEnd?: boolean; eventCounter: number; recoveryTicksRemaining: number; botMemory: Record<string, BotMemory>;
 }
 export interface VisibleActor extends Pose { seatId: string; team: TeamId; role: 'pilot'; hp: number; aim: number; shieldUntilTick: number; respawnAtTick: number | null; carrying: boolean; substitute: boolean; chargeTicks: number; }
 export interface BatteryView { mode: Battery['mode']; team?: TeamId; spaceId?: SpaceId; x?: number; z?: number; carrierId?: string; returnAtTick?: number | null; }
@@ -59,6 +61,6 @@ export interface ShiftView {
   self: { seatId: string; team: TeamId; role: Role; controllerEpoch: number; lastAcceptedSeq: number; connected: boolean; nextRole: Role };
   seats: (Seat & { role: Role; substitute: boolean })[]; board: (RoomId | null)[]; boardRevision: number; motion: ShiftMotion | null; previousMotion: ShiftState['previousMotion'];
   priority: TeamId; cooldownUntilTick: Record<TeamId, number>; score: Record<TeamId, number>; actors: VisibleActor[]; ghosts: Ghost[];
-  battery: BatteryView; pings: Ping[]; events: GameEvent[]; journal?: GameEvent[]; doors: Door[]; shiftOptions: ShiftOption[]; rounds: RoundResult[]; winner: TeamId | null; stats: Record<string, VisibleStats>; goalSpace: 'west' | 'east';
+  battery: BatteryView; pings: Ping[]; events: GameEvent[]; journal?: GameEvent[]; roundRecap?: RoundRecap; doors: Door[]; shiftOptions: ShiftOption[]; rounds: RoundResult[]; winner: TeamId | null; stats: Record<string, VisibleStats>; goalSpace: 'west' | 'east';
 }
 export interface TickResult { receipts: Receipt[]; checkpoint: boolean; events: GameEvent[]; }

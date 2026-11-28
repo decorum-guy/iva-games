@@ -45,14 +45,23 @@ Client frames:
 
 Other discrete payload types are `interact` and `ping` from the core types.
 `actionId` may also be present inside the payload, but must match the envelope.
-Input is limited to 30 frames/second, discrete commands to 12/second and eight
-pending commands per connection. The core enforces gameplay cooldowns and the
+Input uses a 30 frames/second token bucket with a six-frame burst allowance for
+network batching; the runtime still coalesces to the latest input per seat and
+tick. Discrete commands are limited to 12/second and eight pending commands per
+connection. The core enforces gameplay cooldowns and the
 stricter ping limit. Maximum frame size is 8192 bytes; binary frames are rejected.
 
 The first response and subsequent 15 Hz updates are
 `{type:'snapshot',version,matchId,controllerEpoch,tick,view}`. Accepted and
 rejected commands receive `{type:'receipt',...,actionId,result}`, where `result`
 is the core `Receipt`; transport errors have `type:'error'` and a stable `code`.
+After the immutable final result, an existing action ID still replays its
+SQLite receipt (or rejects a changed payload with `ACTION_CONFLICT`). A fresh
+action ID receives the terminal admission error `MATCH_FINISHED`; the client
+must remove that pending action instead of retrying it. No new final-state
+receipt or checkpoint is written for this rejected admission. Recovery is
+different: commands admitted during its temporary pause receive a durable
+`PHASE` receipt, so they cannot execute after the pause ends.
 No server state, opposing input, account identity or hidden pose is serialized.
 Slow sockets drop obsolete snapshots and close at the hard buffer limit;
 receipts are not intentionally dropped. HTTP `GET .../match` remains the
@@ -73,8 +82,16 @@ transitions, shift start/end and the 2-second checkpoint are durable. Failure to
 commit stops that resident match and returns no success receipt. Restart loads
 the last whole checkpoint, cancels old control epochs, and applies the core's
 five-second recovery preparation before simulation resumes. Finished matches
-are loaded without advancing them. A normal shutdown flushes pending commands
-and checkpoints before closing the database.
+are loaded without advancing them. Finished HTTP result reads do not populate
+the simulation map. A completed resident remains available while live result
+pages reference it, then is evicted after the final lease closes; the result
+and receipts remain in SQLite. A stale takeover lease cannot evict its active
+replacement. A normal shutdown flushes pending commands and checkpoints before
+closing the database. The gateway first cancels every snapshot interval and
+releases live leases synchronously; asynchronous WebSocket close events cannot
+query a subsequently closed platform database. A rejected upgrade also releases
+its provisional lease. HTTP shutdown still drains its lifecycle if lease
+cleanup reports an error.
 
 The `advanceTicks` method is an in-process deterministic test driver; no network
 route exposes it. Production never accepts client positions, tick changes,

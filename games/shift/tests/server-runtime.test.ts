@@ -42,7 +42,7 @@ describe('durable Shift runtime', () => {
     expect(() => shiftRoomSettings({ admin: true })).toThrow();
   });
 
-  it.each([2, 3] as const)('creates one durable %iv%i match for one start ID and restricts its frozen roster', async size => {
+  it.each([2, 3] as const)('creates one durable match with %i players per team for one start ID and restricts its frozen roster', async size => {
     const { runtime } = fixture(), input = request(size);
     const first = await runtime.createMatch(input);
     expect(await runtime.createMatch(input)).toEqual(first);
@@ -76,11 +76,18 @@ describe('durable Shift runtime', () => {
     expect(restored.motion?.roomId).toBe('O');
     expect(restored.recoveryTicksRemaining).toBe(150);
     const frozen = restored.tick;
-    f.runtime.advanceTicks(150);
+    const duringRecovery = { ...a, controllerEpoch: resumed.controllerEpoch };
+    const pendingRecovery = resumed.command('recovery-rejected-action', duringRecovery);
+    f.runtime.advanceTicks();
+    const recoveryReceipt = await pendingRecovery as Receipt;
+    expect(recoveryReceipt).toMatchObject({ accepted: false, reason: 'PHASE', tick: frozen });
+    f.runtime.advanceTicks(149);
     expect((resumed.snapshot().view as ShiftView).tick).toBe(frozen);
     f.runtime.advanceTicks(20);
     const arrived = resumed.snapshot().view as ShiftView;
     expect(arrived.motion).toBeNull(); expect(arrived.board[7]).toBe('O'); expect(arrived.board[4]).toBeNull();
+    // A rejected recovery key cannot turn into a later action when the client retries.
+    expect(await resumed.command('recovery-rejected-action', duringRecovery)).toEqual(recoveryReceipt);
     expect(await resumed.command('shift-action-a', a)).toEqual(one);
     expect((resumed.snapshot().view as ShiftView).boardRevision).toBe(arrived.boardRevision);
   });
@@ -108,12 +115,29 @@ describe('durable Shift runtime', () => {
     expect(await next.command('shutdown-command', payload)).toEqual(receipt);
   });
 
-  it('keeps a completed result durable while a rematch gets a distinct match identity', async () => {
+  it('evicts completed residents, keeps final receipt replay durable, and starts a distinct rematch', async () => {
     const f = fixture(), input = request(), first = await f.runtime.createMatch(input);
+    const residentCount = (): number => (Reflect.get(f.runtime, 'matches') as Map<string, unknown>).size;
+    const firstLease = f.runtime.openLiveSession(first.matchId, 'player-0');
+    const payload = { type: 'shift', roundId: 1, controllerEpoch: firstLease.controllerEpoch, roomId: 'O', expectedBoardRevision: 0 };
+    const pending = firstLease.command('before-finish-receipt', payload);
+    f.runtime.advanceTicks(); const receipt = await pending;
+    firstLease.close();
     // Real fixed steps and public-view bot substitutes, without setting scores or deadlines.
     f.runtime.advanceTicks(16_000);
+    expect(residentCount()).toBe(0);
     const completed = await f.runtime.status(first.matchId);
     expect(completed.finished).toBe(true);
+    await f.runtime.viewForPlayer(first.matchId, 'player-0');
+    expect(residentCount()).toBe(0); // Historical HTTP reads do not join the 30 Hz clock.
+    const resultTab = f.runtime.openLiveSession(first.matchId, 'player-0');
+    const takeover = f.runtime.openLiveSession(first.matchId, 'player-0');
+    resultTab.close(); expect(takeover.isCurrent()).toBe(true); expect(residentCount()).toBe(1);
+    expect(await takeover.command('before-finish-receipt', payload)).toEqual(receipt);
+    expect(() => takeover.command('before-finish-receipt', { ...payload, roomId: 'F' })).toThrow(expect.objectContaining({ code: 'ACTION_CONFLICT' }));
+    for (let index = 0; index < 100; index++) expect(() => takeover.command(`after-finish-${index}`, { ...payload, controllerEpoch: takeover.controllerEpoch })).toThrow(expect.objectContaining({ code: 'MATCH_FINISHED' }));
+    expect((takeover.snapshot().view as ShiftView).phase).toBe('finished');
+    takeover.close(); expect(residentCount()).toBe(0);
     const second = await f.runtime.createMatch({ ...input, startCommandId: 'fresh-rematch-start' });
     expect(second.matchId).not.toBe(first.matchId);
     expect((await f.runtime.status(second.matchId)).finished).toBe(false);
@@ -122,6 +146,11 @@ describe('durable Shift runtime', () => {
     expect(await f.runtime.status(first.matchId)).toEqual(completed);
     const final = await f.runtime.viewForPlayer(first.matchId, 'player-0') as ShiftView;
     expect(final.phase).toBe('finished'); expect(final.recoveryTicksRemaining).toBe(0);
+    expect(residentCount()).toBe(1); // Only the unfinished rematch was restored.
+    const restoredFinal = f.runtime.openLiveSession(first.matchId, 'player-0');
+    expect(await restoredFinal.command('before-finish-receipt', payload)).toEqual(receipt);
+    expect(() => restoredFinal.command('after-restart-finish', { ...payload, controllerEpoch: restoredFinal.controllerEpoch })).toThrow(expect.objectContaining({ code: 'MATCH_FINISHED' }));
+    restoredFinal.close(); expect(residentCount()).toBe(1);
   }, 30_000);
 
   it('recovers an acknowledged shift after an actual SIGKILL with no graceful runtime close', async () => {

@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -12,7 +12,7 @@ import { createPlatformHttpServer } from '../src/http';
 import type { Room } from '../src/types';
 
 const cleanup: (() => Promise<void>)[] = [];
-afterEach(async () => { for (const close of cleanup.splice(0)) await close(); });
+afterEach(async () => { try { for (const close of cleanup.splice(0)) await close(); } finally { vi.useRealTimers(); } });
 type Frame = { type: string; view?: ShiftView; actionId?: string; code?: string; controllerEpoch?: number; result?: { accepted: boolean; reason?: string } };
 async function fixture() {
   const directory = await mkdtemp(join(tmpdir(), 'iva-shift-live-'));
@@ -24,11 +24,15 @@ async function fixture() {
   await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
   const base = `ws://127.0.0.1:${(server.address() as AddressInfo).port}`;
   const sockets: WebSocket[] = [];
-  cleanup.push(async () => {
+  let stopped = false;
+  const stop = async (): Promise<void> => {
+    if (stopped) return;
+    stopped = true;
     for (const socket of sockets) socket.terminate();
     await server.shutdown(); await platform.settle(); shift.close(); platform.close();
     await rm(directory, { recursive: true, force: true });
-  });
+  };
+  cleanup.push(stop);
   async function signup(handle: string) {
     const created = await platform.register({ email: handle + '@example.test', handle, displayName: handle, password: 'Long isolated testing password 304' });
     const message = mail.messages.find(item => item.to === handle + '@example.test')!;
@@ -67,11 +71,11 @@ async function fixture() {
     platform.startRoom(host.id, room.roomId, { expectedRevision: room.revision }); await platform.reconcile();
     return platform.getRoom(host.id, room.roomId);
   }
-  return { platform, shift, signup, connect, room };
+  return { platform, shift, server, stop, signup, connect, room };
 }
 
 describe('shared authenticated live gateway with Shift', () => {
-  it.each([2, 3] as const)('opens independent views in %iv%i and settles same-tick competing room commands once', async size => {
+  it.each([2, 3] as const)('opens independent views with %i players per team and settles same-tick competing room commands once', async size => {
     const f = await fixture(), a = await f.signup('live_a'), b = await f.signup('live_b');
     const room = await f.room(a, b, size);
     expect(room.state).toBe('playing');
@@ -100,6 +104,26 @@ describe('shared authenticated live gateway with Shift', () => {
     expect(one.motion).toEqual(two.motion);
   });
 
+  it('synchronously stops live snapshot timers and leases before the platform databases close', async () => {
+    // Real sockets and databases; only interval dispatch is controlled so a
+    // queued snapshot cannot hide behind a lucky close-event ordering.
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+    const f = await fixture(), a = await f.signup('shutdown_a'), b = await f.signup('shutdown_b');
+    const room = await f.room(a, b, 3);
+    const first = f.connect(a, room), second = f.connect(b, room);
+    await Promise.all([first, second].map(client => new Promise<void>(resolve => client.socket.once('message', () => resolve()))));
+    expect(vi.getTimerCount()).toBeGreaterThan(0);
+    const sessionReads = vi.spyOn(f.platform, 'getSession');
+    const shutdown = f.server.shutdown();
+    // This happens before asynchronous WS close events get a turn.
+    expect(vi.getTimerCount()).toBe(0);
+    vi.advanceTimersByTime(1000);
+    expect(sessionReads).not.toHaveBeenCalled();
+    await shutdown; await f.stop();
+    expect(() => vi.advanceTimersByTime(1000)).not.toThrow();
+    expect(sessionReads).not.toHaveBeenCalled();
+  });
+
   it('rejects foreign origins, missing sessions, non-members, mismatched matches and wire versions', async () => {
     const f = await fixture(), a = await f.signup('auth_a'), b = await f.signup('auth_b'), outside = await f.signup('auth_out');
     const room = await f.room(a, b);
@@ -116,6 +140,20 @@ describe('shared authenticated live gateway with Shift', () => {
     }
   });
 
+  it('releases a controller lease when a later WebSocket handshake field is rejected', async () => {
+    const f = await fixture(), a = await f.signup('handshake_a'), b = await f.signup('handshake_b');
+    const room = await f.room(a, b);
+    const rejected = f.connect(a, room, { 'Sec-WebSocket-Protocol': ',' });
+    const status = await new Promise<number>(resolve => rejected.socket.once('unexpected-response', (_request, response) => {
+      response.resume(); resolve(response.statusCode!); rejected.socket.terminate();
+    }));
+    expect(status).toBe(400);
+    await vi.waitFor(async () => {
+      const view = await f.platform.matchView(a.id, room.roomId) as ShiftView;
+      expect(view.self.connected).toBe(false);
+    });
+  });
+
   it('takes over one seat with a new epoch and closes a revoked session', async () => {
     const f = await fixture(), a = await f.signup('epoch_a'), b = await f.signup('epoch_b'), room = await f.room(a, b);
     const first = f.connect(a, room), initial = await first.wait(frame => frame.type === 'snapshot');
@@ -126,6 +164,25 @@ describe('shared authenticated live gateway with Shift', () => {
     const revoked = new Promise<number>(resolve => second.socket.once('close', resolve));
     f.platform.revokeSession(a.session.sessionHash);
     expect(await revoked).toBe(4003);
+  });
+
+  it('accepts a bounded input burst after network jitter while continuing to limit a flood', async () => {
+    const f = await fixture(), a = await f.signup('jitter_a'), b = await f.signup('jitter_b'), room = await f.room(a, b);
+    const client = f.connect(a, room), first = await client.wait(frame => frame.type === 'snapshot');
+    let seq = 0;
+    const sendInputs = (count: number) => { for (let i = 0; i < count; i++) client.socket.send(JSON.stringify({ type: 'input', version: 'shift-wire@1', payload: {
+      type: 'input', roundId: first.view!.round, controllerEpoch: first.controllerEpoch, seq: ++seq, moveX: 0, moveZ: 0, aim: 0, fireHeld: false,
+    } })); };
+    let start = client.frames.length;
+    sendInputs(6); await client.wait(frame => frame.type === 'snapshot', start);
+    expect(client.frames.slice(start).filter(frame => frame.code === 'INPUT_RATE')).toHaveLength(0);
+    start = client.frames.length;
+    sendInputs(60); await client.wait(frame => frame.code === 'INPUT_RATE', start);
+    expect(client.socket.readyState).toBe(WebSocket.OPEN);
+    await new Promise(resolve => setTimeout(resolve, 400));
+    start = client.frames.length;
+    sendInputs(6); await client.wait(frame => frame.type === 'snapshot', start);
+    expect(client.frames.slice(start).filter(frame => frame.code === 'INPUT_RATE')).toHaveLength(0);
   });
 
   it('rejects invalid lobby capacity and resets human readiness after team changes', async () => {

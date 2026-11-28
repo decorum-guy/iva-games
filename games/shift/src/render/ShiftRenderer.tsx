@@ -4,6 +4,7 @@ import { ROOM_IDS } from '../core/arenas';
 import { roomOrigin } from '../core/geometry';
 import type { ShiftView, Vec2 } from '../core/types';
 import { drawOverlay, drawPlan, interpolatedActors } from './draw';
+import { canonicalAimPoint, presentationTick } from './presentation';
 import { ShiftThreeScene } from './three-scene';
 import type { ShiftRendererProps } from './types';
 
@@ -14,6 +15,7 @@ export function ShiftRenderer(props: ShiftRendererProps) {
   const [failed, setFailed] = useState(false);
   const sceneRef = useRef<ShiftThreeScene | null>(null), projectionRef = useRef({ width: 1, height: 1, scale: 1, centerX: 8, centerZ: 8 });
   const tickRef = useRef(props.view.tick), draggingRef = useRef(false);
+  const mouseRef = useRef<{ clientX: number; clientY: number } | null>(null);
   const actualMode = props.mode === '2d' || failed ? '2d' : '3d';
 
   useEffect(() => {
@@ -28,6 +30,13 @@ export function ShiftRenderer(props: ShiftRendererProps) {
   useEffect(() => {
     if (actualMode === '2d') propsRef.current.onViewportReady?.();
   }, [actualMode]);
+
+  useEffect(() => {
+    const clear = () => { mouseRef.current = null; };
+    const pointer = (event: PointerEvent) => { if (event.pointerType === 'touch') clear(); };
+    window.addEventListener('pointerdown', pointer, true); window.addEventListener('blur', clear);
+    return () => { window.removeEventListener('pointerdown', pointer, true); window.removeEventListener('blur', clear); };
+  }, []);
 
   useEffect(() => {
     const canvas = sceneCanvasRef.current;
@@ -56,8 +65,7 @@ export function ShiftRenderer(props: ShiftRendererProps) {
       if (!running || !ctx) return;
       const p = propsRef.current, v = p.view, elapsed = Math.max(0, now - receivedRef.current);
       // Visual interpolation is capped; a missing snapshot cannot keep a drone running.
-      const smoothTick = v.tick + (v.phase === 'active' && v.recoveryTicksRemaining <= 0 ? Math.min(2, elapsed * .03) : 0);
-      const tick = p.reducedMotion && v.motion ? v.motion.startTick : smoothTick;
+      const tick = presentationTick(v, elapsed, p.reducedMotion);
       const effectTick = v.tick + elapsed * .03;
       tickRef.current = tick;
       const predicted = p.getPredictedSelf?.();
@@ -80,6 +88,13 @@ export function ShiftRenderer(props: ShiftRendererProps) {
         for (let z = -5; z <= 21; z++) { const a = project(-10, z), b = project(26, z); ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke(); }
         drawPlan(ctx, p, tick, project, actors); drawOverlay(ctx, p, tick, project, actors, true, effectTick);
       }
+      // With a fixed/2D camera, a stationary cursor is still a new direction when
+      // the pilot moves. Reproject after this frame's camera update. A touch
+      // gesture clears mouse ownership, so a stick is never overwritten here.
+      if (p.view.self.role === 'pilot' && mouseRef.current) {
+        const point = worldPoint(mouseRef.current);
+        if (point) p.onWorldAim?.(point);
+      }
       frames++;
       if (now - frameStart >= 1000) { host!.dataset.fps = (frames * 1000 / (now - frameStart)).toFixed(1); frames = 0; frameStart = now; }
       raf = requestAnimationFrame(frame);
@@ -88,22 +103,14 @@ export function ShiftRenderer(props: ShiftRendererProps) {
     return () => { running = false; cancelAnimationFrame(raf); resize.disconnect(); };
   }, [actualMode]);
 
-  function worldPoint(event: ReactPointerEvent): Vec2 | null {
+  function worldPoint(event: { clientX: number; clientY: number }): Vec2 | null {
     const rect = hostRef.current?.getBoundingClientRect();
     if (!rect) return null;
     const x = event.clientX - rect.left, y = event.clientY - rect.top;
     const projection = projectionRef.current;
     const point = actualMode === '3d' && sceneRef.current ? sceneRef.current.unproject(x, y)
       : { x: projection.centerX + (x - projection.width / 2) / projection.scale, z: projection.centerZ + (y - projection.height / 2) / projection.scale };
-    const p = propsRef.current, view = p.view;
-    const self = view.actors.find(a => a.seatId === view.self.seatId);
-    if (point && p.reducedMotion && view.motion && self?.spaceId === view.motion.roomId) {
-      // The short reduced-motion transition retains aim relative to the room.
-      const displayed = roomOrigin(view.board, self.spaceId, view.motion, tickRef.current);
-      const canonical = roomOrigin(view.board, self.spaceId, view.motion, view.tick);
-      return { x: point.x + canonical.x - displayed.x, z: point.z + canonical.z - displayed.z };
-    }
-    return point;
+    return canonicalAimPoint(propsRef.current.view, point, tickRef.current);
   }
 
   function pointerDown(event: ReactPointerEvent<HTMLDivElement>) {
@@ -115,17 +122,23 @@ export function ShiftRenderer(props: ShiftRendererProps) {
       const room = ROOM_IDS.find(id => { const o = roomOrigin(view.board, id, view.motion, tickRef.current); return Math.abs(point.x - o.x) <= 3.95 && Math.abs(point.z - o.z) <= 3.95; });
       if (room) propsRef.current.onRoomSelect?.(room);
     } else if (event.button === 0 && event.pointerType !== 'touch') {
+      mouseRef.current = { clientX: event.clientX, clientY: event.clientY };
       event.currentTarget.setPointerCapture(event.pointerId); draggingRef.current = true;
       propsRef.current.onWorldAim?.(point); propsRef.current.onFireChange?.(true);
     }
   }
-  function pointerUp() { if (draggingRef.current) { draggingRef.current = false; propsRef.current.onFireChange?.(false); } }
+  function pointerUp() {
+    if (draggingRef.current) { draggingRef.current = false; propsRef.current.onFireChange?.(false); }
+    const mouse = mouseRef.current, rect = hostRef.current?.getBoundingClientRect();
+    if (mouse && rect && (mouse.clientX < rect.left || mouse.clientX > rect.right || mouse.clientY < rect.top || mouse.clientY > rect.bottom)) mouseRef.current = null;
+  }
   const label = (props.lang ?? 'ru') === 'ru' ? 'Тактический этаж. Север сверху. Выберите комнату или управляйте пилотом.' : 'Tactical floor. North is up. Select a room or control your pilot.';
   return <div ref={hostRef} className={props.className ?? 'shift-renderer'} data-shift-renderer={actualMode} data-testid="shift-scene"
     tabIndex={0} role="application" aria-label={label}
     onPointerDown={pointerDown} onPointerUp={pointerUp} onPointerCancel={pointerUp} onLostPointerCapture={pointerUp}
-    onPointerMove={event => { if (propsRef.current.view.self.role === 'pilot' && event.pointerType !== 'touch') { const point = worldPoint(event); if (point) propsRef.current.onWorldAim?.(point); } }}
-    onContextMenu={event => event.preventDefault()} onBlur={pointerUp}
+    onPointerMove={event => { if (propsRef.current.view.self.role === 'pilot' && event.pointerType !== 'touch') { mouseRef.current = { clientX: event.clientX, clientY: event.clientY }; const point = worldPoint(event); if (point) propsRef.current.onWorldAim?.(point); } }}
+    onPointerLeave={() => { if (!draggingRef.current) mouseRef.current = null; }}
+    onContextMenu={event => event.preventDefault()} onBlur={() => { mouseRef.current = null; pointerUp(); }}
     style={{ position: 'relative', width: '100%', height: '100%', minHeight: 180, overflow: 'hidden', background: '#101820', touchAction: 'none' }}>
     {actualMode === '3d' && <canvas ref={sceneCanvasRef} aria-hidden="true" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', display: 'block' }} />}
     <canvas ref={overlayRef} aria-hidden="true" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', display: 'block', pointerEvents: 'none' }} />

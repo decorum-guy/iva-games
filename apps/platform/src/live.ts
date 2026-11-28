@@ -7,6 +7,8 @@ import type { HttpOptions } from './http.js';
 
 const PREFIX = '/api/platform/v1/rooms/';
 const MAX_BUFFER = 256 * 1024;
+const INPUT_RATE = 30;
+const INPUT_BURST = 6;
 function sessionCookie(request: IncomingMessage, name: string): string | undefined {
   const values = (request.headers.cookie ?? '').split(';').map(value => value.trim()).filter(value => value.startsWith(name + '='));
   return values.length === 1 ? values[0].slice(name.length + 1) : undefined;
@@ -26,9 +28,11 @@ export function attachPlatformLive(server: Server, service: PlatformService, opt
   const secure = options.secureCookies ?? origin.startsWith('https:');
   const cookieName = secure ? '__Host-iva_session' : 'iva_dev_session';
   const wss = new WebSocketServer({ noServer: true, maxPayload: 8192, perMessageDeflate: false });
+  const teardowns = new Set<() => void>();
   let stopping = false;
   server.on('upgrade', (request, socket, head) => {
     let lease: LiveGameSession | undefined;
+    let release: (() => void) | undefined;
     try {
       if (stopping || request.method !== 'GET') { deny(socket, 503); return; }
       if (request.headers.upgrade?.toLowerCase() !== 'websocket' || request.headers['sec-websocket-version'] !== '13' || typeof request.headers['sec-websocket-key'] !== 'string' || !/^[+/0-9A-Za-z]{22}==$/.test(request.headers['sec-websocket-key'])) { deny(socket, 400); return; }
@@ -47,6 +51,19 @@ export function attachPlatformLive(server: Server, service: PlatformService, opt
       // Validate before the upgrade; this is also the only place a lease epoch changes.
       lease = service.openLiveSession(actor, roomId, matchId, version);
       const controller = lease;
+      let closed = false, timer: ReturnType<typeof setInterval> | undefined;
+      const close = (): void => {
+        if (closed) return;
+        closed = true;
+        if (timer) clearInterval(timer);
+        teardowns.delete(close);
+        controller.close();
+      };
+      release = close;
+      teardowns.add(close);
+      // Also releases a lease if ws rejects a later handshake field before its
+      // connection callback. Closing an HTTP server alone does not drain WS.
+      socket.once('close', close);
       let lastTouch = Date.now();
       const authorizationFailure = (): number | null => {
         const touch = Date.now() - lastTouch >= 30_000;
@@ -57,29 +74,42 @@ export function attachPlatformLive(server: Server, service: PlatformService, opt
       };
       wss.handleUpgrade(request, socket, head, ws => {
         const scope = { version, matchId, controllerEpoch: controller.controllerEpoch };
-        let closed = false, pending = 0;
-        let inputWindow = 0, inputs = 0, commandWindow = 0, commands = 0;
+        let pending = 0;
+        let inputBudget = INPUT_BURST, inputBudgetAt = performance.now(), commandWindow = 0, commands = 0;
         const send = (frame: unknown, disposable = false): void => {
-          if (ws.readyState !== WebSocket.OPEN) return;
+          if (stopping || closed || ws.readyState !== WebSocket.OPEN) return;
           if (ws.bufferedAmount > MAX_BUFFER * 4) { ws.close(1013, 'Slow connection'); return; }
           if (disposable && ws.bufferedAmount > MAX_BUFFER) return;
           ws.send(JSON.stringify(frame));
         };
         const snapshot = (): void => {
-          const denied = authorizationFailure();
-          if (denied) { ws.close(denied, 'Session changed'); return; }
+          if (stopping || closed || ws.readyState !== WebSocket.OPEN) return;
           try {
+            const denied = authorizationFailure();
+            if (denied) { ws.close(denied, 'Session changed'); return; }
             const current = controller.snapshot();
             send({ type: 'snapshot', ...scope, tick: current.tick, view: current.view }, true);
-          } catch (error) { send({ type: 'error', ...scope, code: code(error) }); }
+          } catch (error) {
+            send({ type: 'error', ...scope, code: code(error) });
+            close(); ws.close(1011, 'Live unavailable');
+          }
         };
+        ws.once('close', close);
+        ws.once('error', close);
         // Queueing keeps the first snapshot ahead of all client commands.
         snapshot();
-        const timer = setInterval(snapshot, 1000 / 15);
-        timer.unref();
+        if (!closed && !stopping && ws.readyState === WebSocket.OPEN) {
+          timer = setInterval(snapshot, 1000 / 15);
+          timer.unref();
+        }
         ws.on('message', (data, binary) => {
-          const denied = authorizationFailure();
-          if (denied) { ws.close(denied, 'Session changed'); return; }
+          if (stopping || closed || ws.readyState !== WebSocket.OPEN) return;
+          try {
+            const denied = authorizationFailure();
+            if (denied) { ws.close(denied, 'Session changed'); return; }
+          } catch {
+            close(); ws.close(1011, 'Session unavailable'); return;
+          }
           if (binary) { ws.close(1003, 'JSON required'); return; }
           let frame: Record<string, unknown>;
           try {
@@ -91,8 +121,13 @@ export function attachPlatformLive(server: Server, service: PlatformService, opt
           const now = Date.now();
           try {
             if (frame.type === 'input') {
-              if (now - inputWindow >= 1000) { inputWindow = now; inputs = 0; }
-              if (++inputs > 30) { send({ type: 'error', ...scope, code: 'INPUT_RATE' }); return; }
+              const inputNow = performance.now();
+              // Network delivery can bunch several ordinary 30 Hz inputs. The
+              // runtime coalesces them to one latest input per authoritative tick.
+              inputBudget = Math.min(INPUT_BURST, inputBudget + Math.max(0, inputNow - inputBudgetAt) * INPUT_RATE / 1000);
+              inputBudgetAt = inputNow;
+              if (inputBudget < 1) { send({ type: 'error', ...scope, code: 'INPUT_RATE' }); return; }
+              inputBudget--;
               controller.input(frame.payload);
             } else if (frame.type === 'command') {
               if (typeof frame.actionId !== 'string' || !/^[A-Za-z0-9:_-]{8,100}$/.test(frame.actionId)) throw new Error('action');
@@ -107,23 +142,23 @@ export function attachPlatformLive(server: Server, service: PlatformService, opt
             } else send({ type: 'error', ...scope, code: 'UNKNOWN_FRAME' });
           } catch (error) { send({ type: 'error', ...scope, code: code(error) }); }
         });
-        const close = (): void => {
-          if (closed) return;
-          closed = true; clearInterval(timer); controller.close();
-        };
-        ws.on('close', close);
-        ws.on('error', close);
       });
     } catch (error) {
-      lease?.close();
+      if (release) release(); else lease?.close();
       const status = error && typeof error === 'object' && 'status' in error && typeof error.status === 'number' ? error.status : 403;
       deny(socket, status);
     }
   });
   return { close() {
+    if (stopping) return;
     stopping = true;
+    let failure: unknown;
+    // Clear every timer and release every lease synchronously, before the owner
+    // can close PlatformService or runtime databases. WS close events are async.
+    for (const release of [...teardowns]) { try { release(); } catch (error) { failure ??= error; } }
     // Every accepted command remains owned by its runtime until its durable receipt.
     for (const socket of wss.clients) { socket.close(1012, 'Server restart'); socket.terminate(); }
     wss.close();
+    if (failure) throw failure;
   } };
 }

@@ -326,5 +326,9 @@ export function createPlatformHttpServer(service: PlatformService, options: Http
   server.requestTimeout = 15_000;
   server.headersTimeout = 10_000;
   server.keepAliveTimeout = 5_000;
-  return Object.assign(server, { shutdown: () => { live.close(); return lifecycle.close(); } });
+  let closing: Promise<void> | undefined;
+  return Object.assign(server, { shutdown: () => {
+    closing ??= (async () => { try { live.close(); } finally { await lifecycle.close(); } })();
+    return closing;
+  } });
 }

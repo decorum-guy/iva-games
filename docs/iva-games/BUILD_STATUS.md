@@ -1,5 +1,27 @@
 # Iva Games — состояние реализации
 
+## Сдвиг — разработка и диагностическая приёмка — 28 ноября 2026
+
+[PR #46](https://github.com/decorum-guy/iva-games/pull/46), ветка `feat/shift`: авторитетный бой 2×2/3×3 с переносом комнат, три арены, обе роли, боты, обучение, оригинальные ассеты и действующие платформенные комнаты. Полные диагностические матрицы локального и онлайн Chromium завершены; найденные дефекты исправляются перед заключительными прогонами. Это браузерная автоматизация, не игры людей. [Основной журнал, результаты и ограничения](../../games/shift/STATUS.md), [локальные проверки](../../games/shift/QA_LOCAL.md), [онлайн](../../games/shift/QA_ONLINE.md), [ассеты](../../games/shift/QA_ART.md).
+
+PR остаётся draft до заключительных циклов и проверки точной вершины; `DEPLOYED` для «Сдвига» нет. Участие людей, физические устройства, Safari и прослушивание учитываются отдельно и не объявляются выполненными по автоматизации. Порядок допуска и единственного выпуска определяется текущим поручением владельца.
+
+## Район: публичная приёмка и торговля — 28 ноября 2026
+
+На публичном `357f60049e83b298bb5bbc2f760654fbd02384e3` агент полностью прошёл обучение и упражнение защиты, запустил все шесть карт и довёл две самостоятельные партии с ботами до настоящего результата: «Большой лиман» 10:2 и «Маячные озёра» 6:7:8:10. Старый завершённый район сохранил прежний вид и итог после reload. [Подробный отчёт и ограничения](VALIDATION_DISTRICT_PUBLIC_PLAY_2026_11_28.md).
+
+[PR #43](https://github.com/decorum-guy/iva-games/pull/43), выполненный GPT-6.1-Sol совместно с приёмкой, объединён в `main` как `aebb4223fa31e6687dc2873300081064fb09020c`. Он устраняет сдвиг поля при торговле, рассылает предложение всем и оставляет выбор согласившегося автору; согласие само по себе ресурсы не переводит. Также новость больше не закрывает учебный шаг, а цены домов объяснены явно. [CI PR](https://github.com/decorum-guy/iva-games/actions/runs/46152569962) и [CI main](https://github.com/decorum-guy/iva-games/actions/runs/46153743350) прошли; [журнал выпуска](https://github.com/decorum-guy/iva-games/actions/runs/46154721072/job/141009456178) содержит `DEPLOYED aebb4223fa31e6687dc2873300081064fb09020c`. Каталог подтвердил `district@0.4` / `district-territorial@1`.
+
+После доставки на публичном сайте повторены курс и защита, включая новость на узком окне. В отдельной комнате предложение дошло до трёх ботов, согласие без выбора не списало ресурсы, отмена сработала, повторный выбор провёл обмен; поле не сместилось. Реальный обмен через порт древесины 2:1 и reload с сохранением ресурсов также прошли. Старое завершённое сохранение открылось с прежним итогом.
+
+Нет второго независимого авторизованного аккаунта и доступа к физическому телефону без входа владельца в Mac. Проверены перезагрузки, но не отдельный краткий обрыв сети; прослушивание звука также не выполнено. Локальная touch-эмуляция и технические игры не выдаются за физический телефон или участие людей.
+
+## District broadcast trade candidate — 28 November 2026
+
+[PR #43](https://github.com/decorum-guy/iva-games/pull/43) broadcasts new v0.4 proposals to every other participant and requires separate author selection after consent, including two-seat rooms. Decline/cancellation transfers nothing; bots use the same protocol. Persisted addressed proposals and v0.2/v0.3 readers remain compatible. A permanent player-status row fixes the reproduced board jump.
+
+197 District tests, 324 platform tests, TypeScript/ESLint, foundation build and a real isolated HTTP/SQLite browser trade with a bot passed. Desktop and emulated phone geometry remained equal before/after consent and completion; consent did not change the author's hand. The earlier full run finished 12 rounds with recovery. [Exact builds, scenarios and the final bot recovery distinction](DISTRICT_BROADCAST_TRADE_2026_11_28.md). Final CI is checked on the PR head; merge and production delivery are not claimed here.
+
 ## Колосс: последние два звука выбраны владельцем — 28 ноября 2026
 
 Владелец приложил `colossus-armor-and-shield-review.md` и поручил продолжить работу с выбранными звуками. Приняты **A «Круглый щит»** для `armour` и **A «Мягкий блок»** для `shield`. Вместе с прежними 15 принятыми эффектами это закрывает выбор всего банка; повторно выбирать эти два звука не требуется. [Точное решение, SHA-256 и проверки](../colossus/AUDIO_SELECTION_2026_11_28.md).

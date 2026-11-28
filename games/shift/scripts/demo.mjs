@@ -89,18 +89,20 @@ export async function startShiftDemo(options = {}) {
   const port = options.port ?? 4398;
   assert.ok(Number.isSafeInteger(port) && port > 1024 && port < 65536, 'Use an unprivileged isolated port');
   const origin = `http://127.0.0.1:${port}`;
-  for (const path of ['dist-platform/main.js', 'apps/portal/dist/index.html']) assert.ok((await stat(join(ROOT, path)).catch(() => null))?.isFile(), 'Run npm run build:foundation first');
+  const platformEntrypoint = resolve(options.platformEntrypoint || join(ROOT, 'dist-platform/main.js'));
+  const portalDirectory = resolve(options.portalDirectory || join(ROOT, 'apps/portal/dist'));
+  for (const path of [platformEntrypoint, join(portalDirectory, 'index.html')]) assert.ok((await stat(path).catch(() => null))?.isFile(), 'Run npm run build:foundation first');
   const base = join(ROOT, '.qa', 'shift-demo'); await mkdir(base, { recursive: true, mode: 0o700 });
   const directory = await mkdtemp(join(base, 'run-'));
   const mailbox = join(directory, 'mail'), logPath = join(directory, 'platform.log');
   let running = null, stopped = false;
   async function start() {
-    const child = spawn(process.execPath, ['dist-platform/main.js'], { cwd: ROOT,
+    const child = spawn(process.execPath, [platformEntrypoint], { cwd: ROOT,
       env: { ...process.env, NODE_ENV: 'development', PLATFORM_HOST: '127.0.0.1', PLATFORM_PORT: String(port),
         PORTAL_ORIGIN: origin, PLATFORM_ALLOWED_HOSTS: `127.0.0.1:${port},localhost:${port}`, PLATFORM_ALLOWED_ORIGINS: origin,
         TRUSTED_PROXY_IPS: '', PLATFORM_DATABASE_PATH: join(directory, 'platform.sqlite'), PLATFORM_LAB_DATABASE_PATH: join(directory, 'runtime.sqlite'),
         MAIL_MODE: 'file', MAIL_FILE_DIRECTORY: mailbox, TELEGRAM_ENABLED: 'false', TELEGRAM_AUTH_ENABLED: 'false',
-        PORTAL_DIST_DIRECTORY: join(ROOT, 'apps/portal/dist') }, stdio: ['ignore', 'pipe', 'pipe'] });
+        PORTAL_DIST_DIRECTORY: portalDirectory }, stdio: ['ignore', 'pipe', 'pipe'] });
     const state = { child, output: '', error: null }; running = state;
     const collect = part => { const text = String(part); state.output = (state.output + text).slice(-16000); void appendFile(logPath, text, { mode: 0o600 }).catch(error => { state.error ??= error; }); };
     child.stdout.on('data', collect); child.stderr.on('data', collect); child.on('error', error => { state.error = error; });
