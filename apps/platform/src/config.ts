@@ -71,7 +71,12 @@ export function loadPlatformConfig(env: NodeJS.ProcessEnv = process.env): Platfo
       !/^[A-Za-z0-9_-]{32,256}$/.test(webhookSecret) || codeKey.length !== 32 || codeKey.toString('base64') !== encodedKey) {
       throw new Error('Invalid Telegram account bot configuration');
     }
-    telegramAuth = { botId, botUsername, webhookSecret, codeKey };
+    const botToken = env.TELEGRAM_AUTH_BOT_TOKEN || undefined;
+    const proxyUrl = env.TELEGRAM_AUTH_PROXY_URL || undefined;
+    if (!!botToken !== !!proxyUrl || (botToken && (!/^\d{4,}:[A-Za-z0-9_-]{20,}$/.test(botToken) || botToken.split(':')[0] !== botId))) {
+      throw new Error('Invalid Telegram account delivery configuration');
+    }
+    telegramAuth = { botId, botUsername, webhookSecret, codeKey, botToken, proxyUrl };
   }
   let telegram: PlatformConfig['telegram'];
   const telegramFlag = env.TELEGRAM_ENABLED;
