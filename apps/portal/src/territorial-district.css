@@ -182,7 +182,7 @@
   .territory-tool > span { display: none; }
   .territory-tool:has(svg) { min-width: 44px; }
   .territory-players { display: flex; overflow-x: auto; scrollbar-width: none; }
-  .territory-players > li { flex: 1 0 calc(220px * var(--table-text-scale)); }
+  .territory-players > li { flex: 1 0 calc(252px * var(--table-text-scale)); }
   .territory-statusbar { grid-template-columns: minmax(0,1fr); gap: 4px; }
   .territory-phase { padding: 5px 9px; gap: 1px; }
   .territory-phase-heading strong { font-size: 12px; }

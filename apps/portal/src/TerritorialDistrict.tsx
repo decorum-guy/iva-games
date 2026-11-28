@@ -226,8 +226,8 @@ function TerritorialPlayers({ view, lang }: { view: TerritoryView; lang: Languag
     {view.players.map(player => <li key={player.participantId} className={player.participantId === view.activeParticipantId && !view.outcome ? "is-active" : ""}>
       <span className="territory-seat" style={{ background: colors[player.seatIndex] }}>{player.seatIndex + 1}</span>
       <span className="territory-person"><strong title={player.displayName}>{player.displayName}</strong>
-        <small title={ru ? `Ресурсы: ${player.handCount} · Путь: ${player.longestRoute} · Карты развития: ${player.cardCount}` : `Resources: ${player.handCount} · Route: ${player.longestRoute} · Development cards: ${player.cardCount}`}>{player.isBot || player.left ? ru ? "Бот · " : "Bot · " : ""}{ru ? "Рес." : "Res."} {player.handCount}
-          {" · "}{ru ? "Путь" : "Route"} {player.longestRoute}{` · ${ru ? "Разв." : "Dev."} ${player.cardCount}`}</small>
+        <small title={ru ? `Ресурсы: ${player.handCount} · Путь: ${player.longestRoute} · Карты развития: ${player.cardCount}` : `Resources: ${player.handCount} · Route: ${player.longestRoute} · Development cards: ${player.cardCount}`}>{player.isBot || player.left ? ru ? "Бот · " : "Bot · " : ""}{ru ? "Ресурсы" : "Resources"} {player.handCount}
+          {" · "}{ru ? "Путь" : "Route"} {player.longestRoute}{` · ${ru ? "Карты" : "Cards"} ${player.cardCount}`}</small>
       </span>
       <b className="territory-points">{player.participantId === view.you.participantId ? view.you.points : player.points}<small>/{view.goal}</small></b>{tradeLabel(player.participantId) && <span className="territory-player-trade">{tradeLabel(player.participantId)}</span>}
     </li>)}

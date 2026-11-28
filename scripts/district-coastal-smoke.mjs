@@ -57,7 +57,7 @@ export async function checkCoastalMap(client, phone, origin) {
     const cards = page.locator('.territory-players > li');
     await expect(cards).toHaveCount(4);
     await expect(page.locator('.territory-match')).toHaveCSS('--table-text-scale', '1.3');
-    await expect(cards.filter({ hasText: /Бот · Рес\./ })).toHaveCount(3);
+    await expect(cards.filter({ hasText: /Бот · Ресурсы/ })).toHaveCount(3);
     for (const viewport of [{ width: 1280, height: 720 }, { width: 390, height: 844 }]) {
       await page.setViewportSize(viewport);
       for (const card of await cards.all()) {
