@@ -126,7 +126,7 @@ describe('Persistent and private table feedback', () => {
     s = act(s, 'a', offer);
     const first = s.offers[0].id;
     expect(viewTerritory(s, 'b', 2_000).offers[0].canAccept).toBe(true);
-    expect(viewTerritory(s, 'c', 2_000).history).toEqual([]);
+    expect(viewTerritory(s, 'c', 2_000).offers).toHaveLength(1);
     s = act(s, 'a', { type: 'bank', give: 'wood', receive: 'grain' });
     expect(viewTerritory(s, 'b', 2_000).offers[0]).toMatchObject({ id: first, canAccept: false, unavailableReason: 'author-resources' });
     expect(s.offerHistory).toEqual([]);
@@ -135,19 +135,20 @@ describe('Persistent and private table feedback', () => {
     expect(s.offerHistory!.at(-1)?.status).toBe('declined');
     s.players.a.hand = stock({ wood: 4 });
     s = act(s, 'a', offer);
-    const second = s.offers[0].id;
+    const second = s.offers.find(offer => offer.targetId === 'b')!.id;
     s = act(s, 'b', { type: 'offer', targetId: 'a', parentId: second, give: stock({ brick: 1 }), receive: stock({ wood: 2 }) });
-    expect(s.offerHistory!.at(-1)).toMatchObject({ id: second, status: 'replaced' });
-    s = act(s, 'a', { type: 'accept', offerId: s.offers[0].id });
-    expect(s.offerHistory!.at(-1)?.status).toBe('accepted');
-    expect(viewTerritory(s, 'a', 2_000).history!.at(-1)).toMatchObject({ kind: 'accept', paid: stock({ wood: 2 }), received: stock({ brick: 1 }) });
+    expect(s.offerHistory!.find(offer => offer.id === second)).toMatchObject({ id: second, status: 'replaced' });
+    const counter = s.offers.find(offer => offer.authorId === 'b' && offer.targetId === 'a')!;
+    s = act(s, 'a', { type: 'accept', offerId: counter.id });
+    s = act(s, 'b', { type: 'accept', offerId: counter.id });
+    expect(s.offerHistory!.find(offer => offer.id === counter.id)?.status).toBe('accepted');
+    expect(viewTerritory(s, 'a', 2_000).history!.some(entry => entry.kind === 'accept' && entry.offerStatus === 'accepted')).toBe(true);
     s = act(s, 'a', offer); s = act(s, 'a', { type: 'cancel', offerId: s.offers[0].id });
     expect(s.offerHistory!.at(-1)?.status).toBe('withdrawn');
     s = act(s, 'a', offer); s = act(s, 'a', { type: 'end' });
     expect(s.offerHistory!.at(-1)).toMatchObject({ status: 'expired', closedTurn: 1, closedRound: 1, closedRevision: s.revision });
     const outsider = viewTerritory(s, 'c', 2_000);
-    expect(outsider.offerHistory).toEqual([]);
-    expect(outsider.history!.every(entry => entry.offerId === undefined)).toBe(true);
+    expect(outsider.offerHistory!.every(offer => offer.targetId === 'c')).toBe(true);
   });
 
   it('loads legacy schema-one history honestly, without inventing an actor or missing past events', () => {
@@ -383,14 +384,17 @@ describe('SQLite replay and paced bots', () => {
       payload: { phaseId: offered.phaseId, type: 'accept', offerId: offered.offers[0].id } };
     const receipt = await f.runtime.applyAction(matchId, 'a', command);
     expect(f.read(matchId).botSchedule).toBeUndefined();
-    expect(receipt.you.hand).toEqual(stock({ wood: 1 }));
+    expect(receipt.you.hand).toEqual(stock({ brick: 1 }));
+    expect(receipt.offers[0].agreedAt).toBeDefined();
     f.reopen(); f.clock.now++;
     const after = await f.runtime.viewForPlayer(matchId, 'a');
     expect(after.revision).toBe(receipt.revision);
     expect(after.botActionAt).toBeGreaterThan(f.clock.now);
     expect(await f.runtime.applyAction(matchId, 'a', command)).toEqual(receipt);
+    f.clock.now = after.botActionAt!;
+    await f.runtime.viewForPlayer(matchId, 'a');
     expect(f.read(matchId).offerHistory!.filter(offer => offer.status === 'accepted')).toHaveLength(1);
-    expect(f.read(matchId).history!.filter(entry => entry.kind === 'accept')).toHaveLength(1);
+    expect(f.read(matchId).history!.filter(entry => entry.kind === 'accept' && entry.offerStatus === 'accepted')).toHaveLength(1);
   });
 
   it('declines an unaffordable bot offer once and preserves the next scheduled action', async () => {
@@ -417,7 +421,7 @@ describe('SQLite replay and paced bots', () => {
     const advanced = await f.runtime.viewForPlayer(matchId, 'a');
     expect(advanced.revision).toBeGreaterThan(s.revision);
     expect(advanced.activeParticipantId).toBe('recipient');
-    expect(f.read(matchId).offerHistory!.at(-1)?.status).toBe('declined');
+    expect(f.read(matchId).offerHistory!.some(offer => offer.targetId === 'recipient' && offer.status === 'declined')).toBe(true);
   });
 
   it('leaves forty seconds for a human counteroffer while preserving the deadline and real expiry', async () => {
@@ -463,6 +467,8 @@ describe('Grouped negotiations and visual production receipts', () => {
     expect(s.offerHistory?.find(o => o.id === parentId)?.status).toBe('replaced');
     const id = s.offers[0].id;
     s = act(s, 'a', { type: 'accept', offerId: id });
+    expect(s.players.a.hand).toEqual(stock({wood:1}));
+    s = act(s, 'b', { type: 'accept', offerId: id });
     expect(s.players.a.hand).toEqual(stock({ brick: 1 }));
     expect(s.players.b.hand).toEqual(stock({ wood: 2, brick: 1 }));
     expect(() => act(s, 'a', { type: 'accept', offerId: id })).toThrow();

@@ -325,14 +325,14 @@ function OfferCard({ offer, view, lang, busy, onAction, onCounter, onResponse, c
     finally { setSending(false); }
   }
   return <article className={`ta-offer${mine ? ' is-outgoing' : ''}`} data-offer-id={offer.id} data-offer-status={agreed ? 'agreed' : 'waiting'}>
-    <header><h4>{word(lang, mine ? 'Вы → ' : 'Вам от ', mine ? 'You → ' : 'To you from ')}{nameOf(view, other)}</h4>
+    <header><h4><span className="ta-player-dot" style={{ background: ['#ca4e37','#2867a8','#79498f','#2c7954'][view.players.find(player => player.participantId === other)?.seatIndex ?? 0] }} aria-hidden="true"/>{word(lang, mine ? 'Вы → ' : 'Вам от ', mine ? 'You → ' : 'To you from ')}{nameOf(view, other)}</h4>
       <span className="ta-offer-status"><i aria-hidden="true">{agreed ? '✓' : '·'}</i>{sending ? word(lang, 'Отправляем ответ…', 'Sending response…') : agreed ? word(lang, mine ? 'Согласен · выберите игрока' : 'Вы согласились · ждём выбора', mine ? 'Agreed · choose player' : 'Agreed · awaiting selection') : word(lang, mine ? 'Отправлено · ждём ответа' : 'Ждёт вашего ответа', mine ? 'Sent · awaiting response' : 'Awaiting your response')}{seconds !== null && <small title={activeBot ? word(lang,'Ориентир окна ответа бота','Estimated bot reply window') : word(lang,'Остаток хода','Turn remaining')}> · {activeBot?'≈':''}{seconds}{word(lang,' с','s')}</small>}</span></header>
     {!compact && <OfferTerms give={give} receive={receive} lang={lang}/>}
     {stockTotal(shortage) > 0 && <p className="ta-short">{word(lang, 'В вашей руке не хватает', 'Your hand is missing')} <ResourceStock stock={shortage} lang={lang}/></p>}
     {offer.unavailableReason === 'author-resources' && !mine && <p className="ta-short">{word(lang, 'У автора уже нет нужных ресурсов. Попросите другие условия.', 'The sender no longer has the required resources. Ask for different terms.')}</p>}
-    <div className="ta-buttons">{canChoose && <button type="button" className="ta-primary" disabled={!actionable || !canAccept} onClick={() => void respond('accept')}>{word(lang,'Обменяться','Trade with')} {nameOf(view,other)}</button>}{!mine && <><button type="button" className="ta-primary" disabled={!actionable || !canAccept || agreed} onClick={() => void respond('accept')}>{word(lang, 'Принять', 'Accept')}</button>
+    <div className="ta-buttons">{canChoose && <button type="button" className="ta-primary" disabled={!actionable || !canAccept} onClick={() => void respond('accept')}>✓ {word(lang,'Обменяться','Trade with')} {nameOf(view,other)}</button>}{!mine && <><button type="button" className="ta-primary" disabled={!actionable || !canAccept || agreed} onClick={() => void respond('accept')}>{word(lang, 'Принять', 'Accept')}</button>
       <button type="button" disabled={busy || sending} onClick={() => onCounter(offer)}>{word(lang, 'Другие условия', 'Counteroffer')}</button></>}
-      <button type="button" disabled={!actionable} onClick={() => void respond(mine ? 'cancel' : 'decline')}>{word(lang, mine ? 'Отозвать' : 'Отклонить', mine ? 'Withdraw' : 'Decline')}</button></div>
+      <button type="button" disabled={!actionable} onClick={() => void respond(mine ? 'cancel' : 'decline')}>✕ {word(lang, mine ? 'Отозвать' : 'Отклонить', mine ? 'Withdraw' : 'Decline')}</button></div>
     {failed && <p className="ta-feedback" role="status">{word(lang, 'Ответ не подтверждён. Проверьте состояние сделки.', 'The response was not confirmed. Check the offer status.')}</p>}
   </article>;
 }
@@ -341,7 +341,7 @@ function PlayerTrade({ view, lang, busy, onAction, handPick }: Props) {
   const own = view.you.participantId;
   const storageKey = tradeDraftKey(view.matchId, own);
   const targets = view.players.filter(player => player.participantId !== own && !player.left);
-  const initialTarget = targets.find(player => own === view.activeParticipantId || player.participantId === view.activeParticipantId)?.participantId ?? '';
+  const initialTarget = '*';
   const [draft, setDraft] = useState<TradeDraft>(() => {
     try { return parseTradeDraft(sessionStorage.getItem(storageKey)) ?? emptyTradeDraft(initialTarget); }
     catch { return emptyTradeDraft(initialTarget); }
@@ -384,16 +384,16 @@ function PlayerTrade({ view, lang, busy, onAction, handPick }: Props) {
     catch { setStorageAvailable(false); }
   }, [storageKey, draft]);
   useEffect(() => {
-    if (discardConfirm) keepDraftButton.current?.focus();
+    if (discardConfirm) keepDraftButton.current?.focus({ preventScroll: true });
   }, [discardConfirm]);
   useEffect(() => {
     if (draft.editing && !bankOpen && focusEditor.current) {
       focusEditor.current = false;
-      editor.current?.querySelector<HTMLElement>('select:not(:disabled), button:not(:disabled):not([aria-disabled="true"])')?.focus();
+      editor.current?.querySelector<HTMLElement>('select:not(:disabled), button:not(:disabled):not([aria-disabled="true"])')?.focus({ preventScroll: true });
     }
     if (!draft.editing && !bankOpen && focusAfterClose.current) {
       focusAfterClose.current = false;
-      (newButton.current?.disabled ? tradeHeading.current : newButton.current)?.focus();
+      (newButton.current?.disabled ? tradeHeading.current : newButton.current)?.focus({ preventScroll: true });
     }
   }, [draft.editing, draft.parentId, bankOpen]);
   useEffect(() => {
@@ -433,8 +433,8 @@ function PlayerTrade({ view, lang, busy, onAction, handPick }: Props) {
     setSending(true); setSendFailed(false);
     awaitingOffer.current = { draft: { ...draft, give: { ...draft.give }, receive: { ...draft.receive } },
       knownIds: new Set([...view.offers, ...(view.offerHistory ?? [])].map(offer => offer.id)) };
-    const targetIds = draft.targetId === '*' ? targets.map(p => p.participantId) : [draft.targetId];
-    const action: TerritoryAction = { type: 'offer', targetId: targetIds[0], ...(targetIds.length > 1 ? { targetIds } : {}), give: { ...draft.give }, receive: { ...draft.receive }, ...(state.parent ? { parentId: state.parent.id } : {}) };
+    const targetIds = targets.map(p => p.participantId);
+    const action: TerritoryAction = { type: 'offer', targetId: state.parent?.authorId ?? targetIds[0], ...(targetIds.length > 1 ? { targetIds } : {}), give: { ...draft.give }, receive: { ...draft.receive }, ...(state.parent ? { parentId: state.parent.id } : {}) };
     try {
       const confirmed = await onAction(action);
       if (confirmed === true) {
@@ -446,18 +446,6 @@ function PlayerTrade({ view, lang, busy, onAction, handPick }: Props) {
     finally { setSending(false); }
   }
   const stack = useRef<HTMLDivElement>(null);
-  const previousPositions = useRef(new Map<string, number>());
-  useLayoutEffect(() => {
-    const next = new Map<string, number>();
-    for (const card of Array.from(stack.current?.querySelectorAll<HTMLElement>('[data-offer-id]') ?? [])) {
-      const id = card.dataset.offerId!, top = card.getBoundingClientRect().top - (stack.current?.getBoundingClientRect().top ?? 0) + (stack.current?.scrollTop ?? 0);
-      const old = previousPositions.current.get(id);
-      if (old !== undefined && old !== top && !stack.current?.closest('.territory-reduce-motion') && !window.matchMedia('(prefers-reduced-motion: reduce)').matches)
-        card.animate([{ transform: 'translateY(' + (old-top) + 'px)' }, { transform: 'translateY(0)' }], { duration: 240, easing: 'ease-out' });
-      next.set(id,top);
-    }
-    previousPositions.current = next;
-  }, [view.offers]);
   const bundles = new Map<string, TerritoryOffer[]>();
   for (const offer of [...view.offers].reverse()) {
     const key = offer.authorId === own && offer.groupId ? offer.groupId : offer.id;
@@ -465,7 +453,12 @@ function PlayerTrade({ view, lang, busy, onAction, handPick }: Props) {
     if (bundle) bundle.push(offer);
     else bundles.set(key, [offer]);
   }
-  const offerCount = view.offers.length;
+  for (const offer of view.offerHistory ?? []) {
+    if (offer.authorId === own && offer.groupId && offer.status === 'declined' && offer.closedTurn === view.turn && !(view.offerHistory ?? []).some(closed => closed.groupId === offer.groupId && closed.status !== 'declined') && !bundles.has(offer.groupId)) {
+      bundles.set(offer.groupId, []);
+    }
+  }
+  const offerCount = view.offers.length + [...bundles.values()].filter(items => !items.length).length;
   return <section className="ta-trades territory-trade-dock" aria-label={word(lang, 'Сделки с игроками', 'Player trades')}>
     <header className="ta-section-heading territory-sr-only"><h4 ref={tradeHeading} tabIndex={-1}>{word(lang, 'Сделки с игроками', 'Player trades')}</h4></header>
     <button type="button" className="ta-offer-toggle" ref={offerToggle} hidden={!offerCount || offersOpen}
@@ -479,15 +472,16 @@ function PlayerTrade({ view, lang, busy, onAction, handPick }: Props) {
         }}>{word(lang, 'Свернуть', 'Collapse')} <span aria-hidden="true">⌄</span></button></header>
     <div className="ta-offer-stack" ref={stack} aria-live="polite">
       {[...bundles].map(([key, items]) => {
-        const terms = items[0];
+        const terms = items[0] ?? (view.offerHistory ?? []).find(offer => offer.groupId === key)!;
         const grouped = terms.authorId === own && !!terms.groupId;
         const render = (offer: TerritoryOffer) => <OfferCard key={offer.id} offer={offer} compact={grouped}
-          view={view} lang={lang} busy={busy || sending} onAction={onAction} onCounter={edit} onResponse={() => tradeHeading.current?.focus()}/>;
+          view={view} lang={lang} busy={busy || sending} onAction={onAction} onCounter={edit} onResponse={() => tradeHeading.current?.focus({ preventScroll: true })}/>;
         if (!grouped) return render(terms);
         return <section key={key} className="ta-offer-group" data-group-id={key}>
           <strong>{word(lang,'Ваше предложение игрокам','Your offer to players')}</strong>
           <OfferTerms give={terms.give} receive={terms.receive} lang={lang}/>
           {items.map(render)}
+          {(view.offerHistory ?? []).filter(offer => offer.groupId === key && offer.status === 'declined').map(offer => <div key={offer.id} className="ta-declined">✕ {nameOf(view, offer.targetId)} · {word(lang, 'Отказ', 'Declined')}</div>)}
         </section>;
       })}
     </div>
@@ -519,21 +513,13 @@ function PlayerTrade({ view, lang, busy, onAction, handPick }: Props) {
       {state.overlaps && <p className="ta-short">{word(lang, 'Каждый ресурс должен быть только на одной стороне.', 'Put each resource on only one side of the trade.')}</p>}
       {stockTotal(state.shortage) > 0 && <p className="ta-short">{word(lang, 'Не хватает', 'Missing')} <ResourceStock stock={state.shortage} lang={lang}/></p>}
       <div className="ta-trade-footer">
-        <label className="ta-select ta-draft-target"><span>{word(lang, 'Кому', 'To')}</span>
-          <select value={draft.targetId} disabled={!!state.parent || sending || busy} aria-label={word(lang, 'Кому', 'Trade with')}
-            onChange={event => update({ targetId: event.target.value })}>
-            {!draft.targetId && <option value="">{word(lang, 'Выберите игрока', 'Choose a player')}</option>}
-            {draft.targetId && draft.targetId !== '*' && !targets.some(player => player.participantId === draft.targetId) && <option value={draft.targetId}>{state.target?.displayName ?? word(lang, 'Игрок недоступен', 'Player unavailable')}</option>}
-            {!draft.parentId && targets.length > 1 && (view.activeParticipantId === own || draft.targetId === '*') && <option value="*">{word(lang, 'Все игроки', 'All players')}</option>}
-            {targets.map(player => <option key={player.participantId} value={player.participantId}>{player.displayName}</option>)}
-          </select>
-        </label>
+        <span className="ta-muted">{word(lang, 'Всем игрокам · выберите согласного', 'All players · choose who to trade with')}</span>
         <button type="button" className="ta-primary" disabled={busy || sending || !state.ready} onClick={() => void send()}>{sending ? word(lang, 'Отправляем…', 'Sending…') : word(lang, 'Отправить', 'Send offer')}</button>
       </div>
       {!storageAvailable && hasContent && <small className="ta-muted" role="status">{word(lang, 'До закрытия страницы', 'Until this page closes')}</small>}
       {discardConfirm && <div className="ta-feedback"><p>{word(lang, 'Удалить сохранённые условия?', 'Discard your saved terms?')}</p><div className="ta-buttons">
         <button type="button" onClick={() => { focusAfterClose.current = true; setDraft(emptyTradeDraft(initialTarget)); setDiscardConfirm(false); }}>{word(lang, 'Удалить', 'Discard')}</button>
-        <button type="button" ref={keepDraftButton} onClick={() => { setDiscardConfirm(false); resetButton.current?.focus(); }}>{word(lang, 'Оставить', 'Keep')}</button></div></div>}
+        <button type="button" ref={keepDraftButton} onClick={() => { setDiscardConfirm(false); resetButton.current?.focus({ preventScroll: true }); }}>{word(lang, 'Оставить', 'Keep')}</button></div></div>}
     </div>}
     {sendFailed && <p className="ta-feedback" role="status">{word(lang,'Отправка не подтверждена. Черновик сохранён.','Sending was not confirmed. Your draft is kept.')}</p>}
     </div>
@@ -589,7 +575,7 @@ function TacticalCards({ view, lang, busy, onAction }: Props) {
         setConfirm(null);
         remember(kind);
         if ((kind === 'survey' || kind === 'patrol') && details.current) details.current.open = false;
-        heading.current?.focus();
+        heading.current?.focus({ preventScroll: true });
       } else remember('unconfirmed');
     } catch { remember('unconfirmed'); }
     finally { setSending(false); }
@@ -609,7 +595,7 @@ function TacticalCards({ view, lang, busy, onAction }: Props) {
       <header className="ta-card-heading"><h4>{word(lang,'Карты развития','Development cards')}</h4>
         <button type="button" className="ta-close" aria-label={word(lang,'Закрыть карты развития','Close development cards')} onClick={() => {
           if (details.current) details.current.open = false;
-          heading.current?.focus();
+          heading.current?.focus({ preventScroll: true });
         }}>×</button></header>
       <p className="ta-muted">{word(lang, 'Одна активная карта за ход; купленную можно сыграть со следующего своего хода.', 'Play one active card per turn; a purchased card becomes playable on your next turn.')}</p>
       {shownCost && view.cardsAvailable > 0 && <div className="ta-buy-card"><Cost lang={lang} cost={shownCost} hand={view.you.hand} pricing={view.legal.buyCardPricing}/>

@@ -51,6 +51,36 @@ async function group(f: Awaited<ReturnType<typeof fixture>>) {
 }
 
 describe('Independent PR26 transactional and provenance audit', () => {
+  it('broadcasts addressed input, keeps a sole consent pending, and cancels the whole group without transfer', async () => {
+    const f = await fixture(); const before = f.read().players;
+    await f.action('a', 'broadcast', { type: 'offer', targetId: 'b', give: stock({ wood: 1 }), receive: stock({ brick: 1 }) });
+    const offers = f.read().offers;
+    expect(offers.map(offer => offer.targetId)).toEqual(['b', 'c']);
+    await f.action('c', 'decline-broadcast', { type: 'decline', offerId: offers[1].id });
+    await f.action('b', 'sole-consent', { type: 'accept', offerId: offers[0].id });
+    expect(f.read().players).toEqual(before);
+    expect(f.read().offers[0].agreedAt).toBeDefined();
+    f.reopen();
+    await f.action('a', 'cancel-broadcast', { type: 'cancel', offerId: offers[0].id });
+    expect(f.read().offers).toEqual([]);
+    expect(f.read().players).toEqual(before);
+    expect(f.read().offerHistory?.map(offer => offer.status)).toEqual(['declined', 'withdrawn']);
+  });
+
+  it('requires author choice even in a two-seat match and reads old addressed offers unchanged', () => {
+    let state = createTerritory({ matchId: 'two', roomId: 'two', map: territoryMaps[0], participants: participants.slice(0, 2), preset: 'medium', seed: 'two', now: 0 });
+    state.phase = 'play'; state.players.a.hand = stock({wood:1}); state.players.b.hand = stock({brick:1});
+    state = applyTerritory(state, 'a', {type:'offer',targetId:'b',give:stock({wood:1}),receive:stock({brick:1})}, 1);
+    const before = structuredClone(state.players), id = state.offers[0].id;
+    const legacy = structuredClone(state); delete legacy.offers[0].groupId;
+    expect(applyTerritory(legacy,'b',{type:'accept',offerId:id},2).players.a.hand).toEqual(stock({brick:1}));
+    state = applyTerritory(state,'b',{type:'accept',offerId:id},2);
+    expect(state.players).toEqual(before);
+    state = applyTerritory(state,'a',{type:'accept',offerId:id},3);
+    expect(state.players.a.hand).toEqual(stock({brick:1}));
+    expect(() => applyTerritory(state,'a',{type:'accept',offerId:id},4)).toThrow();
+  });
+
   it('serializes competing author choices after restart and preserves the exact receipt without another transfer', async () => {
     const f = await fixture(); const before = f.read().players;
     const offers = await group(f);
@@ -85,6 +115,7 @@ describe('Independent PR26 transactional and provenance audit', () => {
     await f.action('c', 'separate-offer', { type: 'offer', targetId: 'a', give: stock({ brick: 1 }), receive: stock({ wood: 1 }) });
     const separate = f.read().offers.find(offer => offer.authorId === 'c')!;
     await f.action('a', 'separate-accept', { type: 'accept', offerId: separate.id });
+    await f.action('c', 'separate-confirm', { type: 'accept', offerId: separate.id });
     const before = f.read();
     expect(before.players.c.hand).toEqual(stock({ wood: 1 }));
     await expect(f.action('a', 'unfunded-selection', { type: 'accept', offerId: offers[1].id })).rejects.toMatchObject({ code: 'INVALID_ACTION' });

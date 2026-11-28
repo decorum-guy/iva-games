@@ -525,8 +525,8 @@ try {
           await page.reload();
           if (await page.getByRole('button', { name: 'Dismiss news', exact: true }).isVisible()) await page.getByRole('button', { name: 'Dismiss news', exact: true }).click();
           await page.getByRole('button', { name: 'Offer a trade', exact: true }).click();
-          const counterpart = view.players.find((p) => p.participantId === other.you.participantId);
-          await page.locator('.ta-trade-editor select').selectOption(counterpart.participantId);
+          const geometry = async p => p.locator('.tb-surface').evaluate(el => { const r=el.getBoundingClientRect(); return {x:r.x,y:r.y,width:r.width,height:r.height,scrollY:window.scrollY}; });
+          const beforeGeometry = await Promise.all(pages.map(geometry));
           const resourceName = (r) => r.charAt(0).toUpperCase() + r.slice(1);
           await page.getByRole('button', { name: 'I give + ' + resourceName(give), exact: true }).click();
           await page.getByRole('button', { name: 'I receive + ' + resourceName(take), exact: true }).click();
@@ -540,6 +540,14 @@ try {
               .filter({ hasText: nameOfHuman(view) })
               .getByRole('button', { name: 'Accept', exact: true }),
           );
+          await expect(page.locator('.ta-offer[data-offer-status=agreed]')).toBeVisible();
+          const consentView = await current(client);
+          assert.deepEqual(consentView.you.hand, view.you.hand, 'Consent cannot transfer the author hand');
+          for (const [i,p] of pages.entries()) assert.deepEqual(await geometry(p), beforeGeometry[i], 'Offer appearance/consent keeps board and page geometry');
+          await clickAction(page, page.locator('.ta-offer').filter({hasText: other.players.find(p=>p.participantId===other.you.participantId).displayName}).getByRole('button', {name: /^✓ Trade with/}));
+          await expect(page.locator('.ta-offer[data-offer-status=agreed]')).toHaveCount(0);
+          for (const [i,p] of pages.entries()) assert.deepEqual(await geometry(p), beforeGeometry[i], 'Offer removal keeps board and page geometry');
+          result.tradeGeometry = beforeGeometry;
           result.trade = true;
         } else await post(client, view, action);
       } else await post(client, view, action);

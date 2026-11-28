@@ -270,17 +270,19 @@ function deal(s: TerritoryState, id: string, action: Extract<TerritoryAction, { 
   const player = s.players[id];
   if (action.type === 'offer') {
     const { targetId, give, receive, parentId } = action;
-    const targets = action.targetIds ?? [targetId];
-    requireAction(targets.length > 0 && targets.length <= 3 && targets[0] === targetId && new Set(targets).size === targets.length && (!parentId || targets.length === 1));
-    requireAction(targets.every(target => Object.hasOwn(s.players, target) && !s.left.includes(target) && target !== id && (id === currentId(s) || target === currentId(s))));
+    const targets = s.participants.map(participant => participant.participantId).filter(target => target !== id && !s.left.includes(target));
+    requireAction(targets.length > 0 && targets.length <= 3 && new Set(targets).size === targets.length);
+    requireAction(targets.every(target => Object.hasOwn(s.players, target) && !s.left.includes(target) && target !== id));
     requireAction(sumStock(give) && sumStock(receive) && covers(player.hand, give) && RESOURCES.every(resource => !(give[resource] && receive[resource])));
+    let parentGroup: string | undefined;
     if (parentId) {
       const parent = s.offers.find(offer => offer.id === parentId);
       requireAction(parent?.targetId === id && parent.authorId === targetId);
+      parentGroup = parent.groupId;
     }
-    closeOffers(s, offer => offer.id === parentId || offer.authorId === id && targets.includes(offer.targetId), 'replaced', id);
+    closeOffers(s, offer => offer.id === parentId || !!parentGroup && offer.groupId === parentGroup || offer.authorId === id && targets.includes(offer.targetId), 'replaced', id);
     if (!parentId) (s.volunteered ??= []).push(id);
-    const groupId = targets.length > 1 ? 'group-' + (s.offerNumber + 1) : undefined;
+    const groupId = 'group-' + (s.offerNumber + 1);
     for (const target of targets) s.offers.push({ id: 'offer-' + ++s.offerNumber, authorId: id, targetId: target, offeredAt: now, give: { ...give }, receive: { ...receive }, ...(parentId ? { parentId } : {}), ...(groupId ? { groupId } : {}) });
     return;
   }
@@ -302,6 +304,7 @@ function deal(s: TerritoryState, id: string, action: Extract<TerritoryAction, { 
     }
   }
   closeOffers(s, item => item.id === offer.id, action.type === 'accept' ? 'accepted' : action.type === 'decline' ? 'declined' : 'withdrawn', id);
+  if (action.type === 'cancel' && offer.groupId) closeOffers(s, item => item.groupId === offer.groupId && item.authorId === id, 'withdrawn', id);
   if (confirming) closeOffers(s, item => item.groupId === offer.groupId && item.authorId === id, 'withdrawn', id);
 }
 

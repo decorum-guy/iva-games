@@ -145,3 +145,9 @@
 .territory-map-first .ta-trade-window .ta-buttons { gap:4px; }
 .territory-map-first .ta-map-required .ta-mandatory h4 { margin:0; }
 .territory-map-first .ta-map-required .ta-mandatory { background:#fff7df; }
+
+/* Offer changes stay in the overlay; hidden docks must not create focus/scroll targets. */
+.territory-trade-dock [hidden] { display:none!important; }
+.territory-trade-dock .ta-offer { animation:none; }
+.ta-player-dot { display:inline-block;width:12px;height:12px;border-radius:50%;margin-right:5px; }
+.ta-declined { padding:7px;color:#8a453c;font-size:12px; }
