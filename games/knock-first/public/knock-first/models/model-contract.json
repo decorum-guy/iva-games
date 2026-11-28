@@ -1,0 +1,1010 @@
+{
+  "battery": {
+    "file": "models/battery.glb",
+    "units": "metres",
+    "up": "+Y",
+    "forward": "-Z",
+    "triangles": 3216,
+    "bytes": 173552,
+    "meshPrimitives": 2,
+    "dimensionsXYZ": [
+      1.3063,
+      0.4385,
+      0.576
+    ],
+    "bodyDimensionsXYZ": [
+      0.95,
+      0.43,
+      0.55
+    ],
+    "collision": {
+      "type": "box",
+      "size": [
+        0.95,
+        0.43,
+        0.55
+      ],
+      "center": [
+        0,
+        0.215,
+        0
+      ]
+    },
+    "animations": [],
+    "skinCount": 0,
+    "anchors": [
+      "Handle_L",
+      "Handle_R",
+      "BodyCenter",
+      "InstallPoint"
+    ],
+    "notes": "Body exact size excludes two real end handles. Handle anchors ±0.62m; grip crossbar local Z."
+  },
+  "socket": {
+    "file": "models/socket.glb",
+    "units": "metres",
+    "up": "+Y",
+    "forward": "-Z",
+    "triangles": 1164,
+    "bytes": 70232,
+    "meshPrimitives": 2,
+    "dimensionsXYZ": [
+      1.42,
+      0.441,
+      0.9
+    ],
+    "bodyDimensionsXYZ": null,
+    "collision": {
+      "type": "box",
+      "size": [
+        1.42,
+        0.14,
+        0.9
+      ],
+      "center": [
+        0,
+        0.07,
+        0
+      ]
+    },
+    "animations": [],
+    "skinCount": 0,
+    "anchors": [
+      "BatterySeat",
+      "Interaction"
+    ],
+    "notes": ""
+  },
+  "resonator": {
+    "file": "models/resonator.glb",
+    "units": "metres",
+    "up": "+Y",
+    "forward": "-Z",
+    "triangles": 7132,
+    "bytes": 246268,
+    "meshPrimitives": 2,
+    "dimensionsXYZ": [
+      0.32,
+      2.65,
+      0.55
+    ],
+    "bodyDimensionsXYZ": null,
+    "collision": {
+      "type": "capsule",
+      "radius": 0.16,
+      "height": 2.65
+    },
+    "animations": [],
+    "skinCount": 0,
+    "anchors": [
+      "KnockPoint"
+    ],
+    "notes": ""
+  },
+  "striker": {
+    "file": "models/striker.glb",
+    "units": "metres",
+    "up": "+Y",
+    "forward": "-Z",
+    "triangles": 2488,
+    "bytes": 62912,
+    "meshPrimitives": 1,
+    "dimensionsXYZ": [
+      0.09,
+      0.3075,
+      0.08
+    ],
+    "bodyDimensionsXYZ": null,
+    "collision": null,
+    "animations": [],
+    "skinCount": 0,
+    "anchors": [
+      "Grip",
+      "StrikeTip"
+    ],
+    "notes": ""
+  },
+  "timer": {
+    "file": "models/timer.glb",
+    "units": "metres",
+    "up": "+Y",
+    "forward": "-Z",
+    "triangles": 1304,
+    "bytes": 59276,
+    "meshPrimitives": 1,
+    "dimensionsXYZ": [
+      0.255,
+      0.24174,
+      0.22
+    ],
+    "bodyDimensionsXYZ": null,
+    "collision": {
+      "type": "sphere",
+      "radius": 0.13,
+      "center": [
+        0,
+        0.13,
+        0
+      ]
+    },
+    "animations": [],
+    "skinCount": 0,
+    "anchors": [
+      "Floor",
+      "SoundSource"
+    ],
+    "notes": ""
+  },
+  "beacon": {
+    "file": "models/beacon.glb",
+    "units": "metres",
+    "up": "+Y",
+    "forward": "-Z",
+    "triangles": 860,
+    "bytes": 46448,
+    "meshPrimitives": 2,
+    "dimensionsXYZ": [
+      0.24,
+      0.3125,
+      0.17
+    ],
+    "bodyDimensionsXYZ": null,
+    "collision": null,
+    "animations": [],
+    "skinCount": 0,
+    "anchors": [
+      "RescuePoint"
+    ],
+    "notes": ""
+  },
+  "cabinet": {
+    "file": "models/cabinet.glb",
+    "units": "metres",
+    "up": "+Y",
+    "forward": "-Z",
+    "triangles": 1004,
+    "bytes": 68348,
+    "meshPrimitives": 2,
+    "dimensionsXYZ": [
+      0.78,
+      1.3,
+      0.405
+    ],
+    "bodyDimensionsXYZ": null,
+    "collision": {
+      "type": "box",
+      "size": [
+        0.78,
+        1.3,
+        0.37
+      ],
+      "center": [
+        0,
+        0.65,
+        0
+      ]
+    },
+    "animations": [],
+    "skinCount": 0,
+    "anchors": [
+      "Timer_1",
+      "Timer_2"
+    ],
+    "notes": ""
+  },
+  "lift": {
+    "file": "models/lift.glb",
+    "units": "metres",
+    "up": "+Y",
+    "forward": "-Z",
+    "triangles": 5276,
+    "bytes": 330676,
+    "meshPrimitives": 2,
+    "dimensionsXYZ": [
+      9.94,
+      3.42,
+      9.955
+    ],
+    "bodyDimensionsXYZ": [
+      10,
+      3.3,
+      10
+    ],
+    "collision": null,
+    "animations": [],
+    "skinCount": 0,
+    "anchors": [
+      "Socket_L",
+      "Socket_R",
+      "Cabinet",
+      "Display",
+      "SafeThreshold"
+    ],
+    "notes": "Detail shell only; no additional collision. Side access is open for the Pump route. Sockets/cabinet are separate models."
+  },
+  "operative": {
+    "file": "models/operative.glb",
+    "units": "metres",
+    "up": "+Y",
+    "forward": "-Z",
+    "triangles": 15032,
+    "bytes": 1151128,
+    "meshPrimitives": 2,
+    "dimensionsXYZ": [
+      0.75,
+      1.713,
+      0.442
+    ],
+    "bodyDimensionsXYZ": [
+      0.56,
+      1.72,
+      0.42
+    ],
+    "collision": {
+      "type": "capsule",
+      "radius": 0.28,
+      "height": 1.72
+    },
+    "animations": [
+      "idle",
+      "walk",
+      "run",
+      "crouch",
+      "carry",
+      "revive",
+      "down",
+      "support"
+    ],
+    "skinCount": 1,
+    "anchors": [
+      "Hand_L",
+      "Hand_R",
+      "HeadLamp"
+    ],
+    "notes": "Oilskin archive crew with glove fingers, goggles, lamp, harness, knee pads and medical pouch. Color patch uses atlas cyan."
+  },
+  "arms": {
+    "file": "models/arms.glb",
+    "units": "metres",
+    "up": "+Y",
+    "forward": "-Z",
+    "triangles": 9376,
+    "bytes": 652116,
+    "meshPrimitives": 1,
+    "dimensionsXYZ": [
+      0.92,
+      0.27155,
+      0.82255
+    ],
+    "bodyDimensionsXYZ": null,
+    "collision": null,
+    "animations": [
+      "idle",
+      "walk",
+      "run",
+      "crouch",
+      "carry",
+      "knock",
+      "revive",
+      "down"
+    ],
+    "skinCount": 1,
+    "anchors": [
+      "Hand_L",
+      "Hand_R"
+    ],
+    "notes": "Camera-local origin, forward -Z. Rig shoulder/elbow/wrist chains support per-frame IK to the server-defined handle anchor; use idle/carry animation for fingers and override arm chain only."
+  },
+  "listener": {
+    "file": "models/listener.glb",
+    "units": "metres",
+    "up": "+Y",
+    "forward": "-Z",
+    "triangles": 9448,
+    "bytes": 702352,
+    "meshPrimitives": 1,
+    "dimensionsXYZ": [
+      0.99471,
+      2.469,
+      0.75938
+    ],
+    "bodyDimensionsXYZ": [
+      1.12,
+      2.4,
+      0.68
+    ],
+    "collision": {
+      "type": "capsule",
+      "radius": 0.35,
+      "height": 2.38
+    },
+    "animations": [
+      "idle",
+      "walk",
+      "run",
+      "listen",
+      "turn",
+      "lunge",
+      "push"
+    ],
+    "skinCount": 1,
+    "anchors": [
+      "HearingOrigin",
+      "ContactOrigin"
+    ],
+    "notes": "Original asymmetric folio mantle, offset hearing bell, barred face cavity, long bound arms. No third-party mesh, animation or character reference is included."
+  },
+  "shelf": {
+    "file": "models/shelf.glb",
+    "units": "metres",
+    "up": "+Y",
+    "forward": "-Z",
+    "triangles": 8756,
+    "bytes": 600048,
+    "meshPrimitives": 1,
+    "dimensionsXYZ": [
+      2.0,
+      2.35,
+      0.659
+    ],
+    "bodyDimensionsXYZ": [
+      2,
+      2.35,
+      0.65
+    ],
+    "collision": {
+      "type": "box",
+      "size": [
+        2,
+        2.35,
+        0.65
+      ],
+      "center": [
+        0,
+        1.175,
+        0
+      ]
+    },
+    "animations": [],
+    "skinCount": 0,
+    "anchors": [],
+    "notes": ""
+  },
+  "pump": {
+    "file": "models/pump.glb",
+    "units": "metres",
+    "up": "+Y",
+    "forward": "-Z",
+    "triangles": 4108,
+    "bytes": 162040,
+    "meshPrimitives": 1,
+    "dimensionsXYZ": [
+      1.85,
+      1.77,
+      0.62
+    ],
+    "bodyDimensionsXYZ": [
+      1.85,
+      1.78,
+      0.62
+    ],
+    "collision": {
+      "type": "box",
+      "size": [
+        1.85,
+        1.78,
+        0.62
+      ],
+      "center": [
+        0,
+        0.89,
+        0
+      ]
+    },
+    "animations": [],
+    "skinCount": 0,
+    "anchors": [],
+    "notes": ""
+  },
+  "pipe": {
+    "file": "models/pipe.glb",
+    "units": "metres",
+    "up": "+Y",
+    "forward": "-Z",
+    "triangles": 1136,
+    "bytes": 55092,
+    "meshPrimitives": 1,
+    "dimensionsXYZ": [
+      0.565,
+      2.8,
+      0.43
+    ],
+    "bodyDimensionsXYZ": null,
+    "collision": null,
+    "animations": [],
+    "skinCount": 0,
+    "anchors": [],
+    "notes": ""
+  },
+  "valve": {
+    "file": "models/valve.glb",
+    "units": "metres",
+    "up": "+Y",
+    "forward": "-Z",
+    "triangles": 1648,
+    "bytes": 59720,
+    "meshPrimitives": 1,
+    "dimensionsXYZ": [
+      0.6,
+      0.452,
+      0.424
+    ],
+    "bodyDimensionsXYZ": null,
+    "collision": null,
+    "animations": [],
+    "skinCount": 0,
+    "anchors": [],
+    "notes": ""
+  },
+  "pallet": {
+    "file": "models/pallet.glb",
+    "units": "metres",
+    "up": "+Y",
+    "forward": "-Z",
+    "triangles": 1080,
+    "bytes": 77280,
+    "meshPrimitives": 1,
+    "dimensionsXYZ": [
+      1.38,
+      0.2025,
+      0.82
+    ],
+    "bodyDimensionsXYZ": null,
+    "collision": {
+      "type": "box",
+      "size": [
+        1.38,
+        0.202,
+        0.82
+      ],
+      "center": [
+        0,
+        0.101,
+        0
+      ]
+    },
+    "animations": [],
+    "skinCount": 0,
+    "anchors": [],
+    "notes": ""
+  },
+  "vent": {
+    "file": "models/vent.glb",
+    "units": "metres",
+    "up": "+Y",
+    "forward": "-Z",
+    "triangles": 1960,
+    "bytes": 105344,
+    "meshPrimitives": 1,
+    "dimensionsXYZ": [
+      1.15,
+      1.2,
+      0.21243
+    ],
+    "bodyDimensionsXYZ": null,
+    "collision": null,
+    "animations": [],
+    "skinCount": 0,
+    "anchors": [],
+    "notes": ""
+  },
+  "cable": {
+    "file": "models/cable.glb",
+    "units": "metres",
+    "up": "+Y",
+    "forward": "-Z",
+    "triangles": 828,
+    "bytes": 30452,
+    "meshPrimitives": 1,
+    "dimensionsXYZ": [
+      2.65,
+      0.29762,
+      0.17
+    ],
+    "bodyDimensionsXYZ": null,
+    "collision": null,
+    "animations": [],
+    "skinCount": 0,
+    "anchors": [],
+    "notes": ""
+  },
+  "lamp": {
+    "file": "models/lamp.glb",
+    "units": "metres",
+    "up": "+Y",
+    "forward": "-Z",
+    "triangles": 1808,
+    "bytes": 51684,
+    "meshPrimitives": 2,
+    "dimensionsXYZ": [
+      0.216,
+      0.5,
+      0.358
+    ],
+    "bodyDimensionsXYZ": null,
+    "collision": null,
+    "animations": [],
+    "skinCount": 0,
+    "anchors": [
+      "LightOrigin"
+    ],
+    "notes": ""
+  },
+  "archive-box": {
+    "file": "models/archive-box.glb",
+    "units": "metres",
+    "up": "+Y",
+    "forward": "-Z",
+    "triangles": 492,
+    "bytes": 35468,
+    "meshPrimitives": 1,
+    "dimensionsXYZ": [
+      0.67,
+      0.4625,
+      0.5055
+    ],
+    "bodyDimensionsXYZ": null,
+    "collision": {
+      "type": "box",
+      "size": [
+        0.67,
+        0.463,
+        0.5
+      ],
+      "center": [
+        0,
+        0.2315,
+        0
+      ]
+    },
+    "animations": [],
+    "skinCount": 0,
+    "anchors": [],
+    "notes": ""
+  },
+  "fan": {
+    "file": "models/fan.glb",
+    "units": "metres",
+    "up": "+Y",
+    "forward": "-Z",
+    "triangles": 3488,
+    "bytes": 135224,
+    "meshPrimitives": 1,
+    "dimensionsXYZ": [
+      1.25,
+      1.4,
+      0.538
+    ],
+    "bodyDimensionsXYZ": null,
+    "collision": null,
+    "animations": [],
+    "skinCount": 0,
+    "anchors": [],
+    "notes": ""
+  },
+  "ladder": {
+    "file": "models/ladder.glb",
+    "units": "metres",
+    "up": "+Y",
+    "forward": "-Z",
+    "triangles": 2100,
+    "bytes": 84368,
+    "meshPrimitives": 1,
+    "dimensionsXYZ": [
+      0.71,
+      2.8,
+      0.235
+    ],
+    "bodyDimensionsXYZ": null,
+    "collision": null,
+    "animations": [],
+    "skinCount": 0,
+    "anchors": [],
+    "notes": "Non-traversable set dressing; gameplay height changes use the permitted ramps."
+  },
+  "sign": {
+    "file": "models/sign.glb",
+    "units": "metres",
+    "up": "+Y",
+    "forward": "-Z",
+    "triangles": 764,
+    "bytes": 38480,
+    "meshPrimitives": 1,
+    "dimensionsXYZ": [
+      0.78,
+      0.32,
+      0.0535
+    ],
+    "bodyDimensionsXYZ": null,
+    "collision": null,
+    "animations": [],
+    "skinCount": 0,
+    "anchors": [
+      "LocalizedLabel"
+    ],
+    "notes": "Blank sign panel. Runtime labels are RU/EN canvas textures, never baked untranslated text."
+  },
+  "control-panel": {
+    "file": "models/control-panel.glb",
+    "units": "metres",
+    "up": "+Y",
+    "forward": "-Z",
+    "triangles": 3056,
+    "bytes": 126268,
+    "meshPrimitives": 1,
+    "dimensionsXYZ": [
+      0.85,
+      1.2,
+      0.3474
+    ],
+    "bodyDimensionsXYZ": null,
+    "collision": null,
+    "animations": [],
+    "skinCount": 0,
+    "anchors": [],
+    "notes": ""
+  },
+  "extinguisher": {
+    "file": "models/extinguisher.glb",
+    "units": "metres",
+    "up": "+Y",
+    "forward": "-Z",
+    "triangles": 876,
+    "bytes": 39060,
+    "meshPrimitives": 1,
+    "dimensionsXYZ": [
+      0.32649,
+      0.7175,
+      0.247
+    ],
+    "bodyDimensionsXYZ": null,
+    "collision": null,
+    "animations": [],
+    "skinCount": 0,
+    "anchors": [],
+    "notes": ""
+  },
+  "door-frame": {
+    "file": "models/door-frame.glb",
+    "units": "metres",
+    "up": "+Y",
+    "forward": "-Z",
+    "triangles": 648,
+    "bytes": 47112,
+    "meshPrimitives": 1,
+    "dimensionsXYZ": [
+      3.48,
+      3.3,
+      0.4025
+    ],
+    "bodyDimensionsXYZ": [
+      3.48,
+      3.3,
+      0.4
+    ],
+    "collision": null,
+    "animations": [],
+    "skinCount": 0,
+    "anchors": [
+      "Opening",
+      "DoorHinge"
+    ],
+    "notes": ""
+  },
+  "door": {
+    "file": "models/door.glb",
+    "units": "metres",
+    "up": "+Y",
+    "forward": "-Z",
+    "triangles": 1624,
+    "bytes": 91152,
+    "meshPrimitives": 1,
+    "dimensionsXYZ": [
+      3.0,
+      2.9,
+      0.21992
+    ],
+    "bodyDimensionsXYZ": [
+      3,
+      2.9,
+      0.1
+    ],
+    "collision": {
+      "type": "box",
+      "size": [
+        3,
+        2.9,
+        0.1
+      ],
+      "center": [
+        0,
+        1.45,
+        0
+      ]
+    },
+    "animations": [],
+    "skinCount": 0,
+    "anchors": [
+      "Handle"
+    ],
+    "notes": ""
+  },
+  "wall-archive": {
+    "file": "models/wall-archive.glb",
+    "units": "metres",
+    "up": "+Y",
+    "forward": "-Z",
+    "triangles": 756,
+    "bytes": 54576,
+    "meshPrimitives": 1,
+    "dimensionsXYZ": [
+      3.0,
+      3.3,
+      0.2725
+    ],
+    "bodyDimensionsXYZ": [
+      3,
+      3.3,
+      0.22
+    ],
+    "collision": {
+      "type": "box",
+      "size": [
+        3,
+        3.3,
+        0.22
+      ],
+      "center": [
+        0,
+        1.65,
+        0
+      ]
+    },
+    "animations": [],
+    "skinCount": 0,
+    "anchors": [],
+    "notes": ""
+  },
+  "wall-pump": {
+    "file": "models/wall-pump.glb",
+    "units": "metres",
+    "up": "+Y",
+    "forward": "-Z",
+    "triangles": 1528,
+    "bytes": 75076,
+    "meshPrimitives": 1,
+    "dimensionsXYZ": [
+      3.0,
+      3.3,
+      0.2725
+    ],
+    "bodyDimensionsXYZ": [
+      3,
+      3.3,
+      0.22
+    ],
+    "collision": {
+      "type": "box",
+      "size": [
+        3,
+        3.3,
+        0.22
+      ],
+      "center": [
+        0,
+        1.65,
+        0
+      ]
+    },
+    "animations": [],
+    "skinCount": 0,
+    "anchors": [],
+    "notes": ""
+  },
+  "wall-relay": {
+    "file": "models/wall-relay.glb",
+    "units": "metres",
+    "up": "+Y",
+    "forward": "-Z",
+    "triangles": 864,
+    "bytes": 62132,
+    "meshPrimitives": 1,
+    "dimensionsXYZ": [
+      3.0,
+      3.3,
+      0.3075
+    ],
+    "bodyDimensionsXYZ": [
+      3,
+      3.3,
+      0.22
+    ],
+    "collision": {
+      "type": "box",
+      "size": [
+        3,
+        3.3,
+        0.22
+      ],
+      "center": [
+        0,
+        1.65,
+        0
+      ]
+    },
+    "animations": [],
+    "skinCount": 0,
+    "anchors": [],
+    "notes": ""
+  },
+  "floor": {
+    "file": "models/floor.glb",
+    "units": "metres",
+    "up": "+Y",
+    "forward": "-Z",
+    "triangles": 468,
+    "bytes": 34396,
+    "meshPrimitives": 1,
+    "dimensionsXYZ": [
+      3.0,
+      0.1375,
+      3.0
+    ],
+    "bodyDimensionsXYZ": [
+      3,
+      0.12,
+      3
+    ],
+    "collision": {
+      "type": "box",
+      "size": [
+        3,
+        0.12,
+        3
+      ],
+      "center": [
+        0,
+        -0.06,
+        0
+      ]
+    },
+    "animations": [],
+    "skinCount": 0,
+    "anchors": [],
+    "notes": ""
+  },
+  "ceiling": {
+    "file": "models/ceiling.glb",
+    "units": "metres",
+    "up": "+Y",
+    "forward": "-Z",
+    "triangles": 432,
+    "bytes": 31876,
+    "meshPrimitives": 1,
+    "dimensionsXYZ": [
+      3.0,
+      0.265,
+      3.0
+    ],
+    "bodyDimensionsXYZ": [
+      3,
+      0.28,
+      3
+    ],
+    "collision": null,
+    "animations": [],
+    "skinCount": 0,
+    "anchors": [],
+    "notes": ""
+  },
+  "corner": {
+    "file": "models/corner.glb",
+    "units": "metres",
+    "up": "+Y",
+    "forward": "-Z",
+    "triangles": 324,
+    "bytes": 24356,
+    "meshPrimitives": 1,
+    "dimensionsXYZ": [
+      0.52,
+      3.3,
+      0.525
+    ],
+    "bodyDimensionsXYZ": [
+      0.52,
+      3.3,
+      0.52
+    ],
+    "collision": null,
+    "animations": [],
+    "skinCount": 0,
+    "anchors": [],
+    "notes": ""
+  },
+  "ramp": {
+    "file": "models/ramp.glb",
+    "units": "metres",
+    "up": "+Y",
+    "forward": "-Z",
+    "triangles": 3916,
+    "bytes": 215840,
+    "meshPrimitives": 1,
+    "dimensionsXYZ": [
+      3.0,
+      3.75059,
+      8.554
+    ],
+    "bodyDimensionsXYZ": [
+      3,
+      3.63,
+      8.5
+    ],
+    "collision": {
+      "type": "ramp",
+      "length": 8.5,
+      "rise": 2.6,
+      "width": 3
+    },
+    "animations": [],
+    "skinCount": 0,
+    "anchors": [
+      "Lower",
+      "Upper"
+    ],
+    "notes": "17.0 degree slope, no step >0.24m; scalable only through authoritative ramp transforms."
+  },
+  "railing": {
+    "file": "models/railing.glb",
+    "units": "metres",
+    "up": "+Y",
+    "forward": "-Z",
+    "triangles": 764,
+    "bytes": 30904,
+    "meshPrimitives": 1,
+    "dimensionsXYZ": [
+      3.054,
+      1.033,
+      0.066
+    ],
+    "bodyDimensionsXYZ": [
+      3.07,
+      1.033,
+      0.066
+    ],
+    "collision": null,
+    "animations": [],
+    "skinCount": 0,
+    "anchors": [],
+    "notes": ""
+  }
+}

@@ -108,6 +108,21 @@
       "roomStatus": "planned"
     },
     {
+      "gameId": "knock-first",
+      "collectionId": "other",
+      "title": {
+        "ru": "Сначала постучи",
+        "en": "Knock First"
+      },
+      "description": {
+        "ru": "Стук проявляет путь и привлекает Слушателя. Найдите две батареи и вернитесь в лифт вместе.",
+        "en": "A knock reveals the way and draws the Listener. Find two batteries and return to the lift together."
+      },
+      "minPlayers": 2,
+      "maxPlayers": 5,
+      "roomStatus": "runtime"
+    },
+    {
       "gameId": "harbor",
       "collectionId": "other",
       "title": {

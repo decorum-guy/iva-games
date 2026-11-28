@@ -36,7 +36,8 @@ SPEC = {
                   'packages/session-kit', 'packages/telegram-transport', 'vite.platform.config.ts', 'tsconfig.platform.json'],
         'compatibility': ['apps/platform/src/database.ts', 'apps/platform/src/telegram/schema.ts',
                           'packages/session-kit/src', 'games/district/src/types.ts',
-                          'games/district/src/core.ts', 'games/district/src/runtime.ts'],
+                          'games/district/src/core.ts', 'games/district/src/runtime.ts',
+                          'games/knock-first/src/core', 'games/knock-first/src/runtime.ts'],
     },
 }
 COMMON = ['.dockerignore', '.npmrc', 'tsconfig.base.json', 'packages/game-registry', 'scripts/check-game-registry.mjs',

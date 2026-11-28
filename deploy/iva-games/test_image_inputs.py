@@ -89,6 +89,29 @@ class ImageInputsTest(unittest.TestCase):
         self.write('games/district/maps/new-map.json', {'shape': 'two-islands'})
         self.assert_platform_only()
 
+    def test_reachable_knock_assets_refresh_platform_and_rules_change_compatibility(self):
+        name, path = '@iva-games/knock-first', 'games/knock-first'
+        package = {'name': name, 'dependencies': {'@iva-games/session-kit': '1.0.0'}}
+        for app in ('apps/platform', 'apps/portal'):
+            self.workspaces[app]['dependencies'][name] = '1.0.0'
+            self.lock['packages'][app] = copy.deepcopy(self.workspaces[app])
+            self.write(app + '/package.json', self.workspaces[app])
+        self.lock['packages'][path] = package
+        self.lock['packages']['node_modules/' + name] = {'link': True, 'resolved': path}
+        self.write(path + '/package.json', package)
+        self.write(path + '/src/core/version.ts', 'export const version = 1;')
+        self.write(path + '/public/knock-first/models/battery.glb', 'first mesh fixture')
+        self.save_manifests()
+        self.stage()
+        self.before = self.hashes()
+        compatibility = self.run_command(sys.executable, '-B', str(SCRIPT), 'platform').split()[1]
+        self.write(path + '/public/knock-first/models/battery.glb', 'corrected mesh fixture')
+        self.assert_platform_only()
+        self.assertEqual(self.run_command(sys.executable, '-B', str(SCRIPT), 'platform').split()[1], compatibility)
+        self.write(path + '/src/core/version.ts', 'export const version = 2;')
+        self.stage()
+        self.assertNotEqual(self.run_command(sys.executable, '-B', str(SCRIPT), 'platform').split()[1], compatibility)
+
     def test_district_manifest_and_private_dependency_do_not_invalidate_chess(self):
         self.workspaces['games/district']['dependencies']['map-layout'] = '1.0.0'
         self.lock['packages']['games/district'] = copy.deepcopy(self.workspaces['games/district'])

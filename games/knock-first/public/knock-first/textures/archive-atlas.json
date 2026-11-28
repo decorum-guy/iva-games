@@ -1,0 +1,184 @@
+{
+  "version": 1,
+  "size": 512,
+  "tileSize": 128,
+  "uvPaddingPixels": 4,
+  "swatches": [
+    {
+      "id": "concrete",
+      "index": 0,
+      "baseColorSrgb": [
+        64,
+        82,
+        88
+      ],
+      "roughness": 0.91,
+      "metallic": 0.0
+    },
+    {
+      "id": "painted-steel",
+      "index": 1,
+      "baseColorSrgb": [
+        44,
+        73,
+        76
+      ],
+      "roughness": 0.68,
+      "metallic": 0.48
+    },
+    {
+      "id": "rust",
+      "index": 2,
+      "baseColorSrgb": [
+        117,
+        78,
+        51
+      ],
+      "roughness": 0.86,
+      "metallic": 0.18
+    },
+    {
+      "id": "paper",
+      "index": 3,
+      "baseColorSrgb": [
+        184,
+        170,
+        140
+      ],
+      "roughness": 0.96,
+      "metallic": 0.0
+    },
+    {
+      "id": "oilskin",
+      "index": 4,
+      "baseColorSrgb": [
+        139,
+        128,
+        92
+      ],
+      "roughness": 0.85,
+      "metallic": 0.0
+    },
+    {
+      "id": "rubber",
+      "index": 5,
+      "baseColorSrgb": [
+        33,
+        38,
+        37
+      ],
+      "roughness": 0.92,
+      "metallic": 0.0
+    },
+    {
+      "id": "brass",
+      "index": 6,
+      "baseColorSrgb": [
+        148,
+        126,
+        79
+      ],
+      "roughness": 0.48,
+      "metallic": 0.75
+    },
+    {
+      "id": "bare-steel",
+      "index": 7,
+      "baseColorSrgb": [
+        116,
+        134,
+        137
+      ],
+      "roughness": 0.52,
+      "metallic": 0.84
+    },
+    {
+      "id": "leather",
+      "index": 8,
+      "baseColorSrgb": [
+        75,
+        61,
+        47
+      ],
+      "roughness": 0.82,
+      "metallic": 0.0
+    },
+    {
+      "id": "archive-blue",
+      "index": 9,
+      "baseColorSrgb": [
+        52,
+        70,
+        88
+      ],
+      "roughness": 0.76,
+      "metallic": 0.12
+    },
+    {
+      "id": "insulation",
+      "index": 10,
+      "baseColorSrgb": [
+        77,
+        89,
+        71
+      ],
+      "roughness": 0.95,
+      "metallic": 0.0
+    },
+    {
+      "id": "ivory-enamel",
+      "index": 11,
+      "baseColorSrgb": [
+        206,
+        197,
+        175
+      ],
+      "roughness": 0.56,
+      "metallic": 0.35
+    },
+    {
+      "id": "warning-amber",
+      "index": 12,
+      "baseColorSrgb": [
+        199,
+        135,
+        67
+      ],
+      "roughness": 0.63,
+      "metallic": 0.3
+    },
+    {
+      "id": "dark-steel",
+      "index": 13,
+      "baseColorSrgb": [
+        28,
+        43,
+        48
+      ],
+      "roughness": 0.67,
+      "metallic": 0.59
+    },
+    {
+      "id": "cyan-paint",
+      "index": 14,
+      "baseColorSrgb": [
+        120,
+        172,
+        180
+      ],
+      "roughness": 0.65,
+      "metallic": 0.3
+    },
+    {
+      "id": "skin",
+      "index": 15,
+      "baseColorSrgb": [
+        154,
+        126,
+        102
+      ],
+      "roughness": 0.86,
+      "metallic": 0.0
+    }
+  ]
+}

@@ -1,0 +1,54 @@
+[
+  {
+    "file": "ibm-plex-mono-regular.woff2",
+    "sourceFile": "assets-src/fonts/IBMPlexMono-Regular.ttf",
+    "sourceUrl": "https://raw.githubusercontent.com/google/fonts/main/ofl/ibmplexmono/IBMPlexMono-Regular.ttf",
+    "family": "IBM Plex Mono",
+    "weight": "400",
+    "version": "Version 2.3",
+    "license": "OFL-1.1",
+    "licenseFile": "ibmplexmono-OFL.txt",
+    "modification": "Lossless WOFF2 container conversion. All glyphs retained. No outlines or names edited.",
+    "glyphCoverageChecked": "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯабвгдеёжзийклмнопрстуфхцчшщъыьэюя№",
+    "sha256": "eef6724b03dd43e2f7e5df442e20e3e99830af146fc6212f03a902e777cca968"
+  },
+  {
+    "file": "ibm-plex-mono-medium.woff2",
+    "sourceFile": "assets-src/fonts/IBMPlexMono-Medium.ttf",
+    "sourceUrl": "https://raw.githubusercontent.com/google/fonts/main/ofl/ibmplexmono/IBMPlexMono-Medium.ttf",
+    "family": "IBM Plex Mono",
+    "weight": "500",
+    "version": "Version 2.3",
+    "license": "OFL-1.1",
+    "licenseFile": "ibmplexmono-OFL.txt",
+    "modification": "Lossless WOFF2 container conversion. All glyphs retained. No outlines or names edited.",
+    "glyphCoverageChecked": "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯабвгдеёжзийклмнопрстуфхцчшщъыьэюя№",
+    "sha256": "df42866f7e593f5999a489ba3311480b1406a0b3f88958fd04f08d796823e30a"
+  },
+  {
+    "file": "pt-sans-regular.woff2",
+    "sourceFile": "assets-src/fonts/PT_Sans-Web-Regular.ttf",
+    "sourceUrl": "https://raw.githubusercontent.com/google/fonts/main/ofl/ptsans/PT_Sans-Web-Regular.ttf",
+    "family": "PT Sans",
+    "weight": "400",
+    "version": "Version 2.003W OFL",
+    "license": "OFL-1.1",
+    "licenseFile": "ptsans-OFL.txt",
+    "modification": "Lossless WOFF2 container conversion. All glyphs retained. No outlines or names edited.",
+    "glyphCoverageChecked": "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯабвгдеёжзийклмнопрстуфхцчшщъыьэюя№",
+    "sha256": "b729f34000457864e5fa2719239e21f70c56e9d41f68f7881ade70a4cbbb9139"
+  },
+  {
+    "file": "pt-sans-bold.woff2",
+    "sourceFile": "assets-src/fonts/PT_Sans-Web-Bold.ttf",
+    "sourceUrl": "https://raw.githubusercontent.com/google/fonts/main/ofl/ptsans/PT_Sans-Web-Bold.ttf",
+    "family": "PT Sans",
+    "weight": "700",
+    "version": "Version 2.003W OFL",
+    "license": "OFL-1.1",
+    "licenseFile": "ptsans-OFL.txt",
+    "modification": "Lossless WOFF2 container conversion. All glyphs retained. No outlines or names edited.",
+    "glyphCoverageChecked": "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯабвгдеёжзийклмнопрстуфхцчшщъыьэюя№",
+    "sha256": "761459208f1425d0ec060b609f7c9459e9215b1dd1cd4f595f0e851503edec56"
+  }
+]

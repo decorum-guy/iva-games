@@ -1,0 +1,22 @@
+{
+  "method": "SHA-256 of the completed local build; no browser rendering or production delivery implied",
+  "mainBase": "1f571a7fa24a5c682a236d5fa0ef5a499f09c24d",
+  "sharedRealtime": "6a9337df076c9542c8c8a705bb0accc331cea304",
+  "files": [
+    {
+      "path": "dist-platform/main.js",
+      "bytes": 548010,
+      "sha256": "6d12d543c68bd1fe086872224019d0008e84475759c5bc53d88e1eb50ac4bb90"
+    },
+    {
+      "path": "apps/portal/dist/index.html",
+      "bytes": 598,
+      "sha256": "3b4a0d0ee263463f1146eb8858ccf998cfdea00ce0c8a7608b65913a9a400e24"
+    },
+    {
+      "path": "apps/portal/dist/assets/KnockFirst-DW4XG4n0.js",
+      "bytes": 725317,
+      "sha256": "92d557a76391e466e74c02cf36abde94df8c51e44df3926e1812720f260c1811"
+    }
+  ]
+}

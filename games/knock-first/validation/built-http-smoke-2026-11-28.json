@@ -1,0 +1,25 @@
+{
+  "builtHttpSmoke": "passed",
+  "browser": false,
+  "independentClients": 2,
+  "botSeats": 1,
+  "rounds": 3,
+  "staticAssets": "byte-matched",
+  "persistentRestart": "passed",
+  "replayAfterRestart": "passed",
+  "districtStaleFlagRoom": "started-and-played",
+  "knockFirst": {
+    "room": "started",
+    "privateView": "checked",
+    "persistentRestart": "same-match",
+    "gameplay": false,
+    "assets": {
+      "representativeFiles": 9,
+      "verification": "mime-byte-sha256",
+      "manifestSha256": "6489c9fbd2a1632d7945e7e0ebb022f6d85cd46ffab5b8540eadb20a0ebdba09"
+    }
+  },
+  "telegram": "disabled",
+  "telegramAuth": "disabled",
+  "externalMessages": 0
+}

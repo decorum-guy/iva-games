@@ -1,0 +1,20 @@
+{
+  "name": "@iva-games/knock-first",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./runtime": "./src/runtime.ts",
+    "./client": "./src/client/KnockFirst.tsx",
+    "./lobby": "./src/client/Lobby.tsx"
+  },
+  "scripts": { "test": "vitest run --config vitest.config.ts" },
+  "dependencies": {
+    "@iva-games/session-kit": "0.1.0",
+    "better-sqlite3": "13.2.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "three": "^0.187.0"
+  }
+}
