@@ -476,36 +476,62 @@ try {
       // Author group decisions own their stale retry in the UI. Observe the
       // same intent after one click; a successful retry removes its button.
       assert.ok(['accept', 'cancel'].includes(uiRetry.type));
-      let original, previousRevision, attempts = 0;
-      let validation = Promise.resolve(false);
-      const pendingResponse = page.waitForResponse(response => {
-        if (!response.url().endsWith(path + '/actions') || response.request().method() !== 'POST') return false;
-        validation = validation.then(async () => {
-          const command = response.request().postDataJSON();
-          assert.equal(command.payload.type, uiRetry.type);
-          assert.ok(typeof command.actionId === 'string' && command.actionId.length > 0);
-          assert.ok(Number.isSafeInteger(command.expectedRevision));
-          assert.ok(uiRetry.offerIds.includes(command.payload.offerId), 'Author decision stays within its original offer group');
-          if (original) {
-            assert.equal(command.actionId, original.actionId, 'UI retry preserves the clicked action identity');
-            assert.ok(command.expectedRevision > previousRevision, 'A stale retry uses a newer revision');
-            const payload = uiRetry.type === 'cancel' ? { ...command.payload, offerId: original.payload.offerId } : command.payload;
-            assert.deepEqual(payload, original.payload, 'UI retry preserves the decision, chosen recipient and phase');
-          } else original = command;
-          previousRevision = command.expectedRevision;
-          const data = await response.json();
-          assert.ok(++attempts <= 5, 'Author decision has at most five POST attempts');
-          if (response.status() === 200) return true;
-          assert.equal(response.status(), 409, JSON.stringify(data));
-          assert.equal(data.error?.code, 'STALE_REVISION', JSON.stringify(data));
-          assert.ok(attempts < 5, 'Author decision exhausted its stale retry limit');
-          return false;
+      const responses = [];
+      const isAction = response => response.url().endsWith(path + '/actions') && response.request().method() === 'POST';
+      const recordResponse = response => { if (isAction(response)) responses.push(response); };
+      let injected = false, routed = false;
+      const forceStale = async route => {
+        const command = route.request().postDataJSON();
+        if (!injected) {
+          injected = true;
+          assert.ok(command.expectedRevision > 0);
+          // Explicit diagnostic retained from accepted main: only the first
+          // command revision changes; the real server and UI perform the retry.
+          await route.continue({ postData: JSON.stringify({ ...command, expectedRevision: command.expectedRevision - 1 }) });
+        } else await route.continue();
+      };
+      const injectStale = process.env.DISTRICT_FORCE_AUTHOR_STALE === '1';
+      page.on('response', recordResponse);
+      try {
+        if (injectStale) { await page.route(origin + '/api/platform/v1' + path + '/actions', forceStale); routed = true; }
+        let original, previousRevision, attempts = 0;
+        let validation = Promise.resolve(false);
+        const pendingResponse = page.waitForResponse(response => {
+          if (!isAction(response)) return false;
+          validation = validation.then(async () => {
+            const command = response.request().postDataJSON();
+            assert.equal(command.payload.type, uiRetry.type);
+            assert.ok(typeof command.actionId === 'string' && command.actionId.length > 0);
+            assert.ok(Number.isSafeInteger(command.expectedRevision));
+            assert.ok(uiRetry.offerIds.includes(command.payload.offerId), 'Author decision stays within its original offer group');
+            if (original) {
+              assert.equal(command.actionId, original.actionId, 'UI retry preserves the clicked action identity');
+              assert.ok(command.expectedRevision > previousRevision, 'A stale retry uses a newer revision');
+              const payload = uiRetry.type === 'cancel' ? { ...command.payload, offerId: original.payload.offerId } : command.payload;
+              assert.deepEqual(payload, original.payload, 'UI retry preserves the decision, chosen recipient and phase');
+            } else original = command;
+            previousRevision = command.expectedRevision;
+            const data = await response.json();
+            assert.ok(++attempts <= 5, 'Author decision has at most five POST attempts');
+            if (response.status() === 200) return true;
+            assert.equal(response.status(), 409, JSON.stringify(data));
+            assert.equal(data.error?.code, 'STALE_REVISION', JSON.stringify(data));
+            assert.ok(attempts < 5, 'Author decision exhausted its stale retry limit');
+            return false;
+          });
+          return validation;
         });
-        return validation;
-      });
-      await Promise.all([button.click(), pendingResponse]);
-      result.uiActions.push(uiRetry.type);
-      return;
+        const [, response] = await Promise.all([button.click(), pendingResponse]);
+        assert.equal(new Set(responses.map(item => item.request().postDataJSON().actionId)).size, 1, 'One author click retains one action ID through UI retries');
+        if (injectStale) assert.ok(injected && responses.some(item => item.status() === 409), 'The forced outdated command reached the real server');
+        (result.authorDecisionRetries ??= []).push({ action: response.request().postDataJSON().payload.type,
+          statuses: responses.map(item => item.status()), forcedStale: injectStale, oneActionId: true });
+        result.uiActions.push(uiRetry.type);
+        return;
+      } finally {
+        page.off('response', recordResponse);
+        if (routed) await page.unroute(origin + '/api/platform/v1' + path + '/actions', forceStale);
+      }
     }
     for(let attempt=0;attempt<3;attempt++) {
       const pendingResponse=page.waitForResponse(r=>r.url().endsWith(path+'/actions')&&r.request().method()==='POST');

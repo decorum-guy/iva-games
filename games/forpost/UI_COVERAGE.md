@@ -129,3 +129,13 @@ Build `9ebeb9e75054876409d81e615743254a1ba976ac`, [exact evidence](qa/ci-round-5
 - L01/L05–L07/R01–R03 FP02/2D reached a real match result and menu with an actual escort order. It did not score a delivery for the controlled team. Other five map passages failed; no complete all-map or replay acceptance.
 - F02/S01 real focus-loss precondition failed in both headless drivers. Downstream fire-release/stable-ammo checks were not reached. The same tagged scenario moves to mandatory headed Chromium/WebKit Xvfb jobs for R6; this is prepared coverage, not an observed pass.
 - Native emulated multitouch passed again; physical-device and complete visual-state review remain open.
+
+## Observed automated subcases, CI round 6
+
+[Exact R6 evidence](qa/ci-round-6.json), build `4c3c86fb405f11409a48fb941f8be72c077b00d6`: **24 PASS / 8 FAIL** in 32 cases. Chromium interface: 15/15; WebKit interface: 9/9. The 6 map cases and both headed focus cases failed. No inventory row receives acceptance for all its states; executor-operated passages: 0.
+
+The R5 restart/focused-keyboard, final lesson → real practice and late-response cleanup scenarios replayed successfully. Default 3D construction passed in 25.8 s, native 29 WAV audio in 7.2 s, and native CDP touch in 8.2 s. The lifecycle scenario observed real 201 / appAbandon 200 responses, retained lesson 0 and accepted the next mode action.
+
+Headed Chromium/WebKit stayed visible/focused; no real blur/hidden occurred. The old Chromium diagnostic bool meant that a second CDP session accepted a command before navigation; it did not measure the absence of every override. Subsequent stable-ammo assertions were not reached. The new Chromium fixture uses a public API and remains a candidate, not acceptance evidence.
+
+Every map observed SERVER_BUSY. FP01/3D also timed out on the correctly disabled mode switch. Result/replay/own-delivery remain open; the historical R5 FP02/2D result is not transferred to R6.

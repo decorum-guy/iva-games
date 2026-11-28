@@ -37,11 +37,13 @@ const steps: [string, string][][] = [
     ['Перейдите в тактику кнопкой внизу или Tab.', 'Enter tactics using the bottom button or Tab.'],
     ['Выберите свой дрон и прикажите «Сопровождать». Дождитесь, пока он приблизится к транспорту.', 'Select your drone and choose “Escort”. Wait for it to reach your transport.'],
     ['Вернитесь к бойцу. Дрон сохранит приказ сопровождения.', 'Switch back to your fighter. The drone will keep escorting.'],
+    ['Оставайтесь бойцом вне круга комплекса. Дождитесь, пока ваш дрон сам разгрузит транспорт: ему нужны 3 секунды в круге без противника.', 'Keep your fighter outside the complex circle. Wait for your drone to unload the vehicle on its own: it needs 3 seconds in the circle without an enemy.'],
   ],
-  [[
-    'Завершите учебную операцию: доставьте близкую к комплексу машину и удерживайте круг. Правила доставки и боя обычные.',
-    'Finish the training operation: deliver the vehicle near the complex and hold the circle. Normal delivery and combat rules apply.',
-  ]],
+  [
+    ['Перейдите в тактику, выберите бойца и прикажите «Сопровождать». Дождитесь его самостоятельной доставки, затем результата операции. Правила доставки и боя обычные.', 'Enter tactics, select your fighter and choose “Escort”. Wait for its autonomous delivery, then the operation result. Normal delivery and combat rules apply.'],
+    ['Доставка автопилотом подтверждена. Дождитесь результата операции; вы можете продолжать управлять своим отрядом.', 'Autopilot delivery confirmed. Wait for the operation result; you may continue commanding your squad.'],
+    ['Операция завершилась без доставки автопилотом. Нажмите «Повторить», затем в тактике прикажите своему бойцу «Сопровождать» и удержите круг разгрузки.', 'The operation ended without an autopilot delivery. Press “Restart”, then order your fighter to “Escort” in tactics and hold the unloading circle.'],
+  ],
 ]
 export function tutorialInstruction(progress: TutorialProgress, lang: Language): string {
   if (progress.completed) return text(lang, 'Задача выполнена игровыми действиями. Можно перейти дальше или повторить урок.', 'Objective completed through your actions. Continue to the next lesson or repeat this one.')

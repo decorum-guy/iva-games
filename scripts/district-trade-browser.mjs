@@ -420,7 +420,9 @@ try {
     await expect(page.locator('.territory-player-trade').filter({hasText:/\S/})).toHaveCount(0);
     await expectTradeHistory(page, /Trade declined/, '· Declined');
   }
-  await expect(pages[entry.hostIndex].locator('.ta-closed-response')).toContainText('\u274c');
+  const declined = pages[entry.hostIndex].locator('.ta-closed-response');
+  await expect(declined.getByRole('img', { name: /Not agreed/ })).toBeVisible();
+  await expect(declined.locator('svg')).toBeVisible();
   passed('declined active offers disappear and the author retains a visible response with history');
   entry = await open('trade-draft');
   await action(pages[entry.hostIndex], pages[entry.hostIndex].getByRole('button', { name: 'Withdraw offer for everyone', exact: true }));

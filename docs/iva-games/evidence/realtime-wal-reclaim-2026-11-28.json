@@ -1,0 +1,154 @@
+{
+  "format": "iva-wal-budget-replay-comparison-1",
+  "basis": "Two actual bounded SQLite runs, byte-identical scenario, actual separate checkpoint worker, followed by read-only stored-world comparison",
+  "comparisonPassed": true,
+  "originalCaseSha256": "4a460be1151b6bfa185dc0a713e2c52aa1bafc6f797409b248e3ed68f7fc5c84",
+  "onlyChangedProbeModule": {
+    "path": "apps/realtime-server/src/checkpoint.ts",
+    "sha256": "305c9e4da57cc477b9ede555d72d676f2a37e51b951e320b1e13a40004a9a50e",
+    "baselineSha256": "6a487bedd0d51eedae507e697625c6abb663652b2107fe1ea2e6166e2a27ce79",
+    "unchanged": false
+  },
+  "coreSha256": "14d49d29954d0f7f427feea026beb23113699ff8ecb36ec4480f61f339a61e68",
+  "baseline": {
+    "directory": ".qa/wal-budget-imQKz2",
+    "exitCode": 0,
+    "reproducedLatch": true,
+    "elapsedMs": 4028.2119580000003,
+    "executableSha256": "fb93b2fd9adde12a8b81f834b25d9983d5db44bfec101e4cd1d0ce35bb801d3a",
+    "reportSha256": "6a2017d2e2740e2a1371a20f611adfa9d5f18414fecb3938754f1093b4feba17",
+    "logSha256": "b4d8b31de2cc3f2c58f09b80358c70c81bb64b31a768bbc5c4cf4620ec2906d5",
+    "postReaderRelease": {
+      "status": {
+        "observedAt": 1795894158718,
+        "sqliteVersion": "3.54.1",
+        "pageSize": 4096,
+        "walBytes": 67296112,
+        "logFrames": 16334,
+        "checkpointedFrames": 16334,
+        "busy": 0,
+        "runs": 12,
+        "maxMs": 4.102824999999939,
+        "p99Ms": 4.2,
+        "failures": 0
+      },
+      "actualWalBytes": 67296112,
+      "guard": "CHECKPOINT_WAL_LIMIT",
+      "integrity": "ok"
+    },
+    "postRepeatPoll": {
+      "status": {
+        "observedAt": 1795894158994,
+        "sqliteVersion": "3.54.1",
+        "pageSize": 4096,
+        "walBytes": 67296112,
+        "logFrames": 16334,
+        "checkpointedFrames": 16334,
+        "busy": 0,
+        "runs": 12,
+        "maxMs": 4.102824999999939,
+        "p99Ms": 4.2,
+        "failures": 0
+      },
+      "actualWalBytes": 67296112,
+      "guard": "CHECKPOINT_WAL_LIMIT"
+    }
+  },
+  "candidate": {
+    "directory": ".qa/wal-budget-replay-wtqH20",
+    "exitCode": 2,
+    "exitMeaning": "Original unmodified scenario returns 2 when the former latch is not reproduced; expected for this replay",
+    "reproducedLatch": false,
+    "elapsedMs": 4310.882006,
+    "executableSha256": "ab251d70c2451d55c0f56458b0955035903b73abd47ed035a793432a3c90a7c6",
+    "reportSha256": "f1df9d725a4dd960b090e89f71ebf1a14471e77c4b40f658eebd915e0af2fcd8",
+    "logSha256": "49bb08f820d67695a4f9884c9b72293ffdda8ffe004379218fe7b0536ae49562",
+    "postReaderRelease": {
+      "status": {
+        "observedAt": 1795894643744,
+        "sqliteVersion": "3.54.1",
+        "pageSize": 4096,
+        "walBytes": 0,
+        "logFrames": 0,
+        "checkpointedFrames": 0,
+        "busy": 0,
+        "runs": 13,
+        "maxMs": 7.832360999999764,
+        "p99Ms": 7.9,
+        "failures": 0,
+        "reclaimAttempts": 1,
+        "reclaimBusy": 0,
+        "reclaimMaxMs": 18.26832800000011,
+        "reclaimP99Ms": 18.3
+      },
+      "actualWalBytes": 0,
+      "guard": "PASS",
+      "integrity": "ok"
+    },
+    "postRepeatPoll": {
+      "status": {
+        "observedAt": 1795894644022,
+        "sqliteVersion": "3.54.1",
+        "pageSize": 4096,
+        "walBytes": 0,
+        "logFrames": 0,
+        "checkpointedFrames": 0,
+        "busy": 0,
+        "runs": 13,
+        "maxMs": 7.832360999999764,
+        "p99Ms": 7.9,
+        "failures": 0,
+        "reclaimAttempts": 1,
+        "reclaimBusy": 0,
+        "reclaimMaxMs": 18.26832800000011,
+        "reclaimP99Ms": 18.3
+      },
+      "actualWalBytes": 0,
+      "guard": "PASS"
+    },
+    "guardPassedBeforeExplicitManualTruncateControl": true
+  },
+  "sameInjectedBoundary": {
+    "batches": 130,
+    "worldTransitions": 520,
+    "allocatedWalBytes": 67296112,
+    "initialGuardRejection": "CHECKPOINT_WAL_LIMIT"
+  },
+  "readonlyStateChecks": [
+    {
+      "case": "accelerated-control",
+      "worldsCompared": 4,
+      "allWorldHashesAndJournalSeqEqual": true
+    },
+    {
+      "case": "accelerated-pinned-reader-release",
+      "worldsCompared": 4,
+      "allWorldHashesAndJournalSeqEqual": true
+    }
+  ],
+  "limits": {
+    "acceleratedWrites": true,
+    "explicitPinnedReaderFaultInjection": true,
+    "fullSynchronousUnchanged": true,
+    "guard64MiBUnchanged": true,
+    "journalSizeLimit16MiBUnchanged": true,
+    "noProductWriteBypassedGuard": true,
+    "noAutomaticRoomUnfailTested": true,
+    "noLatencyOrCapacityAcceptance": true,
+    "noR6FailureAttribution": true,
+    "busyTimeoutZeroDoesNotBoundIoDuration": true
+  },
+  "commands": [
+    {
+      "command": "timeout --signal=TERM --kill-after=3s 52s node .qa/wal-budget-replay-wtqH20/build.mjs 305c9e4da57cc477b9ede555d72d676f2a37e51b951e320b1e13a40004a9a50e",
+      "exitCode": 0
+    },
+    {
+      "command": "timeout --signal=TERM --kill-after=3s 52s node .qa/wal-budget-replay-wtqH20/code/case.js .qa/wal-budget-replay-wtqH20 > .qa/wal-budget-replay-wtqH20/run.log 2>&1",
+      "exitCode": 2
+    }
+  ],
+  "activeOwnChildrenAfterRuns": 0,
+  "sourceEditsByProbeAuthor": false,
+  "commitsOrPushesByProbeAuthor": false
+}

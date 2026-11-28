@@ -19,7 +19,7 @@ async function clickSquare(page: Page, cell: string) {
 }
 async function normalGame(page: Page, lang: Language) {
   await page.goto('/overdrive/')
-  await page.getByRole('button', { name: lang === 'ru' ? 'За одной доской' : 'At one board', exact: true }).click()
+  await page.getByRole('button', { name: lang === 'ru' ? 'На одном устройстве' : 'On one device', exact: true }).click()
   await page.getByRole('button', { name: lang === 'ru' ? 'Начать партию' : 'Start game', exact: true }).click()
   await clickSquare(page, 'e2'); await clickSquare(page, 'e4')
   await expect(app(page)).toHaveAttribute('data-turn', '1')
@@ -146,8 +146,8 @@ test('move-book entry and reloading an unfinished lesson preserve the normal sav
     await page.getByRole('button', { name: 'Move book', exact: true }).click()
     await page.getByRole('button', { name: 'Try on the board', exact: true }).click()
   } else {
-    await page.getByRole('button', { name: 'New game', exact: true }).click()
-    await page.getByRole('button', { name: /Learn on the board/ }).click()
+    await page.getByRole('button', { name: 'Menu', exact: true }).click()
+    await page.locator('.od-panel-setup').getByRole('button', { name: 'Tutorial', exact: true }).click()
   }
   await play(page, QUICK_LESSONS[0].state, QUICK_LESSONS[0].expected, 'en')
   expect(await localSave(page)).toBe(before)
@@ -192,8 +192,9 @@ test('online tutorial consumes a queued reply and returns the latest room withou
   await page.clock.install({ time: new Date('2026-11-27T12:00:00Z') })
   try {
     const before = await normalGame(page, 'en')
-    await page.getByRole('button', { name: 'New game', exact: true }).click()
-    await page.getByRole('button', { name: /Play online/ }).click()
+    await page.getByRole('button', { name: 'Menu', exact: true }).click()
+    await page.getByTestId('mode-friend').click()
+    await page.getByRole('button', { name: 'Online', exact: true }).click()
     await page.getByLabel('Your name', { exact: true }).fill('Tutor host')
     await page.getByRole('button', { name: 'Create room', exact: true }).click()
     const invitation = await page.locator('.od-lobby input').inputValue()

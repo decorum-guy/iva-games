@@ -1,0 +1,1083 @@
+{
+  "format": "iva-storage-diagnostic-1",
+  "complete": true,
+  "kind": "Bounded checkout storage diagnosis; not browser, capacity, deployment or power-loss acceptance",
+  "stage": "completed",
+  "source": {
+    "format": "iva-forpost-source-2",
+    "gitCommit": "4c3c86fb405f11409a48fb941f8be72c077b00d6",
+    "dirty": false,
+    "sourceSha256": "8654dcb1855edd76e8d70a9a3bfda9eb41b9ef4cf5c99b14e7c4304f02e5680c",
+    "sourceFileCount": 252,
+    "coreSha256": "14d49d29954d0f7f427feea026beb23113699ff8ecb36ec4480f61f339a61e68",
+    "coreFileCount": 18,
+    "method": "SHA-256 of sorted relative paths then exact bytes; independent per-file SHA-256 and strict complete inventory",
+    "providedTraceVerified": false
+  },
+  "buildRevision": "4c3c86fb405f11409a48fb941f8be72c077b00d6",
+  "build": {
+    "diagnosticExecutableSha256": "2826440aca81ab2ef22d1d2cb74130e1c24eff7ca58f4ade2222a6173a4e81fc",
+    "executableFileCount": 3,
+    "nativeSqliteSha256": "1a03a2916dd210925f8a074d460f0f7a2a28b1aeed2a1c3e2bf1a3b0322276cf",
+    "nativeSqlitePackageVersion": "13.2.0",
+    "target": "node24"
+  },
+  "limits": {
+    "timeoutSeconds": 180,
+    "rawByteGuard": 33554432,
+    "terminationGraceMs": 1500
+  },
+  "host": {
+    "node": "v24.22.3",
+    "kernel": "7.0.0-1020-azure",
+    "cpuModel": "AMD EPYC 7763 64-Core Processor",
+    "availableParallelism": 4,
+    "findmntAvailable": true,
+    "lsblkAvailable": true,
+    "devices": {
+      "available": true,
+      "mountDeviceResolved": true,
+      "devices": [
+        {
+          "name": "sda",
+          "majorMinor": "8:0",
+          "type": "disk",
+          "bytes": 161061273600,
+          "rotational": true,
+          "readOnly": false
+        },
+        {
+          "name": "sda1",
+          "majorMinor": "8:1",
+          "type": "part",
+          "bytes": 159871122944,
+          "rotational": true,
+          "readOnly": false
+        }
+      ]
+    },
+    "comparedLocations": [
+      {
+        "location": "checkout",
+        "typeHex": "0xef53",
+        "mount": {
+          "available": true,
+          "fsType": "ext4",
+          "source": "/dev/root",
+          "majorMinor": "8:1",
+          "options": [
+            "rw",
+            "relatime",
+            "discard",
+            "journal_async_commit",
+            "nobarrier",
+            "errors",
+            "commit=30",
+            "data=writeback"
+          ]
+        }
+      },
+      {
+        "location": "diagnostic-directory",
+        "typeHex": "0xef53",
+        "mount": {
+          "available": true,
+          "fsType": "ext4",
+          "source": "/dev/root",
+          "majorMinor": "8:1",
+          "options": [
+            "rw",
+            "relatime",
+            "discard",
+            "journal_async_commit",
+            "nobarrier",
+            "errors",
+            "commit=30",
+            "data=writeback"
+          ]
+        }
+      },
+      {
+        "location": "read-only-comparison",
+        "typeHex": "0xef53",
+        "mount": {
+          "available": true,
+          "fsType": "ext4",
+          "source": "/dev/root",
+          "majorMinor": "8:1",
+          "options": [
+            "rw",
+            "relatime",
+            "discard",
+            "journal_async_commit",
+            "nobarrier",
+            "errors",
+            "commit=30",
+            "data=writeback"
+          ]
+        }
+      },
+      {
+        "location": "read-only-comparison",
+        "typeHex": "0xef53",
+        "mount": {
+          "available": true,
+          "fsType": "ext4",
+          "source": "/dev/root",
+          "majorMinor": "8:1",
+          "options": [
+            "rw",
+            "relatime",
+            "discard",
+            "journal_async_commit",
+            "nobarrier",
+            "errors",
+            "commit=30",
+            "data=writeback"
+          ]
+        }
+      }
+    ]
+  },
+  "environmentBefore": {
+    "observedAt": 1795893197470,
+    "filesystem": {
+      "typeHex": "0xef53",
+      "blockSize": 4096,
+      "blocks": 37840252,
+      "freeBlocks": 22602792,
+      "availableBlocks": 22598696,
+      "files": 18690560,
+      "freeFiles": 17636103,
+      "mount": {
+        "available": true,
+        "fsType": "ext4",
+        "source": "/dev/root",
+        "majorMinor": "8:1",
+        "options": [
+          "rw",
+          "relatime",
+          "discard",
+          "journal_async_commit",
+          "nobarrier",
+          "errors",
+          "commit=30",
+          "data=writeback"
+        ]
+      }
+    },
+    "pressure": {
+      "cpu": {
+        "available": true,
+        "some": {
+          "avg10": 3.5,
+          "avg60": 2.47,
+          "avg300": 0.73,
+          "total": 2594814
+        },
+        "full": {
+          "avg10": 0,
+          "avg60": 0,
+          "avg300": 0,
+          "total": 0
+        }
+      },
+      "io": {
+        "available": true,
+        "some": {
+          "avg10": 3.54,
+          "avg60": 3.61,
+          "avg300": 1.06,
+          "total": 3651252
+        },
+        "full": {
+          "avg10": 3.16,
+          "avg60": 3.09,
+          "avg300": 0.9,
+          "total": 3062702
+        }
+      },
+      "memory": {
+        "available": true,
+        "some": {
+          "avg10": 0,
+          "avg60": 0,
+          "avg300": 0,
+          "total": 1
+        },
+        "full": {
+          "avg10": 0,
+          "avg60": 0,
+          "avg300": 0,
+          "total": 1
+        }
+      }
+    },
+    "cgroup": {
+      "available": false,
+      "cpuCores": null,
+      "cpuUsageUsec": 27976238,
+      "cpuThrottledUsec": 0,
+      "cpuThrottledPeriods": 0,
+      "memoryLimitBytes": null,
+      "memoryUsedBytes": null,
+      "memoryPeakBytes": null
+    }
+  },
+  "environmentAfter": {
+    "observedAt": 1795893223009,
+    "filesystem": {
+      "typeHex": "0xef53",
+      "blockSize": 4096,
+      "blocks": 37840252,
+      "freeBlocks": 22602256,
+      "availableBlocks": 22598160,
+      "files": 18690560,
+      "freeFiles": 17636071,
+      "mount": {
+        "available": true,
+        "fsType": "ext4",
+        "source": "/dev/root",
+        "majorMinor": "8:1",
+        "options": [
+          "rw",
+          "relatime",
+          "discard",
+          "journal_async_commit",
+          "nobarrier",
+          "errors",
+          "commit=30",
+          "data=writeback"
+        ]
+      }
+    },
+    "pressure": {
+      "cpu": {
+        "available": true,
+        "some": {
+          "avg10": 0.27,
+          "avg60": 1.62,
+          "avg300": 0.67,
+          "total": 2677740
+        },
+        "full": {
+          "avg10": 0,
+          "avg60": 0,
+          "avg300": 0,
+          "total": 0
+        }
+      },
+      "io": {
+        "available": true,
+        "some": {
+          "avg10": 1.23,
+          "avg60": 2.58,
+          "avg300": 1.02,
+          "total": 3938053
+        },
+        "full": {
+          "avg10": 1.2,
+          "avg60": 2.24,
+          "avg300": 0.88,
+          "total": 3348360
+        }
+      },
+      "memory": {
+        "available": true,
+        "some": {
+          "avg10": 0,
+          "avg60": 0,
+          "avg300": 0,
+          "total": 1
+        },
+        "full": {
+          "avg10": 0,
+          "avg60": 0,
+          "avg300": 0,
+          "total": 1
+        }
+      }
+    },
+    "cgroup": {
+      "available": false,
+      "cpuCores": null,
+      "cpuUsageUsec": 30612771,
+      "cpuThrottledUsec": 0,
+      "cpuThrottledPeriods": 0,
+      "memoryLimitBytes": null,
+      "memoryUsedBytes": null,
+      "memoryPeakBytes": null
+    }
+  },
+  "cases": [
+    {
+      "name": "file-baseline",
+      "phase": "fsync",
+      "traced": false,
+      "elapsedMs": 2399.615061,
+      "samples": 64,
+      "warmup": 8,
+      "threadCpu": {
+        "samples": 64,
+        "p50Ms": 0.144,
+        "p95Ms": 0.203,
+        "p99Ms": 0.301,
+        "maxMs": 0.301,
+        "meanMs": 0.15276562500000002,
+        "over50Ms": 0
+      },
+      "bytesPerWrite": 16384,
+      "totalWrittenBytes": 1179648,
+      "write": {
+        "samples": 64,
+        "p50Ms": 0.031599000000028354,
+        "p95Ms": 0.0614140000000134,
+        "p99Ms": 0.1000770000000557,
+        "maxMs": 0.1000770000000557,
+        "meanMs": 0.03543132812498406,
+        "over50Ms": 0
+      },
+      "fsync": {
+        "samples": 64,
+        "p50Ms": 0.6040960000000268,
+        "p95Ms": 0.981928000000039,
+        "p99Ms": 3.3554370000001654,
+        "maxMs": 3.3554370000001654,
+        "meanMs": 0.6871359218749982,
+        "over50Ms": 0
+      },
+      "total": {
+        "samples": 64,
+        "p50Ms": 0.6365170000000262,
+        "p95Ms": 1.0138469999999415,
+        "p99Ms": 3.3942490000001726,
+        "maxMs": 3.3942490000001726,
+        "meanMs": 0.7225672499999822,
+        "over50Ms": 0
+      }
+    },
+    {
+      "name": "sqlite-baseline",
+      "phase": "sqlite",
+      "traced": false,
+      "elapsedMs": 11061.894752999999,
+      "samples": 300,
+      "warmup": 30,
+      "threadCpu": {
+        "samples": 300,
+        "p50Ms": 0.345,
+        "p95Ms": 0.503,
+        "p99Ms": 0.742,
+        "maxMs": 1.036,
+        "meanMs": 0.3601833333333333,
+        "over50Ms": 0
+      },
+      "cadenceMs": 33.333333333333336,
+      "sqliteVersion": "3.54.1",
+      "journalMode": "wal",
+      "verifiedFinalState": true,
+      "fixture": {
+        "mapId": "FP01",
+        "teamSize": 1,
+        "startTick": 0,
+        "endTick": 330,
+        "seed": 5149,
+        "startPhase": "preparation",
+        "endPhase": "preparation"
+      },
+      "commit": {
+        "samples": 300,
+        "p50Ms": 0.6813009999996211,
+        "p95Ms": 0.9299940000000788,
+        "p99Ms": 1.7927150000004985,
+        "maxMs": 3.485359000000244,
+        "meanMs": 0.730794016666667,
+        "over50Ms": 0
+      },
+      "pacingDebt": {
+        "samples": 300,
+        "p50Ms": 0,
+        "p95Ms": 0,
+        "p99Ms": 0,
+        "maxMs": 0,
+        "meanMs": 0,
+        "over50Ms": 0
+      },
+      "writer": {
+        "batches": 330,
+        "maxTransactionMs": 3.480870999999752,
+        "maxWorldBytes": 6558,
+        "maxRecordBytes": 8525,
+        "maxJournalBytes": 54,
+        "transactionP99Ms": 2,
+        "bodyP99Ms": 0.3,
+        "finalizeP99Ms": 2,
+        "walAutoCheckpoint": 0,
+        "synchronous": 2
+      },
+      "checkpoint": {
+        "pageSize": 4096,
+        "walBytes": 585072,
+        "logFrames": 135,
+        "checkpointedFrames": 0,
+        "busy": 0,
+        "runs": 11,
+        "maxMs": 1.1019349999999974,
+        "p99Ms": 1.2,
+        "failures": 0
+      }
+    },
+    {
+      "name": "sqlite-traced",
+      "phase": "sqlite",
+      "traced": true,
+      "elapsedMs": 11108.778893,
+      "samples": 300,
+      "warmup": 30,
+      "threadCpu": {
+        "samples": 300,
+        "p50Ms": 0.567,
+        "p95Ms": 0.745,
+        "p99Ms": 0.882,
+        "maxMs": 1.074,
+        "meanMs": 0.5670999999999996,
+        "over50Ms": 0
+      },
+      "cadenceMs": 33.333333333333336,
+      "sqliteVersion": "3.54.1",
+      "journalMode": "wal",
+      "verifiedFinalState": true,
+      "fixture": {
+        "mapId": "FP01",
+        "teamSize": 1,
+        "startTick": 0,
+        "endTick": 330,
+        "seed": 5149,
+        "startPhase": "preparation",
+        "endPhase": "preparation"
+      },
+      "commit": {
+        "samples": 300,
+        "p50Ms": 1.5729879999998957,
+        "p95Ms": 2.3491639999992913,
+        "p99Ms": 20.693331999998918,
+        "maxMs": 94.42755600000055,
+        "meanMs": 2.3312773500000437,
+        "over50Ms": 1
+      },
+      "pacingDebt": {
+        "samples": 300,
+        "p50Ms": 0,
+        "p95Ms": 0,
+        "p99Ms": 13.206317333333573,
+        "maxMs": 74.61504100000093,
+        "meanMs": 0.6416527444444485,
+        "over50Ms": 2
+      },
+      "writer": {
+        "batches": 330,
+        "maxTransactionMs": 94.4214549999997,
+        "maxWorldBytes": 6558,
+        "maxRecordBytes": 8525,
+        "maxJournalBytes": 54,
+        "transactionP99Ms": 20.7,
+        "bodyP99Ms": 0.3,
+        "finalizeP99Ms": 20.6,
+        "walAutoCheckpoint": 0,
+        "synchronous": 2
+      },
+      "checkpoint": {
+        "pageSize": 4096,
+        "walBytes": 1116552,
+        "logFrames": 135,
+        "checkpointedFrames": 0,
+        "busy": 0,
+        "runs": 11,
+        "maxMs": 5.510698000000048,
+        "p99Ms": 5.6,
+        "failures": 0
+      }
+    }
+  ],
+  "trace": {
+    "requested": "auto",
+    "status": "captured",
+    "timingIncludesTracerOverhead": true,
+    "files": 8,
+    "aggregate": {
+      "fsync": {
+        "calls": 380,
+        "errors": 0,
+        "p50Ms": 0.435,
+        "p95Ms": 0.824,
+        "p99Ms": 19.392,
+        "maxMs": 92.973,
+        "summedWallMs": 393.681
+      },
+      "fdatasync": {
+        "calls": 0,
+        "errors": 0,
+        "p50Ms": null,
+        "p95Ms": null,
+        "p99Ms": null,
+        "maxMs": null,
+        "summedWallMs": 0
+      },
+      "fcntl": {
+        "calls": 2207,
+        "errors": 14,
+        "p50Ms": 0.026,
+        "p95Ms": 0.037,
+        "p99Ms": 0.05,
+        "maxMs": 0.23299999999999998,
+        "summedWallMs": 58.73199999999904
+      }
+    },
+    "perThread": [
+      {
+        "thread": 2815,
+        "writerMainThread": true,
+        "calls": {
+          "fsync": {
+            "calls": 358,
+            "errors": 0,
+            "p50Ms": 0.435,
+            "p95Ms": 0.824,
+            "p99Ms": 19.392,
+            "maxMs": 92.973,
+            "summedWallMs": 382.92300000000006
+          },
+          "fdatasync": {
+            "calls": 0,
+            "errors": 0,
+            "p50Ms": null,
+            "p95Ms": null,
+            "p99Ms": null,
+            "maxMs": null,
+            "summedWallMs": 0
+          },
+          "fcntl": {
+            "calls": 2141,
+            "errors": 14,
+            "p50Ms": 0.026,
+            "p95Ms": 0.037,
+            "p99Ms": 0.05,
+            "maxMs": 0.23299999999999998,
+            "summedWallMs": 57.08199999999905
+          }
+        },
+        "measuredWindowCalls": {
+          "fsync": {
+            "calls": 309,
+            "errors": 0,
+            "p50Ms": 0.429,
+            "p95Ms": 0.9420000000000001,
+            "p99Ms": 19.392,
+            "maxMs": 92.973,
+            "summedWallMs": 359.1579999999999
+          },
+          "fdatasync": {
+            "calls": 0,
+            "errors": 0,
+            "p50Ms": null,
+            "p95Ms": null,
+            "p99Ms": null,
+            "maxMs": null,
+            "summedWallMs": 0
+          },
+          "fcntl": {
+            "calls": 1818,
+            "errors": 0,
+            "p50Ms": 0.026,
+            "p95Ms": 0.038,
+            "p99Ms": 0.053,
+            "maxMs": 0.23299999999999998,
+            "summedWallMs": 49.88599999999889
+          }
+        }
+      },
+      {
+        "thread": 2816,
+        "writerMainThread": false,
+        "calls": {
+          "fsync": {
+            "calls": 0,
+            "errors": 0,
+            "p50Ms": null,
+            "p95Ms": null,
+            "p99Ms": null,
+            "maxMs": null,
+            "summedWallMs": 0
+          },
+          "fdatasync": {
+            "calls": 0,
+            "errors": 0,
+            "p50Ms": null,
+            "p95Ms": null,
+            "p99Ms": null,
+            "maxMs": null,
+            "summedWallMs": 0
+          },
+          "fcntl": {
+            "calls": 0,
+            "errors": 0,
+            "p50Ms": null,
+            "p95Ms": null,
+            "p99Ms": null,
+            "maxMs": null,
+            "summedWallMs": 0
+          }
+        },
+        "measuredWindowCalls": {
+          "fsync": {
+            "calls": 0,
+            "errors": 0,
+            "p50Ms": null,
+            "p95Ms": null,
+            "p99Ms": null,
+            "maxMs": null,
+            "summedWallMs": 0
+          },
+          "fdatasync": {
+            "calls": 0,
+            "errors": 0,
+            "p50Ms": null,
+            "p95Ms": null,
+            "p99Ms": null,
+            "maxMs": null,
+            "summedWallMs": 0
+          },
+          "fcntl": {
+            "calls": 0,
+            "errors": 0,
+            "p50Ms": null,
+            "p95Ms": null,
+            "p99Ms": null,
+            "maxMs": null,
+            "summedWallMs": 0
+          }
+        }
+      },
+      {
+        "thread": 2817,
+        "writerMainThread": false,
+        "calls": {
+          "fsync": {
+            "calls": 0,
+            "errors": 0,
+            "p50Ms": null,
+            "p95Ms": null,
+            "p99Ms": null,
+            "maxMs": null,
+            "summedWallMs": 0
+          },
+          "fdatasync": {
+            "calls": 0,
+            "errors": 0,
+            "p50Ms": null,
+            "p95Ms": null,
+            "p99Ms": null,
+            "maxMs": null,
+            "summedWallMs": 0
+          },
+          "fcntl": {
+            "calls": 0,
+            "errors": 0,
+            "p50Ms": null,
+            "p95Ms": null,
+            "p99Ms": null,
+            "maxMs": null,
+            "summedWallMs": 0
+          }
+        },
+        "measuredWindowCalls": {
+          "fsync": {
+            "calls": 0,
+            "errors": 0,
+            "p50Ms": null,
+            "p95Ms": null,
+            "p99Ms": null,
+            "maxMs": null,
+            "summedWallMs": 0
+          },
+          "fdatasync": {
+            "calls": 0,
+            "errors": 0,
+            "p50Ms": null,
+            "p95Ms": null,
+            "p99Ms": null,
+            "maxMs": null,
+            "summedWallMs": 0
+          },
+          "fcntl": {
+            "calls": 0,
+            "errors": 0,
+            "p50Ms": null,
+            "p95Ms": null,
+            "p99Ms": null,
+            "maxMs": null,
+            "summedWallMs": 0
+          }
+        }
+      },
+      {
+        "thread": 2818,
+        "writerMainThread": false,
+        "calls": {
+          "fsync": {
+            "calls": 0,
+            "errors": 0,
+            "p50Ms": null,
+            "p95Ms": null,
+            "p99Ms": null,
+            "maxMs": null,
+            "summedWallMs": 0
+          },
+          "fdatasync": {
+            "calls": 0,
+            "errors": 0,
+            "p50Ms": null,
+            "p95Ms": null,
+            "p99Ms": null,
+            "maxMs": null,
+            "summedWallMs": 0
+          },
+          "fcntl": {
+            "calls": 0,
+            "errors": 0,
+            "p50Ms": null,
+            "p95Ms": null,
+            "p99Ms": null,
+            "maxMs": null,
+            "summedWallMs": 0
+          }
+        },
+        "measuredWindowCalls": {
+          "fsync": {
+            "calls": 0,
+            "errors": 0,
+            "p50Ms": null,
+            "p95Ms": null,
+            "p99Ms": null,
+            "maxMs": null,
+            "summedWallMs": 0
+          },
+          "fdatasync": {
+            "calls": 0,
+            "errors": 0,
+            "p50Ms": null,
+            "p95Ms": null,
+            "p99Ms": null,
+            "maxMs": null,
+            "summedWallMs": 0
+          },
+          "fcntl": {
+            "calls": 0,
+            "errors": 0,
+            "p50Ms": null,
+            "p95Ms": null,
+            "p99Ms": null,
+            "maxMs": null,
+            "summedWallMs": 0
+          }
+        }
+      },
+      {
+        "thread": 2819,
+        "writerMainThread": false,
+        "calls": {
+          "fsync": {
+            "calls": 0,
+            "errors": 0,
+            "p50Ms": null,
+            "p95Ms": null,
+            "p99Ms": null,
+            "maxMs": null,
+            "summedWallMs": 0
+          },
+          "fdatasync": {
+            "calls": 0,
+            "errors": 0,
+            "p50Ms": null,
+            "p95Ms": null,
+            "p99Ms": null,
+            "maxMs": null,
+            "summedWallMs": 0
+          },
+          "fcntl": {
+            "calls": 0,
+            "errors": 0,
+            "p50Ms": null,
+            "p95Ms": null,
+            "p99Ms": null,
+            "maxMs": null,
+            "summedWallMs": 0
+          }
+        },
+        "measuredWindowCalls": {
+          "fsync": {
+            "calls": 0,
+            "errors": 0,
+            "p50Ms": null,
+            "p95Ms": null,
+            "p99Ms": null,
+            "maxMs": null,
+            "summedWallMs": 0
+          },
+          "fdatasync": {
+            "calls": 0,
+            "errors": 0,
+            "p50Ms": null,
+            "p95Ms": null,
+            "p99Ms": null,
+            "maxMs": null,
+            "summedWallMs": 0
+          },
+          "fcntl": {
+            "calls": 0,
+            "errors": 0,
+            "p50Ms": null,
+            "p95Ms": null,
+            "p99Ms": null,
+            "maxMs": null,
+            "summedWallMs": 0
+          }
+        }
+      },
+      {
+        "thread": 2820,
+        "writerMainThread": false,
+        "calls": {
+          "fsync": {
+            "calls": 0,
+            "errors": 0,
+            "p50Ms": null,
+            "p95Ms": null,
+            "p99Ms": null,
+            "maxMs": null,
+            "summedWallMs": 0
+          },
+          "fdatasync": {
+            "calls": 0,
+            "errors": 0,
+            "p50Ms": null,
+            "p95Ms": null,
+            "p99Ms": null,
+            "maxMs": null,
+            "summedWallMs": 0
+          },
+          "fcntl": {
+            "calls": 0,
+            "errors": 0,
+            "p50Ms": null,
+            "p95Ms": null,
+            "p99Ms": null,
+            "maxMs": null,
+            "summedWallMs": 0
+          }
+        },
+        "measuredWindowCalls": {
+          "fsync": {
+            "calls": 0,
+            "errors": 0,
+            "p50Ms": null,
+            "p95Ms": null,
+            "p99Ms": null,
+            "maxMs": null,
+            "summedWallMs": 0
+          },
+          "fdatasync": {
+            "calls": 0,
+            "errors": 0,
+            "p50Ms": null,
+            "p95Ms": null,
+            "p99Ms": null,
+            "maxMs": null,
+            "summedWallMs": 0
+          },
+          "fcntl": {
+            "calls": 0,
+            "errors": 0,
+            "p50Ms": null,
+            "p95Ms": null,
+            "p99Ms": null,
+            "maxMs": null,
+            "summedWallMs": 0
+          }
+        }
+      },
+      {
+        "thread": 2821,
+        "writerMainThread": false,
+        "calls": {
+          "fsync": {
+            "calls": 0,
+            "errors": 0,
+            "p50Ms": null,
+            "p95Ms": null,
+            "p99Ms": null,
+            "maxMs": null,
+            "summedWallMs": 0
+          },
+          "fdatasync": {
+            "calls": 0,
+            "errors": 0,
+            "p50Ms": null,
+            "p95Ms": null,
+            "p99Ms": null,
+            "maxMs": null,
+            "summedWallMs": 0
+          },
+          "fcntl": {
+            "calls": 0,
+            "errors": 0,
+            "p50Ms": null,
+            "p95Ms": null,
+            "p99Ms": null,
+            "maxMs": null,
+            "summedWallMs": 0
+          }
+        },
+        "measuredWindowCalls": {
+          "fsync": {
+            "calls": 0,
+            "errors": 0,
+            "p50Ms": null,
+            "p95Ms": null,
+            "p99Ms": null,
+            "maxMs": null,
+            "summedWallMs": 0
+          },
+          "fdatasync": {
+            "calls": 0,
+            "errors": 0,
+            "p50Ms": null,
+            "p95Ms": null,
+            "p99Ms": null,
+            "maxMs": null,
+            "summedWallMs": 0
+          },
+          "fcntl": {
+            "calls": 0,
+            "errors": 0,
+            "p50Ms": null,
+            "p95Ms": null,
+            "p99Ms": null,
+            "maxMs": null,
+            "summedWallMs": 0
+          }
+        }
+      },
+      {
+        "thread": 2822,
+        "writerMainThread": false,
+        "calls": {
+          "fsync": {
+            "calls": 22,
+            "errors": 0,
+            "p50Ms": 0.432,
+            "p95Ms": 1.57,
+            "p99Ms": 3.662,
+            "maxMs": 3.662,
+            "summedWallMs": 10.758
+          },
+          "fdatasync": {
+            "calls": 0,
+            "errors": 0,
+            "p50Ms": null,
+            "p95Ms": null,
+            "p99Ms": null,
+            "maxMs": null,
+            "summedWallMs": 0
+          },
+          "fcntl": {
+            "calls": 66,
+            "errors": 0,
+            "p50Ms": 0.023,
+            "p95Ms": 0.041999999999999996,
+            "p99Ms": 0.05,
+            "maxMs": 0.05,
+            "summedWallMs": 1.6500000000000001
+          }
+        },
+        "measuredWindowCalls": {
+          "fsync": {
+            "calls": 17,
+            "errors": 0,
+            "p50Ms": 0.439,
+            "p95Ms": 3.662,
+            "p99Ms": 3.662,
+            "maxMs": 3.662,
+            "summedWallMs": 9.161999999999999
+          },
+          "fdatasync": {
+            "calls": 0,
+            "errors": 0,
+            "p50Ms": null,
+            "p95Ms": null,
+            "p99Ms": null,
+            "maxMs": null,
+            "summedWallMs": 0
+          },
+          "fcntl": {
+            "calls": 52,
+            "errors": 0,
+            "p50Ms": 0.023,
+            "p95Ms": 0.046,
+            "p99Ms": 0.05,
+            "maxMs": 0.05,
+            "summedWallMs": 1.3050000000000004
+          }
+        }
+      }
+    ],
+    "measuredWindow": {
+      "fromMs": 1795893212894,
+      "toMs": 1795893222864.136
+    },
+    "measuredWindowCalls": {
+      "fsync": {
+        "calls": 326,
+        "errors": 0,
+        "p50Ms": 0.429,
+        "p95Ms": 0.988,
+        "p99Ms": 19.392,
+        "maxMs": 92.973,
+        "summedWallMs": 368.32
+      },
+      "fdatasync": {
+        "calls": 0,
+        "errors": 0,
+        "p50Ms": null,
+        "p95Ms": null,
+        "p99Ms": null,
+        "maxMs": null,
+        "summedWallMs": 0
+      },
+      "fcntl": {
+        "calls": 1870,
+        "errors": 0,
+        "p50Ms": 0.026,
+        "p95Ms": 0.038,
+        "p99Ms": 0.053,
+        "maxMs": 0.23299999999999998,
+        "summedWallMs": 51.190999999998816
+      }
+    },
+    "windowClockPrecisionMs": 1,
+    "scope": "All child threads plus a timestamp-filtered measured window; summed syscall time can overlap between threads; traced latency includes tracer overhead"
+  },
+  "elapsedWallMs": 25561.296102,
+  "peakRawBytes": 3172053,
+  "rawBytesBeforeCleanup": 2097025,
+  "rawRetained": false,
+  "failures": [],
+  "interpretation": {
+    "productionCapacityAccepted": false,
+    "durabilityRelaxed": false,
+    "selectedAlternativeDisk": false,
+    "finalizeIsFsyncMeasurement": false,
+    "tracedAndUntracedComparableWithoutOverhead": false,
+    "writesOnlyOwnCheckoutQADirectory": true
+  }
+}

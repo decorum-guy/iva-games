@@ -151,6 +151,8 @@ test('stdout summary strips raw identities, tokens and unexpected nested values'
   report.capacityFixture.token = secret; report.retentionIdentity.token = secret;
   report.samples[0].cgroup.token = secret; report.samples[1].health.metrics.writer.token = secret;
   report.samples[1].health.metrics.writer.checkpoint.sqliteVersion = secret;
+  report.samples[1].health.metrics.roomFailureReasons = { CHECKPOINT_WAL_LIMIT: 4, WORKER_DEADLINE: secret, [secret]: 1 };
+  report.samples[1].health.metrics.roomFailureStages = { persist: 4, scheduler: -1, disconnect: 0.5, [secret]: 1 };
   report.pauses.push({ slot: 0, mapId: secret, reason: secret, token: secret, elapsedSeconds: 1 });
   report.failures.push({ code: secret, error: secret }); report.admissions.rejectedCodes[secret] = 1;
   const output = JSON.stringify(summarizeLoad(report));
@@ -158,6 +160,13 @@ test('stdout summary strips raw identities, tokens and unexpected nested values'
   assert.equal(output.includes('matchId'), false);
   assert.equal(output.includes('resultId'), false);
   assert.equal(safeFailureCode({ code: secret }), 'QA_CHECK_FAILED');
+  const counts = summarizeLoad(report).timings;
+  assert.equal(counts.roomFailureReasons.CHECKPOINT_WAL_LIMIT, 4);
+  assert.equal(counts.roomFailureReasons.WORKER_DEADLINE, null);
+  assert.equal(counts.roomFailureStages.persist, 4);
+  assert.equal(counts.roomFailureStages.scheduler, null);
+  assert.equal(counts.roomFailureStages.disconnect, null);
+  assert.equal(summarizeLoad(reportFixture()).timings.roomFailureReasons, null);
 });
 test('clean observer disconnect and stalled snapshots/ticks cannot silently reduce load', () => {
   const slot = { finished: false, client: { closed: false }, lastSnapshotAt: 1000, lastTickAt: 1000 };

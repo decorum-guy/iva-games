@@ -26,7 +26,7 @@ async function open(page: Page, reduce = true) {
       JSON.stringify({ board: '2d', sound: false, locale: 'en', reduce }))
   }, reduce)
   await page.goto('/remorse/')
-  await expect(page.getByTestId('mode-hotseat')).toBeVisible()
+  await expect(page.getByTestId('mode-ai')).toBeVisible()
 }
 
 async function restoreGame(page: Page, record: MatchRecord) {

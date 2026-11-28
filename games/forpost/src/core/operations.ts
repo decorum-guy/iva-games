@@ -41,8 +41,9 @@ export function spawnTransports(w: World): void {
 }
 export function unloadTransports(w: World): void {
   const center = getMap(w.mapId).complex
+  const eligible = w.units.filter(u => u.kind !== 'builder' && u.hp > 0 && u.protectedUntil <= w.tick && distance(u, center) <= RULES.unloadRadius)
   const presence = { A: false, B: false }
-  for (const u of w.units) if (u.kind !== 'builder' && u.hp > 0 && u.protectedUntil <= w.tick && distance(u, center) <= RULES.unloadRadius) presence[u.team] = true
+  for (const u of eligible) presence[u.team] = true
   const delivered: string[] = []
   for (const t of w.transports) {
     if (t.distance < t.length) continue
@@ -52,7 +53,9 @@ export function unloadTransports(w: World): void {
       if (t.unloadTicks >= RULES.unloadTicks) {
         w.teams[t.team].deliveries++; w.teams[t.team].nextTransportTick = w.tick + RULES.transportIntervalTicks; delivered.push(t.id)
         publicEvent(w, { type: 'delivery', targetId: t.id, team: t.team, point: center, value: w.teams[t.team].deliveries })
-        for (const p of w.participants.filter(p => p.team === t.team)) if (w.units.some(u => u.ownerId === p.id && u.kind !== 'builder' && distance(u, center) <= RULES.unloadRadius)) p.statistics.deliveries++
+        // Credit only participants whose units actually qualify for this unload.
+        // A protected ally nearby cannot contribute or receive personal delivery credit.
+        for (const p of w.participants.filter(p => p.team === t.team)) if (eligible.some(u => u.ownerId === p.id)) p.statistics.deliveries++
       }
     } else {
       if (t.unloadTicks) teamEvent(w, t.team, { type: 'unload-interrupted', targetId: t.id, team: t.team, point: center })

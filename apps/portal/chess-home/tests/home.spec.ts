@@ -80,6 +80,7 @@ test('opens a root-origin saved game at the new path and keeps subsequent moves'
 
 test('opens an old root invitation at the new REMORSE path and joins the same room', async ({ page, browser }) => {
   await page.goto('/remorse/');
+  await page.getByTestId('mode-friend').click();
   await page.getByTestId('mode-online').click();
   await page.getByTestId('online-name').fill('Host');
   await page.getByTestId('online-side-white').click();

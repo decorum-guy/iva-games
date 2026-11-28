@@ -2,6 +2,13 @@ export type Locale = 'ru' | 'en';
 type Pair = readonly [ru: string, en: string];
 
 export const messages = {
+  'home.shortPrompt': ['Поставьте мат. Взятия меняют характер фигур.', 'Checkmate the king. Captures change your pieces.'],
+  'home.continue': ['Продолжить', 'Continue'],
+  'home.tutorial': ['Обучение', 'Tutorial'],
+  'home.friend': ['С другом', 'With a friend'],
+  'home.sameDevice': ['На одном устройстве', 'On one device'],
+  'home.online': ['По сети', 'Online'],
+  'setup.more': ['Параметры партии', 'Game options'],
   'home.title': ['Шахматы с характером', 'Chess with consequences'],
   'home.prompt': ['Цель — мат. Взятие может вызвать вину, опустошение или ярость. Реакцию определяет кубик, и фигура её запоминает. Вина запрещает взятия. В ярости взятие первым действием даёт той же фигуре ещё одно. Слоны лечат своих и обращают чужих.', 'The goal is checkmate. A capture can cause guilt or devastation, or send a piece berserk. A die sets the reaction, and the piece remembers it. Guilt prevents captures. A berserk piece that captures on its first action earns one extra action. Bishops heal allies and convert enemies.'],
   'home.playAI': ['Играть с ИИ', 'Play against AI'],

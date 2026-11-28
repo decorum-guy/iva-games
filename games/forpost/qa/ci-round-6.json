@@ -1,0 +1,2815 @@
+{
+  "format": "iva-forpost-ci-round-6",
+  "source": "Completed native GitHub Actions job logs and metadata, inspected by the executor and actual delegated agents; no simulated play.",
+  "round": 6,
+  "completedAutomatedUiRoundsToDate": 6,
+  "executorOperatedForpostBrowserPassagesToDate": 0,
+  "prHead": "dae2eabfaaa03bd186b14b34a566b5af5a7fffd5",
+  "sourceTree": "50a7b075bfbead0a4328e140b3679c011d347ac0",
+  "buildRevision": "4c3c86fb405f11409a48fb941f8be72c077b00d6",
+  "runtimeArtifactId": "sha256:98a6727de9c2a9a6b63664cffa8b96842dd3fdc7ed6d78338f9b4f6e7cb62561",
+  "clientContentId": "sha256:77bdcc2d7d64fbfa36a830e46f68c7dcd10d3312d5384969cea3b5a7f04e4f4d",
+  "platformRun": 46179995591,
+  "ui": {
+    "chromium": {
+      "passed": 15,
+      "failed": 7,
+      "skipped": 0
+    },
+    "webkit": {
+      "passed": 9,
+      "failed": 1,
+      "skipped": 0
+    },
+    "total": {
+      "passed": 24,
+      "failed": 8,
+      "skipped": 0,
+      "cases": 32
+    },
+    "completeMatchesThisRound": 0,
+    "completeAutomatedUiMatchesAcrossRounds": 1,
+    "historicalCompleteMatch": "R5 FP02/2D only; own-team deliveries 0; winner B."
+  },
+  "mapJobs": [
+    {
+      "case": "fp01-2d",
+      "jobId": 141087153563,
+      "url": "https://github.com/decorum-guy/iva-games/actions/runs/46179995591/job/141087153563",
+      "conclusion": "failure",
+      "passed": 0,
+      "failed": 1,
+      "skipped": 0,
+      "identityObserved": {
+        "automatedBuildIdentity": true,
+        "map": "FP01",
+        "renderer": "2d",
+        "buildRevision": "4c3c86fb405f11409a48fb941f8be72c077b00d6",
+        "artifactId": "sha256:98a6727de9c2a9a6b63664cffa8b96842dd3fdc7ed6d78338f9b4f6e7cb62561",
+        "contentId": "sha256:77bdcc2d7d64fbfa36a830e46f68c7dcd10d3312d5384969cea3b5a7f04e4f4d"
+      },
+      "hostPhases": [
+        {
+          "phase": "running",
+          "reason": null
+        },
+        {
+          "phase": "paused",
+          "reason": "SERVER_BUSY"
+        }
+      ],
+      "reportedFailure": "assertion on observed phaseChanged SERVER_BUSY",
+      "pageErrors": [],
+      "browserName": "chromium",
+      "browserVersion": "159.0.8154.6",
+      "completeMatches": 0,
+      "rawLogSha256": "bdb1da25fee4e4b138ebc16d79dc90cc082ce1537fe88a2a0e4598642c7252c3",
+      "limits": "Actual automated UI and protocol observations. No executor-operated passage; no hidden world or raw URL query included.",
+      "browserSummary": {
+        "visible": true,
+        "hasFocus": true,
+        "viewport": [
+          1440,
+          900
+        ],
+        "pixelRatio": 1,
+        "build": "4c3c86fb405f11409a48fb941f8be72c077b00d6",
+        "renderer": "no WebGL2 stage context",
+        "elapsedMs": 13143,
+        "frames": 786,
+        "recentFrameGaps": {
+          "samples": 600,
+          "p50Ms": 16.699999999999818,
+          "p95Ms": 16.700000000000728,
+          "maxMs": 16.80000000000109
+        },
+        "longTasks": {
+          "count": 0,
+          "totalMs": 0,
+          "maxMs": 0
+        },
+        "stage": {
+          "backend": "canvas2d",
+          "drawCalls": 0,
+          "triangles": 0,
+          "renderWall": null
+        }
+      },
+      "runtimeSummary": {
+        "ticks": 221,
+        "maxStepMs": 10.529207000001406,
+        "maxCommitMs": 1756.8962659999997,
+        "storageFailures": 0,
+        "stepWorkP99Ms": 0.8,
+        "commitP99Ms": 155.8,
+        "eventLoopDelayP99Ms": 11.182079,
+        "journalAgeP99Ms": 155.8,
+        "snapshotAgeP99Ms": 64.7,
+        "queuedBytesMax": 0,
+        "writer": {
+          "batches": 223,
+          "maxTransactionMs": 1754.3167960000028,
+          "maxWorldBytes": 7285,
+          "maxRecordBytes": 10009,
+          "bodyP99Ms": 0.4,
+          "finalizeP99Ms": 103.4,
+          "synchronous": 2,
+          "queueP99Ms": 3.2,
+          "checkpoint": {
+            "observedAt": 1795893326414,
+            "sqliteVersion": "3.54.1",
+            "pageSize": 4096,
+            "walBytes": 708672,
+            "logFrames": 136,
+            "checkpointedFrames": 136,
+            "busy": 0,
+            "runs": 13,
+            "maxMs": 1617.0863649999992,
+            "p99Ms": 1617.0863649999992,
+            "failures": 0
+          }
+        }
+      }
+    },
+    {
+      "case": "fp02-2d",
+      "jobId": 141087153544,
+      "url": "https://github.com/decorum-guy/iva-games/actions/runs/46179995591/job/141087153544",
+      "conclusion": "failure",
+      "passed": 0,
+      "failed": 1,
+      "skipped": 0,
+      "identityObserved": {
+        "automatedBuildIdentity": true,
+        "map": "FP02",
+        "renderer": "2d",
+        "buildRevision": "4c3c86fb405f11409a48fb941f8be72c077b00d6",
+        "artifactId": "sha256:98a6727de9c2a9a6b63664cffa8b96842dd3fdc7ed6d78338f9b4f6e7cb62561",
+        "contentId": "sha256:77bdcc2d7d64fbfa36a830e46f68c7dcd10d3312d5384969cea3b5a7f04e4f4d"
+      },
+      "hostPhases": [
+        {
+          "phase": "running",
+          "reason": null
+        },
+        {
+          "phase": "paused",
+          "reason": "SERVER_BUSY"
+        }
+      ],
+      "reportedFailure": "assertion on observed phaseChanged SERVER_BUSY",
+      "pageErrors": [],
+      "browserName": "chromium",
+      "browserVersion": "159.0.8154.6",
+      "completeMatches": 0,
+      "rawLogSha256": "9e12872fb3ee16bec0417c27cd1475bbe9ed613234eff0fffcf96e98ec1948a2",
+      "limits": "Actual automated UI and protocol observations. No executor-operated passage; no hidden world or raw URL query included.",
+      "browserSummary": {
+        "visible": true,
+        "hasFocus": true,
+        "viewport": [
+          1440,
+          900
+        ],
+        "pixelRatio": 1,
+        "build": "4c3c86fb405f11409a48fb941f8be72c077b00d6",
+        "renderer": "no WebGL2 stage context",
+        "elapsedMs": 16142.600000000006,
+        "frames": 967,
+        "recentFrameGaps": {
+          "samples": 600,
+          "p50Ms": 16.69999999999891,
+          "p95Ms": 16.700000000000728,
+          "maxMs": 16.80000000000109
+        },
+        "longTasks": {
+          "count": 0,
+          "totalMs": 0,
+          "maxMs": 0
+        },
+        "stage": {
+          "backend": "canvas2d",
+          "drawCalls": 0,
+          "triangles": 0,
+          "renderWall": null
+        }
+      },
+      "runtimeSummary": {
+        "ticks": 325,
+        "maxStepMs": 9.019920000000639,
+        "maxCommitMs": 254.88417800000025,
+        "storageFailures": 0,
+        "stepWorkP99Ms": 0.8,
+        "commitP99Ms": 203.8,
+        "eventLoopDelayP99Ms": 11.616255,
+        "journalAgeP99Ms": 204.5,
+        "snapshotAgeP99Ms": 204.5,
+        "queuedBytesMax": 0,
+        "writer": {
+          "batches": 327,
+          "maxTransactionMs": 239.05676200000016,
+          "maxWorldBytes": 7274,
+          "maxRecordBytes": 9998,
+          "bodyP99Ms": 0.4,
+          "finalizeP99Ms": 198.1,
+          "synchronous": 2,
+          "queueP99Ms": 3.2,
+          "checkpoint": {
+            "observedAt": 1795893236836,
+            "sqliteVersion": "3.54.1",
+            "pageSize": 4096,
+            "walBytes": 4140632,
+            "logFrames": 1001,
+            "checkpointedFrames": 1001,
+            "busy": 0,
+            "runs": 17,
+            "maxMs": 119.85411499999827,
+            "p99Ms": 119.9,
+            "failures": 0
+          }
+        }
+      }
+    },
+    {
+      "case": "fp03-2d",
+      "jobId": 141087153663,
+      "url": "https://github.com/decorum-guy/iva-games/actions/runs/46179995591/job/141087153663",
+      "conclusion": "failure",
+      "passed": 0,
+      "failed": 1,
+      "skipped": 0,
+      "identityObserved": {
+        "automatedBuildIdentity": true,
+        "map": "FP03",
+        "renderer": "2d",
+        "buildRevision": "4c3c86fb405f11409a48fb941f8be72c077b00d6",
+        "artifactId": "sha256:98a6727de9c2a9a6b63664cffa8b96842dd3fdc7ed6d78338f9b4f6e7cb62561",
+        "contentId": "sha256:77bdcc2d7d64fbfa36a830e46f68c7dcd10d3312d5384969cea3b5a7f04e4f4d"
+      },
+      "hostPhases": [
+        {
+          "phase": "running",
+          "reason": null
+        },
+        {
+          "phase": "paused",
+          "reason": "SERVER_BUSY"
+        }
+      ],
+      "reportedFailure": "assertion on observed phaseChanged SERVER_BUSY",
+      "pageErrors": [],
+      "browserName": "chromium",
+      "browserVersion": "159.0.8154.6",
+      "completeMatches": 0,
+      "rawLogSha256": "16bfeb5b2ab8127686f90de9dd4cf53d0ab107e11b165c564cec651214fbec3a",
+      "limits": "Actual automated UI and protocol observations. No executor-operated passage; no hidden world or raw URL query included.",
+      "browserSummary": {
+        "visible": true,
+        "hasFocus": true,
+        "viewport": [
+          1440,
+          900
+        ],
+        "pixelRatio": 1,
+        "build": "4c3c86fb405f11409a48fb941f8be72c077b00d6",
+        "renderer": "no WebGL2 stage context",
+        "elapsedMs": 37920,
+        "frames": 2274,
+        "recentFrameGaps": {
+          "samples": 600,
+          "p50Ms": 16.69999999999709,
+          "p95Ms": 16.700000000004366,
+          "maxMs": 16.80000000000291
+        },
+        "longTasks": {
+          "count": 0,
+          "totalMs": 0,
+          "maxMs": 0
+        },
+        "stage": {
+          "backend": "canvas2d",
+          "drawCalls": 0,
+          "triangles": 0,
+          "renderWall": null
+        }
+      },
+      "runtimeSummary": {
+        "ticks": 930,
+        "maxStepMs": 7.741264000000228,
+        "maxCommitMs": 280.0850449999998,
+        "storageFailures": 0,
+        "stepWorkP99Ms": 1.2,
+        "commitP99Ms": 46.2,
+        "eventLoopDelayP99Ms": 11.403263,
+        "journalAgeP99Ms": 46.2,
+        "snapshotAgeP99Ms": 13.4,
+        "queuedBytesMax": 0,
+        "writer": {
+          "batches": 932,
+          "maxTransactionMs": 277.673397999999,
+          "maxWorldBytes": 19752,
+          "maxRecordBytes": 24622,
+          "bodyP99Ms": 0.6,
+          "finalizeP99Ms": 38.4,
+          "synchronous": 2,
+          "queueP99Ms": 3.2,
+          "checkpoint": {
+            "observedAt": 1795893310843,
+            "sqliteVersion": "3.54.1",
+            "pageSize": 4096,
+            "walBytes": 1668632,
+            "logFrames": 395,
+            "checkpointedFrames": 373,
+            "busy": 0,
+            "runs": 37,
+            "maxMs": 190.31371699999727,
+            "p99Ms": 190.4,
+            "failures": 0
+          }
+        }
+      }
+    },
+    {
+      "case": "fp01-3d",
+      "jobId": 141087153627,
+      "url": "https://github.com/decorum-guy/iva-games/actions/runs/46179995591/job/141087153627",
+      "conclusion": "failure",
+      "passed": 0,
+      "failed": 1,
+      "skipped": 0,
+      "identityObserved": {
+        "automatedBuildIdentity": true,
+        "map": "FP01",
+        "renderer": "3d",
+        "buildRevision": "4c3c86fb405f11409a48fb941f8be72c077b00d6",
+        "artifactId": "sha256:98a6727de9c2a9a6b63664cffa8b96842dd3fdc7ed6d78338f9b4f6e7cb62561",
+        "contentId": "sha256:77bdcc2d7d64fbfa36a830e46f68c7dcd10d3312d5384969cea3b5a7f04e4f4d"
+      },
+      "hostPhases": [
+        {
+          "phase": "running",
+          "reason": null
+        },
+        {
+          "phase": "paused",
+          "reason": "SERVER_BUSY"
+        }
+      ],
+      "reportedFailure": "mode-switch disabled during observed host pause; 15s click timeout",
+      "pageErrors": [],
+      "browserName": "chromium",
+      "browserVersion": "159.0.8154.6",
+      "completeMatches": 0,
+      "rawLogSha256": "6ab008d164549f1162aa91d874935bdbfc98467fb36502196c836f52e90b7ae1",
+      "limits": "Actual automated UI and protocol observations. No executor-operated passage; no hidden world or raw URL query included.",
+      "browserSummary": {
+        "visible": true,
+        "hasFocus": true,
+        "viewport": [
+          1440,
+          900
+        ],
+        "pixelRatio": 1,
+        "build": "4c3c86fb405f11409a48fb941f8be72c077b00d6",
+        "renderer": {
+          "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)",
+          "vendor": "Google Inc. (Google)",
+          "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+          "width": 1160,
+          "height": 756
+        },
+        "elapsedMs": 46034.79999999999,
+        "frames": 175,
+        "recentFrameGaps": {
+          "samples": 174,
+          "p50Ms": 266.6999999999971,
+          "p95Ms": 333.3000000000002,
+          "maxMs": 516.7
+        },
+        "longTasks": {
+          "count": 167,
+          "totalMs": 45223,
+          "maxMs": 478
+        },
+        "stage": {
+          "backend": "webgl",
+          "drawCalls": 318,
+          "triangles": 22640,
+          "renderWall": {
+            "samples": 120,
+            "p50Ms": 2,
+            "p95Ms": 3.3999999999941792,
+            "maxMs": 4.5
+          },
+          "synchronousCallSummary": {
+            "callbackWallMs": {
+              "observations": 164,
+              "samples": 120,
+              "totalMs": 293.10000000006403,
+              "p50Ms": 2.2999999999883585,
+              "p95Ms": 3.7000000000116415,
+              "maxMs": 5
+            },
+            "renderSubmitWallMs": {
+              "observations": 164,
+              "samples": 120,
+              "totalMs": 262.20000000009895,
+              "p50Ms": 2,
+              "p95Ms": 3.3999999999941792,
+              "maxMs": 4.5
+            },
+            "coverage": {
+              "samples": "totalMs and percentiles cover the retained window; observations counts all calls",
+              "sceneUpdates": "completed synchronous Scene calls only; excludes React render/commit and async model completion",
+              "nestedPhase": "cameraLayoutReadMs is included in cameraWallMs",
+              "scheduling": "timestampAgeMs and frame gaps overlap scheduling; do not add them to callback phases",
+              "reactRenderAndCommit": "not-measured",
+              "asyncModelLoading": "not-measured",
+              "gpuCompletion": "not-measured"
+            }
+          }
+        }
+      },
+      "runtimeSummary": {
+        "ticks": 821,
+        "maxStepMs": 13.245030000000042,
+        "maxCommitMs": 246.01172200000292,
+        "storageFailures": 0,
+        "stepWorkP99Ms": 3.9,
+        "commitP99Ms": 96.9,
+        "eventLoopDelayP99Ms": 12.558335,
+        "journalAgeP99Ms": 96.9,
+        "snapshotAgeP99Ms": 21.5,
+        "queuedBytesMax": 0,
+        "writer": {
+          "batches": 825,
+          "maxTransactionMs": 243.73403300000064,
+          "maxWorldBytes": 17175,
+          "maxRecordBytes": 21586,
+          "bodyP99Ms": 0.5,
+          "finalizeP99Ms": 34.3,
+          "synchronous": 2,
+          "queueP99Ms": 5.1,
+          "checkpoint": {
+            "observedAt": 1795893301008,
+            "sqliteVersion": "3.54.1",
+            "pageSize": 4096,
+            "walBytes": 2509112,
+            "logFrames": 2,
+            "checkpointedFrames": 2,
+            "busy": 0,
+            "runs": 45,
+            "maxMs": 234.55595199999516,
+            "p99Ms": 234.6,
+            "failures": 0
+          }
+        }
+      }
+    },
+    {
+      "case": "fp02-3d",
+      "jobId": 141087153491,
+      "url": "https://github.com/decorum-guy/iva-games/actions/runs/46179995591/job/141087153491",
+      "conclusion": "failure",
+      "passed": 0,
+      "failed": 1,
+      "skipped": 0,
+      "identityObserved": {
+        "automatedBuildIdentity": true,
+        "map": "FP02",
+        "renderer": "3d",
+        "buildRevision": "4c3c86fb405f11409a48fb941f8be72c077b00d6",
+        "artifactId": "sha256:98a6727de9c2a9a6b63664cffa8b96842dd3fdc7ed6d78338f9b4f6e7cb62561",
+        "contentId": "sha256:77bdcc2d7d64fbfa36a830e46f68c7dcd10d3312d5384969cea3b5a7f04e4f4d"
+      },
+      "hostPhases": [
+        {
+          "phase": "running",
+          "reason": null
+        },
+        {
+          "phase": "paused",
+          "reason": "SERVER_BUSY"
+        }
+      ],
+      "reportedFailure": "assertion on observed phaseChanged SERVER_BUSY",
+      "pageErrors": [],
+      "browserName": "chromium",
+      "browserVersion": "159.0.8154.6",
+      "completeMatches": 0,
+      "rawLogSha256": "6540418634029dc488db6d8ded301636e5101c7499ff95f03101a158d02575a1",
+      "limits": "Actual automated UI and protocol observations. No executor-operated passage; no hidden world or raw URL query included.",
+      "browserSummary": {
+        "visible": true,
+        "hasFocus": true,
+        "viewport": [
+          1440,
+          900
+        ],
+        "pixelRatio": 1,
+        "build": "4c3c86fb405f11409a48fb941f8be72c077b00d6",
+        "renderer": {
+          "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)",
+          "vendor": "Google Inc. (Google)",
+          "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+          "width": 1160,
+          "height": 756
+        },
+        "elapsedMs": 33168.299999999996,
+        "frames": 201,
+        "recentFrameGaps": {
+          "samples": 200,
+          "p50Ms": 166.69999999999982,
+          "p95Ms": 216.69999999999982,
+          "maxMs": 383.4
+        },
+        "longTasks": {
+          "count": 190,
+          "totalMs": 32293,
+          "maxMs": 354
+        },
+        "stage": {
+          "backend": "webgl",
+          "drawCalls": 332,
+          "triangles": 22610,
+          "renderWall": {
+            "samples": 120,
+            "p50Ms": 1.5,
+            "p95Ms": 2.6000000000058208,
+            "maxMs": 4
+          },
+          "synchronousCallSummary": {
+            "callbackWallMs": {
+              "observations": 184,
+              "samples": 120,
+              "totalMs": 231.80000000003201,
+              "p50Ms": 1.6999999999970896,
+              "p95Ms": 3.2000000000116415,
+              "maxMs": 4.30000000000291
+            },
+            "renderSubmitWallMs": {
+              "observations": 184,
+              "samples": 120,
+              "totalMs": 202.0999999999476,
+              "p50Ms": 1.5,
+              "p95Ms": 2.6000000000058208,
+              "maxMs": 4
+            },
+            "coverage": {
+              "samples": "totalMs and percentiles cover the retained window; observations counts all calls",
+              "sceneUpdates": "completed synchronous Scene calls only; excludes React render/commit and async model completion",
+              "nestedPhase": "cameraLayoutReadMs is included in cameraWallMs",
+              "scheduling": "timestampAgeMs and frame gaps overlap scheduling; do not add them to callback phases",
+              "reactRenderAndCommit": "not-measured",
+              "asyncModelLoading": "not-measured",
+              "gpuCompletion": "not-measured"
+            }
+          }
+        }
+      },
+      "runtimeSummary": {
+        "ticks": 806,
+        "maxStepMs": 16.78744899999947,
+        "maxCommitMs": 588.5887470000016,
+        "storageFailures": 0,
+        "stepWorkP99Ms": 1.9,
+        "commitP99Ms": 23.3,
+        "eventLoopDelayP99Ms": 12.296191,
+        "journalAgeP99Ms": 24.3,
+        "snapshotAgeP99Ms": 33.9,
+        "queuedBytesMax": 0,
+        "writer": {
+          "batches": 808,
+          "maxTransactionMs": 322.5070759999944,
+          "maxWorldBytes": 16487,
+          "maxRecordBytes": 20799,
+          "bodyP99Ms": 0.4,
+          "finalizeP99Ms": 20.1,
+          "synchronous": 2,
+          "queueP99Ms": 4.9,
+          "checkpoint": {
+            "observedAt": 1795893242672,
+            "sqliteVersion": "3.54.1",
+            "pageSize": 4096,
+            "walBytes": 1532672,
+            "logFrames": 362,
+            "checkpointedFrames": 346,
+            "busy": 0,
+            "runs": 33,
+            "maxMs": 99.70843500000046,
+            "p99Ms": 99.8,
+            "failures": 0
+          }
+        }
+      }
+    },
+    {
+      "case": "fp03-3d",
+      "jobId": 141087153533,
+      "url": "https://github.com/decorum-guy/iva-games/actions/runs/46179995591/job/141087153533",
+      "conclusion": "failure",
+      "passed": 0,
+      "failed": 1,
+      "skipped": 0,
+      "identityObserved": {
+        "automatedBuildIdentity": true,
+        "map": "FP03",
+        "renderer": "3d",
+        "buildRevision": "4c3c86fb405f11409a48fb941f8be72c077b00d6",
+        "artifactId": "sha256:98a6727de9c2a9a6b63664cffa8b96842dd3fdc7ed6d78338f9b4f6e7cb62561",
+        "contentId": "sha256:77bdcc2d7d64fbfa36a830e46f68c7dcd10d3312d5384969cea3b5a7f04e4f4d"
+      },
+      "hostPhases": [
+        {
+          "phase": "running",
+          "reason": null
+        },
+        {
+          "phase": "paused",
+          "reason": "SERVER_BUSY"
+        }
+      ],
+      "reportedFailure": "assertion on observed phaseChanged SERVER_BUSY",
+      "pageErrors": [],
+      "browserName": "chromium",
+      "browserVersion": "159.0.8154.6",
+      "completeMatches": 0,
+      "rawLogSha256": "c9d3d1221e22edfd1275227b849832e4410427dc8eb2d7f97cf5beaec8930378",
+      "limits": "Actual automated UI and protocol observations. No executor-operated passage; no hidden world or raw URL query included.",
+      "browserSummary": {
+        "visible": true,
+        "hasFocus": true,
+        "viewport": [
+          1440,
+          900
+        ],
+        "pixelRatio": 1,
+        "build": "4c3c86fb405f11409a48fb941f8be72c077b00d6",
+        "renderer": {
+          "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)",
+          "vendor": "Google Inc. (Google)",
+          "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+          "width": 1160,
+          "height": 756
+        },
+        "elapsedMs": 16247.5,
+        "frames": 91,
+        "recentFrameGaps": {
+          "samples": 90,
+          "p50Ms": 200,
+          "p95Ms": 283.3000000000011,
+          "maxMs": 450.00000000000006
+        },
+        "longTasks": {
+          "count": 71,
+          "totalMs": 15613,
+          "maxMs": 416
+        },
+        "stage": {
+          "backend": "webgl",
+          "drawCalls": 220,
+          "triangles": 16607,
+          "renderWall": {
+            "samples": 68,
+            "p50Ms": 1.900000000023283,
+            "p95Ms": 4.2999999999883585,
+            "maxMs": 92.19999999995343
+          },
+          "synchronousCallSummary": {
+            "callbackWallMs": {
+              "observations": 68,
+              "samples": 68,
+              "totalMs": 277.29999999981374,
+              "p50Ms": 2.2999999999883585,
+              "p95Ms": 4.5,
+              "maxMs": 93.19999999995343
+            },
+            "renderSubmitWallMs": {
+              "observations": 68,
+              "samples": 68,
+              "totalMs": 250.5999999999185,
+              "p50Ms": 1.900000000023283,
+              "p95Ms": 4.2999999999883585,
+              "maxMs": 92.19999999995343
+            },
+            "coverage": {
+              "samples": "totalMs and percentiles cover the retained window; observations counts all calls",
+              "sceneUpdates": "completed synchronous Scene calls only; excludes React render/commit and async model completion",
+              "nestedPhase": "cameraLayoutReadMs is included in cameraWallMs",
+              "scheduling": "timestampAgeMs and frame gaps overlap scheduling; do not add them to callback phases",
+              "reactRenderAndCommit": "not-measured",
+              "asyncModelLoading": "not-measured",
+              "gpuCompletion": "not-measured"
+            }
+          }
+        }
+      },
+      "runtimeSummary": {
+        "ticks": 294,
+        "maxStepMs": 11.793900000000576,
+        "maxCommitMs": 458.6912029999985,
+        "storageFailures": 0,
+        "stepWorkP99Ms": 3.1,
+        "commitP99Ms": 241.9,
+        "eventLoopDelayP99Ms": 12.918783,
+        "journalAgeP99Ms": 242.5,
+        "snapshotAgeP99Ms": 359.8,
+        "queuedBytesMax": 0,
+        "writer": {
+          "batches": 296,
+          "maxTransactionMs": 356.4903460000005,
+          "maxWorldBytes": 7448,
+          "maxRecordBytes": 10206,
+          "bodyP99Ms": 0.5,
+          "finalizeP99Ms": 235.2,
+          "synchronous": 2,
+          "queueP99Ms": 5,
+          "checkpoint": {
+            "observedAt": 1795893232153,
+            "sqliteVersion": "3.54.1",
+            "pageSize": 4096,
+            "walBytes": 1248392,
+            "logFrames": 173,
+            "checkpointedFrames": 171,
+            "busy": 0,
+            "runs": 16,
+            "maxMs": 193.6701260000009,
+            "p99Ms": 193.7,
+            "failures": 0
+          }
+        }
+      }
+    }
+  ],
+  "interfaceAndFocus": {
+    "evidence": "Completed native GitHub Actions logs and source assertion ordering; no agent browser, listening or physical-device observation",
+    "runId": 46179995591,
+    "expectedHeadProvidedByRoot": "dae2eabfaaa03bd186b14b34a566b5af5a7fffd5",
+    "expectedHeadTreeProvidedByRoot": "50a7b075bfbead0a4328e140b3679c011d347ac0",
+    "observedCheckoutRevisions": [
+      "4c3c86fb405f11409a48fb941f8be72c077b00d6"
+    ],
+    "scope": "Only interface, WebKit, headed Chromium focus and headed WebKit focus. Does not include six map jobs or overall workflow acceptance.",
+    "totalPassed": 24,
+    "totalFailed": 2,
+    "totalCases": 26,
+    "runtimeIdentityDirectlyObservedInHeadedJobHealth": {
+      "buildRevision": "4c3c86fb405f11409a48fb941f8be72c077b00d6",
+      "artifactId": "sha256:98a6727de9c2a9a6b63664cffa8b96842dd3fdc7ed6d78338f9b4f6e7cb62561",
+      "clientContentId": "sha256:77bdcc2d7d64fbfa36a830e46f68c7dcd10d3312d5384969cea3b5a7f04e4f4d",
+      "sameInBothHeadedJobs": true
+    },
+    "suites": [
+      {
+        "suite": "interface",
+        "jobId": 141087153905,
+        "status": "completed",
+        "conclusion": "success",
+        "rawLog": ".qa/ci-r6-interface.log",
+        "rawLogSha256": "f1a6b972646bea1d1f77b4c3040ce1b1663cbbeac16b989289a39e9e24e18a23",
+        "rawLogMode": "0o600",
+        "checkoutRevision": "4c3c86fb405f11409a48fb941f8be72c077b00d6",
+        "browserConfigured": "chromium",
+        "browserVersionInThisCompletedLog": null,
+        "domBuildRevisionsPrinted": [
+          "4c3c86fb405f11409a48fb941f8be72c077b00d6"
+        ],
+        "runtimeArtifactIdPrintedInThisCompletedLog": null,
+        "clientContentIdPrintedInThisCompletedLog": null,
+        "identityEvidenceNote": "Interface catalogue test compares actual DOM build with runtime health and passed; it does not print artifact/content digests. Successful WebKit logs print checkout and outcomes, but no DOM/runtime identities.",
+        "passed": 15,
+        "failed": 0,
+        "nativeSummary": "15 passed (3.0m)",
+        "results": [
+          {
+            "outcome": "passed",
+            "index": 1,
+            "source": "games/forpost/e2e/audio.spec.ts:104:1",
+            "title": "native Web Audio decodes all 29 shipped WAVs and honors live cues, mute and reload isolation",
+            "duration": "7.2s"
+          },
+          {
+            "outcome": "passed",
+            "index": 2,
+            "source": "games/forpost/e2e/forpost.spec.ts:83:1",
+            "title": "catalogue, exact build, all map choices and persisted RU/EN/settings",
+            "duration": "809ms"
+          },
+          {
+            "outcome": "passed",
+            "index": 3,
+            "source": "games/forpost/e2e/forpost.spec.ts:107:1",
+            "title": "actual tutorial construction, queue, power state and isolated save",
+            "duration": "25.8s"
+          },
+          {
+            "outcome": "passed",
+            "index": 4,
+            "source": "games/forpost/e2e/forpost.spec.ts:128:3",
+            "title": "mobile controls › touch viewport, 130 percent text, renderer fallback and rotation keep controls usable",
+            "duration": "1.8s"
+          },
+          {
+            "outcome": "passed",
+            "index": 5,
+            "source": "games/forpost/e2e/interaction.spec.ts:78:1",
+            "title": "menu exposes all team, bot, weapon and tool choices and an escaped bounded callsign",
+            "duration": "589ms"
+          },
+          {
+            "outcome": "passed",
+            "index": 6,
+            "source": "games/forpost/e2e/interaction.spec.ts:105:1",
+            "title": "settings trap focus, restore it and persist every control through reload",
+            "duration": "888ms"
+          },
+          {
+            "outcome": "passed",
+            "index": 7,
+            "source": "games/forpost/e2e/interaction.spec.ts:141:1",
+            "title": "movement, aim, reload and modal neutral input complete the first lesson through controls",
+            "duration": "7.2s"
+          },
+          {
+            "outcome": "passed",
+            "index": 8,
+            "source": "games/forpost/e2e/interaction.spec.ts:185:1",
+            "title": "construction cancel, queued refund, rebuild and disabled reasons finish the infrastructure lesson",
+            "duration": "12.3s"
+          },
+          {
+            "outcome": "passed",
+            "index": 9,
+            "source": "games/forpost/e2e/interaction.spec.ts:217:1",
+            "title": "power priority, sale cancellation and generator finish the power lesson",
+            "duration": "9.9s"
+          },
+          {
+            "outcome": "passed",
+            "index": 10,
+            "source": "games/forpost/e2e/interaction.spec.ts:242:1",
+            "title": "dock cancel, production, drone escort and switching back finish the squad lesson",
+            "duration": "11.2s"
+          },
+          {
+            "outcome": "passed",
+            "index": 11,
+            "source": "games/forpost/e2e/interaction.spec.ts:265:1",
+            "title": "cover lesson requires a blocked shot, a real wall detour and barrier placement",
+            "duration": "6.9s"
+          },
+          {
+            "outcome": "passed",
+            "index": 12,
+            "source": "games/forpost/e2e/interaction.spec.ts:280:1",
+            "title": "delivery lesson escorts its vehicle and clears the actual unloading circle",
+            "duration": "16.6s"
+          },
+          {
+            "outcome": "passed",
+            "index": 13,
+            "source": "games/forpost/e2e/interaction.spec.ts:293:1",
+            "title": "final lesson reaches an operation result and starts a separate live practice",
+            "duration": "31.3s"
+          },
+          {
+            "outcome": "passed",
+            "index": 14,
+            "source": "games/forpost/e2e/lifecycle.spec.ts:17:1",
+            "title": "a late real practice response leaves the newly selected lesson active and releases its own room",
+            "duration": "31.0s"
+          },
+          {
+            "outcome": "passed",
+            "index": 15,
+            "source": "games/forpost/e2e/touch.spec.ts:24:1",
+            "title": "touch sticks, simultaneous fire, cancel, reload and rotation operate the real controls",
+            "duration": "8.2s"
+          }
+        ],
+        "nativeAudio": [
+          {
+            "nativeAudio": "passed",
+            "build": "4c3c86fb405f11409a48fb941f8be72c077b00d6",
+            "browserName": "chromium",
+            "decodedClips": 29,
+            "freshUiCue": "order",
+            "freshShotCue": "carbine",
+            "muteStoppedNativeVoice": true,
+            "mutedShotConsumed": true,
+            "reloadReplayedOldShots": false,
+            "audioListened": false,
+            "physicalDevice": false,
+            "mockedAudio": false
+          }
+        ],
+        "lifecycle": [
+          {
+            "automatedLifecycle": "late-practice-response",
+            "realCreateStatus": 201,
+            "appAbandonStatus": 200,
+            "responseDelayMs": 272.17298900001333,
+            "unchangedLesson": 0,
+            "acceptedAction": "mode"
+          }
+        ],
+        "hostPhases": [
+          {
+            "test": "final lesson reaches an operation result and starts a separate live practice",
+            "automatedHostPhase": "running",
+            "reason": null
+          }
+        ],
+        "focusScenarioTransferredToSeparateRequiredHeadedJobs": true
+      },
+      {
+        "suite": "webkit",
+        "jobId": 141087153608,
+        "status": "completed",
+        "conclusion": "success",
+        "rawLog": ".qa/ci-r6-webkit.log",
+        "rawLogSha256": "83b901ba685f8579dca807b0409bebd63ea22b187c11c4d2efc1b514d4a1b9ae",
+        "rawLogMode": "0o600",
+        "checkoutRevision": "4c3c86fb405f11409a48fb941f8be72c077b00d6",
+        "browserConfigured": "webkit",
+        "browserVersionInThisCompletedLog": null,
+        "domBuildRevisionsPrinted": [],
+        "runtimeArtifactIdPrintedInThisCompletedLog": null,
+        "clientContentIdPrintedInThisCompletedLog": null,
+        "identityEvidenceNote": "This successful WebKit job prints checkout and outcomes, but no DOM/runtime artifact/content identities. Do not substitute identifiers observed in another job as this job measurement.",
+        "passed": 9,
+        "failed": 0,
+        "nativeSummary": "9 passed (2.3m)",
+        "results": [
+          {
+            "outcome": "passed",
+            "index": 1,
+            "source": "games/forpost/e2e/interaction.spec.ts:78:1",
+            "title": "menu exposes all team, bot, weapon and tool choices and an escaped bounded callsign",
+            "duration": "9.4s"
+          },
+          {
+            "outcome": "passed",
+            "index": 2,
+            "source": "games/forpost/e2e/interaction.spec.ts:105:1",
+            "title": "settings trap focus, restore it and persist every control through reload",
+            "duration": "3.8s"
+          },
+          {
+            "outcome": "passed",
+            "index": 3,
+            "source": "games/forpost/e2e/interaction.spec.ts:141:1",
+            "title": "movement, aim, reload and modal neutral input complete the first lesson through controls",
+            "duration": "10.0s"
+          },
+          {
+            "outcome": "passed",
+            "index": 4,
+            "source": "games/forpost/e2e/interaction.spec.ts:185:1",
+            "title": "construction cancel, queued refund, rebuild and disabled reasons finish the infrastructure lesson",
+            "duration": "15.0s"
+          },
+          {
+            "outcome": "passed",
+            "index": 5,
+            "source": "games/forpost/e2e/interaction.spec.ts:217:1",
+            "title": "power priority, sale cancellation and generator finish the power lesson",
+            "duration": "13.2s"
+          },
+          {
+            "outcome": "passed",
+            "index": 6,
+            "source": "games/forpost/e2e/interaction.spec.ts:242:1",
+            "title": "dock cancel, production, drone escort and switching back finish the squad lesson",
+            "duration": "14.1s"
+          },
+          {
+            "outcome": "passed",
+            "index": 7,
+            "source": "games/forpost/e2e/interaction.spec.ts:265:1",
+            "title": "cover lesson requires a blocked shot, a real wall detour and barrier placement",
+            "duration": "9.9s"
+          },
+          {
+            "outcome": "passed",
+            "index": 8,
+            "source": "games/forpost/e2e/interaction.spec.ts:280:1",
+            "title": "delivery lesson escorts its vehicle and clears the actual unloading circle",
+            "duration": "18.5s"
+          },
+          {
+            "outcome": "passed",
+            "index": 9,
+            "source": "games/forpost/e2e/interaction.spec.ts:293:1",
+            "title": "final lesson reaches an operation result and starts a separate live practice",
+            "duration": "34.1s"
+          }
+        ],
+        "nativeAudio": [],
+        "lifecycle": [],
+        "hostPhases": [
+          {
+            "test": "final lesson reaches an operation result and starts a separate live practice",
+            "automatedHostPhase": "running",
+            "reason": null
+          }
+        ],
+        "focusScenarioTransferredToSeparateRequiredHeadedJobs": true
+      },
+      {
+        "suite": "focus-chromium",
+        "jobId": 141087153501,
+        "status": "completed",
+        "conclusion": "failure",
+        "rawLog": ".qa/ci-r6-focus-chromium.log",
+        "rawLogSha256": "9ebf3eb4585fa7d3986ac58075df6cbb293c6f9ce624fcd9aa4dc944c4e342b4",
+        "rawLogMode": "0o600",
+        "checkoutRevision": "4c3c86fb405f11409a48fb941f8be72c077b00d6",
+        "domBuildRevision": "4c3c86fb405f11409a48fb941f8be72c077b00d6",
+        "runtimeBuildRevision": "4c3c86fb405f11409a48fb941f8be72c077b00d6",
+        "runtimeArtifactId": "sha256:98a6727de9c2a9a6b63664cffa8b96842dd3fdc7ed6d78338f9b4f6e7cb62561",
+        "clientContentId": "sha256:77bdcc2d7d64fbfa36a830e46f68c7dcd10d3312d5384969cea3b5a7f04e4f4d",
+        "identityAgreement": true,
+        "environment": {
+          "automatedFocusEnvironment": true,
+          "browserName": "chromium",
+          "browserVersion": "159.0.8154.6",
+          "headless": false,
+          "xvfbRunRequested": true,
+          "displayConfigured": true
+        },
+        "initialFocus": {
+          "automatedFocusPrecondition": "visible-and-focused",
+          "browserName": "chromium",
+          "chromiumFocusEmulationDisabled": true
+        },
+        "passed": 0,
+        "failed": 1,
+        "results": [
+          {
+            "outcome": "failed",
+            "index": 1,
+            "source": "games/forpost/e2e/interaction.spec.ts:381:1",
+            "title": "switching browser tabs while firing releases input and does not resume old shots @native-focus",
+            "duration": "3.9s"
+          }
+        ],
+        "observedFailure": "BROWSER_FOCUS_LOSS_UNAVAILABLE",
+        "realBlurOrHiddenObserved": false,
+        "focusEvents": [
+          {
+            "seq": 1,
+            "type": "initial",
+            "elapsedMs": 0,
+            "hidden": false,
+            "hasFocus": true
+          }
+        ],
+        "finalVisible": true,
+        "finalHasFocus": true,
+        "firstAmmoDecrease": "satisfied before the observed failure, inferred from the test control flow",
+        "downstreamNonemptyStableAmmoAssertions": "not reached",
+        "automatedFocusReleasePassed": false,
+        "pageErrors": [],
+        "limits": "Headed Xvfb automation did not produce the required native blur/hidden event; this is an explicit capability failure, not accepted fire-release behavior.",
+        "initialFocusFieldInterpretation": "chromiumFocusEmulationDisabled in the R6 log meant that a separately created CDP session accepted false before navigation. It did not measure all overrides after navigation."
+      },
+      {
+        "suite": "focus-webkit",
+        "jobId": 141087153542,
+        "status": "completed",
+        "conclusion": "failure",
+        "rawLog": ".qa/ci-r6-focus-webkit.log",
+        "rawLogSha256": "2bc4cc4dfd8f5ef41935bb1e7e8e22d4f437d736d0209c66c2e9f3390b746665",
+        "rawLogMode": "0o600",
+        "checkoutRevision": "4c3c86fb405f11409a48fb941f8be72c077b00d6",
+        "domBuildRevision": "4c3c86fb405f11409a48fb941f8be72c077b00d6",
+        "runtimeBuildRevision": "4c3c86fb405f11409a48fb941f8be72c077b00d6",
+        "runtimeArtifactId": "sha256:98a6727de9c2a9a6b63664cffa8b96842dd3fdc7ed6d78338f9b4f6e7cb62561",
+        "clientContentId": "sha256:77bdcc2d7d64fbfa36a830e46f68c7dcd10d3312d5384969cea3b5a7f04e4f4d",
+        "identityAgreement": true,
+        "environment": {
+          "automatedFocusEnvironment": true,
+          "browserName": "webkit",
+          "browserVersion": "27.2",
+          "headless": false,
+          "xvfbRunRequested": true,
+          "displayConfigured": true
+        },
+        "initialFocus": {
+          "automatedFocusPrecondition": "visible-and-focused",
+          "browserName": "webkit",
+          "chromiumFocusEmulationDisabled": false
+        },
+        "passed": 0,
+        "failed": 1,
+        "results": [
+          {
+            "outcome": "failed",
+            "index": 1,
+            "source": "games/forpost/e2e/interaction.spec.ts:381:1",
+            "title": "switching browser tabs while firing releases input and does not resume old shots @native-focus",
+            "duration": "7.7s"
+          }
+        ],
+        "observedFailure": "BROWSER_FOCUS_LOSS_UNAVAILABLE",
+        "realBlurOrHiddenObserved": false,
+        "focusEvents": [
+          {
+            "seq": 1,
+            "type": "initial",
+            "elapsedMs": 1,
+            "hidden": false,
+            "hasFocus": true
+          }
+        ],
+        "finalVisible": true,
+        "finalHasFocus": true,
+        "firstAmmoDecrease": "satisfied before the observed failure, inferred from the test control flow",
+        "downstreamNonemptyStableAmmoAssertions": "not reached",
+        "automatedFocusReleasePassed": false,
+        "pageErrors": [],
+        "limits": "Headed Xvfb automation did not produce the required native blur/hidden event; this is an explicit capability failure, not accepted fire-release behavior."
+      }
+    ],
+    "limitations": [
+      "The required real blur/hidden precondition failed in both headed Xvfb browsers; downstream nonempty/stable-ammo release assertions were not reached.",
+      "Native audio pass proves hash/decode and actual Web Audio start/stop/gain/cue isolation assertions, not human listening.",
+      "Touch automation does not establish physical phone behavior.",
+      "Most interaction cases use the supported 2D setting; the separate actual tutorial construction case retains default 3D. Passing all interface tests is not full default-3D map acceptance."
+    ]
+  },
+  "runtimeTrace": {
+    "format": "iva-forpost-ci-overload-review-1",
+    "runId": 46179995591,
+    "jobId": 141087153563,
+    "jobConclusion": "failure",
+    "source": {
+      "buildRevision": "4c3c86fb405f11409a48fb941f8be72c077b00d6",
+      "prHead": "dae2eabfaaa03bd186b14b34a566b5af5a7fffd5",
+      "tree": "50a7b075bfbead0a4328e140b3679c011d347ac0",
+      "sourceSha256": "8654dcb1855edd76e8d70a9a3bfda9eb41b9ef4cf5c99b14e7c4304f02e5680c",
+      "coreSha256": "14d49d29954d0f7f427feea026beb23113699ff8ecb36ec4480f61f339a61e68",
+      "sourceBasis": "Same exact CI checkout/tree; storage job reports full source inventory; trace and health agree on build/runtime"
+    },
+    "identity": {
+      "runtime": "sha256:98a6727de9c2a9a6b63664cffa8b96842dd3fdc7ed6d78338f9b4f6e7cb62561",
+      "client": "sha256:77bdcc2d7d64fbfa36a830e46f68c7dcd10d3312d5384969cea3b5a7f04e4f4d"
+    },
+    "trace": {
+      "file": ".qa/ci-r6-runtime-trace.json",
+      "validation": {
+        "singleTrace": true,
+        "buildMatches": true,
+        "artifactMatches": true,
+        "rowsMatch": true,
+        "rowLimit": true,
+        "bytesLimit": true,
+        "windowLimit": true,
+        "allRowsNumericSafeIntegers": true,
+        "continuousSeq": true,
+        "knownKinds": true,
+        "knownOps": true,
+        "allConfirmedTickLinks": true,
+        "triggerExists": true,
+        "cutoffSeqMatches": true,
+        "allRecordedTimesWithinCutoff": true
+      },
+      "freeze": {
+        "atUs": 19780494,
+        "seq": 474,
+        "backlogUs": 1757066,
+        "triggerTickSeq": 472,
+        "triggerTickStatus": "retained",
+        "durablePause": "confirmed"
+      },
+      "retained": {
+        "firstSeq": 1,
+        "lastSeq": 474,
+        "rows": 474,
+        "droppedRows": 0,
+        "truncatedRows": 0,
+        "evictedUpdates": 0,
+        "incompleteRows": 1,
+        "missingCommitSpans": 0,
+        "completeFromStart": false
+      }
+    },
+    "observations": {
+      "failure": "SERVER_BUSY observed in an actual phaseChanged message",
+      "corePhaseAtFailure": "preparation",
+      "browser": {
+        "backend": "canvas2d",
+        "pageErrors": 0,
+        "frames": 786,
+        "elapsedMs": 13143,
+        "recentFrameGaps": {
+          "samples": 600,
+          "p50Ms": 16.699999999999818,
+          "p95Ms": 16.700000000000728,
+          "maxMs": 16.80000000000109
+        },
+        "longTasks": {
+          "count": 0,
+          "totalMs": 0,
+          "maxMs": 0
+        }
+      },
+      "healthMetrics": {
+        "ticks": 221,
+        "maxStepMs": 10.529207000001406,
+        "maxCommitMs": 1756.8962659999997,
+        "storageFailures": 0,
+        "resyncs": 0,
+        "admissionFailures": 0,
+        "stepWorkSamples": 221,
+        "stepWorkCpuTotalMs": 20.701000000000004,
+        "maxCommitBatchSize": 1,
+        "journalPendingAgeMs": 0,
+        "journalAgeP99Ms": 155.8,
+        "snapshotAgeMs": 0,
+        "snapshotAgeP99Ms": 64.7,
+        "resyncReasons": {
+          "requested": 0,
+          "staleEpoch": 0,
+          "backpressure": 0
+        },
+        "stepP99Ms": 1.7,
+        "commitP99Ms": 155.8,
+        "eventLoopDelayP99Ms": 11.182079,
+        "stepWorkP99Ms": 0.8,
+        "stepWorkCpuP99Ms": 0.7,
+        "processCpuMs": 1200.73,
+        "processElapsedMs": 20543.596943,
+        "writer": {
+          "batches": 223,
+          "maxTransactionMs": 1754.3167960000028,
+          "maxWorldBytes": 7285,
+          "maxRecordBytes": 10009,
+          "maxJournalBytes": 313,
+          "transactionP99Ms": 103.9,
+          "bodyP99Ms": 0.4,
+          "finalizeP99Ms": 103.4,
+          "walAutoCheckpoint": 0,
+          "synchronous": 2,
+          "queueP99Ms": 3.2,
+          "checkpoint": {
+            "observedAt": 1795893326414,
+            "sqliteVersion": "3.54.1",
+            "pageSize": 4096,
+            "walBytes": 708672,
+            "logFrames": 136,
+            "checkpointedFrames": 136,
+            "busy": 0,
+            "runs": 13,
+            "maxMs": 1617.0863649999992,
+            "p99Ms": 1617.0863649999992,
+            "failures": 0
+          }
+        },
+        "byGame": {
+          "forpost": {
+            "stepP99Ms": 1.7,
+            "stepWorkP99Ms": 0.8,
+            "stepWorkCpuP99Ms": 0.7,
+            "commitP99Ms": 155.8,
+            "journalPendingAgeMs": 0,
+            "journalAgeP99Ms": 155.8,
+            "snapshotAgeMs": 0,
+            "snapshotAgeP99Ms": 64.7
+          }
+        },
+        "rssBytes": 172347392,
+        "heapUsedBytes": 19090608,
+        "queuedBytesMax": 0
+      },
+      "operationStatistics": {
+        "starts": {
+          "total": 3,
+          "pending": 0,
+          "failures": 0,
+          "rpcMs": {
+            "samples": 3,
+            "p50": 2.356,
+            "p99": 136.625,
+            "max": 136.625,
+            "sum": 141.265
+          },
+          "preReceiveMs": {
+            "samples": 3,
+            "p50": 0.076,
+            "p99": 133.82,
+            "max": 133.82,
+            "sum": 133.957
+          },
+          "queueMs": {
+            "samples": 3,
+            "p50": 2.124,
+            "p99": 2.33,
+            "max": 2.33,
+            "sum": 6.566000000000001
+          },
+          "executionMs": {
+            "samples": 3,
+            "p50": 0.109,
+            "p99": 0.17,
+            "max": 0.17,
+            "sum": 0.30400000000000005
+          },
+          "replyMs": {
+            "samples": 3,
+            "p50": 0.071,
+            "p99": 0.305,
+            "max": 0.305,
+            "sum": 0.438
+          }
+        },
+        "list": {
+          "total": 1,
+          "pending": 0,
+          "failures": 0,
+          "rpcMs": {
+            "samples": 1,
+            "p50": 2.369,
+            "p99": 2.369,
+            "max": 2.369,
+            "sum": 2.369
+          },
+          "preReceiveMs": {
+            "samples": 1,
+            "p50": 0.078,
+            "p99": 0.078,
+            "max": 0.078,
+            "sum": 0.078
+          },
+          "queueMs": {
+            "samples": 1,
+            "p50": 2.123,
+            "p99": 2.123,
+            "max": 2.123,
+            "sum": 2.123
+          },
+          "executionMs": {
+            "samples": 1,
+            "p50": 0.105,
+            "p99": 0.105,
+            "max": 0.105,
+            "sum": 0.105
+          },
+          "replyMs": {
+            "samples": 1,
+            "p50": 0.063,
+            "p99": 0.063,
+            "max": 0.063,
+            "sum": 0.063
+          }
+        },
+        "consumeBridge": {
+          "total": 17,
+          "pending": 1,
+          "failures": 0,
+          "rpcMs": {
+            "samples": 16,
+            "p50": 2.915,
+            "p99": 15.05,
+            "max": 15.05,
+            "sum": 65.508
+          },
+          "preReceiveMs": {
+            "samples": 16,
+            "p50": 0.072,
+            "p99": 0.75,
+            "max": 0.75,
+            "sum": 1.8869999999999998
+          },
+          "queueMs": {
+            "samples": 16,
+            "p50": 2.113,
+            "p99": 3.005,
+            "max": 3.005,
+            "sum": 36.32
+          },
+          "executionMs": {
+            "samples": 16,
+            "p50": 0.54,
+            "p99": 12.812,
+            "max": 12.812,
+            "sum": 25.77
+          },
+          "replyMs": {
+            "samples": 16,
+            "p50": 0.058,
+            "p99": 0.559,
+            "max": 0.559,
+            "sum": 1.5310000000000001
+          }
+        },
+        "byStart": {
+          "total": 2,
+          "pending": 0,
+          "failures": 0,
+          "rpcMs": {
+            "samples": 2,
+            "p50": 2.303,
+            "p99": 3.902,
+            "max": 3.902,
+            "sum": 6.205
+          },
+          "preReceiveMs": {
+            "samples": 2,
+            "p50": 0.051,
+            "p99": 0.058,
+            "max": 0.058,
+            "sum": 0.109
+          },
+          "queueMs": {
+            "samples": 2,
+            "p50": 2.112,
+            "p99": 3.195,
+            "max": 3.195,
+            "sum": 5.307
+          },
+          "executionMs": {
+            "samples": 2,
+            "p50": 0.088,
+            "p99": 0.587,
+            "max": 0.587,
+            "sum": 0.6749999999999999
+          },
+          "replyMs": {
+            "samples": 2,
+            "p50": 0.045,
+            "p99": 0.069,
+            "max": 0.069,
+            "sum": 0.114
+          }
+        },
+        "enqueueStart": {
+          "total": 1,
+          "pending": 0,
+          "failures": 0,
+          "rpcMs": {
+            "samples": 1,
+            "p50": 3.007,
+            "p99": 3.007,
+            "max": 3.007,
+            "sum": 3.007
+          },
+          "preReceiveMs": {
+            "samples": 1,
+            "p50": 0.062,
+            "p99": 0.062,
+            "max": 0.062,
+            "sum": 0.062
+          },
+          "queueMs": {
+            "samples": 1,
+            "p50": 2.109,
+            "p99": 2.109,
+            "max": 2.109,
+            "sum": 2.109
+          },
+          "executionMs": {
+            "samples": 1,
+            "p50": 0.742,
+            "p99": 0.742,
+            "max": 0.742,
+            "sum": 0.742
+          },
+          "replyMs": {
+            "samples": 1,
+            "p50": 0.094,
+            "p99": 0.094,
+            "max": 0.094,
+            "sum": 0.094
+          }
+        },
+        "reserveStart": {
+          "total": 1,
+          "pending": 0,
+          "failures": 0,
+          "rpcMs": {
+            "samples": 1,
+            "p50": 2.886,
+            "p99": 2.886,
+            "max": 2.886,
+            "sum": 2.886
+          },
+          "preReceiveMs": {
+            "samples": 1,
+            "p50": 0.06,
+            "p99": 0.06,
+            "max": 0.06,
+            "sum": 0.06
+          },
+          "queueMs": {
+            "samples": 1,
+            "p50": 2.105,
+            "p99": 2.105,
+            "max": 2.105,
+            "sum": 2.105
+          },
+          "executionMs": {
+            "samples": 1,
+            "p50": 0.672,
+            "p99": 0.672,
+            "max": 0.672,
+            "sum": 0.672
+          },
+          "replyMs": {
+            "samples": 1,
+            "p50": 0.049,
+            "p99": 0.049,
+            "max": 0.049,
+            "sum": 0.049
+          }
+        },
+        "create": {
+          "total": 1,
+          "pending": 0,
+          "failures": 0,
+          "rpcMs": {
+            "samples": 1,
+            "p50": 3.167,
+            "p99": 3.167,
+            "max": 3.167,
+            "sum": 3.167
+          },
+          "preReceiveMs": {
+            "samples": 1,
+            "p50": 0.173,
+            "p99": 0.173,
+            "max": 0.173,
+            "sum": 0.173
+          },
+          "queueMs": {
+            "samples": 1,
+            "p50": 2.115,
+            "p99": 2.115,
+            "max": 2.115,
+            "sum": 2.115
+          },
+          "executionMs": {
+            "samples": 1,
+            "p50": 0.766,
+            "p99": 0.766,
+            "max": 0.766,
+            "sum": 0.766
+          },
+          "replyMs": {
+            "samples": 1,
+            "p50": 0.113,
+            "p99": 0.113,
+            "max": 0.113,
+            "sum": 0.113
+          }
+        },
+        "admission": {
+          "total": 3,
+          "pending": 0,
+          "failures": 0,
+          "rpcMs": {
+            "samples": 3,
+            "p50": 2.684,
+            "p99": 2.85,
+            "max": 2.85,
+            "sum": 8.046
+          },
+          "preReceiveMs": {
+            "samples": 3,
+            "p50": 0.093,
+            "p99": 0.34,
+            "max": 0.34,
+            "sum": 0.47000000000000003
+          },
+          "queueMs": {
+            "samples": 3,
+            "p50": 2.102,
+            "p99": 2.108,
+            "max": 2.108,
+            "sum": 6.288
+          },
+          "executionMs": {
+            "samples": 3,
+            "p50": 0.373,
+            "p99": 0.421,
+            "max": 0.421,
+            "sum": 1.157
+          },
+          "replyMs": {
+            "samples": 3,
+            "p50": 0.035,
+            "p99": 0.062,
+            "max": 0.062,
+            "sum": 0.131
+          }
+        },
+        "checkAdmission": {
+          "total": 1,
+          "pending": 0,
+          "failures": 0,
+          "rpcMs": {
+            "samples": 1,
+            "p50": 2.501,
+            "p99": 2.501,
+            "max": 2.501,
+            "sum": 2.501
+          },
+          "preReceiveMs": {
+            "samples": 1,
+            "p50": 0.09,
+            "p99": 0.09,
+            "max": 0.09,
+            "sum": 0.09
+          },
+          "queueMs": {
+            "samples": 1,
+            "p50": 2.109,
+            "p99": 2.109,
+            "max": 2.109,
+            "sum": 2.109
+          },
+          "executionMs": {
+            "samples": 1,
+            "p50": 0.237,
+            "p99": 0.237,
+            "max": 0.237,
+            "sum": 0.237
+          },
+          "replyMs": {
+            "samples": 1,
+            "p50": 0.065,
+            "p99": 0.065,
+            "max": 0.065,
+            "sum": 0.065
+          }
+        },
+        "consumeTicket": {
+          "total": 1,
+          "pending": 0,
+          "failures": 0,
+          "rpcMs": {
+            "samples": 1,
+            "p50": 19.291,
+            "p99": 19.291,
+            "max": 19.291,
+            "sum": 19.291
+          },
+          "preReceiveMs": {
+            "samples": 1,
+            "p50": 0.033,
+            "p99": 0.033,
+            "max": 0.033,
+            "sum": 0.033
+          },
+          "queueMs": {
+            "samples": 1,
+            "p50": 2.1,
+            "p99": 2.1,
+            "max": 2.1,
+            "sum": 2.1
+          },
+          "executionMs": {
+            "samples": 1,
+            "p50": 17.077,
+            "p99": 17.077,
+            "max": 17.077,
+            "sum": 17.077
+          },
+          "replyMs": {
+            "samples": 1,
+            "p50": 0.081,
+            "p99": 0.081,
+            "max": 0.081,
+            "sum": 0.081
+          }
+        },
+        "commit": {
+          "total": 222,
+          "pending": 0,
+          "failures": 0,
+          "rpcMs": {
+            "samples": 222,
+            "p50": 3.113,
+            "p99": 99.965,
+            "max": 1756.874,
+            "sum": 3056.6789999999996
+          },
+          "preReceiveMs": {
+            "samples": 222,
+            "p50": 0.11,
+            "p99": 0.206,
+            "max": 0.228,
+            "sum": 25.165000000000017
+          },
+          "queueMs": {
+            "samples": 222,
+            "p50": 2.112,
+            "p99": 2.412,
+            "max": 4.626,
+            "sum": 467.37100000000027
+          },
+          "executionMs": {
+            "samples": 222,
+            "p50": 0.739,
+            "p99": 97.524,
+            "max": 1754.367,
+            "sum": 2532.422
+          },
+          "replyMs": {
+            "samples": 222,
+            "p50": 0.137,
+            "p99": 0.264,
+            "max": 0.287,
+            "sum": 31.720999999999982
+          }
+        }
+      },
+      "longestCompletedOperations": [
+        {
+          "seq": 473,
+          "op": "commit",
+          "rpcSeq": 252,
+          "batchSeq": 222,
+          "result": 1,
+          "sentMs": 18023.41,
+          "receivedMs": 18023.513,
+          "startMs": 18025.63,
+          "endMs": 19779.997,
+          "ackMs": 19780.284,
+          "rpcMs": 1756.874,
+          "preReceiveMs": 0.103,
+          "queueMs": 2.117,
+          "executionMs": 1754.367,
+          "replyMs": 0.287
+        },
+        {
+          "seq": 129,
+          "op": "commit",
+          "rpcSeq": 77,
+          "batchSeq": 53,
+          "result": 1,
+          "sentMs": 12430.746,
+          "receivedMs": 12430.836,
+          "startMs": 12432.934,
+          "endMs": 12604.095,
+          "ackMs": 12604.371,
+          "rpcMs": 173.625,
+          "preReceiveMs": 0.09,
+          "queueMs": 2.098,
+          "executionMs": 171.161,
+          "replyMs": 0.276
+        },
+        {
+          "seq": 127,
+          "op": "commit",
+          "rpcSeq": 76,
+          "batchSeq": 52,
+          "result": 1,
+          "sentMs": 12330.11,
+          "receivedMs": 12330.236,
+          "startMs": 12332.342,
+          "endMs": 12429.866,
+          "ackMs": 12430.075,
+          "rpcMs": 99.965,
+          "preReceiveMs": 0.126,
+          "queueMs": 2.106,
+          "executionMs": 97.524,
+          "replyMs": 0.209
+        },
+        {
+          "seq": 471,
+          "op": "commit",
+          "rpcSeq": 251,
+          "batchSeq": 221,
+          "result": 1,
+          "sentMs": 17958.148,
+          "receivedMs": 17958.272,
+          "startMs": 17960.381,
+          "endMs": 18021.944,
+          "ackMs": 18022.18,
+          "rpcMs": 64.032,
+          "preReceiveMs": 0.124,
+          "queueMs": 2.109,
+          "executionMs": 61.563,
+          "replyMs": 0.236
+        },
+        {
+          "seq": 155,
+          "op": "commit",
+          "rpcSeq": 90,
+          "batchSeq": 66,
+          "result": 1,
+          "sentMs": 12795.768,
+          "receivedMs": 12795.912,
+          "startMs": 12798.034,
+          "endMs": 12854.184,
+          "ackMs": 12854.4,
+          "rpcMs": 58.632,
+          "preReceiveMs": 0.144,
+          "queueMs": 2.122,
+          "executionMs": 56.15,
+          "replyMs": 0.216
+        },
+        {
+          "seq": 131,
+          "op": "commit",
+          "rpcSeq": 78,
+          "batchSeq": 54,
+          "result": 1,
+          "sentMs": 12612.428,
+          "receivedMs": 12612.593,
+          "startMs": 12614.697,
+          "endMs": 12663.862,
+          "ackMs": 12664.053,
+          "rpcMs": 51.625,
+          "preReceiveMs": 0.165,
+          "queueMs": 2.104,
+          "executionMs": 49.165,
+          "replyMs": 0.191
+        },
+        {
+          "seq": 369,
+          "op": "commit",
+          "rpcSeq": 199,
+          "batchSeq": 171,
+          "result": 1,
+          "sentMs": 16292.616,
+          "receivedMs": 16292.715,
+          "startMs": 16294.851,
+          "endMs": 16312.713,
+          "ackMs": 16312.901,
+          "rpcMs": 20.285,
+          "preReceiveMs": 0.099,
+          "queueMs": 2.136,
+          "executionMs": 17.862,
+          "replyMs": 0.188
+        },
+        {
+          "seq": 17,
+          "op": "consumeTicket",
+          "rpcSeq": 17,
+          "batchSeq": 0,
+          "result": 1,
+          "sentMs": 7557.357,
+          "receivedMs": 7557.39,
+          "startMs": 7559.49,
+          "endMs": 7576.567,
+          "ackMs": 7576.648,
+          "rpcMs": 19.291,
+          "preReceiveMs": 0.033,
+          "queueMs": 2.1,
+          "executionMs": 17.077,
+          "replyMs": 0.081
+        },
+        {
+          "seq": 208,
+          "op": "commit",
+          "rpcSeq": 117,
+          "batchSeq": 92,
+          "result": 1,
+          "sentMs": 13661.613,
+          "receivedMs": 13661.7,
+          "startMs": 13663.807,
+          "endMs": 13680.437,
+          "ackMs": 13680.611,
+          "rpcMs": 18.998,
+          "preReceiveMs": 0.087,
+          "queueMs": 2.107,
+          "executionMs": 16.63,
+          "replyMs": 0.174
+        },
+        {
+          "seq": 37,
+          "op": "commit",
+          "rpcSeq": 30,
+          "batchSeq": 8,
+          "result": 1,
+          "sentMs": 10861.14,
+          "receivedMs": 10861.28,
+          "startMs": 10863.426,
+          "endMs": 10878.548,
+          "ackMs": 10878.783,
+          "rpcMs": 17.643,
+          "preReceiveMs": 0.14,
+          "queueMs": 2.146,
+          "executionMs": 15.122,
+          "replyMs": 0.235
+        },
+        {
+          "seq": 196,
+          "op": "commit",
+          "rpcSeq": 111,
+          "batchSeq": 86,
+          "result": 1,
+          "sentMs": 13457.616,
+          "receivedMs": 13457.721,
+          "startMs": 13459.828,
+          "endMs": 13474.023,
+          "ackMs": 13474.18,
+          "rpcMs": 16.564,
+          "preReceiveMs": 0.105,
+          "queueMs": 2.107,
+          "executionMs": 14.195,
+          "replyMs": 0.157
+        },
+        {
+          "seq": 50,
+          "op": "commit",
+          "rpcSeq": 37,
+          "batchSeq": 14,
+          "result": 1,
+          "sentMs": 11065.722,
+          "receivedMs": 11065.847,
+          "startMs": 11067.958,
+          "endMs": 11082.142,
+          "ackMs": 11082.348,
+          "rpcMs": 16.626,
+          "preReceiveMs": 0.125,
+          "queueMs": 2.111,
+          "executionMs": 14.184,
+          "replyMs": 0.206
+        }
+      ],
+      "lastSixTicks": [
+        {
+          "seq": 461,
+          "rpcSeq": 246,
+          "dueMs": 17823.255,
+          "startMs": 17825.591,
+          "workerEndMs": 17826.059,
+          "commitEndMs": 17829.347,
+          "backlogMs": 0,
+          "workerMs": 0.468,
+          "store": {
+            "seq": 462,
+            "op": "commit",
+            "rpcSeq": 246,
+            "batchSeq": 217,
+            "result": 1,
+            "sentMs": 17826.114,
+            "receivedMs": 17826.205,
+            "startMs": 17828.347,
+            "endMs": 17829.179,
+            "ackMs": 17829.325,
+            "rpcMs": 3.211,
+            "preReceiveMs": 0.091,
+            "queueMs": 2.142,
+            "executionMs": 0.832,
+            "replyMs": 0.146
+          }
+        },
+        {
+          "seq": 463,
+          "rpcSeq": 247,
+          "dueMs": 17856.591,
+          "startMs": 17857.249,
+          "workerEndMs": 17857.762,
+          "commitEndMs": 17860.958,
+          "backlogMs": 0,
+          "workerMs": 0.513,
+          "store": {
+            "seq": 464,
+            "op": "commit",
+            "rpcSeq": 247,
+            "batchSeq": 218,
+            "result": 1,
+            "sentMs": 17857.835,
+            "receivedMs": 17857.933,
+            "startMs": 17860.039,
+            "endMs": 17860.785,
+            "ackMs": 17860.94,
+            "rpcMs": 3.105,
+            "preReceiveMs": 0.098,
+            "queueMs": 2.106,
+            "executionMs": 0.746,
+            "replyMs": 0.155
+          }
+        },
+        {
+          "seq": 465,
+          "rpcSeq": 248,
+          "dueMs": 17889.926,
+          "startMs": 17896.732,
+          "workerEndMs": 17897.264,
+          "commitEndMs": 17900.367,
+          "backlogMs": 0,
+          "workerMs": 0.532,
+          "store": {
+            "seq": 466,
+            "op": "commit",
+            "rpcSeq": 248,
+            "batchSeq": 219,
+            "result": 1,
+            "sentMs": 17897.329,
+            "receivedMs": 17897.432,
+            "startMs": 17899.542,
+            "endMs": 17900.195,
+            "ackMs": 17900.348,
+            "rpcMs": 3.019,
+            "preReceiveMs": 0.103,
+            "queueMs": 2.11,
+            "executionMs": 0.653,
+            "replyMs": 0.153
+          }
+        },
+        {
+          "seq": 468,
+          "rpcSeq": 250,
+          "dueMs": 17923.255,
+          "startMs": 17926.483,
+          "workerEndMs": 17926.967,
+          "commitEndMs": 17930.146,
+          "backlogMs": 0,
+          "workerMs": 0.484,
+          "store": {
+            "seq": 469,
+            "op": "commit",
+            "rpcSeq": 250,
+            "batchSeq": 220,
+            "result": 1,
+            "sentMs": 17927.031,
+            "receivedMs": 17927.114,
+            "startMs": 17929.231,
+            "endMs": 17929.988,
+            "ackMs": 17930.125,
+            "rpcMs": 3.094,
+            "preReceiveMs": 0.083,
+            "queueMs": 2.117,
+            "executionMs": 0.757,
+            "replyMs": 0.137
+          }
+        },
+        {
+          "seq": 470,
+          "rpcSeq": 251,
+          "dueMs": 17956.592,
+          "startMs": 17957.583,
+          "workerEndMs": 17958.085,
+          "commitEndMs": 18022.234,
+          "backlogMs": 32.316,
+          "workerMs": 0.502,
+          "store": {
+            "seq": 471,
+            "op": "commit",
+            "rpcSeq": 251,
+            "batchSeq": 221,
+            "result": 1,
+            "sentMs": 17958.148,
+            "receivedMs": 17958.272,
+            "startMs": 17960.381,
+            "endMs": 18021.944,
+            "ackMs": 18022.18,
+            "rpcMs": 64.032,
+            "preReceiveMs": 0.124,
+            "queueMs": 2.109,
+            "executionMs": 61.563,
+            "replyMs": 0.236
+          }
+        },
+        {
+          "seq": 472,
+          "rpcSeq": 252,
+          "dueMs": 17989.923,
+          "startMs": 18022.797,
+          "workerEndMs": 18023.338,
+          "commitEndMs": 19780.31,
+          "backlogMs": 1757.058,
+          "workerMs": 0.541,
+          "store": {
+            "seq": 473,
+            "op": "commit",
+            "rpcSeq": 252,
+            "batchSeq": 222,
+            "result": 1,
+            "sentMs": 18023.41,
+            "receivedMs": 18023.513,
+            "startMs": 18025.63,
+            "endMs": 19779.997,
+            "ackMs": 19780.284,
+            "rpcMs": 1756.874,
+            "preReceiveMs": 0.103,
+            "queueMs": 2.117,
+            "executionMs": 1754.367,
+            "replyMs": 0.287
+          }
+        }
+      ]
+    },
+    "interpretation": {
+      "observed": "Triggering tick and its completed commit are retained. The long interval lies inside the writer execution span; transport, queue and reply spans are short for this operation.",
+      "limits": [
+        "One consumeBridge request is incomplete at freeze; whole-process trace is not complete from start despite no dropped rows.",
+        "Incomplete bridge was sent during the already executing long commit; it cannot be assigned a completed execution duration from this trace.",
+        "Writer execution includes the commit callback and guard; the trace does not split SQL body, transaction finalization or fsync per operation.",
+        "Checkpoint maximum is cumulative and lacks per-call start/end correlation.",
+        "The separate storage job runs on another hosted runner; its mount/device measurements are not attributed to the browser job.",
+        "The observer adds bounded instrumentation overhead; this is no production capacity acceptance."
+      ],
+      "provenFsyncRootCause": false,
+      "productionCapacityAccepted": false
+    }
+  },
+  "runtimeTraceEvidence": {
+    "privateRawTrace": ".qa/ci-r6-runtime-trace.json",
+    "sha256": "f7ac49a72d39fffb1560d6cb00841f14a52f967e4723e864739c0660484b51ce",
+    "publicSource": "https://github.com/decorum-guy/iva-games/actions/runs/46179995591/job/141087153563",
+    "meaning": "Raw numeric trace stays outside Git; the bounded validation and causal limits are summarized in runtimeTrace."
+  },
+  "maximumScene": {
+    "format": "iva-forpost-ci-core-summary-1",
+    "runId": 46179995591,
+    "jobId": 141087153243,
+    "conclusion": "success",
+    "source": {
+      "gitCommit": "4c3c86fb405f11409a48fb941f8be72c077b00d6",
+      "tree": "50a7b075bfbead0a4328e140b3679c011d347ac0",
+      "prHead": "dae2eabfaaa03bd186b14b34a566b5af5a7fffd5"
+    },
+    "environment": {
+      "node": "v24.22.3",
+      "cpu": "AMD EPYC 9V74 80-Core Processor",
+      "availableParallelism": 4,
+      "reportedMemoryBytes": 16759431168,
+      "cpuQuota": "unavailable",
+      "memoryQuota": "unavailable",
+      "scope": "CI maximum-scene probe; not a production capacity profile or a four-room hour"
+    },
+    "gate": {
+      "samplesPerFixture": 500,
+      "warmupPerFixture": 30,
+      "wallP99LessThanMs": 16.666666666666668
+    },
+    "reports": [
+      {
+        "workload": "Forpost max scene, 6 smokes + 0 barriers, fresh explicit fixture per sample",
+        "samples": 500,
+        "coldStepMs": 18.339383999999995,
+        "warmupMaxMs": 18.339383999999995,
+        "p50ms": 2.4531100000001516,
+        "p95ms": 4.016109000000029,
+        "p99ms": 4.847923999999978,
+        "p99cpuMs": 11.026,
+        "maxMs": 5.896019000000024,
+        "observedFiringSources": 24,
+        "maxViewBytes": 38195,
+        "fullWorldBytes": 32709,
+        "fighters": 6,
+        "builders": 6,
+        "drones": 12,
+        "buildings": 30,
+        "transports": 2,
+        "activeConstruction": 6,
+        "tools": 6,
+        "illegalUnits": []
+      },
+      {
+        "workload": "Forpost max scene, 0 smokes + 6 barriers, fresh explicit fixture per sample",
+        "samples": 500,
+        "coldStepMs": 3.993445999999949,
+        "warmupMaxMs": 4.21881099999996,
+        "p50ms": 1.6432790000003479,
+        "p95ms": 2.784461999999621,
+        "p99ms": 3.089975000000095,
+        "p99cpuMs": 6.328,
+        "maxMs": 4.001378000000159,
+        "observedFiringSources": 24,
+        "maxViewBytes": 37798,
+        "fullWorldBytes": 32847,
+        "fighters": 6,
+        "builders": 6,
+        "drones": 12,
+        "buildings": 30,
+        "transports": 2,
+        "activeConstruction": 6,
+        "tools": 6,
+        "illegalUnits": []
+      },
+      {
+        "workload": "Forpost max scene, 3 smokes + 3 barriers, fresh explicit fixture per sample",
+        "samples": 500,
+        "coldStepMs": 2.970056999999997,
+        "warmupMaxMs": 2.970056999999997,
+        "p50ms": 1.7367850000000544,
+        "p95ms": 2.169659000000138,
+        "p99ms": 3.061873999999989,
+        "p99cpuMs": 6.051,
+        "maxMs": 3.5327579999998306,
+        "observedFiringSources": 24,
+        "maxViewBytes": 38190,
+        "fullWorldBytes": 32777,
+        "fighters": 6,
+        "builders": 6,
+        "drones": 12,
+        "buildings": 30,
+        "transports": 2,
+        "activeConstruction": 6,
+        "tools": 6,
+        "illegalUnits": []
+      }
+    ],
+    "limits": "Single strict core benchmark job; no durable writer, browser or four-room acceptance."
+  },
+  "storageDiagnostic": {
+    "jobId": 141087153536,
+    "conclusion": "success",
+    "evidence": "../../../docs/iva-games/evidence/realtime-storage-ci-r6-2026-11-28.json",
+    "meaning": "A bounded diagnostic on its own CI runner completed; neither a capacity PASS nor attribution of the FP01 runtime stall."
+  },
+  "fourRoomHour": {
+    "jobId": 141087153710,
+    "conclusion": "failure",
+    "stage": "load-summary",
+    "kind": "capped CI profiling with diagnostic assumptions; not production capacity acceptance",
+    "productionCapacityAccepted": false,
+    "complete": false,
+    "requestedSeconds": 3600,
+    "elapsedLoadSeconds": 389.06326008400004,
+    "elapsedWallSeconds": 402.05678788700004,
+    "requestedRooms": 4,
+    "identity": {
+      "buildRevision": "4c3c86fb405f11409a48fb941f8be72c077b00d6",
+      "imageId": "sha256:04dda31a69512d1b3dd9026a510fb2885c4a39afe8482c2a19f00b11e7b9f39a",
+      "runtimeArtifact": "sha256:98a6727de9c2a9a6b63664cffa8b96842dd3fdc7ed6d78338f9b4f6e7cb62561",
+      "clientContent": "sha256:77bdcc2d7d64fbfa36a830e46f68c7dcd10d3312d5384969cea3b5a7f04e4f4d",
+      "sourceCommit": "4c3c86fb405f11409a48fb941f8be72c077b00d6",
+      "sourceDirty": false,
+      "sourceSha256": "8654dcb1855edd76e8d70a9a3bfda9eb41b9ef4cf5c99b14e7c4304f02e5680c",
+      "coreSha256": "14d49d29954d0f7f427feea026beb23113699ff8ecb36ec4480f61f339a61e68",
+      "sourceFileCount": 252,
+      "providedTraceVerified": true,
+      "retention": {
+        "bundleFileSha256": "9447886837c65e1d5fc356ec05f941b4e6a717f3ec65f48acdaab06922ebf544",
+        "seal": "sha256:9d30a11a7f8162a88a9488d19ecad43a01599f1e09ed2d04fc68822ac04085c2",
+        "buildRevision": "4c3c86fb405f11409a48fb941f8be72c077b00d6",
+        "current": {
+          "runtime": "sha256:98a6727de9c2a9a6b63664cffa8b96842dd3fdc7ed6d78338f9b4f6e7cb62561",
+          "client": "sha256:77bdcc2d7d64fbfa36a830e46f68c7dcd10d3312d5384969cea3b5a7f04e4f4d"
+        },
+        "artifactCount": 1,
+        "clientCount": 1,
+        "readerProfileCount": 1
+      }
+    },
+    "admission": {
+      "profileSource": "test-fixture",
+      "assumptions": {
+        "source": "test-fixture",
+        "evidence": "Synthetic sizing assumptions only; not measured capacity and not a production profile.",
+        "maxRooms": 4,
+        "maxBodies": 224,
+        "maxBots": 24,
+        "maxConnections": 48,
+        "stepP99Ms": 8,
+        "roomMemoryBytes": 268435456
+      },
+      "initialSuccessful": 4,
+      "attempted": 8,
+      "successful": 8,
+      "rejected": 0,
+      "rejectedCodes": {}
+    },
+    "pauses": [],
+    "failureCodes": [
+      "OBSERVER_DISCONNECTED",
+      "SERVER_HEALTH_FAILED",
+      "DRAIN_FAILED"
+    ],
+    "completedMatches": 4,
+    "completedByMap": {
+      "FP01": 2,
+      "FP02": 1,
+      "FP03": 1
+    },
+    "slots": [
+      {
+        "slot": 0,
+        "mapId": "FP01",
+        "starts": 2,
+        "snapshots": 5988,
+        "deltas": 5790,
+        "lastTick": 5328,
+        "observedTickAdvances": 11856,
+        "phase": "battle",
+        "temporaryBotObserved": true,
+        "peakVisibleEntities": 30
+      },
+      {
+        "slot": 1,
+        "mapId": "FP02",
+        "starts": 2,
+        "snapshots": 5942,
+        "deltas": 5746,
+        "lastTick": 5036,
+        "observedTickAdvances": 11765,
+        "phase": "battle",
+        "temporaryBotObserved": true,
+        "peakVisibleEntities": 20
+      },
+      {
+        "slot": 2,
+        "mapId": "FP03",
+        "starts": 2,
+        "snapshots": 5895,
+        "deltas": 5700,
+        "lastTick": 3072,
+        "observedTickAdvances": 11671,
+        "phase": "battle",
+        "temporaryBotObserved": true,
+        "peakVisibleEntities": 21
+      },
+      {
+        "slot": 3,
+        "mapId": "FP01",
+        "starts": 2,
+        "snapshots": 5848,
+        "deltas": 5655,
+        "lastTick": 3920,
+        "observedTickAdvances": 11576,
+        "phase": "battle",
+        "temporaryBotObserved": true,
+        "peakVisibleEntities": 24
+      }
+    ],
+    "resources": {
+      "constraintsObserved": true,
+      "configuredCaps": {
+        "cpuCores": 2,
+        "memoryBytes": 2147483648,
+        "swapBytes": 0
+      },
+      "first": {
+        "available": true,
+        "cpuCores": 2,
+        "cpuUsageUsec": 2929902,
+        "cpuThrottledUsec": 3773,
+        "cpuThrottledPeriods": 1,
+        "memoryLimitBytes": 2147483648,
+        "memoryUsedBytes": 208592896,
+        "memoryPeakBytes": 210972672,
+        "swapLimitBytes": 0,
+        "swapUsedBytes": 0,
+        "minMemoryHeadroomFraction": 0.9028663635253906,
+        "minMemoryPeakHeadroomFraction": 0.9017581939697266
+      },
+      "last": {
+        "available": true,
+        "cpuCores": 2,
+        "cpuUsageUsec": 214222727,
+        "cpuThrottledUsec": 3773,
+        "cpuThrottledPeriods": 1,
+        "memoryLimitBytes": 2147483648,
+        "memoryUsedBytes": 734515200,
+        "memoryPeakBytes": 760545280,
+        "swapLimitBytes": 0,
+        "swapUsedBytes": 0,
+        "minMemoryHeadroomFraction": 0.6579647064208984,
+        "minMemoryPeakHeadroomFraction": 0.645843505859375
+      },
+      "minimumEffectiveCpuCores": 2,
+      "cpuHeadroomMethod": "minimum whole-container CPU delta over monotonic intervals of at least one second divided by smaller observed quota/affinity-aware runtime capacity",
+      "memoryHeadroomMethod": "minimum latched memory.peak headroom across observed cgroup ancestors; includes bootstrap and QA clients",
+      "maxRuntimeCpuCoreEquivalents": 0.8869462994717486,
+      "minContainerCpuHeadroomFraction": 0.5340692682710015,
+      "minContainerMemoryHeadroomFraction": 0.645843505859375,
+      "peakRuntimeRssBytes": 549502976,
+      "peakContainerMemoryBytes": 734515200
+    },
+    "timings": {
+      "ticks": 46874,
+      "stepRpcP99Ms": 6.4,
+      "stepWorkP99Ms": 3.6,
+      "stepWorkCpuP99Ms": 3.2,
+      "commitP99Ms": 13.8,
+      "maxCommitMs": 31.662010999993072,
+      "journalAgeP99Ms": 17.5,
+      "snapshotAgeP99Ms": 17.4,
+      "eventLoopDelayP99Ms": 11.665407,
+      "maxCommitBatchSize": 4,
+      "storageFailures": 4,
+      "peakJournalPendingAgeMs": 87.04518700001063,
+      "queuedBytesMax": 0,
+      "backpressureResyncs": 0,
+      "writer": {
+        "batches": 34260,
+        "maxTransactionMs": 23.91129699999874,
+        "maxWorldBytes": 188273,
+        "maxRecordBytes": 217646,
+        "maxJournalBytes": 136,
+        "transactionP99Ms": 7.3,
+        "bodyP99Ms": 4.4,
+        "finalizeP99Ms": 3.1,
+        "walAutoCheckpoint": 0,
+        "synchronous": 2,
+        "queueP99Ms": 2.9,
+        "checkpoint": {
+          "pageSize": 4096,
+          "walBytes": 61960712,
+          "logFrames": 15039,
+          "checkpointedFrames": 15039,
+          "busy": 0,
+          "runs": 1072,
+          "maxMs": 18.778717000001052,
+          "p99Ms": 5.6,
+          "failures": 0,
+          "sqliteVersion": "3.54.1"
+        }
+      }
+    },
+    "checks": {
+      "durationCompleted": false,
+      "allSlotsAdmitted": true,
+      "noUnexpectedPauses": true,
+      "noFailures": false,
+      "noStorageFailures": false,
+      "noOutputQueueOverflow": true,
+      "stepWorkP99BelowHalfTick": true,
+      "commitP99Below50Ms": true,
+      "cpuHeadroom30Percent": true,
+      "memoryHeadroom25Percent": true,
+      "resourceCapsObserved": true,
+      "exactImageIdentity": true
+    },
+    "diagnosticThresholdsMet": false,
+    "notVerified": [
+      "production host capacity",
+      "browser rendering/FPS",
+      "human play",
+      "physical device",
+      "public deployment"
+    ],
+    "failureInterpretation": "storageFailures counts generic failRoom transitions. The original exception was discarded, server.log was not published and no workflow artifacts were available. SQLite I/O, WAL guard, fsync or overload cannot be asserted as the cause."
+  },
+  "generalCheck": {
+    "jobId": 141087153548,
+    "conclusion": "success",
+    "unit": {
+      "files": 121,
+      "passed": 1452,
+      "skipped": 1
+    },
+    "profileAndStorageHarnessTestsPassed": 26,
+    "infrastructureTestsPassed": 85,
+    "typesLintBoundaries": "passed",
+    "buildAll": "passed",
+    "networkSmoke": {
+      "passed": 14,
+      "kind": "automated HTTP/WebSocket, not browser or capacity acceptance",
+      "performanceAcceptance": false
+    },
+    "steps": [
+      {
+        "name": "Set up job",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Run actions/checkout@v6",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Run actions/setup-node@v7",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Run npm ci --no-audit --no-fund",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Run npm run check",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Run node --test apps/realtime-server/tests/profiling-scripts.test.mjs apps/realtime-server/tests/storage-diagnostic.test.mjs",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Run python3 -B -m unittest discover -s deploy/iva-games -p 'test_*.py'",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Run npx vite build --config games/district/vite.territorial-simulation.config.ts",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Run node .qa/territorial-runner/simulate.mjs --bot-audit --map=azure-bay --samples=6",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Run npm run build:all",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Check real realtime admission, controller transfer and recovery",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Run npm run platform:smoke",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Run npx playwright install --with-deps chromium",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Run npm run chess-home:e2e -- --workers=1",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Run npm run portal:e2e -- --workers=1",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Run node scripts/profile-avatar-browser.mjs",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Run npm run district:browser",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Run node scripts/district-interface-browser.mjs",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Run node scripts/district-trade-browser.mjs",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Run node scripts/district-compact-trade-browser.mjs",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Run node scripts/district-audio-browser.mjs",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Run node scripts/district-territorial-browser.mjs",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Post Run actions/setup-node@v7",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Post Run actions/checkout@v6",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Complete job",
+        "status": "completed",
+        "conclusion": "success"
+      }
+    ],
+    "districtTerritorial": {
+      "commands": 161,
+      "trade": true,
+      "groupCancel": true,
+      "rounds": 15,
+      "revision": 250,
+      "winners": 1,
+      "newsMessages": 7
+    },
+    "chessHomeBrowserPassed": 8,
+    "portalBrowserPassed": 18
+  },
+  "images": {
+    "schema": "iva-forpost-r6-image-ci-observation-1",
+    "runId": 46179995706,
+    "source": "completed GitHub job logs and step metadata; tested merge tree verified through GitHub commit API",
+    "prHead": "dae2eabfaaa03bd186b14b34a566b5af5a7fffd5",
+    "testedMerge": "4c3c86fb405f11409a48fb941f8be72c077b00d6",
+    "tree": "50a7b075bfbead0a4328e140b3679c011d347ac0",
+    "baseMain": "7c2be21db5743b15b4a42d708ac959039c6b725e",
+    "images": [
+      {
+        "kind": "realtime",
+        "jobId": 141087154140,
+        "conclusion": "success",
+        "imageId": "sha256:76550e7da08c767d5ec00fdef2ee366babb4a76c12233872764d0aceac8aaa8b",
+        "rawLog": "ci-r6-realtime-image.log",
+        "rawMode": "0600",
+        "rawSha256": "1509f691c209e36c6638a55ba5cd5b2c894f3f773471b52f8aca9b8e35c14ec8",
+        "steps": [
+          {
+            "name": "Validate deployment Compose and Caddy configuration",
+            "status": "completed",
+            "conclusion": "skipped"
+          },
+          {
+            "name": "Collect actual saved realtime versions from the deployed image",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Build runtime image from the checked-out revision",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Check isolated production runtime and persistent volume",
+            "status": "completed",
+            "conclusion": "success"
+          }
+        ]
+      },
+      {
+        "kind": "chess",
+        "jobId": 141087154300,
+        "conclusion": "success",
+        "imageId": "sha256:212504bbdaf4fd2ef14111d8731002240645b03c9feffb3e12de954325fbdc8f",
+        "rawLog": "ci-r6-chess-image.log",
+        "rawMode": "0600",
+        "rawSha256": "d0d025dfa49e0aca0a2f6714951c4f20c473154f1b0147e831ad11e3bff7953e",
+        "steps": [
+          {
+            "name": "Validate deployment Compose and Caddy configuration",
+            "status": "completed",
+            "conclusion": "skipped"
+          },
+          {
+            "name": "Collect actual saved realtime versions from the deployed image",
+            "status": "completed",
+            "conclusion": "skipped"
+          },
+          {
+            "name": "Build runtime image from the checked-out revision",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Check isolated production runtime and persistent volume",
+            "status": "completed",
+            "conclusion": "success"
+          }
+        ]
+      },
+      {
+        "kind": "platform",
+        "jobId": 141087154373,
+        "conclusion": "success",
+        "imageId": "sha256:b638bff8c903c0a89712001e6e446cdede50851d624786384ecd720a89653cb4",
+        "rawLog": "ci-r6-platform-image.log",
+        "rawMode": "0600",
+        "rawSha256": "d3a65aae92d76998a10f1fcbc0b9d08f85581aa791e2ae7573c51f4fa1cc3ed2",
+        "steps": [
+          {
+            "name": "Validate deployment Compose and Caddy configuration",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Collect actual saved realtime versions from the deployed image",
+            "status": "completed",
+            "conclusion": "skipped"
+          },
+          {
+            "name": "Build runtime image from the checked-out revision",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Check isolated production runtime and persistent volume",
+            "status": "completed",
+            "conclusion": "success"
+          }
+        ]
+      }
+    ],
+    "collector": {
+      "bootstrap": true,
+      "bootstrapEvidence": "recognized-public-legacy-portal-v1",
+      "buildRevision": null,
+      "hostPreflightRequired": true,
+      "ok": true,
+      "requiredManifests": 0
+    },
+    "realtimeSealedBundle": {
+      "buildRevision": "4c3c86fb405f11409a48fb941f8be72c077b00d6",
+      "runtime": "sha256:98a6727de9c2a9a6b63664cffa8b96842dd3fdc7ed6d78338f9b4f6e7cb62561",
+      "client": "sha256:77bdcc2d7d64fbfa36a830e46f68c7dcd10d3312d5384969cea3b5a7f04e4f4d",
+      "artifacts": 1,
+      "clients": 1,
+      "seal": "sha256:9d30a11a7f8162a88a9488d19ecad43a01599f1e09ed2d04fc68822ac04085c2"
+    },
+    "actualStoreChecks": [
+      {
+        "operation": "check-store",
+        "ok": true,
+        "manifests": 0,
+        "bundleSeal": "sha256:9d30a11a7f8162a88a9488d19ecad43a01599f1e09ed2d04fc68822ac04085c2",
+        "buildRevision": "4c3c86fb405f11409a48fb941f8be72c077b00d6"
+      },
+      {
+        "operation": "check-store",
+        "ok": true,
+        "manifests": 1,
+        "bundleSeal": "sha256:9d30a11a7f8162a88a9488d19ecad43a01599f1e09ed2d04fc68822ac04085c2",
+        "buildRevision": "4c3c86fb405f11409a48fb941f8be72c077b00d6"
+      },
+      {
+        "operation": "check-store",
+        "ok": true,
+        "manifests": 1,
+        "bundleSeal": "sha256:9d30a11a7f8162a88a9488d19ecad43a01599f1e09ed2d04fc68822ac04085c2",
+        "buildRevision": "4c3c86fb405f11409a48fb941f8be72c077b00d6"
+      }
+    ],
+    "realtimeSmokeSourceBlob": "1100e65bc215a8977cded48ab01b910ac73b62ba",
+    "realtimeSmokeVerified": {
+      "nonRootRuntime": true,
+      "guestAdmissionAndReadmission": true,
+      "websocketHelloAndFull": true,
+      "restoredEpochIncrease": true,
+      "hiddenSeedAbsent": true,
+      "clientHtml": true,
+      "sqliteQuickCheckAndWal": true,
+      "sanitizedInventoryEqualsActualStore": true,
+      "readOnlyNoNetworkVolumePreflight": true,
+      "sameVolumeRestart": true,
+      "cleanShutdown": true
+    },
+    "realtimeSmokeLimitations": [
+      "No movement or discrete game action is sent by this image smoke.",
+      "hiddenSeedAbsent is the specific view assertion, not the complete privacy matrix.",
+      "Bootstrap bundle contained one current runtime/client; inherited production archives were not exercised.",
+      "The read-only volume is an isolated CI volume, not the production host volume.",
+      "No rendered browser, public gameplay, hour-load or capacity result is established here."
+    ],
+    "publish": "skipped",
+    "deploy": "skipped",
+    "productionActionsByThisRun": false,
+    "newImageFailure": null,
+    "hourJobInspected": false,
+    "localSourceChanged": false,
+    "localDockerExecuted": false
+  },
+  "overdrive": {
+    "jobId": 141087153614,
+    "conclusion": "success",
+    "browserPassed": 16,
+    "browserSkipped": 2
+  },
+  "colossus": {
+    "runId": 46179995596,
+    "jobId": 141087153051,
+    "conclusion": "success",
+    "browserPassed": 36,
+    "browserSkipped": 2
+  },
+  "rawLogSha256": {
+    "ci-r6-fp01-2d.log": "bdb1da25fee4e4b138ebc16d79dc90cc082ce1537fe88a2a0e4598642c7252c3",
+    "ci-r6-fp02-2d.log": "9e12872fb3ee16bec0417c27cd1475bbe9ed613234eff0fffcf96e98ec1948a2",
+    "ci-r6-fp03-2d.log": "16bfeb5b2ab8127686f90de9dd4cf53d0ab107e11b165c564cec651214fbec3a",
+    "ci-r6-fp01-3d.log": "6ab008d164549f1162aa91d874935bdbfc98467fb36502196c836f52e90b7ae1",
+    "ci-r6-fp02-3d.log": "6540418634029dc488db6d8ded301636e5101c7499ff95f03101a158d02575a1",
+    "ci-r6-fp03-3d.log": "c9d3d1221e22edfd1275227b849832e4410427dc8eb2d7f97cf5beaec8930378",
+    "ci-r6-interface.log": "f1a6b972646bea1d1f77b4c3040ce1b1663cbbeac16b989289a39e9e24e18a23",
+    "ci-r6-webkit.log": "83b901ba685f8579dca807b0409bebd63ea22b187c11c4d2efc1b514d4a1b9ae",
+    "ci-r6-focus-chromium.log": "9ebf3eb4585fa7d3986ac58075df6cbb293c6f9ce624fcd9aa4dc944c4e342b4",
+    "ci-r6-focus-webkit.log": "2bc4cc4dfd8f5ef41935bb1e7e8e22d4f437d736d0209c66c2e9f3390b746665",
+    "ci-r6-check.log": "b6c58ad349d55019e0735746b5e6701430a8099f169e2e692d7bac92de86db58",
+    "ci-r6-realtime-image.log": "1509f691c209e36c6638a55ba5cd5b2c894f3f773471b52f8aca9b8e35c14ec8",
+    "ci-r6-chess-image.log": "d0d025dfa49e0aca0a2f6714951c4f20c473154f1b0147e831ad11e3bff7953e",
+    "ci-r6-platform-image.log": "d3a65aae92d76998a10f1fcbc0b9d08f85581aa791e2ae7573c51f4fa1cc3ed2",
+    "ci-r6-image-hour.log": "760d9ff559876f39bf02cacb354834abdcef2c68f0e3899526e27ba3c1a41bf3",
+    "ci-r6-core.log": "9a2e5d8b7fc67cf8ce83ffa66756f9088fc836089a484139359ad352fc9ff1b3",
+    "ci-r6-storage.log": "25ea01ac439d6d74e92762206e0def16d130ef283d15e97ae82f041fb4592b6f",
+    "ci-r6-overdrive.log": "5ece6323ecd84fbefc3179bbc42210cdbb58c292bf895ec85e3a71e4e7fbdc7f",
+    "ci-r6-colossus.log": "9a6a1137ebc143b76b2d66d6d2f5790a8621a09f946b4ad1572c24de79ccb69e"
+  },
+  "limits": [
+    "Six full-map executions failed after actual SERVER_BUSY. No R6 UI match completed.",
+    "FP01/3D subsequently timed out clicking a disabled mode switch during the observed pause; this differs from the prior R5 FP02/3D scrolling timeout.",
+    "Both headed focus jobs failed before real blur/hidden; no downstream fire-release acceptance.",
+    "Native audio API tests are not listening; CDP multi-touch is not a physical phone.",
+    "The numeric runtime trace locates one 1.754s writer-operation interval but does not split it into SQL, fsync, locks or descheduling.",
+    "The hour workload completed 389.063260s of the required 3600s, four technical matches, with generic failRoom failures and no registered overload pauses.",
+    "Image smoke checks real isolated volumes and restoration; it does not prove production host provisioning or public deployment.",
+    "SwiftShader performance remains slow and source attribution incomplete.",
+    "No accepted production capacity, complete interaction/privacy matrix, independent agent browser passage or public Forpost release."
+  ]
+}

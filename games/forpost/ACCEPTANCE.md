@@ -2,7 +2,7 @@
 
 ## Status
 
-Implementation is in progress. This document records observed results, not a release certificate. Executor-operated browser passages: **0**. Completed automated UI rounds: **5**, none accepted as a whole; one automated full match (FP02, 2D). No public Forpost release has been made by this task.
+Implementation is in progress. This document records observed results, not a release certificate. Executor-operated browser passages: **0**. Completed automated UI rounds: **6**, none accepted as a whole; one automated full match (FP02, 2D). No public Forpost release has been made by this task.
 
 Sources: the normative project documents merged from PR #41 at `0479cdd43d783afbccc54ed7050637a052edb220`, the local implementation, and actual command results. No remembered conversations or fabricated play sessions are used as evidence.
 
@@ -66,20 +66,20 @@ These are integration, code-review and automated-test findings, **not browser ac
 | Area | Required evidence | Current status |
 |---|---|---|
 | Exact build | Client and running server identities; asset hashes; immutable source revision | Pending final candidate |
-| Three maps | FP01, FP02, FP03 completed through normal UI to match result | Blocked browser access |
+| Three maps | FP01, FP02, FP03 completed through normal UI to match result | One R5 FP02/2D automated match; all six R6 map cases failed; executor browser access blocked |
 | Combat | All three weapons, reload, protection, ray collision, smoke/barrier/repair | Core tests; UI pending |
 | Tactics | Own selection, group selection, orders, drones, delivery without direct shooting | Core tests; UI pending |
 | Construction | Reservations, physical builder, queue/reorder/cancel, limits and refunds | Core tests; UI pending |
 | Power | Relay graph, personal supply, priority, outages, generator restoration | Core tests; UI pending |
 | Objectives | Stations, routes, escort, unloading, same-tick deaths/deliveries, overtime | Core tests; UI pending |
 | Outcomes | Three-operation progression, side changes, wins/draws, repeat and menu | Core tests; full UI pending |
-| Tutorial | Seven actual exercises, skip/restart/resume, isolated save | Core walkthroughs; UI pending |
+| Tutorial | Seven actual exercises, skip/restart/resume, isolated save | R6 automated lesson predicates and restart passed; full executor usability acceptance pending |
 | Network | 2+3 independent clients; latency/loss/jitter; backpressure; controller handover | Real HTTP/WS smoke and 14 controlled TCP-delay profiles passed on their recorded old artifacts; true IP loss and final-build matrix pending |
 | Privacy | Raw views, events, sound sectors, statistics, stale memories and pixels | Projection tests; pixel/audio checks pending |
 | Recovery | Crash, durable receipts, owner fencing, 24h empty pause, exact old artifact | Partial tests; final matrix pending |
 | Interaction | Every element/state in `UI_COVERAGE.md` | Inventory prepared; specific R2 automated subcases observed, complete state matrix pending |
-| Desktop/touch | Keyboard, pointer/touch, focus loss, fire release, rotation, 390×600, 130% text | R2 automated layout/rotation assertions passed; native multitouch automation and physical device acceptance pending; executor browser access blocked |
-| Performance | Maximum scene, four-room/hour load, client FPS/frame times on named hardware | Maximum-scene p99 gate failed; both four-room hour attempts failed before an hour; client FPS pending |
+| Desktop/touch | Keyboard, pointer/touch, focus loss, fire release, rotation, 390×600, 130% text | R6 layout/rotation/native CDP multitouch assertions passed; both headed focus gates failed; physical device and executor acceptance pending |
+| Performance | Maximum scene, four-room/hour load, client FPS/frame times on named hardware | Named R3–R6 CI core gates passed; historical local p99 failure retained; three actual four-room attempts failed before an hour; default-3D FPS unaccepted |
 | Bot series | 3 maps × 3 sizes × 2 sides × 4 seeds = 72 normal-rule matches | Final 72/72 technical matches, zero technicalErrors; not UI acceptance |
 | Human balance | Separate observed matches with shooter and strategy players | Not performed; bot data is not a proxy claim |
 | Public release | Accepted candidate, normal merge/CI/deploy, actual public catalog/room/game actions | Not released; provisioning prerequisite unresolved |
@@ -258,3 +258,54 @@ Chess/platform images, Overdrive (16 PASS/2 SKIP) and Colossus (36 PASS/2 SKIP) 
 General job141073352848 completed **success**:1440unit/120files(+1opt-in skip),26Node-harness,80Python, types/lint/boundaries,build:all,14realHTTP/WS and all existing-game browser steps passed. D28's original District territorial passage now completed with trade/groupCancel/restart true,298commands,29rounds and one winner. The accepted200/retry assertions stayed active; this does not reconstruct the missing POST trace of R4.
 
 D31 is a separate newly reproduced runtime defect: after a delayed durable final transition, the scheduler's unconditional backlog check could overwrite finished/abandoned/pendingOutcome-paused with SERVER_BUSY. The narrow phase guard applies overload only while still running. [Deterministic red/green evidence](qa/runtime-terminal-phase.json): three failures before,11/11 publication tests after, including a positive control that still pauses an overloaded running match. The1500ms delayed writer-RPC confirmation is fault injection, not an observed1500ms fsync. FULL, thresholds and the committed publication boundary are unchanged. This correction requires a new runtime build and native replay; it does not explain or close the preparation-time map pauses.
+
+## Repository CI round 6 — automated, not executor browser play
+
+PR head `dae2eabfaaa03bd186b14b34a566b5af5a7fffd5`, tree `50a7b075bfbead0a4328e140b3679c011d347ac0`; actual checkout/build **`4c3c86fb405f11409a48fb941f8be72c077b00d6`**. Runtime: `sha256:98a6727de9c2a9a6b63664cffa8b96842dd3fdc7ed6d78338f9b4f6e7cb62561`; CI client: `sha256:77bdcc2d7d64fbfa36a830e46f68c7dcd10d3312d5384969cea3b5a7f04e4f4d`. The local `a3312fc` client differs and is not substituted for the CI client. [Completed R6 evidence](qa/ci-round-6.json) records individual job IDs and raw-log hashes.
+
+[Platform run 46179995591](https://github.com/decorum-guy/iva-games/actions/runs/46179995591): **24 PASS / 8 FAIL / 32 UI cases**, no skips. Passed cases: Chromium 15/22, WebKit 9/10. Completed UI matches: 0 this round; 1 across all rounds (R5 FP02/2D). Executor-operated Forpost passages: 0.
+
+| Scope | Completed result | Limit |
+| --- | --- | --- |
+| Chromium interface | 15 PASS; default 3D construction: 25.8 s; native 29 WAV: 7.2 s; native CDP touch: 8.2 s | No listening, physical phone or whole-game visual acceptance |
+| WebKit interface | 9 PASS; seven tutorial predicates, restart, final lesson → real practice | The job prints checkout/outcomes, but no independent runtime/content hashes |
+| Late practice lifecycle | PASS in 31.0 s; real 201, appAbandon 200, new lesson 0 retained, next mode action accepted | Actual response delay: 272.17 ms; other timings are not established |
+| Six map jobs | 0 PASS / 6 FAIL; all observed actual SERVER_BUSY | FP01/3D later timed out on the mode switch disabled by the pause; no R6 result/replay |
+| Two required headed focus jobs | 0 PASS / 2 FAIL; actual headless:false and DISPLAY | No real blur/hidden; subsequent stable-ammo assertions were not reached |
+| General check | 1452 unit tests / 121 files + 1 opt-in skip, 26 Node, 85 Python, types/lint/boundaries/build-all, 14 real HTTP/WS checks: PASS | Automation, not executor passage |
+| Existing games | PASS: Chess home 8, portal 18, District territorial 161 commands / 15 rounds / 1 winner; Overdrive 16 PASS / 2 skip, Colossus 36 PASS / 2 skip | Not Forpost acceptance |
+| Three Docker images | PASS; realtime manifests: 0→1→1 | Isolated CI volume, not production; publish/deploy skipped |
+| Four-room hour | FAIL after 389.063260 s load / 402.056788 s wall time; 4 technical matches / 8 admissions | No completed hour; generic failRoom count: 4; no registered overload pause; cause unknown |
+
+### Defects and original-scenario retests
+
+D22 default 3D lesson clock/build passes in R4/R5/R6; this does not establish acceptable SwiftShader FPS. D24 restart/focused-keyboard passes in R5/R6 in both browsers. D25 final lesson → practice and D30 late-response cleanup pass in R5/R6 with real 201/200 responses, the retained lesson and an accepted next action. D27 collector canonicalization passes the original **native realtime Docker sequence** in R6, including actual seal/store/drain/restart/readmission; host preflight remains outstanding. The D28 District territorial scenario passes in R5/R6; the earlier failed HTTP response remains unknown.
+
+D31 terminal guard is in the R6 runtime. Controlled writer confirmation delayed by 1500 ms retains finished/abandoned/pendingOutcome and running-overload protection; native network/image checks pass. This does not repair preparation-phase overload. D23 SERVER_BUSY remains open in all 6 map cases; D26 focus remains open in both headed drivers; D29 default 3D remains slow.
+
+### Actual runtime correlation
+
+[Bounded trace](qa/ci-round-6.json): tick 472 → RPC 252 / store 473 / batch 222. Worker: 0.541 ms; commit RPC: 1756.874 ms; queue: 2.117 ms; writer execution: 1754.367 ms; reply: 0.287 ms; backlog: 1757.066 ms. SQLite transaction maximum 1754.317 ms matches this interval. Freeze: 19.780494 s; ordinary durable pause confirmed. The trace has 474 rows, with one concurrent consumeBridge pending. The trigger is complete, with no eviction, truncation or missing link. Completeness of the entire trace is not claimed.
+
+This localizes one interval inside writer execution; it does not separate fsync, locking, the SQL body or descheduling. Cumulative checkpoint max 1617.086 ms has no exact temporal pairing. In the separate storage job, untraced commit p99/max was 1.793/3.485 ms, traced p99/max was 20.693/94.428 ms, and measured writer fsync max was 92.973 ms. These measurements came from a different runner/window and do not attribute the map event.
+
+The unchanged maximum-scene gate with 500 samples / 30 warmup passed: p99 **4.847924/3.089975/3.061874 ms**. The older local failure at 17.939 ms remains in the record; capacity is not accepted.
+
+### Hour and following candidate
+
+R6 is the third actual 4-room workload; R4/R5 never reached load. Actual limits: 2 CPU / 2 GiB / swap 0. There were 4 technical matches (FP01×2, FP02×1, FP03×1), followed by observer closure, health failure and drain failure. Pauses: 0; stepWork p99: 3.6 ms; commit p99: 13.8 ms / max 31.662 ms; CPU headroom ≥53.41%; peak memory headroom ≥64.58%.
+
+`storageFailures` counts generic failRoom calls. The original error was discarded; no uploaded artifacts or private server.log are available. **The R6 hour failure's root cause is unknown.** The last sampled WAL size, 61,960,712 bytes, is below 64 MiB and does not prove a later guard failure.
+
+After R6, a separate bounded experiment with real SQLite and an explicitly injected pinned reader reproduced the allocated-WAL latch. After reader release, all 16,334 frames were checkpointed and quick_check was ok, but the 67,296,112 allocated bytes still failed the 64 MiB guard. Diagnostic SQLite TRUNCATE restored the budget and preserved 4 world hashes. Narrow native reclaim and fixed first-failure reason counters are implemented for the next candidate. The byte-identical local scenario now reclaims automatically before its manual control, with matching world hashes and journal sequences; see [exact replay](../../docs/iva-games/REALTIME_WAL_RECLAIM.md). These results do not retroactively establish the R6 cause or constitute a passing hour replay.
+
+
+## Candidate R7: owned delivery and clean local checkpoint
+
+This is preparation, not a completed seventh browser round. [Local evidence](qa/local-round-7.json) records clean commit `4817856`: boundaries, types, lint, 1462 tests in 121 files (+1 skip) using one worker, E2E discovery, `build:all` and 14 real HTTP/WS scenarios passed. Earlier ordinary parallel checks on `fdf6f02` twice timed out in the unchanged main kingFracture white test at its existing 5000 ms limit; the original file replay and serial full suite passed. Four type diagnostics in new E2E callbacks were corrected before the successful typecheck. These failures remain in the record.
+
+[Owned-delivery regression](qa/own-delivery-regression-r7.json): the same frozen tests produced 5 FAIL / 44 PASS on old production sources and 49/49 PASS after the patch. Personal delivery credit now uses the eligible unloading list, excluding protected/dead/noncombat participants. The squad lesson strengthens the broader E13 requirement with an actual independent drone delivery; the final lesson requires fighter-autopilot delivery and a finished operation. Previously completed saves retain their status; an unsuccessful final lesson offers retry guidance.
+
+The full UI candidate keeps normal 1v1 and the original match timing, but now uses visible dock/drone/respawn controls and requires a witnessed autonomous unload of the delivered vehicle, positive team and personal delivery credit, correct visible results, an unchanged restored result and a new-room replay. No live success is claimed before execution. R5 FP02/2D remains a completed historical UI match with zero own deliveries under its older assertions.
+
+Candidate core `805ab712…` and source `1a385fd9…` differ from R6, so earlier differential/bot/performance evidence is not silently transferred. The subsequent normal merge `44fe1e7` includes accepted main `bcb69e7` / PR55. Only a District QA helper required compatible conflict resolution; accepted diagnostics and stricter intent checks were retained, syntax/lint passed and all 252 Forpost source hashes still agree. Exact native combined CI remains required.

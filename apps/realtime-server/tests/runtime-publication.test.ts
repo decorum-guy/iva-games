@@ -204,6 +204,41 @@ describe('publication waits for durable writer confirmation', () => {
     expect(io.records.get(matchId)).toEqual(before); expect(io.results).toEqual([]);
   });
 
+  it.each([
+    ['CHECKPOINT_WAL_LIMIT', 'CHECKPOINT_WAL_LIMIT'],
+    ['WORKER_DEADLINE', 'WORKER_DEADLINE'],
+    ['private fixture exception: account=PRIVATE_PLAYER world=PRIVATE_WORLD', 'UNKNOWN_RUNTIME_FAILURE'],
+  ])('retains only the first allowlisted room-failure reason for %s', async (injected, expected) => {
+    const { runtime, matchId, peer } = await fixture(); await vi.advanceTimersByTimeAsync(3200);
+    const before = runtime.get(matchId)!; const block = blockedCommit();
+    await vi.advanceTimersByTimeAsync(40); await block.started;
+    block.reject(new Error(injected)); await vi.advanceTimersByTimeAsync(0);
+    // persist rejects into the scheduler catch. It must be counted exactly once
+    // and leave the previous durable state authoritative.
+    runtime.disconnect(peer); await vi.advanceTimersByTimeAsync(100);
+    const health = runtime.health();
+    expect(health.ok).toBe(false); expect(health.metrics.storageFailures).toBe(1);
+    expect(health.metrics.roomFailureReasons[expected as keyof typeof health.metrics.roomFailureReasons]).toBe(1);
+    expect(Object.values(health.metrics.roomFailureReasons).reduce((sum, value) => sum + value, 0)).toBe(1);
+    expect(health.metrics.roomFailureStages).toEqual({ persist: 1, disconnect: 0, scheduler: 0, snapshotLease: 0 });
+    expect(JSON.stringify(health)).not.toContain('PRIVATE_');
+    expect(runtime.get(matchId)).toEqual(before); expect(io.records.get(matchId)).toEqual(before);
+    expect(peer.close).toHaveBeenCalledWith(1011, 'RECOVERY_REQUIRED');
+    health.metrics.roomFailureReasons.UNKNOWN_RUNTIME_FAILURE = 99;
+    expect(runtime.health().metrics.roomFailureReasons.UNKNOWN_RUNTIME_FAILURE).toBe(expected === 'UNKNOWN_RUNTIME_FAILURE' ? 1 : 0);
+  });
+
+  it('distinguishes stale snapshot authority from a rejected storage operation without publishing stale state', async () => {
+    const { runtime, matchId, peer, sent, resync } = await fixture();
+    const before = runtime.get(matchId)!; const messages = sent.length;
+    runtime.rooms.get(matchId)!.lastPersistAt = Date.now() - 14_501;
+    await resync();
+    expect(sent).toHaveLength(messages); expect(runtime.get(matchId)).toEqual(before);
+    expect(peer.close).toHaveBeenCalledWith(1011, 'RECOVERY_REQUIRED');
+    expect(runtime.health().metrics.roomFailureReasons.LEASE_HEARTBEAT_EXPIRED).toBe(1);
+    expect(runtime.health().metrics.roomFailureStages).toEqual({ persist: 0, disconnect: 0, scheduler: 0, snapshotLease: 1 });
+  });
+
   it('pauses a silent still-open socket ten seconds after the last signal, without adding a second grace period', async () => {
     const { runtime, matchId } = await fixture(); await vi.advanceTimersByTimeAsync(9990);
     expect(runtime.get(matchId)!.phase).toBe('running');

@@ -1,4 +1,4 @@
-import { BUILDINGS } from './constants'
+import { BUILDINGS, RULES } from './constants'
 import { distance, pointOnRoute } from './geometry'
 import { getMap } from './maps'
 import { createWorld, fighter, nextId, recomputePower } from './state'
@@ -43,6 +43,11 @@ export function updateTutorial(w: World): void {
   const t = w.tutorial
   if (!t || w.mode !== 'tutorial' || t.completed) return
   const p = w.participants.find(p => p.id === t.learnerId)!, u = fighter(w, p.id), target = w.units.find(u => u.id === t.targetId)
+  const center = getMap(w.mapId).complex
+  const eligible = (unit: typeof u): boolean => !!unit && unit.hp > 0 && unit.protectedUntil <= w.tick && distance(unit, center) <= RULES.unloadRadius
+  // Read the actual delivery emitted after damage/unloading in this very tick.
+  // A previous event, mere proximity or an accepted order cannot complete a lesson.
+  const deliveredNow = (w.events[p.id] ?? []).some(event => event.tick === w.tick && event.type === 'delivery' && event.team === p.team)
   if (t.lesson === 0) {
     if (t.stage === 0 && u && distance(u, { x: 12, z: 18 }) < 0.6) t.stage = 1
     else if (t.stage === 1 && u && distance(u, { x: 12, z: 22 }) < 0.6) t.stage = 2
@@ -76,8 +81,17 @@ export function updateTutorial(w: World): void {
     if (t.stage === 1 && drone) t.stage = 2
     if (t.stage === 2 && p.mode === 'tactics') t.stage = 3
     if (t.stage === 3 && drone?.order.type === 'escort' && w.transports.some(tr => tr.team === p.team && distance(drone, tr) <= 4)) t.stage = 4
-    if (t.stage === 4 && p.mode === 'fighter' && drone?.order.type === 'escort') t.completed = true
-  } else if (t.lesson === 6 && w.phase === 'finished') t.completed = true
+    if (t.stage === 4 && p.mode === 'fighter' && drone?.order.type === 'escort') t.stage = 5
+    if (t.stage >= 3 && deliveredNow && p.mode === 'fighter' && drone?.order.type === 'escort' && eligible(drone) && (!u || distance(u, center) > RULES.unloadRadius)) t.flags.droneDelivered = true
+    if (t.stage === 5 && t.flags.droneDelivered) t.completed = true
+  } else if (t.lesson === 6) {
+    if (deliveredNow && p.mode === 'tactics' && u?.order.type === 'escort' && eligible(u)) t.flags.autopilotDelivered = true
+    if (t.flags.autopilotDelivered) t.stage = 1
+    if (w.phase === 'finished') {
+      if (t.flags.autopilotDelivered) t.completed = true
+      else t.stage = 2
+    }
+  }
 }
 export function tutorialProgress(w: World): TutorialProgress {
   const t = w.tutorial

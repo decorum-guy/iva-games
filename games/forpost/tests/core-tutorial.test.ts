@@ -64,18 +64,45 @@ describe('seven real-command tutorial exercises', () => {
     until(w, () => tutorialProgress(w).completed)
     expect(w.participants[0].power).toBe(10)
   })
-  it('requires actual drone production, tactical escort and return to direct control', () => {
+  it('requires actual drone production, escort, switchback and the drone’s independent delivery', () => {
     const w = createTutorialWorld(5), dock = w.buildings.find(b => b.kind === 'dock')!
     applyAction(w, 'learner', { type: 'produceDrone', buildingId: dock.id }); until(w, () => tutorialProgress(w).stage === 2, 300)
     applyAction(w, 'learner', { type: 'mode', mode: 'tactics' }); stepWorld(w)
     const drone = w.units.find(u => u.kind === 'drone')!
     applyAction(w, 'learner', { type: 'order', unitIds: [drone.id], order: { type: 'escort' } }); until(w, () => tutorialProgress(w).stage === 4, 1800)
-    applyAction(w, 'learner', { type: 'mode', mode: 'fighter' }); stepWorld(w); expect(tutorialProgress(w).completed).toBe(true); expect(drone.order.type).toBe('escort')
+    applyAction(w, 'learner', { type: 'mode', mode: 'fighter' }); stepWorld(w)
+    expect(tutorialProgress(w).stage).toBe(5); expect(tutorialProgress(w).completed).toBe(false)
+    expect(w.teams.A.deliveries).toBe(0); expect(drone.order.type).toBe('escort')
+    const restored = deserializeWorld(serializeWorld(w))
+    until(restored, () => tutorialProgress(restored).completed, 1800)
+    expect(restored.teams.A.deliveries).toBeGreaterThan(0)
+    expect(restored.participants[0].statistics.deliveries).toBeGreaterThan(0)
+    expect(distance(fighter(restored, 'learner')!, { x: 32, z: 20 })).toBeGreaterThan(3)
+    const deliveredDrone = restored.units.find(unit => unit.ownerId === 'learner' && unit.kind === 'drone')!
+    expect(deliveredDrone.hp).toBeGreaterThan(0); expect(deliveredDrone.protectedUntil).toBeLessThanOrEqual(restored.tick)
+    expect(distance(deliveredDrone, { x: 32, z: 20 })).toBeLessThanOrEqual(3)
+  })
+  it('does not complete the final lesson merely because an untouched operation ends', () => {
+    const w = createTutorialWorld(6)
+    until(w, () => w.phase === 'finished', 3000)
+    expect(tutorialProgress(w).completed).toBe(false)
+    expect(tutorialProgress(w).stage).toBe(2)
+    expect(w.tutorial?.flags.autopilotDelivered).not.toBe(true)
+  })
+  it('does not attribute a directly controlled delivery to fighter autopilot', () => {
+    const w = createTutorialWorld(6)
+    walk(w, { x: 32, z: 19 })
+    until(w, () => w.phase === 'finished', 3000)
+    expect(w.teams.A.deliveries).toBeGreaterThan(0)
+    expect(w.participants[0].statistics.deliveries).toBeGreaterThan(0)
+    expect(tutorialProgress(w).completed).toBe(false)
+    expect(tutorialProgress(w).stage).toBe(2)
   })
   it('finishes the short operation by real delivery and saves/restores lesson state separately', () => {
     const w = createTutorialWorld(6)
     applyAction(w, 'learner', { type: 'mode', mode: 'tactics' }); applyAction(w, 'learner', { type: 'order', unitIds: ['fighter:learner'], order: { type: 'escort' } })
     advanceWorld(w, 100); const restored = deserializeWorld(serializeWorld(w)); expect(tutorialProgress(restored)).toEqual(tutorialProgress(w))
     until(restored, () => tutorialProgress(restored).completed, 1200); expect(restored.phase).toBe('finished'); expect(restored.teams.A.deliveries).toBeGreaterThan(0)
+    expect(restored.tutorial?.flags.autopilotDelivered).toBe(true); expect(restored.participants[0].statistics.deliveries).toBeGreaterThan(0)
   })
 })

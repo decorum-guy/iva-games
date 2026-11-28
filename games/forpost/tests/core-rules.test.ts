@@ -236,6 +236,29 @@ describe('transport and complete bounded match outcomes', () => {
     unloadTransports(w); expect(t.unloadTicks).toBe(0); b.x = 50; t.unloadTicks = 89
     resolveDamage(w, [{ targetId: t.id, amount: 650, sourceId: 'enemy', sourceOwnerId: 'B1', sourceTeam: 'B' }]); unloadTransports(w); expect(w.teams.A.deliveries).toBe(0)
   })
+  it('credits delivery only to alive eligible nonbuilders, then admits an ally after protection expires', () => {
+    // Controlled boundary fixture: one eligible teammate unloads while the other
+    // participant has only a protected fighter, dead drone and nearby builder.
+    const w = battle(world('FP01', 2)), a1 = fighter(w, 'A1')!, a2 = fighter(w, 'A2')!
+    Object.assign(a1, { x: 32, z: 20, protectedUntil: w.tick + 30 })
+    Object.assign(a2, { x: 32, z: 21, protectedUntil: 0 })
+    const builder = w.units.find(u => u.ownerId === 'A1' && u.kind === 'builder')!
+    Object.assign(builder, { x: 32, z: 20 })
+    const dead = createUnit(w, w.participants.find(p => p.id === 'A1')!, 'drone', { x: 32, z: 20 }, 1)
+    dead.hp = 0; w.units.push(dead)
+    const t = transport(w, 'A', 'N'); t.unloadTicks = 89
+    unloadTransports(w)
+    expect(w.teams.A.deliveries).toBe(1)
+    expect(w.participants.find(p => p.id === 'A1')!.statistics.deliveries).toBe(0)
+    expect(w.participants.find(p => p.id === 'A2')!.statistics.deliveries).toBe(1)
+    expect(viewForPlayer(w, 'A1').participants.every(p => p.statistics === undefined)).toBe(true)
+    w.tick = a1.protectedUntil
+    const next = transport(w, 'A', 'N'); next.unloadTicks = 89
+    unloadTransports(w)
+    expect(w.teams.A.deliveries).toBe(2)
+    expect(w.participants.find(p => p.id === 'A1')!.statistics.deliveries).toBe(1)
+    expect(w.participants.find(p => p.id === 'A2')!.statistics.deliveries).toBe(2)
+  })
   it('simultaneous third delivery enters overtime independent of team traversal (F05)', () => {
     const w = battle(); w.teams.A.deliveries = 3; w.teams.B.deliveries = 3; evaluateOperation(w); expect(w.phase).toBe('overtime'); expect(w.operations).toHaveLength(0)
   })

@@ -1,0 +1,60 @@
+{
+  "kind": "Source freeze after static validation only; native focus remains unaccepted until an actual CI replay",
+  "baseLocalHead": "499b3f3a7ccd086f77e8645a082dfa0072767952",
+  "files": [
+    {
+      "path": "games/forpost/e2e/native-focus-fixture.ts",
+      "sha256": "ff7824d8511cdc25ce75046414f4665a37ecb11552730488b25a1a885f6ca415"
+    },
+    {
+      "path": "games/forpost/e2e/interaction.spec.ts",
+      "sha256": "b0c41e21a284c41ceec77cce1f5b2f6242054498ae230b1a359aeea4fc89307e"
+    },
+    {
+      "path": "games/forpost/e2e/diagnostics.ts",
+      "sha256": "af28617fbf31c235691f78ca9006d87db2eb3538a0a7026a30c1af1ea57a79d5"
+    }
+  ],
+  "checks": {
+    "targetedTypeScript": "PASS exit0 after timeout setter correction",
+    "targetedEslint": "PASS exit0 after timeout setter correction",
+    "gitDiffCheck": "PASS exit0",
+    "discovery": {
+      "chromium-focus": {
+        "tests": 1,
+        "files": 1,
+        "log": ".qa/ci-r6-focus-fixture-chromium-focus-discovery.log",
+        "execution": "list only; no browser/webServer",
+        "validation": "repeated after timeout setter correction; list only"
+      },
+      "webkit-focus": {
+        "tests": 1,
+        "files": 1,
+        "log": ".qa/ci-r6-focus-fixture-webkit-focus-discovery.log",
+        "execution": "list only; no browser/webServer"
+      },
+      "chromium-interface": {
+        "tests": 15,
+        "files": 5,
+        "log": ".qa/ci-r6-focus-fixture-chromium-interface-discovery.log",
+        "execution": "list only; no browser/webServer"
+      },
+      "webkit-interface": {
+        "tests": 9,
+        "files": 1,
+        "log": ".qa/ci-r6-focus-fixture-webkit-interface-discovery.log",
+        "execution": "list only; no browser/webServer"
+      }
+    }
+  },
+  "publicApi": "https://playwright.dev/docs/api/class-browsertype#browser-type-connect-over-cdp",
+  "browserLaunchesDuringThisPatchValidation": 0,
+  "ciRunsStartedByThisAgent": 0,
+  "limitations": [
+    "noDefaults applies only to the existing default Chromium context; the fixture never calls browser.newContext",
+    "WebKit retains the original required real-loss gate; its observed R6 capability failure is not resolved or skipped",
+    "Actual blur/hidden and subsequent nonempty/stable ammo assertions are unchanged acceptance requirements"
+  ],
+  "contextTimeouts": "Public setDefaultTimeout(actionTimeout) and setDefaultNavigationTimeout(navigationTimeout) use the existing project fixtures (15000ms and30000ms).",
+  "independentSourceReview": "platform_audit found no source blocker in ownership, loopback binding, noDefaults/default-context selection or bounded cleanup; this is not native focus acceptance."
+}

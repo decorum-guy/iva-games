@@ -95,3 +95,9 @@ Build `9ebeb9e75054876409d81e615743254a1ba976ac`, [core job 141073352895](https:
 In the separate FP01/3D browser job, SwiftShader frame gaps p50/p95 were 266.8/350ms while RAF callback p50/p95 was 2.4/5.4ms. Its 51 callbacks totaled260.3ms over15.423s; 52 Long Tasks totaled15.46s. The bounded Scene measurements exclude React render/commit, async loading and GPU completion. They do not identify the expensive remainder. LoAF reported only one147.2ms record, so it cannot account for all long tasks. No scene quality or acceptance threshold was lowered.
 
 FP02/2D completed one match; four other maps observed SERVER_BUSY and FP02/3D had a visible stable button click timeout. These are separate interaction/server results, not replacement evidence for core, GPU or production capacity. [Full sanitized R5 evidence](qa/ci-round-5.json).
+
+## Native CI R6 — unchanged maximum-scene gate
+
+Job [141087153243](https://github.com/decorum-guy/iva-games/actions/runs/46179995591/job/141087153243), checkout `4c3c86fb405f11409a48fb941f8be72c077b00d6`, unchanged core `14d49d29954d0f7f427feea026beb23113699ff8ecb36ec4480f61f339a61e68`: 500 samples / 30 warmup. All three cases passed the strict p99 <16.667 ms gate: smoke 4.847924 ms, barriers 3.089975 ms, mixed 3.061874 ms. [Environment/outputs](qa/ci-round-6.json). The historical local failure remains in the record.
+
+The R6 four-room workload using the image failed after 389.063260 s, with a generic failRoom count of 4 and no registered overload pauses. Before failure, stepWork p99 was 3.6 ms and commit p99 was 13.8 ms. These values do not establish a completed hour or acceptable production capacity. Four technical matches are not UI passages.

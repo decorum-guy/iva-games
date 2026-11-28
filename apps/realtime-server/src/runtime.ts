@@ -41,6 +41,10 @@ export interface NewMatch {
 export class StartWaitingError extends Error {
   constructor(readonly waiting: StartWaiting) { super('SERVER_BUSY'); }
 }
+const roomFailureCodes = ['CHECKPOINT_UNAVAILABLE', 'CHECKPOINT_WAL_LIMIT', 'LEASE_LOST', 'STATE_CHECKSUM',
+  'WORKER_DEADLINE', 'WORKER_UNAVAILABLE', 'LEASE_HEARTBEAT_EXPIRED', 'UNKNOWN_RUNTIME_FAILURE'] as const;
+type RoomFailureCode = typeof roomFailureCodes[number];
+type RoomFailureStage = 'persist' | 'disconnect' | 'scheduler' | 'snapshotLease';
 export class RealtimeRuntime {
   readonly store: WorkerRpc;
   readonly leaseOwner = randomUUID();
@@ -66,6 +70,10 @@ export class RealtimeRuntime {
   private lastCapacityDecision: CapacityDecision | null = null;
   private writerMetrics: Record<string, unknown> | null = null;
   private readonly resyncReasons = { requested: 0, staleEpoch: 0, backpressure: 0 };
+  // The legacy storageFailures counter includes all failRoom paths. Preserve
+  // only allowlisted first-failure codes, never raw exceptions or game identity.
+  private readonly roomFailureReasons = Object.fromEntries(roomFailureCodes.map(code => [code, 0])) as Record<RoomFailureCode, number>;
+  private readonly roomFailureStages: Record<RoomFailureStage, number> = { persist: 0, disconnect: 0, scheduler: 0, snapshotLease: 0 };
   private readonly loopDelay = monitorEventLoopDelay({ resolution: 10 });
   private timer: ReturnType<typeof setInterval> | null = null;
   private draining = false;
@@ -260,7 +268,7 @@ export class RealtimeRuntime {
       if (confirmation?.batchSize) this.samples.maxCommitBatchSize = Math.max(this.samples.maxCommitBatchSize, confirmation.batchSize);
       if (confirmation?.writer) this.writerMetrics = confirmation.writer;
     }
-    catch (error) { this.failRoom(room); throw error; }
+    catch (error) { this.failRoom(room, error, 'persist'); throw error; }
     room.published = publication;
     room.publishedAt = room.viewsProducedAt;
     const elapsed = performance.now() - start; this.commitTiming.record(elapsed);
@@ -302,7 +310,7 @@ export class RealtimeRuntime {
       if (room.failed) return;
       const control = room.stored.controls[peer.claims.participantId];
       if (control.connectionId === peer.id) { control.connectionId = null; delete room.inputs[peer.claims.participantId]; await this.persist(room, { type: 'disconnect', participantId: peer.claims.participantId }); }
-    }).catch(() => this.failRoom(room));
+    }).catch(error => this.failRoom(room, error, 'disconnect'));
   }
   private envelope(room: Room, peer: Peer) {
     const match = room.published.match;
@@ -313,7 +321,7 @@ export class RealtimeRuntime {
   private snapshot(room: Room, peer: Peer, forceFull = false): void {
     if (room.failed) return;
     // A suspended former owner may not send stale authority after its lease expires.
-    if (Date.now() - room.lastPersistAt > 14_500) { this.failRoom(room); return; }
+    if (Date.now() - room.lastPersistAt > 14_500) { this.failRoom(room, new Error('LEASE_HEARTBEAT_EXPIRED'), 'snapshotLease'); return; }
     const { match, views } = room.published;
     if (match.pendingOutcome && Date.now() < match.countdownUntil) return;
     let stream = this.projections.get(peer);
@@ -410,7 +418,7 @@ export class RealtimeRuntime {
           room.nextTickAt = performance.now() + 1000;
           this.qaTrace?.emit('confirmed');
         }
-      }).catch(() => { this.failRoom(room); this.qaTrace?.emit('failed'); }).finally(() => { room.busy = false; });
+      }).catch(error => { this.failRoom(room, error, 'scheduler'); this.qaTrace?.emit('failed'); }).finally(() => { room.busy = false; });
     }
   }
   private async tick(room: Room): Promise<number | undefined> {
@@ -491,9 +499,12 @@ export class RealtimeRuntime {
     if (room.stored.tick % 2 === 0 || receipts.length || room.stored.phase !== 'running') for (const peer of room.peers.values()) this.snapshot(room, peer);
     return qaTick;
   }
-  private failRoom(room: Room): void {
+  private failRoom(room: Room, error: unknown, stage: RoomFailureStage): void {
     if (room.failed) return;
     room.failed = true;
+    const reason = error instanceof Error && roomFailureCodes.includes(error.message as RoomFailureCode)
+      ? error.message as RoomFailureCode : 'UNKNOWN_RUNTIME_FAILURE';
+    this.roomFailureReasons[reason]++; this.roomFailureStages[stage]++;
     this.samples.storageFailures++; room.stored.phase = 'failed-recoverable'; room.nextTickAt = Number.POSITIVE_INFINITY;
     for (const peer of room.peers.values()) peer.close(1011, 'RECOVERY_REQUIRED');
   }
@@ -515,6 +526,7 @@ export class RealtimeRuntime {
     admission: { mode: this.options.capacityProfile?.source ?? 'conservative', waiting: this.queuedStarts.length,
       reason: this.lastCapacityDecision?.reason ?? 'READY', reservationTtlMs: LIMITS.reservationMs,
       resources: this.options.resourceSample?.() ?? this.resourceProbe.sample() }, metrics: { ...this.samples, ...ages, resyncReasons: { ...this.resyncReasons },
+      roomFailureReasons: { ...this.roomFailureReasons }, roomFailureStages: { ...this.roomFailureStages },
       stepP99Ms: this.stepTiming.p99(), commitP99Ms: this.commitTiming.p99(), eventLoopDelayP99Ms: this.loopDelay.percentile(99) / 1e6,
       stepWorkP99Ms: this.stepWorkTiming.p99(), stepWorkCpuP99Ms: this.stepCpuTiming.p99(),
       processCpuMs: (cpu.user + cpu.system) / 1000, processElapsedMs: now - this.processStartedAt, writer: this.writerMetrics,

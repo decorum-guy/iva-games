@@ -4,16 +4,21 @@ import { TimingHistogram } from './timing.js';
 
 export const WAL_LIMIT_BYTES = 64 * 1024 * 1024;
 export const CHECKPOINT_STALE_MS = 5000;
+const WAL_RECLAIM_TARGET_BYTES = 16 * 1024 * 1024;
+const RECLAIM_RETRY_MS = 250;
 export interface CheckpointStatus {
   observedAt: number; sqliteVersion: string; pageSize: number; walBytes: number;
   logFrames: number; checkpointedFrames: number; busy: number;
   runs: number; maxMs: number; p99Ms: number; failures: number;
+  reclaimAttempts: number; reclaimBusy: number; reclaimMaxMs: number; reclaimP99Ms: number;
 }
-/** A separate connection: PASSIVE never waits for readers/writers to finish. */
+/** A separate connection; checkpoint/reclaim never waits for reader/writer locks. */
 export class WalCheckpointer {
   private readonly db: Database.Database;
   private readonly timing = new TimingHistogram();
+  private readonly reclaimTiming = new TimingHistogram();
   private lastAttemptAt = 0;
+  private lastReclaimAt = Number.NEGATIVE_INFINITY;
   private status: CheckpointStatus;
   constructor(private readonly path: string) {
     this.db = new Database(path, { fileMustExist: true });
@@ -26,7 +31,8 @@ export class WalCheckpointer {
     this.db.pragma('busy_timeout = 0'); this.db.pragma('synchronous = FULL'); this.db.pragma('wal_autocheckpoint = 0');
     if (this.db.pragma('journal_mode', { simple: true }) !== 'wal') { this.db.close(); throw new Error('CHECKPOINT_REQUIRES_WAL'); }
     this.status = { observedAt: 0, sqliteVersion: version, pageSize: this.db.pragma('page_size', { simple: true }) as number,
-      walBytes: 0, logFrames: 0, checkpointedFrames: 0, busy: 0, runs: 0, maxMs: 0, p99Ms: 0, failures: 0 };
+      walBytes: 0, logFrames: 0, checkpointedFrames: 0, busy: 0, runs: 0, maxMs: 0, p99Ms: 0, failures: 0,
+      reclaimAttempts: 0, reclaimBusy: 0, reclaimMaxMs: 0, reclaimP99Ms: 0 };
   }
   poll(force = false): CheckpointStatus {
     const now = Date.now();
@@ -39,8 +45,27 @@ export class WalCheckpointer {
         const elapsed = performance.now() - start; this.timing.record(elapsed);
         this.status.runs++; this.status.maxMs = Math.max(this.status.maxMs, elapsed); this.status.p99Ms = this.timing.p99();
       }
+      // PASSIVE can finish every frame while retaining the allocated WAL. The
+      // writer's journal_size_limit takes effect only on a later WAL reset;
+      // our hard guard must not prevent that reset forever. SQLite itself
+      // acquires the necessary locks and truncates safely. busy_timeout=0
+      // leaves a pinned reader/writer intact and returns for a later poll.
+      let allocatedBytes = walBytes(this.path);
+      const reclaimNow = performance.now();
+      if (progress.log >= 0 && progress.log === progress.checkpointed &&
+          allocatedBytes > WAL_RECLAIM_TARGET_BYTES && reclaimNow - this.lastReclaimAt >= RECLAIM_RETRY_MS) {
+        this.lastReclaimAt = reclaimNow; this.status.reclaimAttempts++;
+        try {
+          progress = (this.db.pragma('wal_checkpoint(TRUNCATE)') as typeof progress[])[0];
+          if (progress.busy) this.status.reclaimBusy++;
+        } finally {
+          const elapsed = performance.now() - reclaimNow; this.reclaimTiming.record(elapsed);
+          this.status.reclaimMaxMs = Math.max(this.status.reclaimMaxMs, elapsed); this.status.reclaimP99Ms = this.reclaimTiming.p99();
+        }
+        allocatedBytes = walBytes(this.path);
+      }
       this.status.logFrames = Math.max(0, progress.log); this.status.checkpointedFrames = Math.max(0, progress.checkpointed);
-      this.status.busy = progress.busy; this.status.walBytes = walBytes(this.path); this.status.observedAt = Date.now();
+      this.status.busy = progress.busy; this.status.walBytes = allocatedBytes; this.status.observedAt = Date.now();
     } catch { this.status.failures++; this.status.observedAt = Date.now(); }
     return { ...this.status };
   }

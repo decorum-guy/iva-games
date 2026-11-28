@@ -1,7 +1,8 @@
 import { test, expect } from '@playwright/test'
-import type { CDPSession, Locator, Page, Route } from '@playwright/test'
+import type { Locator, Page, Route } from '@playwright/test'
 import type { World } from '../src/core/types'
 import { installDiagnostics, type TimingProbe } from './diagnostics'
+import { nativeFocusTest } from './native-focus-fixture'
 
 installDiagnostics(test)
 
@@ -11,17 +12,17 @@ const tutorialKey = 'iva.forpost.tutorial.v1'
 async function savedLesson(page: Page): Promise<World | null> {
   return page.evaluate(key => JSON.parse(localStorage.getItem(key) ?? 'null'), tutorialKey)
 }
-async function openMenu(page: Page) {
-  await page.goto('/play/forpost/')
-  const health = await (await page.request.get('/api/realtime/v1/health')).json()
+async function openMenu(page: Page, origin?: string) {
+  await page.goto(origin ? new URL('/play/forpost/', origin).href : '/play/forpost/')
+  const health = await (await page.request.get(origin ? new URL('/api/realtime/v1/health', origin).href : '/api/realtime/v1/health')).json()
   await expect(page.locator('[data-build]')).toHaveAttribute('data-build', health.buildRevision)
 }
 async function settings(page: Page) {
   await page.getByRole('button', { name: 'Настройки', exact: true }).click()
   return page.getByRole('dialog', { name: 'Настройки', exact: true })
 }
-async function startLesson(page: Page, index: number) {
-  await openMenu(page)
+async function startLesson(page: Page, index: number, origin?: string) {
+  await openMenu(page, origin)
   const panel = await settings(page)
   await panel.getByRole('combobox', { name: /^Отображение/ }).selectOption('2d')
   await panel.getByRole('button', { name: 'Готово', exact: true }).click()
@@ -239,7 +240,8 @@ test('power priority, sale cancellation and generator finish the power lesson', 
   await expect(page.locator('.fp-lesson')).toContainText('Задача выполнена', { timeout: 30_000 })
 })
 
-test('dock cancel, production, drone escort and switching back finish the squad lesson', async ({ page }) => {
+test('dock cancel, production, drone escort and its independent delivery finish the squad lesson', async ({ page }) => {
+  test.setTimeout(120_000)
   await startLesson(page, 5)
   await selectPad(page, 'L-03')
   const order = page.getByRole('button', { name: /^Заказать дрон/ })
@@ -259,7 +261,18 @@ test('dock cancel, production, drone escort and switching back finish the squad 
   await expect(page.locator('.fp-current-order')).toContainText('Сопровождать')
   await expect(page.locator('.fp-lesson p')).toContainText('Вернитесь к бойцу', { timeout: 30_000 })
   await page.locator('.fp-mode-switch').click()
-  await expect(page.locator('.fp-lesson')).toContainText('Задача выполнена')
+  await expect(page.locator('.fp-lesson p')).toContainText('Дождитесь, пока ваш дрон сам разгрузит транспорт')
+  await expect(page.locator('.fp-lesson')).not.toContainText('Задача выполнена')
+  await expect(page.locator('.fp-lesson')).toContainText('Задача выполнена', { timeout: 75_000 })
+  await expect.poll(async () => (await savedLesson(page))?.tutorial?.flags.droneDelivered).toBe(true)
+  const delivered = (await savedLesson(page))!
+  expect(delivered.teams.A.deliveries).toBeGreaterThan(0)
+  expect(delivered.participants.find(player => player.id === 'learner')!.statistics.deliveries).toBeGreaterThan(0)
+  const fighter = delivered.units.find(unit => unit.ownerId === 'learner' && unit.kind === 'fighter')!
+  expect(Math.hypot(fighter.x - 32, fighter.z - 20)).toBeGreaterThan(3)
+  expect(delivered.participants.find(player => player.id === 'learner')!.mode).toBe('fighter')
+  // The persisted flag records eligible drone participation at the delivery tick.
+  // A later checkpoint may already show the drone returning toward its depot.
 })
 
 test('cover lesson requires a blocked shot, a real wall detour and barrier placement', async ({ page }) => {
@@ -301,6 +314,9 @@ test('final lesson reaches an operation result and starts a separate live practi
   const completed = (await savedLesson(page))!
   expect(completed.phase).toBe('finished')
   expect(completed.operations).toHaveLength(1)
+  expect(completed.operations[0].deliveries.A).toBeGreaterThan(0)
+  expect(completed.tutorial?.flags.autopilotDelivered).toBe(true)
+  expect(completed.participants.find(player => player.id === 'learner')!.statistics.deliveries).toBeGreaterThan(0)
   await expect(page.locator('.fp-result')).toHaveCount(0)
   const practicePath = '/api/realtime/v1/practice'
   expect(await page.evaluate(() => localStorage.getItem('iva.forpost.last-match.v1'))).toBeNull()
@@ -378,26 +394,21 @@ test('final lesson reaches an operation result and starts a separate live practi
   expect(fixtureCleanupFailed, 'OWN_PRACTICE_CLEANUP_FAILED').toBe(false)
 })
 
-test('switching browser tabs while firing releases input and does not resume old shots', { tag: '@native-focus' }, async ({ page, context, browser, browserName, headless }) => {
-  let focusDriver: CDPSession | undefined
+nativeFocusTest('switching browser tabs while firing releases input and does not resume old shots', { tag: '@native-focus' }, async ({ page, context, browser, browserName, headless, baseURL }) => {
   let other: Page | undefined
+  const focusHarness = browserName === 'chromium' ? 'owned-chromium-cdp-default-context-noDefaults' : 'standard-playwright-webkit'
   try {
-    console.log(JSON.stringify({ automatedFocusEnvironment: true, browserName, browserVersion: browser.version(), headless, xvfbRunRequested: process.env.FORPOST_FOCUS_XVFB === '1', displayConfigured: !!process.env.DISPLAY }))
-    if (browserName === 'chromium') {
-      focusDriver = await context.newCDPSession(page)
-      // Playwright enables this override by default. Removing it allows actual
-      // tab activation to determine focus; no focus/blur event is synthesized.
-      await focusDriver.send('Emulation.setFocusEmulationEnabled', { enabled: false })
-    }
-    await startLesson(page, 0)
+    console.log(JSON.stringify({ automatedFocusEnvironment: true, browserName, browserVersion: browser.version(), headless, focusHarness, xvfbRunRequested: process.env.FORPOST_FOCUS_XVFB === '1', displayConfigured: !!process.env.DISPLAY }))
+    if (!baseURL) throw new Error('NATIVE_FOCUS_QA_ORIGIN_UNAVAILABLE')
+    await startLesson(page, 0, baseURL)
     await page.bringToFront()
     try {
       await expect.poll(() => page.evaluate(() => ({ hidden: document.hidden, hasFocus: document.hasFocus() })), { timeout: 3000, message: 'BROWSER_INITIAL_FOCUS_UNAVAILABLE: the lesson must really be visible and focused before firing.' }).toEqual({ hidden: false, hasFocus: true })
     } catch (error) {
-      console.log(JSON.stringify({ automatedCapabilityFailure: 'BROWSER_INITIAL_FOCUS_UNAVAILABLE', browserName, chromiumFocusEmulationDisabled: !!focusDriver }))
+      console.log(JSON.stringify({ automatedCapabilityFailure: 'BROWSER_INITIAL_FOCUS_UNAVAILABLE', browserName, focusHarness }))
       throw error
     }
-    console.log(JSON.stringify({ automatedFocusPrecondition: 'visible-and-focused', browserName, chromiumFocusEmulationDisabled: !!focusDriver }))
+    console.log(JSON.stringify({ automatedFocusPrecondition: 'visible-and-focused', browserName, focusHarness }))
     await aimAtLessonPoint(page, 30, 5)
     const ammo = page.locator('.fp-ammo strong')
     await page.mouse.down()
@@ -414,7 +425,8 @@ test('switching browser tabs while firing releases input and does not resume old
       console.log(JSON.stringify({ automatedCapabilityFailure: 'BROWSER_FOCUS_LOSS_UNAVAILABLE', browserName }))
       throw error
     }
-    console.log(JSON.stringify({ automatedFocusCapability: 'real-focus-loss-observed', browserName, headless }))
+    const focusLossEvidence = await page.evaluate(() => ({ hidden: document.hidden, hasFocus: document.hasFocus(), eventTypes: (window as Window & { __forpostQaTiming?: TimingProbe }).__forpostQaTiming?.focusEvents.slice(-8).map(event => ({ type: event.type, hidden: event.hidden, hasFocus: event.hasFocus })) ?? [] }))
+    console.log(JSON.stringify({ automatedFocusCapability: 'real-focus-loss-observed', browserName, headless, focusHarness, focusLossEvidence }))
     await other.waitForTimeout(500)
     await page.bringToFront()
     await page.waitForTimeout(100)
@@ -423,5 +435,5 @@ test('switching browser tabs while firing releases input and does not resume old
     await page.waitForTimeout(850)
     await expect(ammo).toHaveText(released)
     console.log(JSON.stringify({ automatedFocusRelease: 'passed', browserName, headless, realLossObserved: true, nonemptyAmmoStable: true, build: await page.locator('[data-build]').getAttribute('data-build') }))
-  } finally { await page.mouse.up().catch(() => {}); await other?.close().catch(() => {}); await focusDriver?.detach().catch(() => {}) }
+  } finally { await page.mouse.up().catch(() => {}); await other?.close().catch(() => {}) }
 })

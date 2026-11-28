@@ -84,11 +84,11 @@ export function installDiagnostics(test: typeof PlaywrightTest): void {
       }
     })
   })
-  test.afterEach(async ({ page, browser, browserName }, info) => {
+  test.afterEach(async ({ page, browser, browserName, baseURL }, info) => {
     if (info.status === info.expectedStatus || page.isClosed()) return
     const [body, runtimeHealth, timing] = await Promise.all([
       page.locator('body').innerText({ timeout: 2000 }).catch(() => '[page unavailable]'),
-      page.request.get('/api/realtime/v1/health', { timeout: 3000 }).then(response => response.json()).catch(() => '[health unavailable]'),
+      page.request.get(new URL('/api/realtime/v1/health', baseURL ?? page.url()).href, { timeout: 3000 }).then(response => response.json()).catch(() => '[health unavailable]'),
       boundedDiagnostic(page.evaluate(() => {
         const probe = (window as Window & { __forpostQaTiming?: TimingProbe }).__forpostQaTiming
         const summary = (samples: number[]) => { const sorted = [...samples].sort((a, b) => a - b); return { samples: sorted.length, p50Ms: sorted[Math.ceil(sorted.length * .5) - 1] ?? null, p95Ms: sorted[Math.ceil(sorted.length * .95) - 1] ?? null, maxMs: sorted.at(-1) ?? null } }

@@ -76,8 +76,13 @@ function safeWriter(value) {
   if (!value) return null;
   return { ...numbers(value, ['batches', 'maxTransactionMs', 'maxWorldBytes', 'maxRecordBytes', 'maxJournalBytes',
     'transactionP99Ms', 'bodyP99Ms', 'finalizeP99Ms', 'walAutoCheckpoint', 'synchronous', 'queueP99Ms']),
-    checkpoint: value.checkpoint ? { ...numbers(value.checkpoint, ['pageSize', 'walBytes', 'logFrames', 'checkpointedFrames', 'busy', 'runs', 'maxMs', 'p99Ms', 'failures']),
+    checkpoint: value.checkpoint ? { ...numbers(value.checkpoint, ['pageSize', 'walBytes', 'logFrames', 'checkpointedFrames', 'busy', 'runs', 'maxMs', 'p99Ms', 'failures',
+      'reclaimAttempts', 'reclaimBusy', 'reclaimMaxMs', 'reclaimP99Ms']),
       sqliteVersion: typeof value.checkpoint.sqliteVersion === 'string' && /^\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(value.checkpoint.sqliteVersion) ? value.checkpoint.sqliteVersion : null } : null };
+}
+function safeFailureCounts(value, names) {
+  if (!value || typeof value !== 'object') return null;
+  return Object.fromEntries(names.map(name => [name, Number.isSafeInteger(value[name]) && value[name] >= 0 ? value[name] : null]));
 }
 function safeRetention(value) {
   if (!value) return null;
@@ -165,6 +170,9 @@ export function summarizeLoad(report) {
     timings: { ticks: numeric(metrics.ticks), stepRpcP99Ms: numeric(metrics.stepP99Ms),
       ...numbers(metrics, ['stepWorkP99Ms', 'stepWorkCpuP99Ms', 'commitP99Ms', 'maxCommitMs', 'journalAgeP99Ms', 'snapshotAgeP99Ms',
         'eventLoopDelayP99Ms', 'maxCommitBatchSize', 'storageFailures']),
+      roomFailureReasons: safeFailureCounts(metrics.roomFailureReasons, ['CHECKPOINT_UNAVAILABLE', 'CHECKPOINT_WAL_LIMIT', 'LEASE_LOST', 'STATE_CHECKSUM',
+        'WORKER_DEADLINE', 'WORKER_UNAVAILABLE', 'LEASE_HEARTBEAT_EXPIRED', 'UNKNOWN_RUNTIME_FAILURE']),
+      roomFailureStages: safeFailureCounts(metrics.roomFailureStages, ['persist', 'disconnect', 'scheduler', 'snapshotLease']),
       peakJournalPendingAgeMs: maximum(samples.map(sample => sample.health?.metrics?.journalPendingAgeMs)),
       queuedBytesMax: maximum(samples.map(sample => sample.health?.metrics?.queuedBytesMax)), backpressureResyncs: numeric(metrics.resyncReasons?.backpressure ?? 0), writer: safeWriter(metrics.writer) },
     checks, diagnosticThresholdsMet: Object.values(checks).every(Boolean),

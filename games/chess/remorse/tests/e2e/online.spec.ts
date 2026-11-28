@@ -124,7 +124,8 @@ for (const scenario of [{ locale: 'ru', mobile: false }, { locale: 'en', mobile:
     try {
       await test.step('Create and join through the visible invitation flow', async () => {
         await host.page.goto(liveServer.url);
-        await host.page.getByTestId('mode-online').click();
+        await host.page.getByTestId('mode-friend').click()
+  await host.page.getByTestId('mode-online').click();
         await expect(host.page.getByRole('dialog')).toHaveAccessibleName(nt('title'));
         if (scenario.mobile) {
           expect(await host.page.getByTestId('online-name').evaluate(node => parseFloat(getComputedStyle(node).fontSize))).toBeGreaterThanOrEqual(16);
