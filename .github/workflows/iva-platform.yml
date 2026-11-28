@@ -62,6 +62,10 @@ jobs:
   forpost-browser:
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        scenario: [interface, FP01, FP02, FP03]
     steps:
       - uses: actions/checkout@v6
         with:
@@ -99,6 +103,61 @@ jobs:
         if: steps.changes.outputs.required == 'true'
       - name: Exercise the actual Forpost client, platform and realtime processes
         if: steps.changes.outputs.required == 'true'
-        run: npm run forpost:e2e
+        env:
+          FORPOST_SCENARIO: ${{ matrix.scenario }}
+        run: |
+          # Each map has its own real server/database/browser process tree. This
+          # tests UI outcomes; the independent four-room load probe tests capacity.
+          if [ "$FORPOST_SCENARIO" = interface ]; then
+            npm run forpost:e2e -- --workers=1 --grep-invert 'three complete network matches'
+          else
+            npm run forpost:e2e -- --workers=1 --grep "$FORPOST_SCENARIO: lobby"
+          fi
       # Automated UI checks are distinct from the executor's own browser play.
       # No screenshot, video or trace upload is added to the release pipeline.
+
+  forpost-core-performance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - name: Record the actual benchmark environment
+        run: |
+          node --input-type=module <<'JS'
+          import os from 'node:os';
+          import { readFileSync } from 'node:fs';
+          const read = path => { try { return readFileSync(path, 'utf8').trim(); } catch { return 'unavailable'; } };
+          console.log(JSON.stringify({ node: process.version, cpu: os.cpus()[0]?.model,
+            availableParallelism: os.availableParallelism(), reportedMemoryBytes: os.totalmem(),
+            cpuQuota: read('/sys/fs/cgroup/cpu.max'), memoryQuota: read('/sys/fs/cgroup/memory.max'),
+            scope: 'CI maximum-scene probe; not a production capacity profile or a four-room hour' }));
+          JS
+      - name: Enforce the unchanged maximum-scene p99 budget
+        env:
+          FORPOST_PERF: '1'
+        run: npx vitest run --config games/forpost/vitest.config.ts games/forpost/tests/core-load.test.ts --maxWorkers=1
+
+  forpost-webkit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: npx playwright install --with-deps webkit
+      - name: Exercise settings, keyboard and tutorial actions in WebKit
+        env:
+          FORPOST_BROWSER: webkit
+        run: npm run forpost:e2e -- interaction.spec.ts --workers=1

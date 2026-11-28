@@ -5,7 +5,7 @@ export const WS_PATH = '/ws/realtime/v1';
 export const LIMITS = Object.freeze({ authBytes: 4096, messageBytes: 16_384, inputPerSecond: 30,
   inputBurst: 90, actionPerSecond: 10, actionBurst: 20, neutralAfterMs: 250,
   botAfterMs: 5000, pauseAfterMs: 10_000, resumeForMs: 86_400_000, ticketMs: 30_000,
-  fullEveryTicks: 60, maxQueuedBytes: 262_144, closeQueuedBytes: 1_048_576 });
+  reservationMs: 15_000, fullEveryTicks: 60, maxQueuedBytes: 262_144, closeQueuedBytes: 1_048_576 });
 export type MatchPhase = 'creating' | 'loading' | 'ready' | 'running' | 'paused' | 'recovering' | 'finished' | 'abandoned' | 'failed-recoverable';
 export interface TicketClaims {
   issuer: 'iva-platform' | 'iva-realtime-practice'; audience: 'iva-realtime'; keyId: string;
@@ -22,6 +22,19 @@ export type ClientMessage =
   | (Envelope & { type: 'ackSnapshot'; snapshotSeq: number });
 export interface Admission {
   matchId: string; participantId: string; ticket: string; websocketPath: string; protocolVersion: 1; route: string;
+}
+export interface StartWaiting {
+  reason: 'capacity' | 'updating' | 'another_start' | 'service';
+  retryAt: number; queuePosition?: number; reservationExpiresAt?: number;
+}
+/** Data safe to show only to members of the already authenticated lobby. */
+export function parseStartWaiting(value: unknown): StartWaiting | null {
+  if (!object(value) || !['capacity', 'updating', 'another_start', 'service'].includes(String(value.reason)) ||
+    !safeInteger(value.retryAt) || value.queuePosition !== undefined && (!safeInteger(value.queuePosition) || value.queuePosition < 1 || value.queuePosition > 128) ||
+    value.reservationExpiresAt !== undefined && !safeInteger(value.reservationExpiresAt)) return null;
+  return { reason: value.reason as StartWaiting['reason'], retryAt: value.retryAt,
+    ...(value.queuePosition === undefined ? {} : { queuePosition: value.queuePosition }),
+    ...(value.reservationExpiresAt === undefined ? {} : { reservationExpiresAt: value.reservationExpiresAt }) };
 }
 function object(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === 'object' && !Array.isArray(value);

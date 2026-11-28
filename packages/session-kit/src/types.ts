@@ -14,6 +14,8 @@ export interface Participant {
 export interface StartMatchRequest {
   startCommandId: string;
   roomId: string;
+  /** Trusted lobby owner at the frozen start; optional for older adapters/saves. */
+  hostPlayerId?: string;
   rulesVersion: string;
   contentVersion: string;
   participants: Participant[];

@@ -1,17 +1,15 @@
-import { test, expect } from '@playwright/test'
-import type { Page, APIRequestContext } from '@playwright/test'
+import { test, expect, errors } from '@playwright/test'
+import type { Page, APIRequestContext, Locator } from '@playwright/test'
 import { readFile, readdir } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import type { WorldView } from '../src/core/types'
+import { installDiagnostics } from './diagnostics'
+
+installDiagnostics(test)
 
 const origin = 'http://127.0.0.1:5274'
 const root = resolve(import.meta.dirname, '../../..')
-test.afterEach(async ({ page }, info) => {
-  if (info.status === info.expectedStatus || page.isClosed()) return
-  const body = await page.locator('body').innerText({ timeout: 2000 }).catch(() => '[page unavailable]')
-  console.log(JSON.stringify({ automatedUiFailure: info.title, path: new URL(page.url()).pathname, visibleText: body.slice(0, 12_000) }))
-})
 async function post(api: APIRequestContext, path: string, body: unknown) {
   const current = await (await api.get('/api/platform/v1/session')).json()
   const response = await api.post('/api/platform/v1' + path, { data: body, headers: { Origin: origin, 'X-CSRF-Token': current.csrfToken, 'Idempotency-Key': randomUUID() } })
@@ -50,6 +48,18 @@ function observeView(page: Page) {
     if (latest) { bases.set(packet.snapshotSeq, latest); while (bases.size > 64) bases.delete(bases.keys().next().value!) }
   }))
   return () => latest
+}
+/** A result overlay can arrive between the last snapshot and a visible UI click. */
+async function clickWithinOperation(locator: Locator, latest: () => WorldView | undefined): Promise<boolean> {
+  const before = latest()
+  if (!before || before.phase === 'operationResult' || before.phase === 'finished') return false
+  try { await locator.click({ timeout: 1500 }); return true }
+  catch (error) {
+    const after = latest()
+    // Suppress only a click timeout accompanied by the actually observed result transition.
+    if (error instanceof errors.TimeoutError && after && (after.phase === 'operationResult' || after.phase === 'finished' || after.operation !== before.operation)) return false
+    throw error
+  }
 }
 async function lesson(page: Page, index: number) {
   await page.goto('/play/forpost/')
@@ -155,12 +165,12 @@ test.describe('three complete network matches through visible controls', () => {
     while (Date.now() - started < 1_220_000 && latest()?.phase !== 'finished') {
       if (latest()?.phase === 'operationResult') { await page.waitForTimeout(1000); continue }
       const player = latest()?.participants.find(p => p.id === latest()?.you)
-      if (player?.mode !== 'tactics') { const mode = page.locator('.fp-mode-switch'); if (await mode.isEnabled()) await mode.click() }
+      if (player?.mode !== 'tactics') { const mode = page.locator('.fp-mode-switch'); if (await mode.isEnabled()) await clickWithinOperation(mode, latest) }
       const fighterButton = page.locator('.fp-unit-bar button').filter({ hasText: 'Боец' })
       if (await fighterButton.count()) {
-        await fighterButton.click()
+        if (!await clickWithinOperation(fighterButton, latest)) continue
         const escort = page.getByRole('button', { name: 'Сопровождать', exact: true })
-        if (await escort.isVisible() && await escort.isEnabled()) await escort.click()
+        if (await escort.isVisible() && await escort.isEnabled()) await clickWithinOperation(escort, latest)
       }
       const view = latest()
       if (view?.units.some(unit => unit.ownerId === view.you && unit.kind === 'fighter' && unit.order?.type === 'escort')) observedEscort = true

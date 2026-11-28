@@ -449,11 +449,39 @@ describe('Iva Games platform: independent HTTP clients and persistent authority'
     expect(room.settings.mapId).toBe(resolvedMap);
     expect((await host.client.request(`/rooms/${room.roomId}/settings`, { expectedRevision: room.revision, settings: { loadouts: {} } })).status).toBe(400);
     for (const player of [host, guest]) await player.client.request(`/rooms/${room.roomId}/ready`, { ready: true, expectedRevision: room.revision });
+    expect((await host.client.request(`/rooms/${room.roomId}/start`, { expectedRevision: room.revision, hostPlayerId: guest.account.playerId })).status).toBe(400);
+    expect(starts).toHaveLength(0);
     const started = await host.client.request<{ room: Room }>(`/rooms/${room.roomId}/start`, { expectedRevision: room.revision });
     expect(started.status).toBe(200); room = started.body.room; expect(room.state).toBe('playing'); expect(starts).toHaveLength(1);
+    expect(starts[0].hostPlayerId).toBe(host.account.playerId);
     expect(starts[0].settings).toEqual(room.settings); expect(starts[0].settings.mapId).toBe(resolvedMap);
     expect((await setup(host.client, { tool: 'smoke' })).status).toBe(409);
     expect((await host.client.request(`/rooms/${room.roomId}/settings`, { expectedRevision: room.revision, settings: { mapId: 'random' } })).status).toBe(409);
+  });
+
+  it('keeps a Forpost start waiting visibly and retries the same host-owned command until runtime capacity is ready', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'iva-forpost-waiting-'));
+    const adapter = createForpostRegistration({ baseUrl: 'http://127.0.0.1:1', publicOrigin: ORIGIN, keyId: 'test-platform', signingKeyPath: join(directory, 'signing.pem') });
+    let capacityReady = false; const starts: StartMatchRequest[] = [];
+    const f = await fixture({ directory, games: lab => [lab, { ...adapter.registration, runtime: { ...adapter.registration.runtime!,
+      createMatch: async command => {
+        starts.push(structuredClone(command));
+        if (!capacityReady) throw Object.assign(new Error('START_WAITING'), { startWaiting: { reason: 'capacity', retryAt: 1, queuePosition: 2 } });
+        return { matchId: 'accepted-after-wait' };
+      }, status: async () => ({ finished: false }),
+    } }] });
+    const host = await signup(f, 'fp_wait_host');
+    let room = (await host.client.request<{ room: Room }>('/rooms', { gameId: 'forpost', capacity: 2, settings: { mapId: 'FP01', teamSize: 1 } })).body.room;
+    room = (await host.client.request<{ room: Room }>(`/rooms/${room.roomId}/bots`, { expectedRevision: room.revision, difficulty: 'normal' })).body.room;
+    room = (await host.client.request<{ room: Room }>(`/rooms/${room.roomId}/ready`, { expectedRevision: room.revision, ready: true })).body.room;
+    room = (await host.client.request<{ room: Room }>(`/rooms/${room.roomId}/start`, { expectedRevision: room.revision })).body.room;
+    expect(room.state).toBe('starting'); expect(room.matchId).toBeNull();
+    expect(room.startWaiting).toEqual({ reason: 'capacity', retryAt: f.now.value + 1000, queuePosition: 2 });
+    expect(starts[0].hostPlayerId).toBe(host.account.playerId);
+    const original = starts[0]; capacityReady = true; f.now.value += 1100;
+    await f.platform.reconcile(); room = await host.client.room(room.roomId);
+    expect(starts).toEqual([original, original]); expect(room).toMatchObject({ state: 'playing', matchId: 'accepted-after-wait' });
+    expect(room.startWaiting).toBeUndefined();
   });
 
   it('resolves a random Forpost map before readiness and rejects incomplete or injected room settings', async () => {

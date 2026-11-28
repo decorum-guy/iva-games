@@ -6,19 +6,90 @@ import type { Building, GameEvent, Point, Rect, Team, Unit, World } from './type
 interface VisibilitySnapshot {
   visible: (team: Team, point: Point, targetId?: string) => boolean
   clear: (from: Point, to: Point, fromId?: string, targetId?: string, ignoreSmoke?: boolean) => boolean
+  knownSolids: (team: Team) => VisibilitySolid[]
+  knownBarriers: (team: Team) => World['barriers']
+  prepareTracers: () => void
+}
+interface VisibilitySolid { id: string; rect: Rect; building?: Building }
+interface VisibilityObserver extends Point {
+  id?: string; range: number; range2: number
+}
+interface IndexedVisibilityObserver extends VisibilityObserver {
+  solids: VisibilitySolid[]; smokes: World['smokes']; insideSmokes: World['smokes']
+}
+interface ObserverGrid {
+  minX: number; minZ: number; width: number; height: number
+  observers: IndexedVisibilityObserver[]
+  heads: Int32Array; next: Int32Array; observerIndices: Int32Array; fullyVisible: Int8Array
+}
+const observerCellSize = 4
+function cellFullyVisible(grid: ObserverGrid, cell: number, x1: number, z1: number): boolean {
+  const x2 = x1 + observerCellSize, z2 = z1 + observerCellSize
+  observer: for (let node = grid.heads[cell]; node >= 0; node = grid.next[node]) {
+    const o = grid.observers[grid.observerIndices[node]]
+    const dx = Math.max(Math.abs(x1 - o.x), Math.abs(x2 - o.x)), dz = Math.max(Math.abs(z1 - o.z), Math.abs(z2 - o.z))
+    if (dx * dx + dz * dz > o.range2 - 1e-8) continue
+    // Every observer-to-cell ray lies inside this box. Reject a box touching any occluder;
+    // accepting it therefore proves the whole cell visible without sampling or approximation.
+    const minX = Math.min(x1, o.x) - 1e-9, maxX = Math.max(x2, o.x) + 1e-9
+    const minZ = Math.min(z1, o.z) - 1e-9, maxZ = Math.max(z2, o.z) + 1e-9
+    for (const s of o.smokes) if (s.x - s.radius <= maxX && s.x + s.radius >= minX && s.z - s.radius <= maxZ && s.z + s.radius >= minZ) continue observer
+    for (const s of o.solids) if (s.rect.x1 <= maxX && s.rect.x2 >= minX && s.rect.z1 <= maxZ && s.rect.z2 >= minZ) continue observer
+    return true
+  }
+  return false
+}
+function observerGrid(observers: IndexedVisibilityObserver[]): ObserverGrid {
+  // Conservative broad phase only: every candidate still passes the unchanged range/occlusion tests.
+  const minX = Math.min(...observers.map(o => Math.floor((o.x - o.range - 1e-9) / observerCellSize)))
+  const minZ = Math.min(...observers.map(o => Math.floor((o.z - o.range - 1e-9) / observerCellSize)))
+  const maxX = Math.max(...observers.map(o => Math.floor((o.x + o.range + 1e-9) / observerCellSize)))
+  const maxZ = Math.max(...observers.map(o => Math.floor((o.z + o.range + 1e-9) / observerCellSize)))
+  const width = maxX - minX + 1, height = maxZ - minZ + 1
+  const ranges = observers.map(o => ({
+    x1: Math.floor((o.x - o.range - 1e-9) / observerCellSize) - minX, x2: Math.floor((o.x + o.range + 1e-9) / observerCellSize) - minX,
+    z1: Math.floor((o.z - o.range - 1e-9) / observerCellSize) - minZ, z2: Math.floor((o.z + o.range + 1e-9) / observerCellSize) - minZ,
+  }))
+  const count = ranges.reduce((sum, r) => sum + (r.x2 - r.x1 + 1) * (r.z2 - r.z1 + 1), 0)
+  const heads = new Int32Array(width * height).fill(-1), next = new Int32Array(count), observerIndices = new Int32Array(count)
+  let node = 0
+  // Reverse insertion keeps the original observer order without allocating one array per cell.
+  for (let index = observers.length - 1; index >= 0; index--) {
+    const r = ranges[index]
+    for (let z = r.z1; z <= r.z2; z++) for (let x = r.x1; x <= r.x2; x++) {
+      const cell = z * width + x
+      next[node] = heads[cell]; observerIndices[node] = index; heads[cell] = node++
+    }
+  }
+  return { minX, minZ, width, height, observers, heads, next, observerIndices, fullyVisible: new Int8Array(heads.length) }
 }
 const snapshots = new WeakMap<World, VisibilitySnapshot>()
 /** A scoped, derived query cache. Callers must not move entities or change occluders inside the scope. */
 export function withVisibilitySnapshot<T>(w: World, read: () => T): T {
   if (snapshots.has(w)) return read()
   const map = getMap(w.mapId), pads = new Map(map.pads.map(p => [p.id, p.rect]))
-  const solids: { id?: string; rect: Rect }[] = w.walls.filter(r => !r.destructible || r.hp > 0).map(rect => ({ id: rect.id, rect }))
-  for (const b of w.buildings) if (b.kind !== 'bridge') solids.push({ id: b.id, rect: pads.get(b.padId)! })
-  const observers = { A: [] as (Point & { id?: string; range2: number })[], B: [] as (Point & { id?: string; range2: number })[] }
-  for (const team of ['A', 'B'] as Team[]) observers[team].push({ ...map.bases[w.teams[team].side], range2: VISION.base ** 2 })
-  for (const u of w.units) if (u.hp > 0) observers[u.team].push({ x: u.x, z: u.z, id: u.id, range2: VISION[u.kind] ** 2 })
-  for (const t of w.transports) observers[t.team].push({ x: t.x, z: t.z, id: t.id, range2: VISION.transport ** 2 })
-  for (const b of w.buildings) observers[b.team].push({ x: b.x, z: b.z, id: b.id, range2: (b.powered ? VISION.building : VISION.inactiveBuilding) ** 2 })
+  const solids: VisibilitySolid[] = w.walls.filter(r => !r.destructible || r.hp > 0).map(rect => ({ id: rect.id, rect }))
+  for (const b of w.buildings) if (b.kind !== 'bridge') solids.push({ id: b.id, rect: pads.get(b.padId)!, building: b })
+  const observers = { A: [] as VisibilityObserver[], B: [] as VisibilityObserver[] }
+  const addObserver = (team: Team, point: Point, range: number, id?: string) => {
+    observers[team].push({ x: point.x, z: point.z, id, range, range2: range ** 2 })
+  }
+  for (const team of ['A', 'B'] as Team[]) addObserver(team, map.bases[w.teams[team].side], VISION.base)
+  for (const u of w.units) if (u.hp > 0) addObserver(u.team, u, VISION[u.kind], u.id)
+  for (const t of w.transports) addObserver(t.team, t, VISION.transport, t.id)
+  for (const b of w.buildings) addObserver(b.team, b, b.powered ? VISION.building : VISION.inactiveBuilding, b.id)
+  let grids: Record<Team, ObserverGrid> | undefined
+  const prepareTracers = () => {
+    if (grids) return
+    const index = (team: Team) => observerGrid(observers[team].map(o => {
+      const reach = o.range + 1e-9
+      const nearSolids = solids.filter(s => s.id !== o.id && s.rect.x1 <= o.x + reach && s.rect.x2 >= o.x - reach && s.rect.z1 <= o.z + reach && s.rect.z2 >= o.z - reach)
+      const nearSmokes = w.smokes.filter(s => Math.abs(s.x - o.x) <= reach + s.radius && Math.abs(s.z - o.z) <= reach + s.radius)
+      const insideSmokes = nearSmokes.filter(s => { const x = o.x - s.x, z = o.z - s.z; return x * x + z * z - s.radius * s.radius <= 0 })
+      return { ...o, solids: nearSolids, smokes: nearSmokes, insideSmokes }
+    }))
+    grids = { A: index('A'), B: index('B') }
+  }
   const clear: VisibilitySnapshot['clear'] = (from, to, fromId, targetId, ignoreSmoke = false) => {
     if (!ignoreSmoke && distanceSquared(from, to) > 2.25) for (const smoke of w.smokes) if (smoke.id !== targetId && segmentCircle(from, to, smoke, smoke.radius) !== null) return false
     for (const solid of solids) if ((!solid.id || (solid.id !== fromId && solid.id !== targetId)) && segmentRect(from, to, solid.rect) !== null) return false
@@ -32,11 +103,35 @@ export function withVisibilitySnapshot<T>(w: World, read: () => T): T {
     const existing = key ? cache[team].get(key) : undefined
     if (existing !== undefined) return existing
     let result = false
-    for (const observer of observers[team]) if (distanceSquared(observer, point) <= observer.range2 && clear(observer, point, observer.id, targetId)) { result = true; break }
+    if (!grids) {
+      // Short target/nav/view queries do not pay for the tracer acceleration structures.
+      for (const observer of observers[team]) if (distanceSquared(observer, point) <= observer.range2 && clear(observer, point, observer.id, targetId)) { result = true; break }
+    } else {
+      const grid = grids[team], x = Math.floor(point.x / observerCellSize) - grid.minX, z = Math.floor(point.z / observerCellSize) - grid.minZ
+      if (x >= 0 && x < grid.width && z >= 0 && z < grid.height) {
+        const cell = z * grid.width + x
+        if (grid.fullyVisible[cell] === 0) grid.fullyVisible[cell] = cellFullyVisible(grid, cell, (x + grid.minX) * observerCellSize, (z + grid.minZ) * observerCellSize) ? 1 : -1
+        if (grid.fullyVisible[cell] === 1) result = true
+        else observer: for (let node = grid.heads[cell]; node >= 0; node = grid.next[node]) {
+          const o = grid.observers[grid.observerIndices[node]]
+          const range2 = distanceSquared(o, point)
+          if (range2 > o.range2) continue
+          if (range2 > 2.25) {
+            for (const smoke of o.insideSmokes) if (smoke.id !== targetId) continue observer
+            for (const smoke of o.smokes) if (smoke.id !== targetId && segmentCircle(o, point, smoke, smoke.radius) !== null) continue observer
+          }
+          for (const solid of o.solids) if (solid.id !== targetId && segmentRect(o, point, solid.rect) !== null) continue observer
+          result = true; break
+        }
+      }
+    }
     if (key) cache[team].set(key, result)
     return result
   }
-  snapshots.set(w, { visible, clear })
+  const solidCache: Partial<Record<Team, VisibilitySolid[]>> = {}, barrierCache: Partial<Record<Team, World['barriers']>> = {}
+  const knownSolids = (team: Team) => solidCache[team] ??= solids.filter(s => !s.building || s.building.team === team || visible(team, s.building, s.id))
+  const knownBarriers = (team: Team) => barrierCache[team] ??= w.barriers.filter(b => visible(team, b.a) || visible(team, b.b))
+  snapshots.set(w, { visible, clear, knownSolids, knownBarriers, prepareTracers })
   try { return read() } finally { snapshots.delete(w) }
 }
 
@@ -97,26 +192,28 @@ export function spatialEvent(w: World, point: Point, type: string, actorId?: str
   }
 }
 export function shotEvent(w: World, source: Point & { id: string }, end: Point, label: string): void {
+  const snapshot = snapshots.get(w)
+  if (!snapshot) return withVisibilitySnapshot(w, () => shotEvent(w, source, end, label))
+  snapshot.prepareTracers()
   for (const team of ['A', 'B'] as Team[]) {
-    const map = getMap(w.mapId)
     let fraction = 1
-    const knownBlockers = [...w.walls.filter(r => !r.destructible || r.hp > 0), ...w.buildings.filter(b => b.id !== source.id && b.kind !== 'bridge' && entityVisible(w, team, b)).map(b => map.pads.find(pad => pad.id === b.padId)!.rect)]
-    for (const r of knownBlockers) { const t = segmentRect(source, end, r); if (t !== null) fraction = Math.min(fraction, t) }
-    for (const b of w.barriers) if (isPointVisible(w, team, b.a) || isPointVisible(w, team, b.b)) { const t = segmentSegment(source, end, b.a, b.b); if (t !== null) fraction = Math.min(fraction, t) }
+    for (const solid of snapshot.knownSolids(team)) if (!solid.building || solid.id !== source.id) { const t = segmentRect(source, end, solid.rect); if (t !== null) fraction = Math.min(fraction, t) }
+    for (const b of snapshot.knownBarriers(team)) { const t = segmentSegment(source, end, b.a, b.b); if (t !== null) fraction = Math.min(fraction, t) }
     const visibleEnd = { x: source.x + (end.x - source.x) * fraction, z: source.z + (end.z - source.z) * fraction }
     const steps = Math.max(1, Math.ceil(distance(source, visibleEnd) / 0.5)), segments: { a: Point; b: Point }[] = []
-    let start: Point | null = null, previous: Point = { x: source.x, z: source.z }
+    let start: Point | null = null, previousX = source.x, previousZ = source.z
+    const point = { x: source.x, z: source.z }
     for (let i = 0; i <= steps; i++) {
-      const point = { x: source.x + (visibleEnd.x - source.x) * i / steps, z: source.z + (visibleEnd.z - source.z) * i / steps }
-      const visible = isPointVisible(w, team, point, source.id)
-      if (visible && !start) start = point
-      if (!visible && start) { if (distance(start, previous) > 0.02) segments.push({ a: start, b: previous }); start = null }
-      previous = point
+      point.x = source.x + (visibleEnd.x - source.x) * i / steps; point.z = source.z + (visibleEnd.z - source.z) * i / steps
+      const visible = snapshot.visible(team, point, source.id)
+      if (visible && !start) start = { x: point.x, z: point.z }
+      if (!visible && start) { if (Math.hypot(start.x - previousX, start.z - previousZ) > 0.02) segments.push({ a: start, b: { x: previousX, z: previousZ } }); start = null }
+      previousX = point.x; previousZ = point.z
     }
     if (start && distance(start, visibleEnd) > 0.02) segments.push({ a: start, b: visibleEnd })
     for (const p of w.participants) if (p.team === team) {
       for (const s of segments) append(w, p.id, { type: 'shot', point: s.a, end: s.b, label })
-      if (isPointVisible(w, team, source, source.id)) append(w, p.id, { type: 'muzzle', point: { x: source.x, z: source.z }, actorId: source.id, label })
+      if (snapshot.visible(team, source, source.id)) append(w, p.id, { type: 'muzzle', point: { x: source.x, z: source.z }, actorId: source.id, label })
     }
   }
   spatialEvent(w, source, `weapon:${label}`, source.id, 16)

@@ -1,6 +1,6 @@
 # Forpost interactive inventory
 
-This is the implementation inventory and acceptance checklist. It is derived from the current source. **No row is marked browser-passed yet.** `N/H/P/S/D/W/OK/E` denotes normal, hover, pressed, selected, disabled with reason, waiting, success, and error. Touch has no hover requirement. Each applicable state requires observation in the actual candidate build.
+This is the implementation inventory and acceptance checklist. It is derived from the current source. **No row has complete acceptance across its applicable states.** The automated CI observations below cover specific subcases; they are separate from the executor's browser passage, which has not occurred. `N/H/P/S/D/W/OK/E` denotes normal, hover, pressed, selected, disabled with reason, waiting, success, and error. Touch has no hover requirement. Each applicable state requires observation in the actual candidate build.
 
 | ID | Element / action | Applicable states | Required original-scenario check |
 |---|---|---|---|
@@ -70,3 +70,18 @@ This is the implementation inventory and acceptance checklist. It is derived fro
 | R03 | Replay/back to room/main menu | N/H/P/D/W/OK/E | No duplicated result, new match ID, preserved account room |
 
 Global cases: keyboard-only navigation; touch emulation and physical device separately labelled; focus loss, tab backgrounding, pointercancel/lost capture, screen rotation; 390×600 and landscape; every modal at130%; browser console/network errors; retry with changed world state; server and client build identities. Disabled controls must expose a nearby reason where it is not already explicit in the visible state.
+
+## Observed automated subcases, CI round 2
+
+Evidence: [job 141027294468](https://github.com/decorum-guy/iva-games/actions/runs/46160751975/job/141027294468), checkout/build `f957ca52d7e3899f9075a7a4197d6b18e3fcb27f`, PR head `0120205d3b4ac8399ab394a0eafe896d7e03eb67`. Overall result **2 passed / 4 failed**. The table reports the assertions actually reached; it does not accept every visual state of these controls.
+
+| Inventory rows | Actually observed | Still unaccepted within those rows |
+|---|---|---|
+| M01, H05, H07 | RU→EN selection, 130% text and reduced-motion settings survived reload; English heading appeared | Full gameplay/error translation, visible reduced-motion effects, focus and hover/pressed treatment |
+| M02, M09 | Public-style catalogue card opened the real built client; its build attribute matched health; FP01/FP02/FP03 each became the selected map | Complete match on each map and every state of navigation |
+| L01, L05–L07 | Isolated account created each map's two-seat room, added a bot, readied, started and opened its pinned client | Four/six seats, random map, per-seat edits, retry/error/ownership cases |
+| B01–B03, U01 | Lesson 4 opened; tactics/building panel and pad selects worked; relay/extractor orders were accepted | Actual construction lesson completion failed in this round; cancel/refund/queue outcomes remain unaccepted |
+| H01, H03, H05, T01, T03 | At 390×600 the movement stick was visible; visible Game menu opened Settings; 130% text and 2D were selected without page-width overflow; at 844×390 Fire and Continue controls were visible | Touch movement/fire/tool actions, multitouch, actual rendered pixels/FPS and physical phone |
+| R01 | FP03 reached two operation results and a 1:1 score before a transition click race failed | Third operation, full match result, replay and return |
+
+Round 1's select-locator and mobile-menu failures were replayed successfully where listed above. FP01/FP02 paused before battle and the construction lesson advanced only about two simulation seconds during its timeout; those failures require further diagnosis. The corrected operation-transition scenario and the new interaction suite are prepared for a later build and are not counted here as passed.

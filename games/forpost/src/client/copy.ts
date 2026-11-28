@@ -64,6 +64,8 @@ const errors: Record<string, [string, string]> = {
   DRONE_LIMIT: ['Лимит: два боевых дрона, включая производство.', 'Limit: two combat drones, including production.'],
   ROUTE_COOLDOWN: ['Маршрут можно менять раз в три секунды.', 'Change the route at most once every three seconds.'],
   MATCH_FINISHED: ['Матч завершён. Начните следующую партию.', 'The match has ended. Start another game.'],
+  MATCH_PAUSED: ['Партия сохранена. Сначала возобновите её.', 'The game is saved. Resume it first.'],
+  MODAL_OPEN: ['Сначала закройте открытое окно.', 'Close the open dialog first.'],
   VIEW_ONLY: ['Вы просматриваете партию. Сначала верните управление.', 'You are viewing the match. Take control first.'],
   INVALID_ACTION: ['Команда не принята. Обновите страницу и повторите действие.', 'The command was rejected. Reload and try again.'],
   ACTION_ID_CONFLICT: ['Эта команда уже была использована с другими параметрами. Повторите действие.', 'This command ID was already used with different data. Try the action again.'],

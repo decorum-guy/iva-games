@@ -11,15 +11,17 @@ import type { Admission, TicketClaims } from '@iva-games/realtime-kit';
 import type { StartMatchRequest } from '@iva-games/session-kit';
 import { hash, loadSigningKey, newTicketId, signTicket, verifyBridge, verifyTicket } from './crypto.js';
 import { normalizeForpostSettings, validatePractice } from './settings.js';
-import { RealtimeRuntime } from './runtime.js';
+import { RealtimeRuntime, StartWaitingError } from './runtime.js';
 import type { Peer } from './runtime.js';
 import type { FrozenParticipant, StoredMatch } from './store.js';
 import { retainedClientDirectory } from './content.js';
+import type { CapacityProfile } from './capacity.js';
 
 export interface RealtimeOptions {
   databasePath: string; signingKeyPath: string; trustedKeys?: Record<string, string>; publicOrigin: string;
   staticDirectory: string; maxRooms?: number; artifactId?: string; artifactDirectory?: string; buildRevision?: string; workerDirectory?: URL;
   contentId?: string; contentDirectory?: string;
+  capacityProfile?: CapacityProfile;
 }
 async function body(request: IncomingMessage, max = 16_384): Promise<string> {
   let bytes = 0; const chunks: Buffer[] = [];
@@ -58,7 +60,7 @@ export function createRealtimeServer(options: RealtimeOptions) {
   }
   const runtime = new RealtimeRuntime({ databasePath: options.databasePath, maxRooms: options.maxRooms ?? 4,
     artifactId: options.artifactId ?? 'forpost-runtime-v1', artifactDirectory: options.artifactDirectory, contentId: options.contentId, contentDirectory: options.contentDirectory,
-    buildRevision: options.buildRevision, workerDirectory: options.workerDirectory });
+    buildRevision: options.buildRevision, workerDirectory: options.workerDirectory, capacityProfile: options.capacityProfile });
   const staticRoot = resolve(options.staticDirectory);
   const sockets = new WebSocketServer({ noServer: true, perMessageDeflate: false, maxPayload: LIMITS.messageBytes,
     handleProtocols: protocols => protocols.has(WS_PROTOCOL) ? WS_PROTOCOL : false });
@@ -99,7 +101,7 @@ export function createRealtimeServer(options: RealtimeOptions) {
         if (path.endsWith('/drain')) await runtime.drain();
         else if (path.endsWith('/resume')) await runtime.resume();
         else if (!path.endsWith('/status')) throw new Error('MATCH_UNAVAILABLE');
-        send(response, 200, { ...runtime.health(), drained: runtime.health().draining }); return;
+        send(response, 200, { ...runtime.health(), ...runtime.diagnostics(), drained: runtime.health().draining }); return;
       }
       if (path.startsWith('/internal/realtime/v1/')) {
         const raw = await body(request, 65_536), keyId = keyHeader(request, 'x-iva-key-id'), requestId = keyHeader(request, 'x-iva-request-id');
@@ -116,10 +118,13 @@ export function createRealtimeServer(options: RealtimeOptions) {
               !/^[A-Za-z0-9_-]{1,100}$/.test(p.participantId) || typeof p.displayName !== 'string' || p.displayName.length > 80 ||
               !['human', 'bot'].includes(p.controller.kind) || p.controller.kind === 'human' && (!p.playerId || p.controller.playerId !== p.playerId) ||
               p.controller.kind === 'bot' && (p.playerId !== null || !['easy', 'normal', 'hard'].includes(p.controller.difficulty)))) throw new Error('INVALID_SETTINGS');
+          if (command.hostPlayerId !== undefined && (typeof command.hostPlayerId !== 'string' ||
+            !command.participants.some(person => person.playerId === command.hostPlayerId && person.controller.kind === 'human'))) throw new Error('INVALID_SETTINGS');
           const roster: FrozenParticipant[] = command.participants.map(p => ({ participantId: p.participantId, playerId: p.playerId, displayName: p.displayName,
             team: settings.loadouts[p.participantId]?.team ?? (p.seatIndex % 2 === 0 ? 'A' : 'B'), controller: p.controller.kind }));
           if (roster.filter(p => p.team === 'A').length !== settings.teamSize) throw new Error('TEAM_SIZE');
           const match = await runtime.create({ startId: command.startCommandId, roomId: command.roomId, kind: 'account', ownerHash: null,
+            ...(command.hostPlayerId === undefined ? {} : { hostPlayerId: command.hostPlayerId }),
             roster, rulesVersion: command.rulesVersion, contentVersion: command.contentVersion,
             config: { mapId: settings.mapId, teamSize: settings.teamSize, mode: 'match',
               seed: Number.parseInt(hash(command.startCommandId).slice(0, 8), 16), participants: command.participants.map((p, i) => ({ id: p.participantId,
@@ -207,7 +212,7 @@ export function createRealtimeServer(options: RealtimeOptions) {
       else if (extname(candidate) !== '.html') response.setHeader('Cache-Control', 'public, max-age=86400');
       response.setHeader('Content-Length', statSync(candidate).size);
       if (method === 'HEAD') response.end(); else createReadStream(candidate).on('error', () => response.destroy()).pipe(response);
-    } catch (error) { const code = safeError(error); send(response, statusFor(code), { error: { code } }); }
+    } catch (error) { const code = safeError(error); send(response, statusFor(code), { error: { code }, ...(error instanceof StartWaitingError ? { waiting: error.waiting } : {}) }); }
   })(); });
   server.on('upgrade', (request, socket, head) => {
     if (closing || request.url !== WS_PATH || request.headers.origin !== origin || !(request.headers['sec-websocket-protocol'] ?? '').split(',').map(p => p.trim()).includes(WS_PROTOCOL) || sockets.clients.size >= (options.maxRooms ?? 4) * 12) {

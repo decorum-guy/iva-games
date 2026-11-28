@@ -35,6 +35,8 @@ export interface Participant {
 export interface StartMatchCommand {
   startCommandId: string;
   roomId: string;
+  /** Frozen by the platform from its authenticated host, never a client field. */
+  hostPlayerId?: string;
   rulesVersion: string;
   contentVersion: string;
   participants: Participant[];
@@ -80,6 +82,7 @@ export interface Room {
   matchId: string | null;
   outcome: unknown;
   createdAt: number;
+  startWaiting?: import('@iva-games/realtime-kit').StartWaiting;
 }
 export interface Invitation {
   invitationId: string;

@@ -74,11 +74,11 @@ These are integration, code-review and automated-test findings, **not browser ac
 | Objectives | Stations, routes, escort, unloading, same-tick deaths/deliveries, overtime | Core tests; UI pending |
 | Outcomes | Three-operation progression, side changes, wins/draws, repeat and menu | Core tests; full UI pending |
 | Tutorial | Seven actual exercises, skip/restart/resume, isolated save | Core walkthroughs; UI pending |
-| Network | 2+3 independent clients; latency/loss/jitter; backpressure; controller handover | Partial HTTP/WS tests; full matrix pending |
+| Network | 2+3 independent clients; latency/loss/jitter; backpressure; controller handover | Real HTTP/WS smoke and 14 controlled TCP-delay profiles passed on their recorded old artifacts; true IP loss and final-build matrix pending |
 | Privacy | Raw views, events, sound sectors, statistics, stale memories and pixels | Projection tests; pixel/audio checks pending |
 | Recovery | Crash, durable receipts, owner fencing, 24h empty pause, exact old artifact | Partial tests; final matrix pending |
-| Interaction | Every element/state in `UI_COVERAGE.md` | Inventory prepared; UI pending |
-| Desktop/touch | Keyboard, pointer/touch, focus loss, fire release, rotation, 390×600, 130% text | Blocked browser access |
+| Interaction | Every element/state in `UI_COVERAGE.md` | Inventory prepared; specific R2 automated subcases observed, complete state matrix pending |
+| Desktop/touch | Keyboard, pointer/touch, focus loss, fire release, rotation, 390×600, 130% text | R2 automated layout/rotation assertions passed; native multitouch automation and physical device acceptance pending; executor browser access blocked |
 | Performance | Maximum scene, four-room/hour load, client FPS/frame times on named hardware | Maximum-scene p99 gate failed; both four-room hour attempts failed before an hour; client FPS pending |
 | Bot series | 3 maps × 3 sizes × 2 sides × 4 seeds = 72 normal-rule matches | Final 72/72 technical matches, zero technicalErrors; not UI acceptance |
 | Human balance | Separate observed matches with shooter and strategy players | Not performed; bot data is not a proxy claim |
@@ -86,7 +86,7 @@ These are integration, code-review and automated-test findings, **not browser ac
 
 ## Post-series correctness fixes
 
-These are additional technical corrections, not browser rounds. The latest core source aggregate is `22a7132db389203fa93bb430998c92d4cf632e827a708c74d7c138208c60c768`; 59 targeted tests passed. The previous 72-match result and maximum-scene measurements remain attached to `f2fe9304…`.
+These are the technical corrections preceding CI round 2, not browser rounds. Their core source aggregate is `22a7132db389203fa93bb430998c92d4cf632e827a708c74d7c138208c60c768`; 59 targeted tests passed. The previous 72-match result and maximum-scene measurements remain attached to `f2fe9304…`. Later optimization `14d49d29…` and its still-failing performance gate are recorded separately in `CORE_PERFORMANCE.md`.
 
 | Finding | Correction | Actual verification |
 |---|---|---|
@@ -99,7 +99,7 @@ These are additional technical corrections, not browser rounds. The latest core 
 
 See `ACCEPTANCE_MATRIX.md` for all F01–F22 and E01–E16 requirements, and the realtime validation report for actual artifact IDs and the two failed load attempts.
 
-## Browser rounds
+## Executor-operated browser rounds
 
 None completed. Any future round must record source commit, compiled client hash, server artifact ID, actual environment, UI scenarios, defects and original-scenario retests here before release.
 
@@ -116,3 +116,27 @@ PR [47](https://github.com/decorum-guy/iva-games/pull/47), branch head `03530767
 ## Public catalogue observation
 
 The executor opened `https://iva-games.pro/games` in the cloud browser and waited for the actual catalogue to render. It showed «Пробный стол» and «Район» as playable and «Гавань» as coming soon. There was **no Forpost card**. This was a read-only inspection of the existing public site, not a Forpost game round or a publication of this branch. The visible catalogue did not expose its exact deployed commit; no public Forpost revision is asserted.
+
+## Repository CI round 2 — automated, not executor browser play
+
+PR head `0120205d3b4ac8399ab394a0eafe896d7e03eb67`, tree `87803efc0a68a84b5304f11df2e468a4281d912b`; the observed checkout and client/server build revision were GitHub merge commit `f957ca52d7e3899f9075a7a4197d6b18e3fcb27f`. This round does not test subsequent local renderer, admission, core or control changes.
+
+- [Platform general check](https://github.com/decorum-guy/iva-games/actions/runs/46160751975/job/141027294700) **passed**: 1351 tests / 108 files, one optional series skipped; types, lint, boundaries, 55 deployment tests, full builds, real network smoke and existing portal/District browser regression steps. The earlier statistics-fixture failure is closed by its original real-server scenario. Overdrive tutorial and [Colossus review](https://github.com/decorum-guy/iva-games/actions/runs/46160751960) also passed.
+- [All three release images](https://github.com/decorum-guy/iva-games/actions/runs/46160751947) passed their actual container/volume checks. Publish/deploy were skipped.
+- [Forpost automatic browser job](https://github.com/decorum-guy/iva-games/actions/runs/46160751975/job/141027294468): **2 passed / 4 failed**, no complete match. Catalogue/build identity/all maps/RU–EN/settings persistence passed. Touch layout, 130% text, visible menu-to-settings route, 2D and rotation passed. These replay and close the corresponding R1 selector/navigation failures.
+- FP01/FP02 created real account rooms, started matches and loaded the pinned client. Their initial battle wait failed: preparation remained at 15 seconds and the UI reported a saved pause. The cause is not yet established; a blocked client and missing application heartbeats are a hypothesis, not a measured conclusion.
+- The construction lesson accepted both real orders but did not complete them. After the timeout the visible clock had advanced about two simulation seconds, with both orders still queued. Browser scheduling/rendering requires diagnosis; this is not a passing build lesson.
+- FP03 reached two actual operation results (1:1). During the transition, its result overlay intercepted an Escort click, and the automation failed before the third operation. The full match was not completed. The correction must handle an observed phase transition through the visible interface, without forced clicks or removing the overlay.
+
+Independent executor browser rounds remain **0**. There have been **2 completed automated Forpost UI rounds**, both failed overall. New interaction scenarios and isolated map jobs are prepared for the next candidate; discovery/static validation is not their execution.
+
+## Candidate corrections prepared for CI round 3
+
+These changes have source/unit validation and are awaiting original-scenario browser replay. They are not counted as a third executed UI round yet.
+
+- Restoring a lesson now resets the local input stream's consumed fire sequence, preserving the lesson itself. The regression failed before the fix and passed afterwards. Enter and Space release only the tool input that they own; two regressions failed before the fix and passed afterwards. Gameplay buttons and dispatched actions share the same paused/modal/result/controller guard.
+- Scene work reuses unchanged visibility contours, fog textures and hazard geometry. There were 580 exact comparisons with the previous contours and six invalidation/upload tests. Default 3D, shadows and sight rules are preserved. Node CPU timings do not establish browser FPS or prove the cause of R2's stalls.
+- The FP03 automation tolerates a click timeout only when it has actually observed a new operation or result phase. It never force-clicks through the result screen. Every suite now logs bounded failure diagnostics without world snapshots, cookies or tokens.
+- The UI suite contains 17 scenarios in three files: existing map/catalogue checks, all seven lessons and associated settings/economy/control assertions, plus native Chromium-emulated multitouch. CI isolates each map in its own real server/database/browser job and runs the interaction suite separately in WebKit. No new UI scenario is accepted before execution.
+- The complete local unit run initially had 1399 PASS, one skipped test and a timeout in the existing Remorse king-fracture test. Its four original tests passed alone. Repeating the full suite with two workers passed **1400 tests in 114 files**, one optional series skip; no test timeout or old game source was altered. TypeScript, ESLint and boundaries passed; **55 infrastructure tests passed**. A subsequent narrow cgroup-ancestor correction has its own 14 passing capacity tests. The final CI checkout will bind these changes to one immutable revision.
+- Admission FIFO/reservations, resource checks, durable commit batching and explicit age/CPU metrics are implemented in this candidate. A production capacity profile is not asserted; the conservative fallback permits one room. Exact-artifact network replay and the four-room/hour gate remain separate requirements.

@@ -3,6 +3,18 @@ import { useLanguage } from './ui';
 import type { Room } from './types';
 
 export const forpostLaunchUrl = launchUrls({ development: import.meta.env.DEV, overrides: import.meta.env }).forpost;
+export function ForpostStartWaiting({ waiting }: { waiting: NonNullable<Room['startWaiting']> }) {
+  const { t } = useLanguage();
+  const messages = {
+    capacity: t('Ждём свободное место на сервере. Запуск повторится автоматически.', 'Waiting for server capacity. Your game will start automatically.'),
+    updating: t('Сервис обновляется. Запуск продолжится автоматически.', 'The service is updating. Your game will start automatically.'),
+    another_start: t('Сначала дождитесь запуска вашей другой комнаты.', 'Wait for your other room to start first.'),
+    service: t('Восстанавливаем связь с игровым сервером. Повторим запуск автоматически.', 'Reconnecting to the game server. We will retry your start automatically.'),
+  };
+  return <span className="forpost-start-waiting" role="status">{messages[waiting.reason]}
+    {Number.isInteger(waiting.queuePosition) && waiting.queuePosition! > 0 && <small style={{ display: 'block', marginTop: 8 }}>{t('Место в очереди', 'Queue position')}: {waiting.queuePosition}</small>}
+  </span>;
+}
 export const forpostMaps = [
   { id: 'FP01', ru: 'Литейный двор', en: 'Foundry Yard' },
   { id: 'FP02', ru: 'Каналы', en: 'Canals' },

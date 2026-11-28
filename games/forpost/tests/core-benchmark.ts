@@ -3,10 +3,9 @@ import { createUnit, movementObstacles } from '../src/core/state'
 import { legalPoint, pointOnRoute } from '../src/core/geometry'
 import { chooseTarget } from '../src/core/combat'
 import { buildWorkPoint } from '../src/core/navigation'
-import type { BuildingKind, Input, Team } from '../src/core/types'
+import type { BuildingKind, Input, Team, World } from '../src/core/types'
 
-export function benchmarkCore(sampleCount = 500, warmupCount = 30) {
-    const reports = []
+export function maxSceneFixtures(): World[] {
     const roster = (['A', 'B'] as Team[]).flatMap(team => Array.from({ length: 3 }, (_, i) => ({ id: `${team}${i + 1}`, name: `${team}${i + 1}`, team, controller: 'human' as const })))
     const w = createWorld({ matchId: 'max-scene', mapId: 'FP01', teamSize: 3, seed: 47, firstSide: 'L', participants: roster })
     w.phase = 'battle'; w.tick = 1000; w.phaseStartTick = 1000
@@ -28,12 +27,21 @@ export function benchmarkCore(sampleCount = 500, warmupCount = 30) {
     }
     recomputePower(w)
     const barrierScene = structuredClone(w); barrierScene.smokes = []; barrierScene.barriers = roster.map((p, i) => ({ id: `max-barrier-${i}`, ownerId: p.id, team: p.team, a: { x: 25 + i * 2, z: 16 }, b: { x: 25 + i * 2, z: 20 }, hp: 180, expiresTick: 1120 }))
-    const mixedScene = structuredClone(w); mixedScene.smokes = mixedScene.smokes.slice(0, 3); mixedScene.barriers = barrierScene.barriers.slice(3)
-    for (const fixture of [w, barrierScene, mixedScene]) {
+    const mixedScene = structuredClone(w); mixedScene.smokes = mixedScene.smokes.slice(0, 3); mixedScene.barriers = structuredClone(barrierScene.barriers.slice(3))
+    const fixtures = [w, barrierScene, mixedScene]
+    for (const fixture of fixtures) {
       for (const source of [...fixture.units, ...fixture.buildings]) if (source.kind === 'drone' || source.kind === 'turret') {
         const target = chooseTarget(fixture, source, 14, source.kind)
         if (target) { source.targetId = target.id; source.targetSinceTick = 900; source.angle = Math.atan2(target.z - source.z, target.x - source.x) }
       }
+    }
+    return fixtures
+}
+
+export function benchmarkCore(sampleCount = 500, warmupCount = 30, traceSamples = false) {
+    const reports = []
+    for (const fixture of maxSceneFixtures()) {
+      const map = getMap(fixture.mapId)
       const samples: number[] = [], cpuSamples: number[] = [], warming: number[] = [], snapshotBytes: number[] = [], shots: number[] = []
       // Every sample restores all entities and cooldowns; deaths never silently reduce the workload.
       // Warmup is reported separately, not discarded from the evidence.
@@ -47,10 +55,11 @@ export function benchmarkCore(sampleCount = 500, warmupCount = 30) {
           shots.push(new Set(Object.values(copy.events).flat().filter(e => e.type === 'muzzle').map(e => e.actorId)).size)
         }
       }
+      const samplesInOrder = traceSamples ? [...samples] : undefined
       samples.sort((a, b) => a - b)
       cpuSamples.sort((a, b) => a - b)
       const percentile = (p: number) => samples[Math.ceil(samples.length * p) - 1]
-      reports.push({ workload: `Forpost max scene, ${fixture.smokes.length} smokes + ${fixture.barriers.length} barriers, fresh explicit fixture per sample`, samples: samples.length, coldStepMs: warming[0], warmupMaxMs: Math.max(...warming), p50ms: percentile(0.5), p95ms: percentile(0.95), p99ms: percentile(0.99), p99cpuMs: cpuSamples[Math.ceil(cpuSamples.length * 0.99) - 1], maxMs: samples[samples.length - 1], observedFiringSources: Math.max(...shots), maxViewBytes: Math.max(...snapshotBytes), fullWorldBytes: serializeWorld(fixture).length, fighters: fixture.units.filter(u => u.kind === 'fighter').length, builders: fixture.units.filter(u => u.kind === 'builder').length, drones: fixture.units.filter(u => u.kind === 'drone').length, buildings: fixture.buildings.length, transports: fixture.transports.length, activeConstruction: fixture.buildOrders.length, tools: fixture.smokes.length + fixture.barriers.length, illegalUnits: fixture.units.filter(u => !legalPoint(u, u.radius, map, movementObstacles(fixture, u.team))).map(u => u.id) })
+      reports.push({ workload: `Forpost max scene, ${fixture.smokes.length} smokes + ${fixture.barriers.length} barriers, fresh explicit fixture per sample`, samples: samples.length, ...(samplesInOrder ? { samplesInOrder } : {}), coldStepMs: warming[0], warmupMaxMs: Math.max(...warming), p50ms: percentile(0.5), p95ms: percentile(0.95), p99ms: percentile(0.99), p99cpuMs: cpuSamples[Math.ceil(cpuSamples.length * 0.99) - 1], maxMs: samples[samples.length - 1], observedFiringSources: Math.max(...shots), maxViewBytes: Math.max(...snapshotBytes), fullWorldBytes: serializeWorld(fixture).length, fighters: fixture.units.filter(u => u.kind === 'fighter').length, builders: fixture.units.filter(u => u.kind === 'builder').length, drones: fixture.units.filter(u => u.kind === 'drone').length, buildings: fixture.buildings.length, transports: fixture.transports.length, activeConstruction: fixture.buildOrders.length, tools: fixture.smokes.length + fixture.barriers.length, illegalUnits: fixture.units.filter(u => !legalPoint(u, u.radius, map, movementObstacles(fixture, u.team))).map(u => u.id) })
     }
     return reports
 }

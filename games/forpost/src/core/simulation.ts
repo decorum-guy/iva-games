@@ -26,19 +26,22 @@ function applyInputs(w: World, inputs: Record<string, Input>): void {
 }
 function moveUnits(w: World): void {
   const map = getMap(w.mapId)
+  // Units do not alter walls, water or buildings while this movement phase runs.
+  // Keep this local: damage/construction later in the tick must get fresh geometry.
+  const obstacles = { A: movementObstacles(w, 'A'), B: movementObstacles(w, 'B') }
   for (const u of w.units) {
     if (w.tutorial?.frozenParticipants.includes(u.ownerId)) continue
     const p = participant(w, u.ownerId)!
-    if (u.kind === 'builder') { builderMovement(w, u); continue }
+    if (u.kind === 'builder') { builderMovement(w, u, obstacles[u.team]); continue }
     const autonomous = u.kind === 'drone' || p.mode === 'tactics' || p.controller === 'bot' || p.temporaryBot
     if (!autonomous) {
       const delta = { x: p.input.moveX * RULES.fighterSpeed / 30, z: p.input.moveZ * RULES.fighterSpeed / 30 }
-      const next = moveSliding(u, delta, u.radius, map, movementObstacles(w, u.team))
+      const next = moveSliding(u, delta, u.radius, map, obstacles[u.team])
       u.vx = (next.x - u.x) * 30; u.vz = (next.z - u.z) * 30; u.x = next.x; u.z = next.z
     } else {
       const target = orderPoint(w, u)
       const stop = u.order.type === 'escort' ? 1.5 : u.order.type === 'attack' ? (u.order.lostAt !== undefined ? 0.2 : u.kind === 'drone' ? 10 : WEAPONS[p.weapon].range * 0.75) : u.order.type === 'capture' ? 0.8 : 0.2
-      if (target) walkToward(w, u, target, stop, u.kind === 'drone' ? RULES.droneSpeed : RULES.fighterSpeed)
+      if (target) walkToward(w, u, target, stop, u.kind === 'drone' ? RULES.droneSpeed : RULES.fighterSpeed, obstacles[u.team])
       else { u.vx = 0; u.vz = 0 }
       if (u.order.type === 'move' && target && distance(u, target) <= 0.25) u.order = { type: 'guard', point: { x: target.x, z: target.z } }
     }

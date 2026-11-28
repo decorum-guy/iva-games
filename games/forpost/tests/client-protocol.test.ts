@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { createTutorialWorld, resetInputStream, stepWorld, viewForPlayer } from '../src/core/index'
+import { createTutorialWorld, resetInputStream, serializeWorld, stepWorld, viewForPlayer } from '../src/core/index'
 import { OnlineSession } from '../src/client/transport'
 import { Controls } from '../src/client/controls'
+import { TUTORIAL_SAVE, TutorialSession } from '../src/client/tutorial-client'
 import type { JoinInfo, ConnectionState } from '../src/client/transport'
 import type { Input, WorldView } from '../src/core/types'
 
@@ -283,5 +284,25 @@ describe('client realtime protocol', () => {
     socket.receive({ type: 'delta', epoch: 1, baselineSnapshotSeq: 1, snapshotSeq: 2, phase: 'running', patch: { tick: view.tick + 1 } })
     socket.receive({ type: 'controlChanged', controllerGeneration: 1, controlling: true })
     expect(reset).not.toHaveBeenCalled()
+  })
+  it('accepts the first short fire press after restoring a lesson while preserving its progress and ordinary save', () => {
+    const world = createTutorialWorld(0), learner = world.participants.find(p => p.id === 'learner')!
+    learner.consumedFirePressSeq = 9; learner.input.firePressSeq = 9
+    world.tutorial!.stage = 1
+    const storage = new Map([[TUTORIAL_SAVE, serializeWorld(world)], ['iva.forpost.last-match.v1', '{"matchId":"ordinary-match"}']])
+    vi.stubGlobal('localStorage', { getItem: (key: string) => storage.get(key) ?? null, setItem: (key: string, value: string) => storage.set(key, value) })
+    const progress = vi.fn(), tutorial = new TutorialSession(0, () => {}, progress, true)
+    try {
+      expect(progress).toHaveBeenLastCalledWith(expect.objectContaining({ lesson: 0, stage: 1 }))
+      // A press/release between two 30Hz input ticks is represented by its sequence.
+      tutorial.input({ ...input, moveX: 0, fireHeld: false, firePressSeq: 1 })
+      vi.advanceTimersByTime(35)
+      const fighter = tutorial.getView()!.units.find(u => u.ownerId === 'learner' && u.kind === 'fighter')!
+      expect(fighter.magazine).toBe(23)
+      expect(storage.get('iva.forpost.last-match.v1')).toBe('{"matchId":"ordinary-match"}')
+      tutorial.input({ ...input, moveX: 0, fireHeld: false, firePressSeq: 1 })
+      vi.advanceTimersByTime(300)
+      expect(tutorial.getView()!.units.find(u => u.id === fighter.id)!.magazine).toBe(23)
+    } finally { tutorial.close() }
   })
 })

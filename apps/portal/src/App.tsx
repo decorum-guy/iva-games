@@ -5,7 +5,7 @@ import { DistrictPanel } from "./District";
 import { TERRITORY_RULES, territoryMaps } from "@iva-games/district/territorial";
 import { districtPreset, TerritorialLobby, TerritorialSettingsFields } from "./TerritorialLobby";
 import { districtBotName } from "./districtCopy";
-import { ForpostMapSelect, ForpostRoomMap, ForpostSetupFields, forpostSetupFor, forpostLaunchUrl } from "./ForpostLobby";
+import { ForpostMapSelect, ForpostRoomMap, ForpostSetupFields, ForpostStartWaiting, forpostSetupFor, forpostLaunchUrl } from "./ForpostLobby";
 import { DistrictMapSelect, DistrictLobbyMap } from "./DistrictMap";
 import type { AvatarChoice } from "./types";
 import { friendRequestFeedback } from "./socialFeedback";
@@ -1744,7 +1744,9 @@ function RoomDetail({
                   "Press “I’m ready” when you are ready to start.",
                 )
               : room.state === "starting"
-                ? t("Скоро начнём…", "Starting soon…")
+                ? room.gameId === 'forpost' && room.startWaiting
+                  ? <ForpostStartWaiting waiting={room.startWaiting} />
+                  : t("Скоро начнём…", "Starting soon…")
                 : room.state === "playing"
                   ? t("Партия идёт.", "The game is in progress.")
                   : t(

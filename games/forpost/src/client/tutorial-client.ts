@@ -1,4 +1,4 @@
-import { applyAction, createTutorialWorld, deserializeWorld, serializeWorld, stepWorld, tutorialProgress, viewForPlayer } from '../core/index'
+import { applyAction, createTutorialWorld, deserializeWorld, resetInputStream, serializeWorld, stepWorld, tutorialProgress, viewForPlayer } from '../core/index'
 import type { Action, ActionResult, Input, World, WorldView } from '../core/types'
 import type { SessionClient } from './transport'
 
@@ -12,6 +12,8 @@ export class TutorialSession implements SessionClient {
   constructor(lesson: number, private onView: (view: WorldView) => void, private onProgress: (progress: LessonProgress) => void, resume = false) {
     this.world = createTutorialWorld(lesson, 'learner')
     if (resume) { try { const saved = localStorage.getItem(TUTORIAL_SAVE); if (saved) { const restored = deserializeWorld(saved); if (restored.mode === 'tutorial') this.world = restored } } catch { /* Invalid lesson saves restart the isolated lesson only. */ } }
+    // The restored world belongs to a new local input stream, just like a resumed room.
+    resetInputStream(this.world, 'learner')
     this.publish(); this.timer = setInterval(() => { stepWorld(this.world, { learner: this.inputValue }); this.publish(); if (this.world.tick % 30 === 0) this.save() }, 1000 / 30)
   }
   private publish(): void { this.latest = viewForPlayer(this.world, 'learner'); this.onView(this.latest); this.onProgress(tutorialProgress(this.world)) }

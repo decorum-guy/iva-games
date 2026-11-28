@@ -11,6 +11,7 @@ const assets = `${import.meta.env.BASE_URL}assets/forpost/`
 const UP = new THREE.Vector3(0, 1, 0)
 const SQRT3_2 = Math.sqrt(3) / 2
 const HEIGHT: Record<string, number> = { builder: 1.05, drone: 1.0, transport: 2.0, relay: 2.45, generator: 1.55, extractor: 1.9, turret: 1.85, dock: 1.8, battery: 1.8, respawn: 2.05, bridge: .8, foundation: .7, wall: 1.4, 'wall-destructible': 1.4 }
+const contourCache = new WeakMap<MapData, { observer: string; shapes: Map<string, Point[][]> }>()
 
 type SceneEntity = {
   group: THREE.Group; model: string; team: Team | null; object?: THREE.Object3D
@@ -54,9 +55,16 @@ function circle(x: number, z: number, radius: number, color: string, y = .07, da
 }
 function rayRect(origin: Point, dx: number, dz: number, rect: Rect): number {
   let near = 0, far = Infinity
-  for (const [value, direction, min, max] of [[origin.x, dx, rect.x1, rect.x2], [origin.z, dz, rect.z1, rect.z2]]) {
-    if (Math.abs(direction) < .00001) { if (value < min || value > max) return Infinity; continue }
-    const a = (min - value) / direction, b = (max - value) / direction
+  // Scalar slabs avoid allocating nested axis arrays for every ray/occluder pair.
+  if (Math.abs(dx) < .00001) { if (origin.x < rect.x1 || origin.x > rect.x2) return Infinity }
+  else {
+    const a = (rect.x1 - origin.x) / dx, b = (rect.x2 - origin.x) / dx
+    near = Math.max(near, Math.min(a, b)); far = Math.min(far, Math.max(a, b))
+    if (near > far) return Infinity
+  }
+  if (Math.abs(dz) < .00001) { if (origin.z < rect.z1 || origin.z > rect.z2) return Infinity }
+  else {
+    const a = (rect.z1 - origin.z) / dz, b = (rect.z2 - origin.z) / dz
     near = Math.max(near, Math.min(a, b)); far = Math.min(far, Math.max(a, b))
     if (near > far) return Infinity
   }
@@ -70,11 +78,20 @@ export function visibleContours(view: WorldView, map: MapData): Point[][] {
     ...view.transports.filter(t => t.team === view.yourTeam).map(t => ({ id: t.id, x: t.x, z: t.z, radius: VISION.transport })),
     ...view.buildings.filter(b => b.team === view.yourTeam).map(b => ({ id: b.id, x: b.x, z: b.z, radius: b.powered ? VISION.building : VISION.inactiveBuilding })),
   ]
-  const buildingRects = view.buildings.filter(b => b.kind !== 'bridge').map(b => ({ id: b.id, rect: map.pads.find(p => p.id === b.padId)!.rect }))
-  return sources.map(source => Array.from({ length: 81 }, (_, i) => {
+  const buildingRects = view.buildings.filter(b => b.kind !== 'bridge').map(b => ({ id: b.id, x: b.x, z: b.z, powered: b.powered, rect: map.pads.find(p => p.id === b.padId)!.rect }))
+  const walls = view.walls.filter(wall => !wall.destructible || wall.hp > 0)
+  const observer = JSON.stringify([view.matchId, view.you, view.yourTeam, view.participants.find(p => p.id === view.you)?.seat, view.operation, view.mapVersion, view.teams.A.side, view.teams.B.side])
+  let cache = contourCache.get(map)
+  if (!cache || cache.observer !== observer) { cache = { observer, shapes: new Map() }; contourCache.set(map, cache) }
+  // Include every geometry input, even when a caller reuses/mutates a view object.
+  // Tick, HP above zero, income and presentation settings do not alter sight geometry.
+  const key = JSON.stringify([map.width, map.height, sources, buildingRects, walls.map(wall => [wall.x1, wall.z1, wall.x2, wall.z2]), view.smokes.map(smoke => [smoke.x, smoke.z, smoke.radius])])
+  const cached = cache.shapes.get(key)
+  if (cached) return cached
+  const contours = sources.map(source => Array.from({ length: 81 }, (_, i) => {
     const a = i / 80 * Math.PI * 2, dx = Math.cos(a), dz = Math.sin(a)
     let radius = source.radius
-    for (const wall of view.walls) if (!wall.destructible || wall.hp > 0) radius = Math.min(radius, rayRect(source, dx, dz, wall))
+    for (const wall of walls) radius = Math.min(radius, rayRect(source, dx, dz, wall))
     for (const building of buildingRects) if (building.id !== source.id) radius = Math.min(radius, rayRect(source, dx, dz, building.rect))
     for (const smoke of view.smokes) {
       const ox = source.x - smoke.x, oz = source.z - smoke.z, b = ox * dx + oz * dz, c = ox * ox + oz * oz - smoke.radius ** 2, d = b * b - c
@@ -82,6 +99,9 @@ export function visibleContours(view: WorldView, map: MapData): Point[][] {
     }
     return { x: Math.max(1, Math.min(map.width - 1, source.x + dx * radius)), z: Math.max(1, Math.min(map.height - 1, source.z + dz * radius)) }
   }))
+  cache.shapes.set(key, contours)
+  while (cache.shapes.size > 4) cache.shapes.delete(cache.shapes.keys().next().value!)
+  return contours
 }
 /** A lowered water plane needs actual holes in the opaque ground surface. */
 export function forpostGroundGeometry(map: MapData): THREE.BufferGeometry {
@@ -142,6 +162,8 @@ export class ThreeStage implements Stage {
   private plane = new THREE.Plane(UP, 0)
   private fogCanvas = document.createElement('canvas')
   private fogTexture: THREE.CanvasTexture
+  private fogContours: Point[][] | null = null
+  private hazardKey = ''
   private frames = 0
   private started = performance.now()
   private previousTime = performance.now()
@@ -191,7 +213,7 @@ export class ThreeStage implements Stage {
   private teamAt(side: 'L' | 'R'): Team { return this.view?.teams.A.side === side ? 'A' : 'B' }
   private buildMap(map: MapData): void {
     this.clearGroup(this.mapGroup); this.clearGroup(this.entityGroup); this.clearGroup(this.networkGroup); this.clearGroup(this.controlGroup); this.clearGroup(this.hazardGroup); this.clearGroup(this.effectGroup)
-    this.entities.clear(); this.stationModels.clear(); this.stationArcs.clear(); this.effects = []; this.retiring = []; this.networkKey = ''; this.controlKey = ''
+    this.entities.clear(); this.stationModels.clear(); this.stationArcs.clear(); this.effects = []; this.retiring = []; this.networkKey = ''; this.controlKey = ''; this.hazardKey = ''; this.fogContours = null
     const groundColor = map.id === 'FP03' ? '#b9a47b' : map.id === 'FP02' ? '#78877e' : '#929b8f'
     // Cut real water holes in the ground surface: a lowered water plane underneath an uncut opaque floor is invisible.
     const ground = new THREE.Mesh(forpostGroundGeometry(map), new THREE.MeshStandardMaterial({ color: groundColor, roughness: .95 })); ground.receiveShadow = true; this.mapGroup.add(ground)
@@ -257,9 +279,12 @@ export class ThreeStage implements Stage {
   }
   private updateFog(): void {
     if (!this.view || !this.map) return
+    const contours = visibleContours(this.view, this.map)
+    if (contours === this.fogContours) return
+    this.fogContours = contours
     const ctx = this.fogCanvas.getContext('2d')!, sx = this.fogCanvas.width / this.map.width, sz = this.fogCanvas.height / this.map.height
     ctx.clearRect(0, 0, this.fogCanvas.width, this.fogCanvas.height); ctx.fillStyle = 'rgba(9,23,31,.59)'; ctx.fillRect(0, 0, this.fogCanvas.width, this.fogCanvas.height); ctx.globalCompositeOperation = 'destination-out'
-    for (const contour of visibleContours(this.view, this.map)) {
+    for (const contour of contours) {
       ctx.beginPath(); contour.forEach((p, i) => i ? ctx.lineTo(p.x * sx, p.z * sz) : ctx.moveTo(p.x * sx, p.z * sz)); ctx.closePath(); ctx.fillStyle = '#000'; ctx.fill()
     }
     ctx.globalCompositeOperation = 'source-over'; this.fogTexture.needsUpdate = true
@@ -486,8 +511,10 @@ export class ThreeStage implements Stage {
     }
   }
   private updateHazards(): void {
-    this.clearGroup(this.hazardGroup)
     if (!this.view) return
+    const key = JSON.stringify([this.view.matchId, this.view.you, this.view.yourTeam, this.view.operation, this.view.smokes.map(smoke => [smoke.id, smoke.x, smoke.z, smoke.radius]), this.view.barriers.map(barrier => [barrier.id, barrier.team, barrier.a.x, barrier.a.z, barrier.b.x, barrier.b.z])])
+    if (key === this.hazardKey) return
+    this.hazardKey = key; this.clearGroup(this.hazardGroup)
     for (const smoke of this.view.smokes) {
       const mesh = new THREE.Mesh(new THREE.CylinderGeometry(smoke.radius, smoke.radius, .18, this.settings.quality === 'low' ? 24 : 40), new THREE.MeshBasicMaterial({ color: '#acbab7', transparent: true, opacity: .36, depthWrite: false }))
       mesh.position.set(smoke.x, .5, smoke.z); this.hazardGroup.add(mesh); this.hazardGroup.add(circle(smoke.x, smoke.z, smoke.radius, '#d9e0d5', .60))

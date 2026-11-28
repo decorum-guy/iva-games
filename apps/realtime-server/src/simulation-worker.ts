@@ -1,4 +1,5 @@
 import { parentPort } from 'node:worker_threads';
+import { performance } from 'node:perf_hooks';
 import { applyAction, createWorld, deserializeWorld, resetInputStream, serializeWorld, setController, setRewindEstimate, stepWorld, viewForPlayer } from '@iva-games/forpost/core';
 import type { CreateWorldOptions, Input, World } from '@iva-games/forpost/core';
 const worlds = new Map<string, World>();
@@ -9,6 +10,7 @@ function result(world: World) {
     views: Object.fromEntries(world.participants.filter(p => p.controller === 'human').map(p => [p.id, viewForPlayer(world, p.id)])) };
 }
 parentPort!.on('message', (message: {id: number; op: string; args: unknown[]}) => {
+  const started = performance.now(), cpu = process.threadCpuUsage();
   try {
     const args = message.args; let value: unknown;
     if (message.op === 'create') {
@@ -34,6 +36,10 @@ parentPort!.on('message', (message: {id: number; op: string; args: unknown[]}) =
         value = { ...result(world), results };
       } else if (message.op === 'view') value = result(world);
       else throw new Error('UNKNOWN_SIMULATION_OPERATION');
+    }
+    if (message.op === 'step') {
+      const consumed = process.threadCpuUsage(cpu);
+      value = { ...(value as object), workMs: performance.now() - started, workCpuMs: (consumed.user + consumed.system) / 1000 };
     }
     parentPort!.postMessage({ id: message.id, value });
   } catch (error) { parentPort!.postMessage({ id: message.id, error: error instanceof Error ? error.message : 'SIMULATION_FAILED' }); }

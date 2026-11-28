@@ -2,15 +2,21 @@
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { createServer } from 'node:net';
-import { appendFile, cp, mkdir, mkdtemp } from 'node:fs/promises';
+import { appendFile, cp, mkdir, mkdtemp, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { once } from 'node:events';
 import WebSocket from 'ws';
 import Database from 'better-sqlite3';
+import { sourceIdentity } from './probe-lib.mjs';
 const root = fileURLToPath(new URL('../../../', import.meta.url));
 await mkdir(resolve(root, '.qa'), { recursive: true });
 const directory = await mkdtemp(resolve(root, '.qa/realtime-network-'));
+const sourceTrace = await sourceIdentity();
+const capacityFixture = { schema: 'iva-realtime-capacity-1', gameId: 'forpost', artifactId: 'test-fixture', source: 'test-fixture',
+  evidence: 'Two simultaneously retained versions for a functional HTTP/WS probe. These sizing inputs are synthetic, not measured capacity.',
+  maxRooms: 2, maxBodies: 112, maxBots: 12, maxConnections: 24, stepP99Ms: 8, roomMemoryBytes: 128 * 1024 * 1024 };
+await writeFile(resolve(directory, 'capacity-fixture.json'), JSON.stringify(capacityFixture));
 const probe = createServer(); probe.listen(0, '127.0.0.1'); await once(probe, 'listening');
 const port = probe.address().port; await new Promise(r => probe.close(r));
 const origin = `http://127.0.0.1:${port}`;
@@ -22,7 +28,8 @@ async function start() {
   processHandle = spawn(process.execPath, [entry], { cwd: root,
     env: { ...process.env, REALTIME_PORT: String(port), REALTIME_HOST: '127.0.0.1', REALTIME_PUBLIC_ORIGIN: origin,
       REALTIME_DATABASE_PATH: resolve(directory, 'realtime.sqlite'), REALTIME_PRACTICE_KEY_PATH: resolve(directory, 'key.pem'),
-      REALTIME_STATIC_DIRECTORY: staticDirectory, IVA_BUILD_SHA: 'network-smoke' },
+      REALTIME_STATIC_DIRECTORY: staticDirectory, IVA_BUILD_SHA: process.env.IVA_BUILD_SHA ?? sourceTrace.gitCommit,
+      NODE_ENV: 'test', REALTIME_CAPACITY_PROFILE_PATH: resolve(directory, 'capacity-fixture.json') },
     stdio: ['ignore', 'pipe', 'pipe'] });
   processHandle.stdout.on('data', d => { logs = (logs + d).slice(-6000); });
   processHandle.stderr.on('data', d => { logs = (logs + d).slice(-6000); });
@@ -227,6 +234,7 @@ try {
   const abandoned = await post(`/api/realtime/v1/practice/${matchId}/abandon`); assert.equal(abandoned.status, 200);
   passed.push('owner can end saved practice');
   await stop();
-  console.log(JSON.stringify({ passed: passed.length, checks: passed, lastHealth: health.metrics, evidenceDirectory: directory, kind: 'automated HTTP/WebSocket, not browser acceptance' }, null, 2));
+  console.log(JSON.stringify({ passed: passed.length, checks: passed, artifactId: health.artifactId, contentId: health.contentId,
+    sourceTrace, capacityFixture, lastHealth: health.metrics, evidenceDirectory: directory, kind: 'automated HTTP/WebSocket, not browser or capacity acceptance' }, null, 2));
 } catch (error) { console.error(logs); throw error; }
 finally { await stop(); }

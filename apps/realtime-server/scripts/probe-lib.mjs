@@ -13,7 +13,7 @@ export const sleep = ms => new Promise(r => setTimeout(r, ms));
 export const isSnapshot = message => message.type === 'full' || message.type === 'delta';
 export async function freePort() { const server = createServer(); server.listen(0, '127.0.0.1'); await once(server, 'listening'); const port = server.address().port; await new Promise(r => server.close(r)); return port; }
 export async function writeReport(path, report) { const temporary = path + '.tmp'; await writeFile(temporary, JSON.stringify(report, null, 2) + '\n'); await rename(temporary, path); }
-async function sourceIdentity() {
+export async function sourceIdentity() {
   const collect = async directory => {
     const files = [];
     for (const entry of await readdir(resolve(root, directory), { withFileTypes: true })) {

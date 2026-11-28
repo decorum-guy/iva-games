@@ -1,11 +1,12 @@
 import type { Input, Point } from '../core/types'
 
+export type ToolInputSource = number | ' ' | 'Enter'
 export class Controls {
   value: Input = { moveX: 0, moveZ: 0, aimX: 1, aimZ: 0, fireHeld: false, firePressSeq: 0, toolHeld: false, assist: false }
   private keys = new Set<string>()
   private moveTouch: Point = { x: 0, z: 0 }
   private fireSources = new Set<'mouse' | 'touch' | 'touch-aim'>()
-  private toolSources = new Set<number | 'keyboard'>()
+  private toolSources = new Set<ToolInputSource>()
   private disabled = false
   private listeners: [EventTarget, string, EventListener][] = []
   constructor(private shortcut: (key: string) => void) {
@@ -18,7 +19,7 @@ export class Controls {
       const key = /^Key[WASDRB]$/.test(event.code) ? event.code.slice(3).toLowerCase() : event.key.toLowerCase(); if (['w', 'a', 's', 'd', 'arrowup', 'arrowleft', 'arrowdown', 'arrowright'].includes(key)) { event.preventDefault(); if (event.repeat && !this.keys.has(key)) return; this.keys.add(key); this.move() }
       else if (['r', ' ', 'tab', 'escape', 'b', 'delete', '1', '2', '3', '4'].includes(key)) { event.preventDefault(); if (!event.repeat) this.shortcut(key) }
     }) as EventListener)
-    listen(window, 'keyup', ((event: KeyboardEvent) => { this.keys.delete(/^Key[WASD]$/.test(event.code) ? event.code.slice(3).toLowerCase() : event.key.toLowerCase()); this.move(); if (event.key === ' ') this.tool(false) }) as EventListener)
+    listen(window, 'keyup', ((event: KeyboardEvent) => { this.keys.delete(/^Key[WASD]$/.test(event.code) ? event.code.slice(3).toLowerCase() : event.key.toLowerCase()); this.move(); if (event.key === ' ' || event.key === 'Enter') this.tool(false, event.key) }) as EventListener)
     listen(window, 'blur', () => this.neutral())
     listen(document, 'visibilitychange', () => { if (document.hidden) this.neutral() })
     listen(window, 'orientationchange', () => this.neutral())
@@ -37,8 +38,7 @@ export class Controls {
     if (held) this.fireSources.add(source); else this.fireSources.delete(source)
     this.value.fireHeld = !this.disabled && this.fireSources.size > 0
   }
-  tool(held: boolean, pointerId?: number): void {
-    const source = pointerId ?? 'keyboard'
+  tool(held: boolean, source: ToolInputSource = ' '): void {
     if (held && !this.disabled) this.toolSources.add(source); else this.toolSources.delete(source)
     this.value.toolHeld = !this.disabled && this.toolSources.size > 0
   }

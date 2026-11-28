@@ -35,6 +35,19 @@ describe('client input ownership and focus', () => {
     dispatch('pointerup', { pointerId: 8 }); expect(controls.value.toolHeld).toBe(true)
     key('keyup', ' '); expect(controls.value.toolHeld).toBe(false)
   })
+  it('releases an Enter tool hold globally after focus moves to another element', () => {
+    controls.tool(true, 'Enter')
+    key('keyup', 'Enter', new FocusElement('BUTTON'))
+    expect(controls.value.toolHeld).toBe(false)
+  })
+  it('preserves a simultaneous Space tool hold when Enter releases and vice versa', () => {
+    controls.tool(true, 'Enter'); controls.tool(true, ' ')
+    key('keyup', 'Enter', new FocusElement('A')); expect(controls.value.toolHeld).toBe(true)
+    key('keyup', ' ', new FocusElement('A')); expect(controls.value.toolHeld).toBe(false)
+    controls.tool(true, 'Enter'); controls.tool(true, ' ')
+    key('keyup', ' ', new FocusElement('BUTTON')); expect(controls.value.toolHeld).toBe(true)
+    key('keyup', 'Enter', new FocusElement('BUTTON')); expect(controls.value.toolHeld).toBe(false)
+  })
   it.each(['blur', 'pointercancel', 'orientationchange'])('%s clears every held source while preserving the fire-press counter', event => {
     controls.tool(true, 11); controls.tool(true); controls.touchMove({ x: 1, z: 1 }); controls.fire(true, 'touch')
     const press = controls.value.firePressSeq

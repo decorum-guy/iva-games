@@ -1,18 +1,25 @@
 import { RULES } from './constants'
-import { closestLegalPoint, distance, findPath, legalPoint, moveSliding, normalize } from './geometry'
+import { clearSegment, closestLegalPoint, distance, findPath, legalPoint, moveSliding, normalize } from './geometry'
 import { getMap } from './maps'
 import { movementObstacles } from './state'
 import { entityVisible, visibleEnemyBuildingIds } from './visibility'
-import type { Point, Unit, World } from './types'
+import type { Point, Rect, Unit, World } from './types'
 
-export function walkToward(w: World, u: Unit, target: Point, stopDistance: number, speed: number): void {
-  const map = getMap(w.mapId), physical = movementObstacles(w, u.team)
+export function walkToward(w: World, u: Unit, target: Point, stopDistance: number, speed: number, physical = movementObstacles(w, u.team)): void {
+  const map = getMap(w.mapId)
   if (distance(u, target) <= stopDistance) { u.vx = 0; u.vz = 0; return }
   if (!u.pathTarget || distance(u.pathTarget, target) > 1.5 || u.pathVersion !== w.navigationVersion || (!u.path.length && w.tick >= u.pathRetryTick)) {
-    const known = visibleEnemyBuildingIds(w, u.team)
-    for (const id of Object.keys(w.memories[u.team])) known.add(id)
-    const obstacles = movementObstacles(w, u.team, known)
-    u.path = findPath(u, target, u.radius, map, obstacles); u.pathTarget = { x: target.x, z: target.z }; u.pathVersion = w.navigationVersion; u.pathRetryTick = w.tick + 30
+    // Physical obstacles are a superset of known obstacles. A fully clear direct segment
+    // therefore proves the exact known-only result; otherwise use the original limited view.
+    // Unknown obstacles never cause a different route through this shortcut.
+    if (legalPoint(target, u.radius, map, physical) && clearSegment(u, target, u.radius, physical)) u.path = [{ x: target.x, z: target.z }]
+    else {
+      const known = visibleEnemyBuildingIds(w, u.team)
+      for (const id of Object.keys(w.memories[u.team])) known.add(id)
+      const obstacles = movementObstacles(w, u.team, known)
+      u.path = findPath(u, target, u.radius, map, obstacles)
+    }
+    u.pathTarget = { x: target.x, z: target.z }; u.pathVersion = w.navigationVersion; u.pathRetryTick = w.tick + 30
   }
   while (u.path.length && distance(u, u.path[0]) <= Math.max(0.14, speed / 30)) u.path.shift()
   const next = u.path[0]
@@ -39,11 +46,11 @@ export function orderPoint(w: World, u: Unit): Point | null {
   }
   return null
 }
-export function buildWorkPoint(w: World, u: Unit, padId: string): Point | null {
+export function buildWorkPoint(w: World, u: Unit, padId: string, physical?: Rect[]): Point | null {
   const map = getMap(w.mapId), pad = map.pads.find(p => p.id === padId)
   if (!pad) return null
   if (pad.workPoint) return pad.workPoint
-  const r = pad.rect, obstacle = movementObstacles(w, u.team)
+  const r = pad.rect, obstacle = physical ?? movementObstacles(w, u.team)
   const candidates: Point[] = [
     { x: r.x1 - u.radius - 0.12, z: pad.z }, { x: r.x2 + u.radius + 0.12, z: pad.z },
     { x: pad.x, z: r.z1 - u.radius - 0.12 }, { x: pad.x, z: r.z2 + u.radius + 0.12 },
@@ -51,15 +58,15 @@ export function buildWorkPoint(w: World, u: Unit, padId: string): Point | null {
   candidates.sort((a, b) => distance(u, a) - distance(u, b) || a.x - b.x || a.z - b.z)
   return candidates.find(p => legalPoint(p, u.radius, map, obstacle)) ?? closestLegalPoint(pad, u.radius, map, obstacle, 2)
 }
-export function builderMovement(w: World, u: Unit): void {
+export function builderMovement(w: World, u: Unit, physical = movementObstacles(w, u.team)): void {
   const p = w.participants.find(p => p.id === u.ownerId)!
   const order = !p.builderPaused ? w.buildOrders.find(o => o.ownerId === p.id) : undefined
   if (order) {
-    const target = buildWorkPoint(w, u, order.padId)
-    if (target) walkToward(w, u, target, 0.15, RULES.builderSpeed)
+    const target = buildWorkPoint(w, u, order.padId, physical)
+    if (target) walkToward(w, u, target, 0.15, RULES.builderSpeed, physical)
   } else {
     const target = orderPoint(w, u)
-    if (target) walkToward(w, u, target, 0.25, RULES.builderSpeed)
+    if (target) walkToward(w, u, target, 0.25, RULES.builderSpeed, physical)
     else { u.vx = 0; u.vz = 0 }
   }
   if (Math.hypot(u.vx, u.vz) > 0.01) u.angle = Math.atan2(u.vz, u.vx)

@@ -1,4 +1,5 @@
 import { catalogueDefaults } from '@iva-games/game-registry';
+import { parseStartWaiting } from '@iva-games/realtime-kit';
 import { createHash, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
 import { chmodSync } from 'node:fs';
 import { hash, verify } from '@node-rs/argon2';
@@ -500,12 +501,21 @@ export class PlatformService {
   }
   private roomView(roomId: string): Room {
     const row = this.roomRow(roomId);
+    const start = row.game_id === 'forpost' && row.state === 'starting'
+      ? this.row('SELECT last_error,next_attempt_at FROM start_commands WHERE room_id=? AND completed_at IS NULL', roomId) : undefined;
+    let startWaiting: Room['startWaiting'];
+    if (start) {
+      let saved: unknown;
+      try { saved = JSON.parse(String(start.last_error)); } catch { /* Older unconfirmed records are still readable. */ }
+      startWaiting = { ...(parseStartWaiting(saved) ?? { reason: 'service' as const, retryAt: Number(start.next_attempt_at) }), retryAt: Number(start.next_attempt_at) };
+    }
     return {
       roomId, gameId: String(row.game_id), title: String(row.title), hostPlayerId: String(row.host_player_id),
       state: row.state as Room['state'], capacity: Number(row.capacity), rulesVersion: String(row.rules_version), contentVersion: String(row.content_version),
       revision: Number(row.revision), settings: JSON.parse(String(row.settings_json)), members: this.participants(roomId),
       reservedSeats: Number(this.row('SELECT COUNT(*) AS count FROM seat_reservations WHERE room_id=? AND expires_at>?', roomId, this.now())?.count ?? 0),
       matchId: row.match_id ? String(row.match_id) : null, outcome: row.outcome_json ? JSON.parse(String(row.outcome_json)) : null, createdAt: Number(row.created_at),
+      ...(startWaiting ? { startWaiting } : {}),
     };
   }
   getRoom(actor: string, roomId: string): Room { this.member(actor, roomId); return this.roomView(roomId); }
@@ -774,7 +784,9 @@ export class PlatformService {
     if (participants.some(p => !p.ready)) fail('PLAYERS_NOT_READY', 'Не все игроки готовы', 409);
     if (this.occupancy(roomId) !== participants.length) fail('RESERVATIONS_PENDING', 'Дождитесь приглашённых игроков', 409);
     game.validateStart?.(participants, JSON.parse(String(row.settings_json)) as Record<string, unknown>);
-    const command: StartMatchCommand = { startCommandId: randomUUID(), roomId, rulesVersion: String(row.rules_version), contentVersion: String(row.content_version), participants, settings: JSON.parse(String(row.settings_json)) };
+    const command: StartMatchCommand = { startCommandId: randomUUID(), roomId,
+      ...(game.gameId === 'forpost' ? { hostPlayerId: actor } : {}),
+      rulesVersion: String(row.rules_version), contentVersion: String(row.content_version), participants, settings: JSON.parse(String(row.settings_json)) };
     this.run("UPDATE rooms SET state='starting',revision=revision+1 WHERE room_id=?", roomId);
     this.run('INSERT INTO start_commands VALUES (?,?,?,0,?,NULL,NULL)', command.startCommandId, roomId, JSON.stringify(command), this.now());
     this.revokeRoomInvites(roomId);
@@ -797,9 +809,12 @@ export class PlatformService {
             this.run('UPDATE start_commands SET completed_at=?,attempts=attempts+1,last_error=NULL WHERE start_command_id=?', this.now(), String(row.start_command_id));
             this.run("UPDATE rooms SET state='playing',match_id=?,revision=revision+1 WHERE room_id=? AND state='starting'", result.matchId, String(row.room_id));
           }).immediate();
-        } catch {
+        } catch (error) {
           // An unknown result never reopens the frozen roster; retry the same command.
-          this.run("UPDATE start_commands SET attempts=attempts+1,next_attempt_at=?,last_error='runtime_unconfirmed' WHERE start_command_id=?", this.now() + Math.min(30_000, 1000 * (Number(row.attempts) + 1)), String(row.start_command_id));
+          const waiting = error && typeof error === 'object' && 'startWaiting' in error ? parseStartWaiting(error.startWaiting) : null;
+          const retryAt = this.now() + Math.min(30_000, 1000 * (Number(row.attempts) + 1));
+          this.run('UPDATE start_commands SET attempts=attempts+1,next_attempt_at=?,last_error=? WHERE start_command_id=?', retryAt,
+            waiting ? JSON.stringify({ ...waiting, retryAt }) : 'runtime_unconfirmed', String(row.start_command_id));
         }
       });
       await this.runtimeBatch(this.rows("SELECT room_id,game_id,match_id FROM rooms WHERE state='playing'"), async row => {

@@ -3,6 +3,7 @@ import type { GameRegistration } from '@iva-games/session-kit';
 import { randomInt } from 'node:crypto';
 import { SessionError } from '@iva-games/session-kit';
 import type { Admission, TicketClaims } from '@iva-games/realtime-kit';
+import { parseStartWaiting } from '@iva-games/realtime-kit';
 import { bridgeSignature, canonical, hash, loadSigningKey, newTicketId, publicKeyPem, signTicket } from './realtime-crypto.js';
 
 function normalizeForpostSettings(input: unknown): Record<string, unknown> {
@@ -40,7 +41,14 @@ export function createForpostRegistration(options: AdapterOptions) {
         headers: { 'Content-Type': 'application/json', 'X-Iva-Key-Id': options.keyId, 'X-Iva-Request-Id': requestId,
           'X-Iva-Timestamp': timestamp, 'X-Iva-Signature': bridgeSignature('POST', path, data, requestId, timestamp, key) } });
     } catch { throw new SessionError('GAME_UNAVAILABLE', 'Игра временно недоступна. Попробуйте позже', 503); }
-    if (!response.ok) throw new SessionError('GAME_UNAVAILABLE', 'Не удалось продолжить игру. Попробуйте ещё раз', 503);
+    if (!response.ok) {
+      if (path === '/internal/realtime/v1/matches' && response.status === 503) {
+        const data = await response.json().catch(() => null) as { waiting?: unknown } | null;
+        const waiting = parseStartWaiting(data?.waiting);
+        if (waiting) throw Object.assign(new SessionError('START_WAITING', 'Ожидаем запуска игры. Повторим автоматически', 503), { startWaiting: waiting });
+      }
+      throw new SessionError('GAME_UNAVAILABLE', 'Не удалось продолжить игру. Попробуйте ещё раз', 503);
+    }
     return await response.json() as T;
   };
   const normalizeSettings = (input: unknown) => {
