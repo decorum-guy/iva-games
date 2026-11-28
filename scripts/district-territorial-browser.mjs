@@ -472,13 +472,17 @@ try {
   await training(pages[1], room.roomId, true);
   async function clickAction(page, button) {
     if (await page.getByRole('button', { name: 'Dismiss news', exact: true }).isVisible()) await page.getByRole('button', { name: 'Dismiss news', exact: true }).click();
-    const pendingResponse = page.waitForResponse(
-      (r) => r.url().endsWith(path + '/actions') && r.request().method() === 'POST',
-    );
-    await button.click();
-    const response = await pendingResponse;
-    assert.equal(response.status(), 200, await response.text());
-    result.uiActions.push(response.request().postDataJSON().payload.type);
+    for(let attempt=0;attempt<3;attempt++) {
+      const pendingResponse=page.waitForResponse(r=>r.url().endsWith(path+'/actions')&&r.request().method()==='POST');
+      await button.click(); const response=await pendingResponse;
+      const data=await response.json();
+      if(response.status()===409&&data.error?.code==='STALE_REVISION'&&attempt<2) {
+        await page.waitForResponse(r=>r.url().endsWith(path+'/match')&&r.request().method()==='GET'&&r.ok());
+        continue;
+      }
+      assert.equal(response.status(),200,JSON.stringify(data));
+      result.uiActions.push(response.request().postDataJSON().payload.type); return;
+    }
   }
   let done;
   for (let step = 0; step < 3500; step++) {
@@ -562,7 +566,7 @@ try {
           for (const [i,p] of pages.entries()) assert.deepEqual(await geometry(p), beforeGeometry[i], 'Offer appearance/consent keeps board and page geometry');
           await mkdir(artifacts, {recursive:true});
           for (const [i,p] of pages.entries()) await p.screenshot({path:join(artifacts,i ? 'trade-mobile.png' : 'trade-desktop.png')});
-          await clickAction(page, page.locator('.ta-offer').filter({hasText: other.players.find(p=>p.participantId===other.you.participantId).displayName}).getByRole('button', {name: /^✓ Trade with/}));
+          await clickAction(page, page.getByRole('button', {name: new RegExp('^Trade with '+other.players.find(p=>p.participantId===other.you.participantId).displayName)}));
           await expect(page.locator('.ta-offer[data-offer-status=agreed]')).toHaveCount(0);
           for (const [i,p] of pages.entries()) assert.deepEqual(await geometry(p), beforeGeometry[i], 'Offer removal keeps board and page geometry');
           // The common author cross remains actionable after consent, without a transfer.

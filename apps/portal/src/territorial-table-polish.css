@@ -180,3 +180,4 @@
 .territory-map-tools .ta-offer.is-outgoing,.territory-map-tools .ta-closed-response { flex-basis:52px;width:52px;height:78px;justify-content:center; }
 .territory-map-tools .ta-offer.is-outgoing .ta-response-chip,.territory-map-tools .ta-closed-response { flex-direction:column;gap:2px; }
 .territory-map-tools .ta-response-chip>button,.territory-map-tools .ta-response-chip>span[role=img],.territory-map-tools .ta-closed-response>span[role=img] { width:44px;min-width:44px;height:44px;min-height:44px; }
+.territory-map-tools .ta-group-cancel-space { display:block;flex:0 0 36px;width:36px;height:36px; }

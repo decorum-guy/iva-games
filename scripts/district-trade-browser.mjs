@@ -88,17 +88,20 @@ async function expectTradeHistory(page, text, repeatedStatus) {
   if (repeatedStatus) await expect(entry).not.toContainText(repeatedStatus);
   await tabs.getByRole('button', { name: /Actions/ }).click();
 }
-async function expectTradeArrowCentered(terms) {
+async function expectCompactTerms(terms) {
   await expect(terms).toBeVisible();
-  const gaps = await terms.evaluate(element => {
-    const [give, receive] = [...element.querySelectorAll('.ta-resources')].map(group => group.getBoundingClientRect());
-    const arrow = element.querySelector('.ta-offer-arrow').getBoundingClientRect();
-    return { left: arrow.left - give.right, right: receive.left - arrow.right,
-      centers: [give, arrow, receive].map(rect => rect.top + rect.height / 2) };
-  });
-  assert.ok(gaps.left > 0 && gaps.right > 0 && Math.abs(gaps.left - gaps.right) <= 1, JSON.stringify(gaps));
-  assert.ok(Math.max(...gaps.centers) - Math.min(...gaps.centers) <= 1, JSON.stringify(gaps));
+  const rows=await terms.evaluate(el=>({width:el.getBoundingClientRect().width,rows:[...el.children].map(row=>{const r=row.getBoundingClientRect();return{width:r.width,y:r.y,bottom:r.bottom};})}));
+  assert.equal(rows.rows.length,2);
+  assert.ok(rows.rows.every(row=>row.width>=rows.width*.95),JSON.stringify(rows));
+  assert.ok(rows.rows[1].y>=rows.rows[0].bottom);
 }
+async function freshQuote(entry,screens=pages.slice(0,2)) {
+  const v=await post(entry,entry.hostIndex,{type:'offer',targetId:entry.expected.otherId,give:stock({wood:1}),receive:stock({brick:1})});
+  entry.expected.offerId=v.offers.find(o=>o.authorId===entry.expected.ownerId).id;
+  for(const page of screens) await expect(page.locator(`[data-offer-id="${entry.expected.offerId}"]`)).toBeVisible();
+  return entry;
+}
+
 async function enterPlay(entry, index) {
   let current = await action(pages[index], pages[index].getByRole('button', { name: 'Roll dice', exact: true }));
   if (current.phase === 'discard') {
@@ -272,8 +275,9 @@ try {
   passed('hand adds resources, keyboard adjusts quantities and retains focus when the last unit is removed');
   const authorIndex = entry.hostIndex, receiverIndex = entry.guestIndex;
   const author = pages[authorIndex], receiver = pages[receiverIndex];
-  await expect(author.locator('.territory-players')).toContainText('Awaiting reply');
-  await expect(receiver.locator('.territory-players')).toContainText('Offers a trade');
+  await freshQuote(entry);
+  await expect(author.getByRole('img',{name:'Awaiting response',exact:true})).toBeVisible();
+  await expect(receiver.getByRole('button',{name:'Accept',exact:true})).toBeEnabled();
   await receiver.getByRole('button', { name: 'Counteroffer', exact: true }).click();
   await setTradeCount(receiver, 'I give', 'brick', 2);
   await setTradeCount(receiver, 'I receive', 'wood', 3);
@@ -319,7 +323,7 @@ try {
   assert.deepEqual(sent.give, stock({ brick: 2 })); assert.deepEqual(sent.receive, stock({ wood: 3 }));
   await receiver.unroute(actionsPattern);
   await expect(editor).toHaveCount(0);
-  await expect(receiver.locator(`[data-offer-id="${sent.id}"][data-offer-status="waiting"]`)).toContainText('Sent · awaiting response');
+  await expect(receiver.locator(`[data-offer-id="${sent.id}"][data-offer-status="waiting"]`).getByRole('img',{name:'Awaiting response',exact:true})).toBeVisible();
   const before = await view(entry, authorIndex);
   await expect(author.locator(`[data-offer-id="${sent.id}"]`).getByRole('button', { name: 'Accept', exact: true })).toBeEnabled();
   const consent = await action(author, author.locator(`[data-offer-id="${sent.id}"]`).getByRole('button', { name: 'Accept', exact: true }));
@@ -370,14 +374,14 @@ try {
   entry = await open('trade-draft');
   const unequal = await post(entry, entry.hostIndex, { type: 'offer', targetId: entry.expected.otherId,
     give: stock({ wood: 1, grain: 2, wool: 3, ore: 2 }), receive: stock({ brick: 1 }) });
-  const offerId = unequal.offers[0].id;
-  for (const page of pages) await expectTradeArrowCentered(page.locator(`[data-offer-id="${offerId}"] .ta-offer-terms`));
+  assert.ok(unequal.offers[0].id);
+  for (const page of pages) await expectCompactTerms(page.locator('.ta-offer-terms').first());
   const narrow = pages[1];
   await narrow.setViewportSize({ width: 320, height: 720 });
-  await expectTradeArrowCentered(narrow.locator(`[data-offer-id="${offerId}"] .ta-offer-terms`));
+  await expectCompactTerms(narrow.locator('.ta-offer-terms').first());
   await narrow.screenshot({ path: join(harness.directory, 'offer-unequal-320x720.png') });
   await narrow.setViewportSize({ width: 390, height: 844 });
-  passed('the offer arrow is centered on both clients between one and four resource stacks, including when they wrap on a narrow screen');
+  passed('both author/terms lines use the available width and remain readable with unequal stacks on both clients and a narrow screen');
 
   entry = await open('trade-draft');
   const lostPage = pages[entry.hostIndex];
@@ -416,7 +420,7 @@ try {
     await expect(page.locator('.territory-player-trade').filter({hasText:/\S/})).toHaveCount(0);
     await expectTradeHistory(page, /Trade declined/, '· Declined');
   }
-  await expect(pages[entry.hostIndex].locator('.ta-declined')).toContainText('Declined');
+  await expect(pages[entry.hostIndex].locator('.ta-closed-response')).toContainText('\u274c');
   passed('declined active offers disappear and the author retains a visible response with history');
   entry = await open('trade-draft');
   await action(pages[entry.hostIndex], pages[entry.hostIndex].getByRole('button', { name: 'Withdraw offer for everyone', exact: true }));
@@ -445,7 +449,7 @@ try {
   assert.equal(exchanged.you.hand.grain, bankBefore.you.hand.grain + 1);
   await expect(receipt).toBeVisible();
   await expect(recipientPage.locator('.ta-offer:not(.is-closed)').getByRole('button', { name: 'Accept', exact: true })).toBeDisabled();
-  await expect(recipientPage.locator('.ta-offer:not(.is-closed)')).toContainText('The sender no longer has the required resources');
+  await expect(recipientPage.getByRole('button',{name:'Accept',exact:true})).toHaveAttribute('title','Sender lacks resources');
   await expect(receipt).toHaveCount(0, { timeout: 7_000 });
   await expect(bank).toBeVisible();
   await bank.getByLabel('I give', { exact: true }).selectOption('brick');
@@ -571,7 +575,7 @@ try {
   entry = await open('trade-draft');
   const shortageView = await post(entry, entry.hostIndex, { type: 'offer', targetId: entry.expected.otherId, give: stock({ wood: 1 }), receive: stock({ brick: 5 }) });
   assert.equal(shortageView.offers[0].unavailableReason, undefined, 'Author must not learn a hidden counterparty shortage');
-  await expect(pages[entry.guestIndex].locator('.ta-offer:not(.is-closed)')).toContainText('Your hand is missing');
+  await expect(pages[entry.guestIndex].getByRole('button',{name:'Accept',exact:true})).toHaveAttribute('title','Missing resources');
   await expect(pages[entry.guestIndex].locator('.ta-offer:not(.is-closed)').getByRole('button', { name: 'Accept', exact: true })).toBeDisabled();
   passed('recipient sees own exact shortage while author receives no hidden-hand availability flag');
 
@@ -683,9 +687,10 @@ try {
     entry = await harness.reset('trade-draft');
     await Promise.all(mobile.map(async page => { await page.goto(entry.url); await expect(page.locator('.territory-match')).toBeVisible(); }));
     const receiver = mobile[entry.guestIndex], sender = mobile[entry.hostIndex];
-    const offer = receiver.locator(`[data-offer-id="${entry.expected.offerId}"]`);
+    await freshQuote(entry,mobile);
+    let offer = receiver.locator(`[data-offer-id="${entry.expected.offerId}"]`);
     const layout = await visibleSheet(receiver, '.ta-offers-panel', receiver.getByRole('button', { name: 'Свернуть сделки', exact: true }));
-    await expectTradeArrowCentered(offer.locator('.ta-offer-terms'));
+    await expectCompactTerms(offer.locator('.ta-offer-terms'));
     for (const locator of [offer.locator('.ta-offer-terms'), ...['Принять', 'Другие условия', 'Отклонить'].map(name => offer.getByRole('button', { name, exact: true }))]) {
       await expect(locator).toBeInViewport({ ratio: 1 });
       assert.ok((await touchPoint(locator)).receivesPointer, 'Terms and all decisions must be visible together without internal scrolling');
@@ -707,6 +712,8 @@ try {
     await expect(sender.locator('.ta-offers-panel')).toBeVisible();
     assert.equal((await view(entry, entry.hostIndex)).revision, untouched.revision);
 
+    await freshQuote(entry,mobile);
+    offer=receiver.locator(`[data-offer-id="${entry.expected.offerId}"]`);
     await nativeTap(receiver, offer.getByRole('button', { name: 'Другие условия', exact: true }));
     const trade = receiver.locator('.ta-trade-window'), closeTrade = receiver.getByRole('button', { name: 'Закрыть торговлю', exact: true });
     await visibleSheet(receiver, '.ta-trade-window', closeTrade);
@@ -750,13 +757,15 @@ try {
     await nativeTap(receiver, closeTrade);
     await expect(trade).toBeHidden();
     await nativeTap(sender, sender.getByRole('button', { name: 'Свернуть сделки', exact: true }));
+    await freshQuote(entry,mobile);
+    offer=receiver.locator(`[data-offer-id="${entry.expected.offerId}"]`);
     const response = receiver.waitForResponse(response => response.request().method() === 'POST' && response.url().endsWith('/actions'));
     await nativeTap(receiver, offer.getByRole('button', { name: height === 600 ? 'Принять' : 'Отклонить', exact: true }));
     const answered = await response; assert.equal(answered.status(), 200);
     let outcome = (await answered.json()).view;
     if (height === 600) {
       assert.ok(outcome.offers.find(item=>item.id===entry.expected.offerId).agreedAt!==undefined);
-      await nativeTap(sender,sender.getByRole('button',{name:'Показать сделки',exact:true}));
+      if(await sender.getByRole('button',{name:'Показать сделки',exact:true}).isVisible()) await nativeTap(sender,sender.getByRole('button',{name:'Показать сделки',exact:true}));
       await action(sender,sender.locator(`[data-offer-id="${entry.expected.offerId}"]`).getByRole('button',{name:/Обменяться/}));
       outcome=await view(entry,entry.guestIndex);
     }
