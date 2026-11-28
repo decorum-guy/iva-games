@@ -141,7 +141,7 @@ function instrumentBrowser(options = {}) {
       super(url, protocols);
       if (/\/api\/platform\/v1\/rooms\/[^/]+\/live$/.test(new URL(String(url), location.href).pathname)) {
         state.sockets.push(this); state.active = this; state.scope = null;
-        const lifecycle = { matchId: null, epoch: null, phase: null, closed: false, closeCode: null }; state.socketLifecycles.push(lifecycle);
+        const lifecycle = { socket: state.sockets.length, openedAt: Date.now(), matchId: null, epoch: null, phase: null, tick: null, controllerEpoch: null, closed: false, closeCode: null }; state.socketLifecycles.push(lifecycle);
         if (latency) {
           const delayed = new WeakSet();
           this.addEventListener('message', event => {
@@ -157,11 +157,18 @@ function instrumentBrowser(options = {}) {
             if (frame.type === 'snapshot' && frame.protocol === 'iva-live@1' && frame.wireVersion === 'shift-wire@1') {
               const { protocol, wireVersion, roomId, matchId, epoch } = frame;
               lifecycle.matchId = matchId; lifecycle.epoch = epoch; lifecycle.phase = frame.view?.phase;
+              lifecycle.tick = frame.tick; lifecycle.controllerEpoch = frame.view?.self?.controllerEpoch;
               if (state.active === this) state.scope = { protocol, wireVersion, roomId, matchId, epoch };
             }
           } catch { /* The Node-side observer rejects malformed or wrongly scoped frames. */ }
         });
-        this.addEventListener('close', event => { lifecycle.closed = true; lifecycle.closeCode = event.code; if (state.active === this) state.scope = null; });
+        this.addEventListener('close', event => {
+          lifecycle.closed = true; lifecycle.closeCode = event.code; lifecycle.closeReason = event.reason; lifecycle.wasClean = event.wasClean; lifecycle.closedAt = Date.now();
+          if (state.active === this) state.scope = null;
+          // A native close event is diagnostic evidence, not a fabricated result.
+          // Console delivery remains observable without a follow-up renderer RPC.
+          console.debug('__shiftAcceptanceLifecycle__' + JSON.stringify(lifecycle));
+        });
       }
     }
     send(data) {
@@ -226,8 +233,15 @@ function auditView(view, peer) {
 
 function watchPage(page, name, game) {
   const peer = { page, name, game, view: null, frames: 0, sockets: 0, errors: [], http: [], httpEvents: 0, httpRequests: 0, retired: false, receipts: new Map(), receiptCounts: new Map(), commandsSentAt: new Map(), receiptLatencyMs: [], closes: [], roles: new Set(), motions: new Set(), samples: [], recent: new Map(), commandEnvelopes: new Map(), wireCommandEnvelopes: new Map(), wireErrors: [], expectedLifecycleEvents: [], scopeChecks: 0, staleSocketFramesIgnored: 0, memory: { seq: 0, counter: 0, nextDecisionTick: 0, recentRooms: [] }, lastDriveTick: -1, failure: null };
+  peer.socketHistory = []; peer.browserLifecycles = []; peer.fixtureStages = [];
   observedPeers.push(peer);
   page.on('pageerror', error => { peer.errors.push(error.message); });
+  page.on('console', message => {
+    const prefix = '__shiftAcceptanceLifecycle__', value = message.text();
+    if (!value.startsWith(prefix)) return;
+    try { peer.browserLifecycles.push(JSON.parse(value.slice(prefix.length))); }
+    catch (error) { peer.failure ||= error; }
+  });
   page.on('request', request => { if (new URL(request.url()).pathname.startsWith('/api/platform/')) peer.httpRequests++; });
   page.on('response', response => {
     const path = new URL(response.url()).pathname;
@@ -248,6 +262,8 @@ function watchPage(page, name, game) {
       assert.equal(url.search, ''); assert.equal(url.hash, ''); assert.equal(url.username, ''); assert.equal(url.password, '');
     } catch (error) { peer.failure ||= error; return; }
     peer.sockets++; peer.activeSocket = ws; peer.recent.clear();
+    const history = { socket: peer.sockets, openedAt: Date.now(), closedAt: null, scope: null, tick: null, phase: null };
+    peer.socketHistory.push(history);
     let connectionScope = null, wireScope = null, connectionPhase = null;
     const receive = ({ payload }) => {
       try {
@@ -267,7 +283,7 @@ function watchPage(page, name, game) {
         if (frame.type === 'snapshot') {
           peer.liveScope = scope;
           immutableJson(frame.view);
-          auditView(frame.view, peer); peer.view = frame.view; peer.matchId = frame.matchId; peer.frames++; peer.recent.set(frame.tick, frame.view);
+          auditView(frame.view, peer); peer.view = frame.view; peer.viewSocket = ws; peer.matchId = frame.matchId; peer.frames++; peer.recent.set(frame.tick, frame.view);
           while (peer.recent.size > 40) peer.recent.delete(peer.recent.keys().next().value);
           if (peer.frames === 1 || frame.view.phase !== peer.previousPhase) peer.samples.push({ type: 'phase', tick: frame.tick, view: frame.view });
           peer.previousPhase = frame.view.phase;
@@ -288,7 +304,8 @@ function watchPage(page, name, game) {
         const parsed = JSON.parse(String(frame.payload));
         const scope = auditServerFrame(parsed, game.roomId, wireScope);
         if (!wireScope) assert.equal(parsed.type, 'snapshot', 'The first actual wire frame is a full snapshot');
-        wireScope = scope;
+        wireScope = scope; history.scope = scope;
+        if (parsed.type === 'snapshot') { history.tick = parsed.tick; history.phase = parsed.view.phase; }
       } catch (error) { peer.failure ||= error; return; }
       if (game.oneWayDelayMs) setTimeout(() => receive(frame), game.oneWayDelayMs); else receive(frame);
     });
@@ -308,7 +325,7 @@ function watchPage(page, name, game) {
         peer.scopeChecks++;
       } catch (error) { peer.failure ||= error; }
     });
-    ws.on('close', () => peer.closes.push(Date.now()));
+    ws.on('close', () => { history.closedAt = Date.now(); peer.closes.push(history.closedAt); });
   });
   return peer;
 }
@@ -408,40 +425,79 @@ async function retireInactivePeer(old, replacement, reason) {
   }
 }
 
+async function currentControllerWithHud(peer) {
+  const started = Date.now(), deadline = started + 8000, framesBefore = peer.frames, tickBefore = peer.view.tick;
+  const expected = { matchId: peer.matchId, seatId: peer.view.self.seatId, epoch: peer.liveScope.epoch, controllerEpoch: peer.view.self.controllerEpoch };
+  const remaining = () => Math.max(1, deadline - Date.now());
+  const assertHealthy = () => {
+    const terminal = peer.browserLifecycles.find(item => ![1000, 1001, 1005, 1006, 1012].includes(item.closeCode));
+    assert.equal(terminal, undefined, `Terminal close must not be forgiven: ${terminal?.closeCode}`);
+    assert.deepEqual(peer.errors, [], 'No browser, auth, rate or wire error may be forgiven');
+    if (peer.failure) throw peer.failure;
+  };
+  assertHealthy();
+  const hud = peer.page.locator('.shift-scoreboard');
+  assert.equal(await bounded(hud.isVisible(), 'Adopted controller HUD is visible', remaining()), true);
+  const hudBefore = await bounded(hud.innerText({ timeout: remaining() }), 'Adopted controller initial HUD', remaining());
+  return bounded(until(async () => {
+    assertHealthy();
+    const socket = peer.activeSocket;
+    if (!socket || socket.isClosed() || peer.viewSocket !== socket || peer.frames <= framesBefore || peer.view.tick <= tickBefore) return false;
+    assert.equal(peer.liveScope.matchId, expected.matchId); assert.equal(peer.view.self.seatId, expected.seatId);
+    if (peer.liveScope.epoch === expected.epoch) assert.equal(peer.view.self.controllerEpoch, expected.controllerEpoch);
+    else assert.ok(peer.view.self.controllerEpoch > expected.controllerEpoch, 'A recovered shared scope has a newer core controller epoch');
+    const hudAfter = await bounded(hud.innerText({ timeout: remaining() }), 'Adopted controller HUD progression', remaining());
+    assertHealthy();
+    if (peer.activeSocket !== socket || socket.isClosed() || peer.viewSocket !== socket || hudAfter === hudBefore) return false;
+    return { elapsedMs: Date.now() - started, framesAdvanced: peer.frames - framesBefore, ticksAdvanced: peer.view.tick - tickBefore,
+      sharedEpochChanged: peer.liveScope.epoch !== expected.epoch, controllerEpoch: peer.view.self.controllerEpoch, hudBefore, hudAfter };
+  }, 'Current keyboard controller receives fresh snapshots and updates the visible HUD', remaining()), 'Current keyboard controller and visible HUD within eight seconds', remaining());
+}
+
 async function keyboardAudioInFreshContext(game) {
   const old = game.peers[0], oldEpoch = old.view.self.controllerEpoch, oldSharedEpoch = old.liveScope.epoch;
   const replacement = await createBrowserPeer(game, 'pilot');
+  const stage = name => {
+    const observation = { stage: name, at: new Date().toISOString(), tick: replacement.view?.tick ?? null, frames: replacement.frames, socketClosed: replacement.activeSocket?.isClosed() ?? null };
+    replacement.fixtureStages.push(observation); log({ game: game.label, audioStage: observation });
+  };
+  stage('audio profile created');
   await replacement.page.goto(game.url, { waitUntil: 'domcontentloaded' });
   await until(() => replacement.view?.self.controllerEpoch > oldEpoch, 'Fresh audio-only keyboard context acquires its ordinary seat');
+  stage('audio controller acquired');
   assert.notEqual(replacement.liveScope.epoch, oldSharedEpoch, 'Takeover obtains a fresh shared epoch');
   game.peers[0] = replacement;
   await replacement.page.locator('.shift-scene canvas').first().waitFor();
-  const before = await replacement.page.evaluate(() => window.__shiftAcceptance.audioAudit());
+  const before = await bounded(replacement.page.evaluate(() => window.__shiftAcceptance.audioAudit()), 'Initial online audio audit');
+  stage('initial audio audit');
   assert.equal(before.gestures.pointers, 0); assert.equal(before.gestures.keys, 0);
   assert.ok(before.contexts.every(context => context.state !== 'running'), 'No AudioContext runs before a fresh profile gesture');
   let reachedGame = false;
+  stage('keyboard focus traversal started');
   for (let count = 0; count < 40; count++) {
-    reachedGame = await replacement.page.evaluate(() => !!document.activeElement?.closest('.shift-root'));
+    reachedGame = await bounded(replacement.page.evaluate(() => !!document.activeElement?.closest('.shift-root')), 'Online keyboard focus observation');
     if (reachedGame) break;
-    await replacement.page.keyboard.press('Tab');
+    await bounded(replacement.page.keyboard.press('Tab'), 'Online keyboard focus Tab');
   }
   assert.ok(reachedGame, 'Keyboard focus reaches the actual match without a pointer');
-  const beforeGameKey = await replacement.page.evaluate(() => window.__shiftAcceptance.audioAudit());
-  await replacement.page.keyboard.press('Tab');
+  stage('keyboard reached match');
+  const beforeGameKey = await bounded(replacement.page.evaluate(() => window.__shiftAcceptance.audioAudit()), 'Audio audit before game keyboard gesture');
+  await bounded(replacement.page.keyboard.press('Tab'), 'Trusted in-match keyboard gesture');
   const after = await until(async () => {
-    const audit = await replacement.page.evaluate(() => window.__shiftAcceptance.audioAudit());
+    const audit = await bounded(replacement.page.evaluate(() => window.__shiftAcceptance.audioAudit()), 'Audio audit after game keyboard gesture');
     return audit.contexts.some(context => context.state === 'running' && context.createdDuring?.trusted && context.createdDuring?.inMatch) && audit;
   }, 'Trusted online keyboard gesture unlocks native AudioContext');
   assert.equal(after.gestures.pointers, 0); assert.ok(after.gestures.trustedKeys > 0);
+  stage('audio unlocked by keyboard');
   await old.page.locator('.shift-connection').waitFor();
   assert.match(await old.page.locator('.shift-connection').innerText(), /другой вкладке|Another tab/i);
-  await automated(replacement);
-  const socketState = await bounded(replacement.page.evaluate(() => window.__shiftAcceptance.active?.readyState), 'Adopted keyboard controller socket');
-  assert.equal(socketState, 1, 'The adopted keyboard controller remains connected');
-  const adoptedTick = replacement.view.tick;
-  await until(() => replacement.view.phase === 'finished' || replacement.view.tick > adoptedTick, 'Adopted keyboard controller receives advancing snapshots', 4000);
+  stage('old controller visibly inactive');
+  await bounded(automated(replacement), 'Adopt keyboard controller input policy');
+  stage('policy adopted');
+  const adoptedControl = await currentControllerWithHud(replacement);
+  stage('current controller and advancing HUD confirmed');
   check('Fresh authenticated online context unlocks native AudioContext through keyboard before any pointer', {
-    game: game.label, before, beforeGameKey, after, classification: 'Browser AudioContext state only; no listening or speaker-output claim',
+    game: game.label, before, beforeGameKey, after, adoptedControl, classification: 'Browser AudioContext state only; no listening or speaker-output claim',
   });
   await retireInactivePeer(old, replacement, 'keyboard-audio takeover');
 }
@@ -747,6 +803,15 @@ try {
   stopping = true;
   report.passed = false; report.failures.push({ message: error.message, stack: error.stack });
   report.browserErrors = observedPeers.flatMap(p => p.errors.map(error => ({ game: p.game.label, peer: p.name, error })));
+  // Emit before any DOM probe: a failed renderer must not hide the wire evidence
+  // in an ephemeral CI file. These fields contain no session cookies or tokens.
+  log({ failureContext: { message: error.message, peers: observedPeers.map((peer, index) => ({
+    index, game: peer.game.label, name: peer.name, current: peer.game.peers.includes(peer), retired: peer.retired, url: peer.page.url(),
+    frames: peer.frames, sockets: peer.sockets, activeSocketClosed: peer.activeSocket?.isClosed() ?? null, scope: peer.liveScope ?? null,
+    view: peer.view ? { tick: peer.view.tick, round: peer.view.round, phase: peer.view.phase, seatId: peer.view.self.seatId, controllerEpoch: peer.view.self.controllerEpoch, recoveryTicksRemaining: peer.view.recoveryTicksRemaining } : null,
+    failure: peer.failure?.message ?? null, errors: peer.errors.slice(-4), wireErrors: peer.wireErrors.slice(-4),
+    socketHistory: peer.socketHistory.slice(-4), browserLifecycles: peer.browserLifecycles.slice(-4), fixtureStages: peer.fixtureStages,
+  })) } });
   await writeFile(join(directory, 'failure-http.json'), JSON.stringify(observedPeers.map(p => ({ name: p.name, game: p.game.label, requests: p.http }))), { mode: 0o600 });
   const pages = await Promise.all(observedPeers.slice(-4).map(async peer => {
     try { return { name: peer.name, game: peer.game.label, page: await bounded(peer.page.evaluate(() => ({ url: location.href, readyState: document.readyState, visibility: document.visibilityState, text: document.body.innerText.slice(0, 18000) })), 'Failure DOM observation', 4000) }; }
