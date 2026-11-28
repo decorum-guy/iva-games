@@ -51,7 +51,7 @@ export class OnlineSession implements SessionClient {
   private predicted: PredictedFighter | null = null
   private predictionLife = ''
   private retries = 0
-  constructor(private info: JoinInfo, private renew: () => Promise<JoinInfo>, private onView: (view: WorldView) => void, private onStatus: (status: ConnectionState, code?: string) => void) { this.connect() }
+  constructor(private info: JoinInfo, private renew: () => Promise<JoinInfo>, private onView: (view: WorldView) => void, private onStatus: (status: ConnectionState, code?: string) => void, private onInputReset: () => void = () => {}) { this.connect() }
   private send(value: unknown): void { if (this.socket?.readyState === WebSocket.OPEN) this.socket.send(JSON.stringify(value)) }
   private envelope(type: string): Record<string, unknown> { return { type, protocolVersion: 1, matchId: this.info.matchId, epoch: this.epoch, controllerGeneration: this.generation } }
   private readPhase(value: unknown): void {
@@ -110,6 +110,7 @@ export class OnlineSession implements SessionClient {
       if (message.type === 'hello') {
         this.epoch = Number(message.epoch); this.generation = Number(message.controllerGeneration); this.connected = true; this.retries = 0
         this.controlling = message.controlling === true; this.sequence = 0; this.baselines.clear(); this.inputHistory = []; this.predicted = null
+        this.onInputReset()
         this.readPhase(message.phase); this.reportStatus()
         if (this.heartbeat) clearInterval(this.heartbeat)
         this.heartbeat = setInterval(() => this.send({ ...this.envelope('heartbeat') }), 1000)
@@ -117,7 +118,7 @@ export class OnlineSession implements SessionClient {
       }
       if (message.type === 'full') {
         const nextEpoch = Number(message.epoch)
-        if (nextEpoch !== this.epoch) { this.epoch = nextEpoch; this.sequence = 0; this.baselines.clear(); this.inputHistory = []; this.predicted = null }
+        if (nextEpoch !== this.epoch) { this.epoch = nextEpoch; this.sequence = 0; this.baselines.clear(); this.inputHistory = []; this.predicted = null; this.onInputReset() }
         this.readPhase(message.phase)
         this.snapshotSeq = Number(message.snapshotSeq); this.view = message.view as WorldView; this.remember(this.snapshotSeq, this.view); this.onView(this.view)
         this.send({ ...this.envelope('ackSnapshot'), snapshotSeq: this.snapshotSeq })
@@ -133,7 +134,7 @@ export class OnlineSession implements SessionClient {
         const id = String(message.actionId); const pending = this.pending.get(id)
         if (pending) { if (pending.timer) clearTimeout(pending.timer); this.pending.delete(id); pending.resolve(message.result as ActionResult) }
       }
-      if (message.type === 'controlChanged') { this.generation = Number(message.controllerGeneration); this.sequence = 0; this.inputHistory = []; this.predicted = null; this.controlling = message.controlling === true; this.reportStatus(); this.pausePending(); this.replayPending() }
+      if (message.type === 'controlChanged') { const generation = Number(message.controllerGeneration); if (generation !== this.generation) this.onInputReset(); this.generation = generation; this.sequence = 0; this.inputHistory = []; this.predicted = null; this.controlling = message.controlling === true; this.reportStatus(); this.pausePending(); this.replayPending() }
       if (message.type === 'error') {
         const code = String(message.code ?? 'NETWORK')
         if (code === 'MATCH_PAUSED' && this.hostPhase !== 'finished' && this.hostPhase !== 'abandoned') this.readPhase('paused')

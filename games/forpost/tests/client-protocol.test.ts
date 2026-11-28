@@ -1,8 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { createTutorialWorld, viewForPlayer } from '../src/core/index'
+import { createTutorialWorld, resetInputStream, stepWorld, viewForPlayer } from '../src/core/index'
 import { OnlineSession } from '../src/client/transport'
+import { Controls } from '../src/client/controls'
 import type { JoinInfo, ConnectionState } from '../src/client/transport'
-import type { WorldView } from '../src/core/types'
+import type { Input, WorldView } from '../src/core/types'
 
 class Wire {
   static OPEN = 1
@@ -238,5 +239,49 @@ describe('client realtime protocol', () => {
     expect(actions).toHaveLength(2); expect(actions[1]).toEqual(first)
     socket.receive({ type: 'actionAck', actionId: first.actionId, replayed: true, result: { ok: true, code: 'ok' } })
     await expect(pending).resolves.toEqual({ ok: true, code: 'ok' })
+  })
+  it.each(['hello', 'generation', 'epoch'] as const)('resets control input on %s so the real core cannot replay a released fire press', kind => {
+    vi.stubGlobal('window', new EventTarget()); vi.stubGlobal('document', new EventTarget())
+    const controls = new Controls(() => {})
+    try {
+      for (let i = 0; i < 9; i++) { controls.fire(true, 'mouse'); controls.fire(false, 'mouse') }
+      controls.neutral()
+      expect(controls.value.fireHeld).toBe(false); expect(controls.value.firePressSeq).toBe(9)
+      const world = createTutorialWorld(0), unsafe = structuredClone(world)
+      resetInputStream(unsafe, 'learner')
+      stepWorld(unsafe, { learner: { ...controls.value, inputSeq: 1 } })
+      expect(unsafe.units.find(u => u.ownerId === 'learner' && u.kind === 'fighter')!.shotSerial).toBe(1)
+      const reset = vi.fn(() => { controls.neutral(); controls.value.firePressSeq = 0 })
+      session = new OnlineSession(info, async () => info, () => {}, () => {}, reset)
+      const socket = Wire.instances.at(-1)!
+      if (kind !== 'hello') {
+        socket.hello(); reset.mockClear()
+        for (let i = 0; i < 9; i++) { controls.fire(true, 'mouse'); controls.fire(false, 'mouse') }
+        controls.neutral()
+      }
+      if (kind === 'hello') socket.hello()
+      else if (kind === 'generation') socket.receive({ type: 'controlChanged', controllerGeneration: 2, controlling: true })
+      else socket.receive({ type: 'full', epoch: 2, snapshotSeq: 1, phase: 'running', view: viewForPlayer(world, 'learner') })
+      expect(reset).toHaveBeenCalledTimes(1)
+      session.input(controls.value)
+      const transmitted = socket.sent.at(-1)!.payload as Input
+      expect(transmitted).toMatchObject({ moveX: 0, moveZ: 0, fireHeld: false, firePressSeq: 0, toolHeld: false })
+      resetInputStream(world, 'learner'); stepWorld(world, { learner: transmitted })
+      const fighter = world.units.find(u => u.ownerId === 'learner' && u.kind === 'fighter')!
+      expect(fighter.shotSerial).toBe(0); expect(fighter.magazine).toBe(24)
+    } finally { controls.destroy() }
+  })
+  it('preserves the press counter through ordinary pause/resume, errors and same-generation snapshots', () => {
+    const reset = vi.fn()
+    session = new OnlineSession(info, async () => info, () => {}, () => {}, reset)
+    const socket = Wire.instances.at(-1)!, view = viewForPlayer(createTutorialWorld(0), 'learner')
+    socket.hello(); expect(reset).toHaveBeenCalledTimes(1); reset.mockClear()
+    socket.receive({ type: 'phaseChanged', phase: 'paused' })
+    socket.receive({ type: 'error', code: 'MATCH_PAUSED' })
+    socket.receive({ type: 'full', epoch: 1, snapshotSeq: 1, phase: 'paused', view })
+    socket.receive({ type: 'phaseChanged', phase: 'running' })
+    socket.receive({ type: 'delta', epoch: 1, baselineSnapshotSeq: 1, snapshotSeq: 2, phase: 'running', patch: { tick: view.tick + 1 } })
+    socket.receive({ type: 'controlChanged', controllerGeneration: 1, controlling: true })
+    expect(reset).not.toHaveBeenCalled()
   })
 })

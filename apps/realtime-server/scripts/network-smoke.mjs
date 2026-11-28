@@ -82,6 +82,13 @@ async function admitted(ticket) {
 }
 const passed = [];
 const snapshot = message => message.type === 'full' || message.type === 'delta';
+function committedSpend(matchId, participantId) {
+  const database = new Database(resolve(directory, 'realtime.sqlite'), { readonly: true });
+  try {
+    const saved = JSON.parse(database.prepare('SELECT record_json FROM rt_matches WHERE match_id=?').get(matchId).record_json);
+    return JSON.parse(saved.world).participants.find(person => person.id === participantId).statistics.spent;
+  } finally { database.close(); }
+}
 try {
   await start();
   const startRoom = await post('/api/realtime/v1/practice', { mapId: 'FP01', teamSize: 1, displayName: 'QA', botLevel: 'novice', mode: 'training', seed: 9123 });
@@ -164,7 +171,8 @@ try {
   const option = purchaseOptions(purchaseView)[0];
   assert.ok(option, 'a real legal purchase exists before the lost-ACK crash');
   const purchaseId = 'forpost-smoke-purchase-lost-ack', purchasePayload = { type: 'build', padId: option.padId, kind: option.kind };
-  const spentBeforePurchase = purchaseView.participants.find(person => person.id === purchaseView.you).statistics.spent;
+  assert.equal(purchaseView.participants.find(person => person.id === purchaseView.you).statistics, undefined, 'live combat statistics remain private');
+  const spentBeforePurchase = committedSpend(matchId, purchaseView.you);
   // Stop receiving bytes before the request. The writer remains real SQLite;
   // observe its receipt, then destroy the socket without delivering that ACK.
   restored.ws._socket.pause(); restored.send('action', { actionId: purchaseId, payload: purchasePayload });
@@ -187,7 +195,7 @@ try {
   const crashClient = await admitted(crashTicket.body.ticket); assert.ok(crashClient.hello.epoch > previousEpoch);
   const crashFull = await crashClient.wait(message => message.type === 'full');
   assert.equal(crashFull.view.buildOrders.filter(order => order.id === purchaseReceipt.result.entityId).length, 1);
-  assert.equal(crashFull.view.participants.find(person => person.id === crashFull.view.you).statistics.spent, spentBeforePurchase + option.cost);
+  assert.equal(committedSpend(matchId, crashFull.view.you), spentBeforePurchase + option.cost);
   crashClient.send('action', { actionId: purchaseId, payload: purchasePayload });
   const purchaseReplay = await crashClient.wait(message => message.type === 'actionAck' && message.actionId === purchaseId);
   assert.equal(purchaseReplay.replayed, true); assert.deepEqual(purchaseReplay.result, purchaseReceipt.result);

@@ -43,6 +43,10 @@ These are integration, code-review and automated-test findings, **not browser ac
 | D17 | Neutral input during host pause received an error that falsely restored connected status; claim did not resume simulation | Gate input/actions by host phase; resume paused matches using fresh admission | Five added client protocol regressions; 10/10 client protocol tests pass |
 | D18 | Unlisted power consumers appeared in creation order rather than the core default order | Use explicit priority, RULES.powerOrder, createdTick and ID; identify each pad | TypeScript/ESLint; visible interaction pending |
 
+| D19 | A retained fire-press counter looked like a new press after controller input reset | Reset local input only on fresh session/generation/epoch | Real-core regression reproduces the phantom shot and verifies zero shots after reset; ordinary pause/errors preserve the counter |
+| D20 | Releasing a movement finger also released repair held by another finger | Track tool pointer IDs and keyboard ownership independently | Controls EventTarget regressions for own/other pointer, keyboard combination, blur and cancel |
+| D21 | Focus on a button/link blocked movement after using the HUD | Keep movement active while preserving native button/link activation and editable-field shortcuts | Controls keyboard/focus/modifier regressions; physical/browser interaction still pending |
+
 ## Evidence already obtained
 
 - Full `npm run check` passed: 106 files, 1304 passing tests, one intentionally disabled opt-in 72-match test. TypeScript, ESLint, registry and boundary checks passed. Later explicit-target regression passed in the 57-test core suite.
@@ -90,7 +94,7 @@ These are additional technical corrections, not browser rounds. The latest core 
 | A slow/failed durable write could expose an uncommitted tick or final outcome | Maintain a separate committed publication boundary | Four runtime fault-injection tests, including failed writer and drain race |
 | Silent half-open sockets could delay empty pause twice | Count from the actual last-seen heartbeat | Deterministic runtime regression |
 | Temporary human takeover used normal reactions but original strong/novice strategy branches | Use one effective normal profile for all decisions | Two decision regressions fail before the change and pass after |
-| Client stopped recovering after one failed renewal and could lose a finished-game receipt | Retry recoverable admission errors; replay original pending IDs after reconnect/control; suspend timeout during pause | 19 mocked client protocol tests pass; not a browser/WAN claim |
+| Client stopped recovering after one failed renewal and could lose a finished-game receipt | Retry recoverable admission errors; replay original pending IDs after reconnect/control; suspend timeout during pause | 23 mocked client protocol tests pass; not a browser/WAN claim |
 | Docker builder lacked git metadata and the build revision | Pass VCS_REF to IVA_BUILD_SHA in builder stage | Source check; actual container build delegated to repository CI |
 
 See `ACCEPTANCE_MATRIX.md` for all F01–F22 and E01–E16 requirements, and the realtime validation report for actual artifact IDs and the two failed load attempts.
@@ -98,3 +102,17 @@ See `ACCEPTANCE_MATRIX.md` for all F01–F22 and E01–E16 requirements, and the
 ## Browser rounds
 
 None completed. Any future round must record source commit, compiled client hash, server artifact ID, actual environment, UI scenarios, defects and original-scenario retests here before release.
+
+## Repository CI round 1 — automated, not executor browser play
+
+PR [47](https://github.com/decorum-guy/iva-games/pull/47), branch head `03530767e678fe2017b520d14f1b81665345d8ed`, tree `2f0444e6ed83e4faa845e81c3f166dd035ebd191`; GitHub checks built PR merge ref `4a4fde3f38a727f3434ea233ad822487e9b690a4`. Fresh accepted main `1f571a7fa24a5c682a236d5fa0ef5a499f09c24d` is included.
+
+- [Platform run](https://github.com/decorum-guy/iva-games/actions/runs/46157811110): full check passed **1332 tests in 107 files**, one optional series test skipped; TypeScript, ESLint, boundaries, 55 deployment tests and build:all passed. The network-smoke step failed at reading `participant.statistics.spent`: live statistics are deliberately absent. The corrective test uses its own readonly QA SQLite ledger; privacy is not loosened. The corrected smoke subsequently passed locally, awaiting the next CI run. Downstream portal/District checks in this failed job were skipped, not passed.
+- The same platform run's **overdrive-tutorial job passed**. Its [Forpost browser job](https://github.com/decorum-guy/iva-games/actions/runs/46157811110/job/141018214763) completed with **0 passed / 6 failed**. Catalogue navigation, matching build attributes, all three map selections and opening a lesson were reached. Exact label locators for language, building pad and lobby capacity timed out; all three match scenarios stopped before room creation. The mobile test's teardown masked its first timeout. **No match was played to a result.**
+- Corrected selectors use the real combobox role and visible label prefix; mobile settings use the visible Game menu. Playwright now preserves the originating mobile error and limits individual actions to 15 seconds while keeping the full match deadline unchanged. Static checks and discovery of the same six tests passed; original-scenario browser replay is still pending. These are test-harness corrections, not a passing acceptance claim.
+- [Release image run](https://github.com/decorum-guy/iva-games/actions/runs/46157811112): **all three images** (chess/platform/realtime) built and passed isolated runtime/volume verification. Publish and deploy jobs were **skipped** on this PR.
+- [Colossus review](https://github.com/decorum-guy/iva-games/actions/runs/46157811117): rules/server tests, full build and Colossus browser tests passed. This is regression evidence for the existing game, not Forpost acceptance.
+
+## Public catalogue observation
+
+The executor opened `https://iva-games.pro/games` in the cloud browser and waited for the actual catalogue to render. It showed «Пробный стол» and «Район» as playable and «Гавань» as coming soon. There was **no Forpost card**. This was a read-only inspection of the existing public site, not a Forpost game round or a publication of this branch. The visible catalogue did not expose its exact deployed commit; no public Forpost revision is asserted.

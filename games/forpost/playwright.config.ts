@@ -9,7 +9,7 @@ const revision = process.env.IVA_BUILD_SHA ?? execFileSync('git', ['rev-parse', 
 export default defineConfig({
   testDir: './e2e', fullyParallel: false, workers: 3, timeout: 60_000,
   expect: { timeout: 10_000 }, reporter: [['list']],
-  use: { baseURL: origin, headless: true, trace: 'off', video: 'off', screenshot: 'off',
+  use: { baseURL: origin, headless: true, trace: 'off', video: 'off', screenshot: 'off', actionTimeout: 15_000, navigationTimeout: 30_000,
     viewport: { width: 1440, height: 900 },
     launchOptions: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE ? { executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE } : undefined },
   webServer: { command: 'npm run build:forpost && npm run build:realtime && npm run build:portal && npm run build:platform && node scripts/forpost-qa-server.mjs',
