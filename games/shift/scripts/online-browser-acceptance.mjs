@@ -876,16 +876,25 @@ async function closeBrowser() {
   await instance?.close().catch(() => {}); await server.close().catch(() => {}); clearTimeout(timer);
 }
 try {
-  demo = await startShiftDemo({ port, platformEntrypoint: join(buildSnapshot, 'platform/main.js'), portalDirectory: join(buildSnapshot, 'portal') });
   const localBrowser = join(ROOT, '.qa/shift-chromium/chrome-headless-shell-linux64/chrome-headless-shell');
-  const executablePath = process.env.SHIFT_BROWSER_EXECUTABLE || process.env.SHIFT_CHROMIUM_EXECUTABLE || ((await stat(localBrowser).catch(() => null))?.isFile() ? localBrowser : undefined);
-  const browserOptions = { headless: true, ...(executablePath ? { executablePath } : {}), args: ['--no-sandbox', '--disable-dev-shm-usage', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--autoplay-policy=document-user-activation-required'] };
-  report.browserExecutable = executablePath || 'Playwright installed Chromium';
+  const channel = process.env.SHIFT_BROWSER_CHANNEL || undefined;
+  const explicitExecutable = process.env.SHIFT_BROWSER_EXECUTABLE || process.env.SHIFT_CHROMIUM_EXECUTABLE;
+  if (channel) assert.equal(channel, 'chromium', 'SHIFT_BROWSER_CHANNEL supports the bundled full Chromium channel');
+  assert.ok(!(channel && explicitExecutable), 'SHIFT_BROWSER_CHANNEL cannot be combined with an explicit browser executable');
+  const executablePath = explicitExecutable || (!channel && (await stat(localBrowser).catch(() => null))?.isFile() ? localBrowser : undefined);
+  const browserOptions = { headless: true, ...(channel ? { channel } : {}), ...(executablePath ? { executablePath } : {}), args: ['--no-sandbox', '--disable-dev-shm-usage', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--autoplay-policy=document-user-activation-required'] };
+  report.browserChannel = channel || null;
+  report.browserExecutable = executablePath || (channel ? `Playwright channel ${channel}` : 'Playwright default headless shell');
+  demo = await startShiftDemo({ port, platformEntrypoint: join(buildSnapshot, 'platform/main.js'), portalDirectory: join(buildSnapshot, 'portal') });
   const allCases = [2, 3].flatMap(teamSize => ['foundry', 'calibration', 'depot'].map(arena => ({ teamSize, arena })));
   const matrix = selectedCase ? allCases.filter(item => `${item.arena}-${item.teamSize}v${item.teamSize}` === selectedCase) : smoke ? allCases.slice(0, 1) : allCases;
   assert.ok(matrix.length, 'Unknown --case; use e.g. foundry-3v3');
   for (let batch = 0; batch < matrix.length; batch += concurrency) {
     browserServer = await chromium.launchServer(browserOptions); browser = await chromium.connect(browserServer.wsEndpoint()); report.browserVersion = browser.version();
+    report.browserSpawnfile = browserServer.process().spawnfile;
+    report.browserLaunches ??= [];
+    const launch = { channel: report.browserChannel, spawnfile: report.browserSpawnfile, version: report.browserVersion };
+    report.browserLaunches.push(launch); log({ browserLaunch: launch });
     const observedBrowser = browser;
     observedBrowser.on('disconnected', () => {
       report.browserLifecycles ??= [];
