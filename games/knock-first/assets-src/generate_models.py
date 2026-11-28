@@ -18,6 +18,8 @@ import sys
 from pathlib import Path
 
 import bpy
+sys.path.insert(0,str(Path(__file__).resolve().parent))
+from anatomical_glove import make_glove
 from mathutils import Vector, Quaternion, Matrix
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -333,6 +335,7 @@ def export(name, dimensions=None, collider=None, rig=None, notes=None):
                      'triangles': counts, 'bytes': len(result), 'meshPrimitives': sum(len(m['primitives']) for m in data.get('meshes', [])),
                      'dimensionsXYZ': dimensions_measured, 'bodyDimensionsXYZ': dimensions, 'collision': collider,
                      'animations': clips, 'skinCount': len(data.get('skins', [])), 'anchors': [a.name for a in ANCHORS], 'notes': notes or ''}
+    bpy.ops.wm.save_as_mainfile(filepath=str(QA / (name + '-editable.blend')))
     print('EXPORTED', name, json.dumps(RECORDS[name]))
     return mesh
 
@@ -381,7 +384,21 @@ def socket():
 
 def resonator():
     clear()
-    cylinder('Pipe',(0,0,0),(0,2.65,0),.105,'rust',vertices=16)
+    cylinder('Pipe',(0,0,0),(0,2.65,0),.105,'paint',vertices=32)
+    for y in (.58,.65,.72,1.75,1.82,1.89):
+        cylinder('Hazard_wrap',(0,y-.024,0),(0,y+.024,0),.107,'amber' if int(y*100)%2 else 'dark',vertices=32)
+    for y in (.35,1.95):
+        box('Mount_backplate',(0,y,.31),(.33,.24,.025),'paint',.012)
+        for x in (-.12,.12):
+            for offset in (-.075,.075): bolt((x,y+offset,.29),'Z',.013)
+    tube('Pressure_capillary',[(.13,.2,.08),(.19,.3,.08),(.19,2.2,.08),(.11,2.3,.08)],.012,'brass')
+    cylinder('Pressure_gauge_neck',(.13,1.6,0),(.24,1.6,0),.022,'steel',vertices=16)
+    cylinder('Pressure_gauge_case',(.23,1.6,.02),(.23,1.6,-.06),.083,'dark',vertices=24)
+    cylinder('Pressure_gauge_face',(.23,1.6,-.061),(.23,1.6,-.066),.069,'ivory',vertices=24)
+    for i in range(9):
+        a=math.pi*(.15+i*.09)
+        box('Gauge_tick',(.23+math.cos(a)*.05,1.6+math.sin(a)*.05,-.069),(.004,.011,.003),'dark',0)
+    tube('Gauge_needle',[(.23,1.6,-.072),(.20,1.635,-.072)],.002,'dark')
     for y in (.15,.88,2.15,2.50):
         cylinder('Flange',(0,y-.025,0),(0,y+.025,0),.16,'paint',vertices=16)
         for a in range(6):
@@ -392,18 +409,20 @@ def resonator():
     cylinder('Hot_indicator',(-.12,1.56,-.1),(.12,1.56,-.1),.012,material='warm')
     for y in (.35,1.95):
         box('Wall_standoff',(0,y,.19),(.30,.07,.4),'dark',.008)
-    anchor('KnockPoint',(0,1.30,-.145))
+    anchor('KnockPoint',(0,1.30,-.137))
     return export('resonator', collider={'type':'capsule','radius':.16,'height':2.65})
 
 
 def striker():
     clear()
-    cylinder('Striker_grip',(0,0,0),(0,.18,0),.024,'leather')
-    cylinder('Striker_neck',(0,.15,0),(0,.26,0),.017,'brass')
-    ellipsoid('Striker_head',(0,.275,0),(.09,.065,.08),'steel')
-    for y in (.02,.05,.08,.11,.14):
-        ring('Grip_band',(0,y,0),.025,.003,'XZ','rubber')
-    anchor('Grip',(0,.08,0)); anchor('StrikeTip',(0,.31,0))
+    tailored_segment('Striker_grip',(0,0,0),(0,.18,0),[.014,.016,.0155,.015,.0155,.016,.014],'rubber',None)
+    cylinder('Striker_neck',(0,.15,0),(0,.23,0),.017,'brass')
+    cylinder('Striker_head',(0,.245,-.055),(0,.245,.055),.030,'steel',vertices=24)
+    cylinder('Replaceable_strike_face',(0,.245,-.062),(0,.245,-.052),.032,'dark',vertices=24)
+    cylinder('Head_lock',(0,.245,.055),(0,.245,.060),.024,'brass',vertices=24)
+    for y in (.012,.018,.153,.159):
+        ring('Grip_end_groove',(0,y,0),.016,.0007,'XZ','rubber')
+    anchor('Grip',(0,.08,0)); anchor('StrikeTip',(0,.245,-.062)); anchor('StrikeRear',(0,.245,.06))
     return export('striker', collider=None)
 
 
@@ -452,7 +471,7 @@ def cabinet():
 def lift():
     clear()
     # Safe lift is a 10m room in all routes; side pathways remain completely clear.
-    box('Lift_base',(0,-.06,0),(9.92,.12,9.92),'dark',.018)
+    box('Lift_base',(0,-.085,0),(9.92,.12,9.92),'dark',.018)
     for x in (-4.82,4.82):
         for z in (-4.82,4.82):
             box('Column',(x,1.65,z),(.26,3.3,.26),'paint',.025)
@@ -589,6 +608,29 @@ def animate(rig, name, seconds, poses, loop=True, post_pose=None):
     track.mute = True
     action['loop'] = loop
     rig['animation_' + name + '_loop'] = loop
+
+
+def tailored_segment(name, a, b, radii, tile, bone, flatten=1):
+    """Continuous tapered cloth/leather surface with modeled compression folds."""
+    a,b=V(a),V(b); axis=(b-a).normalized()
+    tangent=axis.cross(Vector((0,0,1)))
+    if tangent.length<.01: tangent=axis.cross(Vector((1,0,0)))
+    tangent.normalize(); other=axis.cross(tangent).normalized()
+    verts=[]; faces=[]; sides=20
+    for j,r in enumerate(radii):
+        center=a.lerp(b,j/(len(radii)-1))
+        for k in range(sides):
+            theta=math.tau*k/sides
+            verts.append(center+tangent*(math.cos(theta)*r)+other*(math.sin(theta)*r*flatten))
+    for j in range(len(radii)-1):
+        for k in range(sides):
+            q=j*sides+k;n=j*sides+(k+1)%sides
+            faces.append((q,n,n+sides,q+sides))
+    faces.append(tuple(reversed(range(sides))))
+    faces.append(tuple((len(radii)-1)*sides+k for k in range(sides)))
+    mesh=bpy.data.meshes.new(name);mesh.from_pydata(verts,[],faces);mesh.update()
+    obj=bpy.data.objects.new(name,mesh);bpy.context.collection.objects.link(obj)
+    return finish(obj,tile,bone,0,True)
 
 
 def hand_geometry(wrist, side, prefix, bones, first_person=False, tile='leather'):
@@ -743,40 +785,63 @@ def arms():
         bones[prefix+'_upper_arm']=(shoulder,elbow,'root')
         bones[prefix+'_forearm']=(elbow,wrist,prefix+'_upper_arm')
         bones[prefix+'_hand']=(wrist,(side*.24,-.30,-.63),prefix+'_forearm')
-        cylinder(prefix+'_upper_sleeve',shoulder,elbow,.092,'oilskin',prefix+'_upper_arm',vertices=16,r2=.078)
-        cylinder(prefix+'_forearm_sleeve',elbow,wrist,.078,'oilskin',prefix+'_forearm',vertices=16,r2=.060)
-        ellipsoid(prefix+'_elbow_seam',elbow,(.16,.14,.15),'leather',prefix+'_forearm')
-        cylinder(prefix+'_glove_cuff',(side*.255,-.312,-.443),wrist,.065,'rubber',prefix+'_forearm',vertices=16)
-        hand_geometry(wrist,side,prefix,bones,True)
-        box(prefix+'_wrist_band',(side*.263,-.253,-.432),(.089,.012,.047),'dark',.006,prefix+'_forearm')
-        if side < 0:
-            box('Analog_wrist_meter',(side*.263,-.244,-.432),(.065,.012,.034),'ivory',.005,prefix+'_forearm')
-            box('Meter_needle',(side*.263,-.236,-.432),(.004,.003,.023),'dark',0,prefix+'_forearm')
+        tailored_segment(prefix+'_upper_sleeve',shoulder,elbow,[.065,.068,.063,.065,.059,.061,.055],'blue',prefix+'_upper_arm',.94)
+        tailored_segment(prefix+'_forearm_sleeve',elbow,wrist,[.055,.060,.051,.055,.049,.051,.043,.040],'blue',prefix+'_forearm',.94)
+        ellipsoid(prefix+'_elbow_seam',elbow,(.115,.10,.105),'blue',prefix+'_forearm')
+        cylinder(prefix+'_glove_cuff',(side*.255,-.312,-.443),wrist,.043,'rubber',prefix+'_forearm',vertices=16)
+        make_glove(sys.modules[__name__],wrist,side,prefix,bones)
     rig=skeleton('FirstPerson',bones)
     anchor('Hand_L',bones['left_hand'][0],'left_hand',rig);anchor('Hand_R',bones['right_hand'][0],'right_hand',rig)
+    anchor('ToolGrip_R',(.24,-.335,-.555),'right_hand',rig)
+    anchor('PalmGrip_L',(-.24,-.335,-.555),'left_hand',rig)
+    anchor('PalmGrip_R',(.24,-.335,-.555),'right_hand',rig)
     def pose(u,mode):
-        s=math.sin(math.tau*u); pulse=math.sin(math.pi*u)**2
-        p={}
+        wave=math.sin(math.tau*u);pulse=math.sin(math.pi*u)**2
+        p={'left_upper_arm':{'rotation':[1,0,4]},'left_forearm':{'rotation':[5,0,0]},'left_hand':{'rotation':[2,-5,0]},
+           'right_upper_arm':{'rotation':[4,0,-3]},'right_forearm':{'rotation':[6,0,0]},'right_hand':{'rotation':[28,42,0]}}
+        for finger in ('index','middle','ring','pinky'):
+            grasp={'index':(-44,-65,-42,12),'middle':(-60,-65,-39,4),'ring':(-44,-65,-40,-7),'pinky':(-34,-110,-67,11)}[finger]
+            for suffix,angle in zip(('', '_tip', '_distal'),grasp[:3]):p['right_'+finger+suffix]={'rotation':[angle,0,grasp[3] if not suffix else 0]}
+            relax={'index':(-22,-12,-8),'middle':(-25,-16,-8),'ring':(-29,-19,-10),'pinky':(-32,-22,-12)}[finger]
+            for suffix,angle in zip(('', '_tip', '_distal'),relax):p['left_'+finger+suffix]={'rotation':[angle,0,0]}
+        for prefix in ('left','right'):
+            p[prefix+'_thumb']={'rotation':[-12,-28 if prefix=='right' else 20,-32 if prefix=='right' else 15]}
+            p[prefix+'_thumb_tip']={'rotation':[-20,0,0]};p[prefix+'_thumb_distal']={'rotation':[-20,0,0]}
+        p['right_thumb']={'rotation':[-24,-65,-65]}
+        p['right_thumb_tip']={'rotation':[-39,0,0]};p['right_thumb_distal']={'rotation':[-36,0,0]}
         if mode=='idle':
-            p={'left_upper_arm':{'rotation':[s*.7,0,0]},'right_upper_arm':{'rotation':[s*.7,0,0]}}
+            p['right_upper_arm']['rotation'][0]+=.5*wave;p['left_upper_arm']['rotation'][0]-=.4*wave
         if mode in ('walk','run','crouch'):
-            amp={'walk':2.7,'run':5,'crouch':1.5}[mode]
-            p={'left_upper_arm':{'rotation':[s*amp,0,0]},'right_upper_arm':{'rotation':[-s*amp,0,0]}}
-        if mode=='carry':
-            p={'left_upper_arm':{'rotation':[-5,7,4]},'right_upper_arm':{'rotation':[-5,-7,-4]},
-               'left_forearm':{'rotation':[-10,0,0]},'right_forearm':{'rotation':[-10,0,0]}}
-            for pre in ('left','right'):
-                for finger in ('index','middle','ring','pinky','thumb'):
-                    p[pre+'_'+finger]={'rotation':[46,0,0]};p[pre+'_'+finger+'_tip']={'rotation':[48,0,0]}
+            amp={'walk':1.0,'run':1.65,'crouch':.35}[mode]
+            # Counter-rotation at elbow and delayed wrist response describe a
+            # restrained weighted tool, rather than lifting both arms as a slab.
+            p['left_upper_arm']['rotation']=[1+1.8*amp*wave,.7*amp*math.cos(math.tau*u),4+.9*amp*wave]
+            p['left_forearm']['rotation'][0]+=-1.2*amp*wave+.5*amp*math.sin(math.tau*u-.45)
+            p['left_hand']['rotation'][2]+=.7*amp*math.sin(math.tau*u-.6)
+            p['right_upper_arm']['rotation'][0]-=.8*amp*wave
+            p['right_upper_arm']['rotation'][1]+=.4*amp*math.cos(math.tau*u)
+            p['right_forearm']['rotation'][0]+=.6*amp*wave
+            p['right_hand']['rotation'][0]+=.45*amp*math.sin(math.tau*u-.6)
+            p['right_hand']['rotation'][2]+=.4*amp*math.cos(math.tau*u-.6)
         if mode=='knock':
-            p={'right_upper_arm':{'rotation':[-17*pulse,4*pulse,-10*pulse]},'right_forearm':{'rotation':[34*pulse,0,0]},'right_hand':{'rotation':[-10*pulse,0,0]}}
-            for finger in ('index','middle','ring','pinky','thumb'):
-                p['right_'+finger]={'rotation':[65,0,0]};p['right_'+finger+'_tip']={'rotation':[60,0,0]}
+            # Starts and ends in the equipped idle pose. The old clip reset the
+            # wrist twist and opened the grip at time zero, producing a snap.
+            windup=math.sin(math.pi*min(u/.42,1)) if u<.42 else 0
+            strike=math.sin(math.pi*min(max((u-.42)/.58,0),1))
+            p['right_upper_arm']['rotation'][0]+=9*windup-7*strike
+            p['right_forearm']['rotation'][0]+=-8*windup+15*strike
+            p['right_hand']['rotation'][0]+=-5*strike
+        if mode=='carry':
+            for prefix in ('left','right'):
+                p[prefix+'_hand']={'rotation':[0,0,0]}
+                for finger in ('index','middle','ring','pinky'):
+                    for suffix,angle in [('',-60),('_tip',-65),('_distal',-40)]:p[prefix+'_'+finger+suffix]={'rotation':[angle,0,0]}
+                p[prefix+'_thumb']={'rotation':[-12,-28 if prefix=='right' else 28,-32 if prefix=='right' else 32]}
         if mode=='revive':
-            p={'left_upper_arm':{'rotation':[-12+s*1.5,0,-8]},'right_upper_arm':{'rotation':[-12-s*1.5,0,8]},
-               'left_hand':{'rotation':[12,0,0]},'right_hand':{'rotation':[12,0,0]}}
+            p['left_upper_arm']={'rotation':[12+wave,0,-8]};p['right_upper_arm']={'rotation':[12-wave,0,8]}
+            p['left_hand']={'rotation':[12,0,0]};p['right_hand']={'rotation':[12,0,0]}
         if mode=='down':
-            p={'left_upper_arm':{'rotation':[15,0,-14]},'right_upper_arm':{'rotation':[15,0,14]},'left_forearm':{'rotation':[-12,0,0]},'right_forearm':{'rotation':[-12,0,0]}}
+            p['left_upper_arm']={'rotation':[15,0,-14]};p['right_upper_arm']={'rotation':[15,0,14]}
         return p
     for name,seconds,loop in [('idle',2.4,True),('walk',1.05,True),('run',.7,True),('crouch',1.5,True),('carry',1.4,True),('knock',.5,False),('revive',2.0,True),('down',2.1,True)]:
         animate(rig,name,seconds,lambda u,n=name:pose(u,n),loop)

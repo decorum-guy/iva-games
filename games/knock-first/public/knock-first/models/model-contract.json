@@ -80,11 +80,11 @@
     "units": "metres",
     "up": "+Y",
     "forward": "-Z",
-    "triangles": 7132,
-    "bytes": 246268,
+    "triangles": 12532,
+    "bytes": 451280,
     "meshPrimitives": 2,
     "dimensionsXYZ": [
-      0.32,
+      0.478,
       2.65,
       0.55
     ],
@@ -106,13 +106,13 @@
     "units": "metres",
     "up": "+Y",
     "forward": "-Z",
-    "triangles": 2488,
-    "bytes": 62912,
+    "triangles": 2804,
+    "bytes": 80304,
     "meshPrimitives": 1,
     "dimensionsXYZ": [
-      0.09,
-      0.3075,
-      0.08
+      0.064,
+      0.277,
+      0.122
     ],
     "bodyDimensionsXYZ": null,
     "collision": null,
@@ -120,7 +120,8 @@
     "skinCount": 0,
     "anchors": [
       "Grip",
-      "StrikeTip"
+      "StrikeTip",
+      "StrikeRear"
     ],
     "notes": ""
   },
@@ -222,7 +223,7 @@
     "meshPrimitives": 2,
     "dimensionsXYZ": [
       9.94,
-      3.42,
+      3.445,
       9.955
     ],
     "bodyDimensionsXYZ": [
@@ -288,13 +289,13 @@
     "units": "metres",
     "up": "+Y",
     "forward": "-Z",
-    "triangles": 9376,
-    "bytes": 652116,
-    "meshPrimitives": 1,
+    "triangles": 33536,
+    "bytes": 1346972,
+    "meshPrimitives": 3,
     "dimensionsXYZ": [
-      0.92,
-      0.27155,
-      0.82255
+      0.875,
+      0.22085,
+      0.8369
     ],
     "bodyDimensionsXYZ": null,
     "collision": null,
@@ -311,7 +312,10 @@
     "skinCount": 1,
     "anchors": [
       "Hand_L",
-      "Hand_R"
+      "Hand_R",
+      "ToolGrip_R",
+      "PalmGrip_L",
+      "PalmGrip_R"
     ],
     "notes": "Camera-local origin, forward -Z. Rig shoulder/elbow/wrist chains support per-frame IK to the server-defined handle anchor; use idle/carry animation for fingers and override arm chain only."
   },
