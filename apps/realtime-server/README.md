@@ -152,13 +152,25 @@ other physical tests. The fifth used an agreed pause in those tests; it does
 not establish exclusive CPU allocation on the executor. It maintained 60 Hz
 without overload, but the step-p99/headroom gate remained open.
 
-The next proposed calibration is one room, first six human protocol clients,
-then one human and five actual bots, on the same frozen candidate in a window
-without browser/physics workloads. This is a plan, not an accepted one-room
-capacity. [The capacity review](qa/CAPACITY_REVIEW.md) records the five results,
-the snapshot-cadence inspection, the difference between event-loop activity and
-physical CPU headroom, and exact sequential 60-second/hour commands. A passing
-short probe must precede the full hour and the separate maximum-scene repeat.
+Two one-room probes subsequently ran on commit
+`848c626481a8ada589fb7e3d742af1f47d028e73`, each with ten seconds of warmup and
+60 measured seconds. All runtime threads used verified affinity to CPUs 0–1;
+the generator used CPUs 2–8, with no concurrent local browser/physics workload.
+Against the explicit 1 GiB memory reference, six human clients passed the short
+gates: step p99 upper bound 7 ms, commit p99 20 ms, peak RSS 675.578 MiB and
+maximum process CPU fraction of the two-core budget 43.180%. One human plus
+five real bots failed step p99: its whole-window bucket was **(16.667, 20] ms**,
+above the strict 8.333 ms limit. Commit p99 was 25 ms, peak RSS 559.961 MiB and
+maximum CPU fraction 33.755%. Both completed with no overload, rate-limit,
+protocol or queue-overflow errors, and both child runtimes drained with exit 0.
+
+**One-room capacity is not accepted.** The cause of the bots' step-p99 failure
+is not established by these measurements. Heavy-scene and hour runs were not
+started after that failure. [The capacity review](qa/CAPACITY_REVIEW.md) records
+the exact artifact/manifests, both reports, historical results, resource limits
+and the next sequential commands. Affinity does not reserve host CPU or measure
+the production VPS. Another frozen candidate must pass its short probes before
+the full hour and maximum-scene repetition.
 
 The QA-only `qa/heavy-seed.ts` and `scripts/vite.realtime-heavy.config.ts`
 prepare one-room `--scene ferry` or `--scene lift` fixtures for the same compiled
@@ -192,13 +204,38 @@ the current CI run. A denied netem capability fails the job; it is not skipped.
 `scripts/realtime-network.mjs --mode loopback` is a local functional preflight
 of the two-client protocol, ordinary crate approach, actual unpack, application
 ACK-loss retry and reconnection. It explicitly reports `netemExecuted:false`
-and `matrixComplete:false`. An earlier local preflight passed. Real netem has
-also executed in CI, with the partial result recorded below; the complete
-matrix has not passed.
+and `matrixComplete:false`. An earlier local preflight passed. Real netem
+subsequently passed the complete matrix on commit `848c626`, as recorded below;
+the local preflight itself remains a non-netem result.
 
 ### Recorded CI evidence
 
-For commit `b7ab9ed4265b819299d082e21a6a3957ba1d07de`, the
+For commit `848c626481a8ada589fb7e3d742af1f47d028e73`, the
+[TCP impairment job 141078691148](https://github.com/decorum-guy/iva-games/actions/runs/46177267482/job/141078691148)
+passed all **24/24** requested RTT/jitter/loss profiles and actual 100% TCP-loss
+intervals of 1, 5 and 15 seconds. The completed log records real qdisc drops,
+reconnection to the same match, one ordinary unpacked physical item, a 6 kg
+crate-mass decrease and the same durable receipt after ACK-loss retries and
+outages. Sampled clients reported no protocol errors. Its runtime
+`949ee96dc027b6042b45a9a55e948b65430c0bfac7de179dc5be9defcc431952` and client
+`65bc616c33132399fd7a52f4d34d670e1c272775b1a3d3e78558a52a0ee3bc47`
+hashes exactly match the local one-room probes. Requested impairment settings
+are distinct from observed heartbeat RTT; these protocol checks do not accept
+rendered/mobile gameplay or hour-long capacity.
+
+The same commit's
+[release-image run 46177267552](https://github.com/decorum-guy/iva-games/actions/runs/46177267552)
+passed [realtime](https://github.com/decorum-guy/iva-games/actions/runs/46177267552/job/141078691614),
+[platform](https://github.com/decorum-guy/iva-games/actions/runs/46177267552/job/141078691916)
+and [chess](https://github.com/decorum-guy/iva-games/actions/runs/46177267552/job/141078691894).
+Realtime image
+`sha256:3c5a4907ede96897df5c8942f30a22ca36eace22162ce33325508523f5c222cf`
+passed the initial and restored-container real-Rapier checks. Publish and deploy
+were skipped. Host preparation and public Tyaga availability remain unverified.
+The inspected logs and parsed network summary are retained locally under
+`.qa/tyaga/ci/*848c626*`.
+
+For the earlier commit `b7ab9ed4265b819299d082e21a6a3957ba1d07de`, the
 [release-image workflow](https://github.com/decorum-guy/iva-games/actions/runs/46169113385)
 passed all three image jobs. The
 [realtime job](https://github.com/decorum-guy/iva-games/actions/runs/46169113385/job/141053233365)
@@ -221,10 +258,11 @@ original run does not establish the precise admission failure cause.
 
 Source review found that the test could reconnect before the previous TCP close
 arrived, receive correct observer admission, and then wait without issuing
-`claimControl`. The next harness explicitly requests that same-player transfer,
+`claimControl`. The subsequent harness explicitly requests that same-player transfer,
 records its attempts and terminal client state, and coalesces ACKs like the
-production client. Those changes are **not accepted by the failed run**; they
-require another real CI matrix. Product observer admission is unchanged.
+production client. The failed run does not establish its exact cause; the
+later `848c626` matrix above validates the revised harness on a new real run.
+Product observer admission is unchanged.
 
 `npx vitest run --project realtime --project platform --project session-kit` exercises actual HTTP/WebSocket connections, one-use and tamper-proof tickets, membership/Origin/CSRF, duplicate starts/actions, competing controllers, stale input, bot takeover, pause/expiry, checkpoint rollback, SQLite journal recovery, receipt survival across recovery epochs, disk-write refusal, view deltas and the existing platform/session contracts.
 

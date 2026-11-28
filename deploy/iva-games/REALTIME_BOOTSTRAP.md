@@ -38,7 +38,29 @@ that account to run a shell or install these files.
 
 ## Recorded CI image and network results
 
-Commit `b7ab9ed4265b819299d082e21a6a3957ba1d07de` passed all three image jobs in
+Commit `848c626481a8ada589fb7e3d742af1f47d028e73` passed all three image jobs in
+[release-image run 46177267552](https://github.com/decorum-guy/iva-games/actions/runs/46177267552):
+[realtime](https://github.com/decorum-guy/iva-games/actions/runs/46177267552/job/141078691614),
+[platform](https://github.com/decorum-guy/iva-games/actions/runs/46177267552/job/141078691916)
+and [chess](https://github.com/decorum-guy/iva-games/actions/runs/46177267552/job/141078691894).
+The realtime image is
+`sha256:3c5a4907ede96897df5c8942f30a22ca36eace22162ce33325508523f5c222cf`.
+Its actual initial and restored-container real-Rapier checks passed. Publish
+and deploy were skipped; this did not install or enable realtime on the host.
+
+The same commit's [TCP impairment job 141078691148](https://github.com/decorum-guy/iva-games/actions/runs/46177267482/job/141078691148)
+passed all 24 requested RTT/jitter/loss profiles and real 100% TCP-loss intervals
+of 1, 5 and 15 seconds. The completed log records restoration to the same match,
+one ordinarily unpacked physical item, a 6 kg crate-mass decrease and the same
+durable receipt after lost application ACKs and outages. The runtime artifact
+`949ee96dc027b6042b45a9a55e948b65430c0bfac7de179dc5be9defcc431952`
+and client hash
+`65bc616c33132399fd7a52f4d34d670e1c272775b1a3d3e78558a52a0ee3bc47`
+match the local R05 one-room probes. These are protocol and container results;
+they do not accept rendered gameplay, local/VPS capacity or public delivery.
+The inspected logs and parsed summary remain in `.qa/tyaga/ci/*848c626*`.
+
+For history, commit `b7ab9ed4265b819299d082e21a6a3957ba1d07de` passed all three image jobs in
 [release-image run 46169113385](https://github.com/decorum-guy/iva-games/actions/runs/46169113385).
 The [realtime job 141053233365](https://github.com/decorum-guy/iva-games/actions/runs/46169113385/job/141053233365)
 built `sha256:fa9b971cc71483db2a80dac7c33abbd784c6ed543d49cdf59b95cda60e9dcd5f`.
@@ -52,13 +74,24 @@ public Tyaga revision follows from these CI successes.
 
 The same commit's [real TCP impairment job 141053233494](https://github.com/decorum-guy/iva-games/actions/runs/46169113462/job/141053233494)
 passed 14 matrix profiles, then failed to obtain a controlling connection for
-nominal RTT 160 ms, jitter 0 ms, loss 5%. Full-matrix and blackhole acceptance
-remain open. Source review found a possible harness race: a replacement socket
+nominal RTT 160 ms, jitter 0 ms, loss 5%. That run did not reach the blackholes.
+Source review found a possible harness race: a replacement socket
 can correctly enter as an observer before the previous close reaches the server.
-The next source explicitly claims control for that isolated same-player test
+The subsequent source explicitly claims control for that isolated same-player test
 client, coalesces ACKs, and records terminal scope/claim evidence. The old failure
-lacked that terminal evidence; its exact cause and the new fix's effectiveness
-require the next real CI run. No production takeover rule was loosened.
+lacked that terminal evidence, so its exact cause remains unconfirmed. The
+later `848c626` run above passed with the revised harness. No production takeover
+rule was loosened.
+
+Local capacity remains **unaccepted**. On frozen `848c626`, one-room 60-second
+probes used verified runtime CPU affinity 0–1, a disjoint generator on 2–8 and
+an explicit 1 GiB reference. Six human clients passed the short gates (step p99
+upper 7 ms); one human plus five bots failed step p99 (bucket (16.667, 20] ms,
+required below 8.333 ms). Both runtimes drained cleanly; no heavy or hour run
+was started after that failure. Its cause is not established by the reports.
+See [the capacity review](../../apps/realtime-server/qa/CAPACITY_REVIEW.md) for
+the exact evidence and remaining gates. The production allocation and measured
+capacity are unknown, and the access/bootstrap boundary above is unchanged.
 
 ## Changes installed once by an administrator
 
@@ -142,7 +175,8 @@ provisioner and deliberately refuses an existing `release.env`.
    The placeholder cannot be used to start realtime. The normal, reviewed
    three-image release overrides it with a verified immutable digest.
    `REALTIME_MAX_MATCHES=2` is the source example, not a measured VPS capacity.
-   The existing two-room calibrations did not meet all acceptance gates. Choose
+   The existing two-room calibrations and the subsequent one-room bots probe
+   did not meet all acceptance gates. Choose
    the actual limit only after the corresponding hour and maximum-scene tests
    on the deployment allocation; a smaller declared capacity is valid only when
    it is measured as well.

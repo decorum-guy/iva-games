@@ -166,8 +166,8 @@
     {
       "file": "games/tyaga/src/core/config.ts",
       "bytes": 6057,
-      "sha256": "3306a7838c46b889e47179f06a8b37778f2949e56462d104640ce7cc6e653e5c",
-      "gitBlobSha1": "35850e1704c69ca5075695a2340eb0c4ed5e2961"
+      "sha256": "a50750992787c091df0c35ac4f55ce78b01434b4a8874de7949e8c04a7c0ce79",
+      "gitBlobSha1": "22ad1a5c89ea85a6838086cbd8bad3e589d52383"
     },
     {
       "file": "games/tyaga/src/core/types.ts",

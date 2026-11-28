@@ -4,7 +4,7 @@ export const CONTENT_VERSION = 'tyaga-expedition@4';
 export const DT = 1 / 60;
 export const PHYSICS_VERSION = 'rapier3d-compat@0.21.0';
 export const SERIALIZER_VERSION = 1;
-export const BOT_VERSION = 'tyaga-bots@2';
+export const BOT_VERSION = 'tyaga-bots@3';
 export const NEUTRAL_INPUT: TyagaInput = { moveX: 0, moveZ: 0, run: false, throttle: 0, steer: 0, brake: false, tool: 0 };
 export const PHYSICS = {
   gravity: 9.81, characterMass: 80, characterHeight: 1.75, characterRadius: .3,

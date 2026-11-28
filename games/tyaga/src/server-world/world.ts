@@ -11,7 +11,7 @@ import { chooseBotAction } from '../bots';
 import { advanceTutorial, tutorialView } from '../tutorial';
 import { bridgeMountParts, deckParts } from './compound';
 
-export const PHYSICS_BUILD_HASH = 'rapier3d-0.21.0:17cfa80eebd8de0291b948496dbffba724b98b489687f8272ca236a7bbf1dd4b:tyaga-solver-12-4-rope64-v9';
+export const PHYSICS_BUILD_HASH = 'rapier3d-0.21.0:17cfa80eebd8de0291b948496dbffba724b98b489687f8272ca236a7bbf1dd4b:tyaga-solver-12-4-rope64-v10';
 let initialization: Promise<void> | undefined;
 export function initializePhysics(): Promise<void> { return initialization ??= RAPIER.init().then(()=>{if(RAPIER.version()!=='0.21.0')throw new Error(`INCOMPATIBLE_RAPIER_RUNTIME:${RAPIER.version()}`);}); }
 export class TyagaWorld {
@@ -308,7 +308,7 @@ export class TyagaWorld {
   setInput(participantId:string,input:TyagaInput):void{this.inputs[participantId]=normalizeInput(input);}
   setControllers(controllers:ControllerState[]):void{
     for(const incoming of controllers){const c=this.state.characters[incoming.participantId];if(!c)continue;const previous=c.controller;
-      if(previous.kind!==incoming.kind||previous.controllerGeneration!==incoming.controllerGeneration){this.inputs[incoming.participantId]={...NEUTRAL_INPUT};if(incoming.kind==='bot')c.task={kind:'follow',status:'following',failures:0,failedAt:0};this.emit('controller',c.bodyId,incoming.participantId);}
+      if(previous.kind!==incoming.kind||previous.controllerGeneration!==incoming.controllerGeneration){this.inputs[incoming.participantId]={...NEUTRAL_INPUT};delete c.botMemory.input;if(incoming.kind==='bot')c.task={kind:'follow',status:'following',failures:0,failedAt:0};this.emit('controller',c.bodyId,incoming.participantId);}
       c.controller={...incoming};
     }
     if(this.state.vote&&this.controllerFingerprint()!==this.state.vote.controllerFingerprint)this.cancelVote('CONTROLLERS_CHANGED');
@@ -327,7 +327,11 @@ export class TyagaWorld {
     if(this.state.vote){this.state.vote.remaining-=DT;if(this.state.vote.remaining<=0)this.cancelVote('TIMEOUT');return;}
     if(!context)this.state.elapsedSeconds+=DT;
     for(const c of Object.values(this.state.characters))if(c.controller.kind==='bot'){
-      if(this.state.tick%6!==0&&c.botMemory.input){this.inputs[c.participant.participantId]={...c.botMemory.input};continue;}
+      // Every seat still decides at 10 Hz. Fixed phases distribute public
+      // view construction and planning across the six 60 Hz physics steps.
+      // A new controller waits neutrally for its own first phase; it never
+      // reuses a command from the previous controller generation.
+      if(this.state.tick%6!==c.participant.seatIndex%6){this.inputs[c.participant.participantId]={...(c.botMemory.input??NEUTRAL_INPUT)};continue;}
       const decision=chooseBotAction(this.view(c.participant.participantId),c.botMemory,this.state.worldTime);
       c.botMemory.input={...decision.input};
       if(decision.status&&c.task)c.task.status=decision.status;if(decision.message)this.emit('bot-report',c.task?.targetId,c.participant.participantId,undefined,decision.message);

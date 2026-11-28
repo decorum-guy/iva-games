@@ -1,13 +1,15 @@
-# Capacity evidence and the next one-room measurement
+# Capacity evidence and remaining acceptance
 
-Status: preparation only. No one-room calibration, one-hour run, or retained
-heavy-scene run described below has executed. The current browser candidate
-must remain unchanged until its acceptance closes. The next measurements use
-one subsequently frozen runtime/client artifact and no concurrent browser or
-physics test workload.
+Status: **capacity not accepted**. Two one-room 60-second probes ran on frozen
+commit `848c626481a8ada589fb7e3d742af1f47d028e73`: six humans passed the short
+gates; one human plus five bots failed step p99. No hour or retained heavy-scene
+run was started. The delay's cause is not established by these measurements.
+Further measurements await a new compiled freeze and must not overlap browser
+or other physics workloads.
 
-This review uses the recorded [five calibrations](load-calibrations.json), the
-runtime and harness source, and read-only resource inspection. It is not a VPS
+This review uses the recorded [five historical calibrations](load-calibrations.json),
+the two local R05 reports identified below, runtime/harness source and read-only
+resource inspection. It is not a VPS
 measurement. The requirements remain [REALTIME_PLATFORM §13 and §16](../../../docs/game-design/REALTIME_PLATFORM.md):
 step p99 strictly below half the fixed step interval, commit p99 at most 50 ms,
 30% compute headroom, 25% memory headroom, no overflowing queues, one hour at the
@@ -15,7 +17,7 @@ declared capacity, and a repeat with simultaneous heavy work.
 
 ## What the existing measurements establish
 
-Every recorded run used two rooms and twelve independent human protocol
+Each of the first five recorded runs used two rooms and twelve independent human protocol
 clients, with ten seconds of warmup. None passed the complete local gate.
 
 | Run | Measured seconds | Step p99 upper bound, ms | Commit p99 upper bound, ms | Peak server RSS, MiB | Maximum worker ELU | Maximum gateway ELU | Overload observed |
@@ -45,12 +47,64 @@ in seven of twelve samples. This supports queue/work pressure as an explanation;
 it does not identify a deterministic pacing defect or a particular CPU hot
 function. No pacing or histogram change follows from these data.
 
+## R05 one-room preflight: completed, capacity still open
+
+Frozen build `848c626481a8-74f5e12d10f0` has aggregate SHA-256
+`74f5e12d10f0c96d670258a2cac56e7715747dcae6114911164c0129aca4423c`.
+Before launch, all 325 served/compiled files and their exact file sets matched
+`.qa/tyaga/R05-build-frozen.json`. Both fresh isolated runs used the unmodified
+compiled output, Ridge, ten seconds of warmup, ordinary 30 Hz human inputs and
+durable appearance actions. No renderer or separate local physics test ran
+concurrently. All nine runtime threads were checked on CPUs 0–1 and all seven
+generator threads on CPUs 2–8; neither mask is an exclusive host reservation.
+
+| Profile | Measured seconds / steps | Whole-window step p99 upper, ms | Commit p99 upper, ms | Peak RSS, MiB | Maximum process CPU / two-CPU budget | Maximum worker / gateway ELU | Short result |
+| --- | --- | ---: | ---: | ---: | ---: | --- | --- |
+| Six human clients | 60.019 / 3601 | 7 | 20 | 675.578 | 43.180% | 63.067% / 28.384% | PASS |
+| One human, five bots | 60.013 / 3602 | 20 | 25 | 559.961 | 33.755% | 50.243% / 9.845% | FAIL: step p99 |
+
+The bots' whole-window p99 is in **(16.667, 20] ms**, which fails the unchanged
+strict limit of 8.333333333333334 ms. Its separate last-2,048-step sample has
+exact p99 24.651636 ms, and its process-lifetime maximum is 82.915538 ms; these
+are different windows, not interchangeable quantiles. This run does not
+separate bot planning, physics, allocation/GC or scheduling costs, so no cause
+is assigned. Lower aggregate CPU use does not cancel a failed tail-latency gate.
+
+Both probes reported zero protocol/rate-limit/queue-overflow errors, no overload
+frames and four durable action acknowledgements per human client. Human
+controllers physically moved; the harness does not record individual bot
+travel as a separate acceptance assertion. Both child runtimes drained with
+exit 0. The bots harness returned 1 for the metric failure, not a server crash.
+Published-world-age p99 bounds were 30/25 ms (humans/bots); uncommitted-age p99
+bounds were 50/100 ms. Over the sampled final approximately 55 seconds, sent
+full/delta rates were 19.552/18.967 Hz per connected human. These rates exclude
+the first five measured seconds and do not measure browser rendering.
+
+Actual server health and match-start manifests, identical across both runs:
+
+- Runtime: `tyaga-runtime@1:949ee96dc027b6042b45a9a55e948b65430c0bfac7de179dc5be9defcc431952`.
+- Client: `65bc616c33132399fd7a52f4d34d670e1c272775b1a3d3e78558a52a0ee3bc47`.
+- Physics: `rapier3d-0.21.0:17cfa80eebd8de0291b948496dbffba724b98b489687f8272ca236a7bbf1dd4b:tyaga-solver-12-4-rope64-v9`.
+- Rules `tyaga@0.1`, content `tyaga-expedition@4`, bots `tyaga-bots@2`, serializer `tyaga-world@1`, protocol `iva-realtime@1`; 60 Hz step / 20 Hz snapshot configuration.
+
+Local evidence is preserved in `.qa/realtime-load/r05-n1-preflight-summary.json`,
+`r05-preflight-artifact.json`, and the `r05-n1-humans-60` / `r05-n1-bots-60`
+directories beneath `.qa/realtime-load/` (reports, configuration, five-second
+samples and runtime logs). No old result or database was replaced.
+
+The same commit's [actual CI netem job](https://github.com/decorum-guy/iva-games/actions/runs/46177267482/job/141078691148)
+passed 24/24 impairment profiles and 1/5/15-second 100% loss intervals, with
+matching runtime/client hashes. Its [three-image workflow](https://github.com/decorum-guy/iva-games/actions/runs/46177267552)
+also passed. Those independent results do not resolve the local bots-p99
+failure or substitute for the unexecuted hour/heavy repeat. See the
+[runtime README](../README.md#recorded-ci-evidence) for exact image/log evidence.
+
 ## Resource reference and limits of the local gate
 
 `cpuHeadroom30Percent` in the five historical reports is an **event-loop
 utilization** check: the maximum measured five-second activity fraction of
 either gateway or simulation worker must be at most 70%. ELU is not a physical
-CPU allocation or a measurement of spare host CPU. The next harness names this
+CPU allocation or a measurement of spare host CPU. The current harness names this
 check `eventLoopHeadroom30Percent` and separately records process CPU
 microseconds and `cpuCoreEquivalents`, including the runtime's threads.
 Load-generator memory/CPU is separate and also recorded.
@@ -63,7 +117,7 @@ are therefore **unknown**. The examples below use `--memory-mib 1024`, the same
 explicit 1 GiB reference as the previous probes. Its RSS threshold is 768 MiB;
 the option does not impose a container limit or claim that 1 GiB was allocated.
 
-The next probe declares **two logical CPUs for the runtime**, with
+The R05 probes declared **two logical CPUs for the runtime**, with
 `--server-cpus 0,1`. The harness launches only its own child through `taskset`,
 verifies its actual process/thread masks at startup and every sample, and
 requires the load generator to use disjoint CPUs. Its separate
@@ -73,8 +127,8 @@ requires the load generator to use disjoint CPUs. Its separate
 
 Without an explicit verified CPU budget that check does not pass. The commands
 pin the generator to CPUs 2–8; all masks and CPU samples are recorded. An actual
-small Node child and worker have confirmed inherited affinity in a focused
-test; the Rapier workload on that budget is still unmeasured.
+small Node child and worker confirmed inherited affinity in a focused test;
+the two real-Rapier probes above then verified it for all runtime threads.
 
 A passing local report can establish consumption relative to this explicit
 two-CPU affinity budget and the recorded memory reference. It does not reserve
@@ -122,17 +176,18 @@ be repaired and recalibrated; it cannot be counted as a passed heavy repeat.
 
 ## Commands after the new candidate is frozen
 
-Run these sequentially from the repository root, after the active renderers
+These are future commands, not authorization to rerun after the recorded
+failure. Run them sequentially from the repository root, after the active renderers
 and other physics tests have exited. The root agent must first identify the
-new runtime/client artifact. Do not run them against the old R04 output merely
+new runtime/client artifact. Do not run them against an old R04/R05 output merely
 because its files exist. Keep that candidate unchanged for the entire series;
 `configuration.json` records worker/client manifests and entry hashes.
 
 Start with two short probes, each with ten additional seconds of warmup:
 
 ```bash
-taskset -c 2-8 node scripts/realtime-load.mjs --server-cpus 0,1 --seconds 60 --rooms 1 --profile humans --scene normal --map ridge --memory-mib 1024 --output .qa/realtime-load/r05-n1-humans-60
-taskset -c 2-8 node scripts/realtime-load.mjs --server-cpus 0,1 --seconds 60 --rooms 1 --profile bots --scene normal --map ridge --memory-mib 1024 --output .qa/realtime-load/r05-n1-bots-60
+taskset -c 2-8 node scripts/realtime-load.mjs --server-cpus 0,1 --seconds 60 --rooms 1 --profile humans --scene normal --map ridge --memory-mib 1024 --output .qa/realtime-load/next-n1-humans-60
+taskset -c 2-8 node scripts/realtime-load.mjs --server-cpus 0,1 --seconds 60 --rooms 1 --profile bots --scene normal --map ridge --memory-mib 1024 --output .qa/realtime-load/next-n1-bots-60
 ```
 
 `humans` means six authenticated independent controllers; `bots` means one
@@ -142,13 +197,14 @@ Do not lower physics frequency, disable bots, relax thresholds, or accept two
 rooms from these one-room results. Other normal maps can be selected explicitly
 with `--map valley` or `--map quarry` when checking which scene is limiting.
 
-Run the one-hour probe using the profile selected from the measured short
+After both normal and heavy short probes pass, run the one-hour probe on the
+final accepted candidate using the profile selected from the measured short
 results. The following is the six-human command; use `--profile bots` and a
 new output directory if bots are the limiting profile. If neither dominates,
 record separate hour runs instead of claiming an unmeasured combined bound.
 
 ```bash
-taskset -c 2-8 node scripts/realtime-load.mjs --server-cpus 0,1 --seconds 3600 --rooms 1 --profile humans --scene normal --map ridge --memory-mib 1024 --output .qa/realtime-load/r05-n1-humans-hour
+taskset -c 2-8 node scripts/realtime-load.mjs --server-cpus 0,1 --seconds 3600 --rooms 1 --profile humans --scene normal --map ridge --memory-mib 1024 --output .qa/realtime-load/next-n1-humans-hour
 ```
 
 Compile the separate fixture preparation module from the **same frozen game
@@ -158,16 +214,16 @@ the actual worker's game/rules/content/physics/runtime artifact.
 
 ```bash
 npx vite build --config scripts/vite.realtime-heavy.config.ts
-taskset -c 2-8 node scripts/realtime-load.mjs --server-cpus 0,1 --seconds 60 --rooms 1 --profile humans --scene ferry --memory-mib 1024 --output .qa/realtime-load/r05-n1-ferry-60
-taskset -c 2-8 node scripts/realtime-load.mjs --server-cpus 0,1 --seconds 60 --rooms 1 --profile humans --scene lift --memory-mib 1024 --output .qa/realtime-load/r05-n1-lift-60
+taskset -c 2-8 node scripts/realtime-load.mjs --server-cpus 0,1 --seconds 60 --rooms 1 --profile humans --scene ferry --memory-mib 1024 --output .qa/realtime-load/next-n1-ferry-60
+taskset -c 2-8 node scripts/realtime-load.mjs --server-cpus 0,1 --seconds 60 --rooms 1 --profile humans --scene lift --memory-mib 1024 --output .qa/realtime-load/next-n1-lift-60
 ```
 
 Only a stable, correctly loaded short scene proceeds to its hour repeat. Both
 different mechanisms remain in scope; one room cannot contain both maps.
 
 ```bash
-taskset -c 2-8 node scripts/realtime-load.mjs --server-cpus 0,1 --seconds 3600 --rooms 1 --profile humans --scene ferry --memory-mib 1024 --output .qa/realtime-load/r05-n1-ferry-hour
-taskset -c 2-8 node scripts/realtime-load.mjs --server-cpus 0,1 --seconds 3600 --rooms 1 --profile humans --scene lift --memory-mib 1024 --output .qa/realtime-load/r05-n1-lift-hour
+taskset -c 2-8 node scripts/realtime-load.mjs --server-cpus 0,1 --seconds 3600 --rooms 1 --profile humans --scene ferry --memory-mib 1024 --output .qa/realtime-load/next-n1-ferry-hour
+taskset -c 2-8 node scripts/realtime-load.mjs --server-cpus 0,1 --seconds 3600 --rooms 1 --profile humans --scene lift --memory-mib 1024 --output .qa/realtime-load/next-n1-lift-hour
 ```
 
 Every output directory must be new; the harness refuses to overwrite saved
