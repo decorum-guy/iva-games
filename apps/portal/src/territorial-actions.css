@@ -140,3 +140,19 @@
   .ta-trade-editor { padding-inline: 9px; }
 }
 @media (prefers-reduced-motion: reduce) { .ta-resource-cards * { transition: none; } }
+
+/* District's enamel-and-brass response seals share the illustrated resource palette. */
+.ta-trade-seal { display:block;width:30px;height:30px;flex:none;overflow:visible; }
+.ta-seal-rim { fill:#e8efe5;stroke:#698b7c;stroke-width:1.3; }
+.ta-seal-inset { stroke:#fffdf0;stroke-width:.8; }
+.ta-trade-seal-accept .ta-seal-rim { fill:#d9ebd3;stroke:#47765c; }
+.ta-trade-seal-decline .ta-seal-rim { fill:#f3dfd0;stroke:#a36550; }
+.ta-trade-seal-waiting .ta-seal-rim { fill:#f3e9c9;stroke:#a28b55; }
+.ta-seal-mark { stroke:#386a4b;stroke-width:2.8;stroke-linecap:round;stroke-linejoin:round; }
+.ta-trade-seal-decline .ta-seal-mark { stroke:#9d503f; }
+.ta-trade-seal-waiting .ta-seal-mark { stroke:#655c3c;stroke-width:1.6; }
+.ta-clock-face,.ta-clock-ticks { stroke:#9c854c;stroke-width:1; }
+.ta-clock-second { stroke:#b26c42;stroke-width:1.2;stroke-linecap:round;transform-origin:16px 16px;animation:ta-clock-tick 12s steps(12,end) infinite; }
+.ta-clock-pin { fill:#8c6e3f; }
+@keyframes ta-clock-tick { to { transform:rotate(360deg); } }
+@media(prefers-reduced-motion:reduce) { .ta-clock-second { animation:none; } }

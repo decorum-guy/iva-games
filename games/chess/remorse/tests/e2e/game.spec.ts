@@ -84,9 +84,10 @@ function ratedStart(human: Side) {
 }
 
 async function newGame(page: Page, mode: 'hotseat' | 'rated' | 'practice', black = false) {
+  if (mode === 'hotseat') await page.getByTestId('mode-friend').click();
   await page.getByTestId(mode === 'hotseat' ? 'mode-hotseat' : 'mode-ai').click();
   if (mode === 'practice') await page.getByTestId('setup-practice').click();
-  if (black) await page.getByTestId('setup-black').click();
+  if (black) await page.locator('.setup-more > summary').click(); await page.getByTestId('setup-black').click();
   await page.getByTestId('setup-start').click();
   await expect(playfield(page)).toHaveAttribute('data-mode', mode);
 }

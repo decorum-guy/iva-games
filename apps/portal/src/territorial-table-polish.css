@@ -159,7 +159,7 @@
 .ta-group-heading { display:flex;align-items:center;justify-content:space-between;gap:5px; }
 .ta-group-heading strong { font-size:12px; }
 .territory-map-first .ta-group-cancel { min-height:34px;padding:4px 6px;font-size:11px; }
-/* Sent quotes have two terms lines and fixed response slots; no visible clocks/status paragraphs. */
+/* Sent quotes have two terms lines and fixed response slots; no numeric countdown or status paragraphs. */
 .territory-map-tools .ta-offer-terms { display:grid;gap:3px;font-size:11px; }
 .territory-map-tools .ta-offer-terms>div { display:flex;align-items:center;flex-wrap:wrap;gap:3px 5px; }
 .territory-map-tools .ta-offer-terms .ta-resources { gap:3px; }

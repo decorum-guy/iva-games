@@ -10,7 +10,7 @@ async function load(page: Page, record: MatchRecord, reduced = false) {
   await page.addInitScript(reduced => localStorage.setItem('remorse-settings-v1',
     JSON.stringify({ board: '2d', reduce: reduced, sound: false })), reduced)
   await page.goto('/remorse/')
-  await page.getByTestId('mode-hotseat').waitFor()
+  await page.getByTestId('mode-ai').waitFor()
   await seedRecords(page, [record], `game/${record.id}`)
   await page.reload()
   await expect(gameView(page)).toHaveAttribute('data-game-id', record.id)
@@ -164,6 +164,7 @@ test('a second action or a promotion can give check, then menu cancellation rest
   await expect(square(page, 'g8')).toHaveAccessibleName(/Ферзь/)
   await expect(gameView(page)).toHaveAttribute('data-royal-square', 'e8')
   await page.getByTestId('leave-game').click()
+  await page.getByTestId('mode-friend').click()
   await page.getByTestId('mode-hotseat').click()
   await page.getByTestId('setup-start').click()
   await expect(gameView(page)).toHaveAttribute('data-mode', 'hotseat')
