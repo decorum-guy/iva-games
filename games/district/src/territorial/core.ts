@@ -51,15 +51,24 @@ function remember(s: TerritoryState, entry: Omit<StoredTerritoryHistoryEntry, 'i
   return item;
 }
 
+export const TRADE_RESPONSE_MS = 10_000;
+/** Old timestamped quotes inherit the same clock; undated saves retain their turn deadline. */
+function responseDue(offer: TerritoryState['offers'][number]) {
+  return offer.responseDeadlineAt ?? (offer.offeredAt === undefined ? Infinity : offer.offeredAt + TRADE_RESPONSE_MS);
+}
+export function tradeResponseDeadline(offer: TerritoryState['offers'][number], turnDeadline: number | null) {
+  return Math.min(responseDue(offer), turnDeadline ?? Infinity);
+}
+
 function closeOffers(s: TerritoryState, predicate: (offer: TerritoryState['offers'][number]) => boolean,
-  status: TerritoryOfferStatus, actorId: string) {
+  status: TerritoryOfferStatus, actorId: string, responseExpired = false) {
   const closing = s.offers.filter(predicate);
   for (const offer of closing) {
-    (s.offerHistory ??= []).push({ ...offer, status, closedRevision: s.revision + 1, closedTurn: s.turn, closedRound: s.round });
+    (s.offerHistory ??= []).push({ ...offer, ...(responseExpired ? {responseExpired:true} : {}), status, closedRevision: s.revision + 1, closedTurn: s.turn, closedRound: s.round });
     // Manual answers already have an action entry; automatic closure needs its own explanation.
     if (status !== 'accepted' && status !== 'declined' && status !== 'withdrawn') remember(s, {
       kind: 'offer-closed', actorId, offerId: offer.id, targetId: offer.targetId, offerStatus: status,
-      reason: status, audienceIds: [offer.authorId, offer.targetId],
+      reason: responseExpired ? 'response-timeout' : status, audienceIds: [offer.authorId, offer.targetId],
     });
   }
   s.offers = s.offers.filter(offer => !predicate(offer));
@@ -276,18 +285,19 @@ function deal(s: TerritoryState, id: string, action: Extract<TerritoryAction, { 
     requireAction(sumStock(give) && sumStock(receive) && covers(player.hand, give) && RESOURCES.every(resource => !(give[resource] && receive[resource])));
     if (parentId) {
       const parent = s.offers.find(offer => offer.id === parentId);
-      requireAction(parent?.targetId === id && parent.authorId === targetId);
+      requireAction(parent?.targetId === id && parent.authorId === targetId && (parent.agreedAt !== undefined || now < tradeResponseDeadline(parent, s.deadlineAt)));
     }
     closeOffers(s, offer => offer.id === parentId || offer.authorId === id && targets.includes(offer.targetId), 'replaced', id);
     if (!parentId) (s.volunteered ??= []).push(id);
     const groupId = 'group-' + (s.offerNumber + 1);
-    for (const target of targets) s.offers.push({ id: 'offer-' + ++s.offerNumber, authorId: id, targetId: target, offeredAt: now, give: { ...give }, receive: { ...receive }, ...(parentId ? { parentId } : {}), ...(groupId ? { groupId } : {}) });
+    for (const target of targets) s.offers.push({ id: 'offer-' + ++s.offerNumber, authorId: id, targetId: target, offeredAt: now, responseDeadlineAt: now + TRADE_RESPONSE_MS, give: { ...give }, receive: { ...receive }, ...(parentId ? { parentId } : {}), ...(groupId ? { groupId } : {}) });
     return;
   }
   const offer = s.offers.find(item => item.id === action.offerId);
   const confirming = action.type === 'accept' && offer?.authorId === id && !!offer.groupId && offer.agreedAt !== undefined;
   requireAction(offer && (action.type === 'cancel' ? offer.authorId === id : offer.targetId === id || confirming));
   if (action.type === 'accept') {
+    if (!confirming) requireAction(now < tradeResponseDeadline(offer, s.deadlineAt));
     if (!offer.groupId || confirming) requireAction(offer.authorId === currentId(s) || offer.targetId === currentId(s));
     const author = s.players[offer.authorId], recipient = s.players[offer.targetId];
     requireAction(covers(author.hand, offer.give) && covers(recipient.hand, offer.receive) && !s.left.includes(offer.targetId));
@@ -571,9 +581,25 @@ export function blockAction(option: TerritoryView['legal']['block'][number], tar
 }
 
 export function advanceTerritory(previous: TerritoryState, now: number): TerritoryState {
-  if (previous.deadlineAt === null || previous.deadlineAt > now) return previous;
-  const ids = previous.phase === 'discard' ? Object.keys(previous.discard).filter(id => previous.discard[id]) : [currentId(previous)];
-  let s = previous;
+  let advanced = previous;
+  const turnOpen = previous.deadlineAt === null || previous.deadlineAt > now;
+  if (turnOpen && previous.offers.some(offer=>offer.agreedAt===undefined && offer.responseDeadlineAt===undefined)) {
+    advanced=structuredClone(previous);
+    for(const offer of advanced.offers) if(offer.agreedAt===undefined && offer.responseDeadlineAt===undefined) offer.responseDeadlineAt=(offer.offeredAt??now)+TRADE_RESPONSE_MS;
+    delete advanced.botSchedule;
+  }
+  const timedOut = (offer: TerritoryState['offers'][number]) => offer.agreedAt === undefined && responseDue(offer) <= now && responseDue(offer) < (advanced.deadlineAt ?? Infinity);
+  if (advanced.offers.some(timedOut)) {
+    advanced = structuredClone(advanced);
+    const historyStart=advanced.history?.length??0;
+    closeOffers(advanced, timedOut, 'expired', currentId(advanced), true);
+    for(const entry of advanced.history?.slice(historyStart)??[]) entry.source='timeout';
+    advanced.revision++;
+    delete advanced.botSchedule;
+  }
+  if (advanced.deadlineAt === null || advanced.deadlineAt > now) return advanced;
+  const ids = advanced.phase === 'discard' ? Object.keys(advanced.discard).filter(id => advanced.discard[id]) : [currentId(advanced)];
+  let s = advanced;
   for (const id of ids) {
     const action = fallbackTerritory(viewTerritory(s, id, now));
     if (action) s = applyTerritory(s, id, action, now, 'timeout');
@@ -617,9 +643,10 @@ export function viewTerritory(s: TerritoryState, id: string, now: number, clone 
       id: offer.id, authorId: offer.authorId, targetId: offer.targetId, give: offer.give, receive: offer.receive,
       ...(offer.parentId ? { parentId: offer.parentId } : {}),
       ...(offer.offeredAt !== undefined ? { offeredAt: offer.offeredAt } : {}),
+      ...(Number.isFinite(tradeResponseDeadline(offer, s.deadlineAt)) ? {responseDeadlineAt:tradeResponseDeadline(offer, s.deadlineAt)} : {}),
       ...(offer.groupId ? { groupId: offer.groupId } : {}), ...(offer.agreedAt !== undefined ? { agreedAt: offer.agreedAt } : {}),
       canAccept: phase === 'play' && !s.left.includes(id) &&
-        (offer.targetId === id && offer.agreedAt === undefined && covers(s.players[offer.authorId].hand, offer.give) && covers(s.players[id].hand, offer.receive) ||
+        (offer.targetId === id && offer.agreedAt === undefined && now < tradeResponseDeadline(offer, s.deadlineAt) && covers(s.players[offer.authorId].hand, offer.give) && covers(s.players[id].hand, offer.receive) ||
           offer.authorId === id && !!offer.groupId && offer.agreedAt !== undefined && (offer.authorId === currentId(s) || offer.targetId === currentId(s)) && covers(s.players[id].hand, offer.give)),
       ...(offer.authorId === id && offer.agreedAt !== undefined && offer.authorId !== currentId(s) && offer.targetId !== currentId(s) ? { unavailableReason: 'inactive-pair' as const } : !covers(s.players[offer.authorId].hand, offer.give) ? { unavailableReason: 'author-resources' as const } :
         // Only the recipient can inspect their own shortage. Publishing it to the

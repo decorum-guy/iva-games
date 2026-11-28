@@ -2,7 +2,7 @@
  * This file is never imported by the game and has no state/transport access. */
 import { chooseBotInput } from '../src/bots';
 import { PARTS } from '../src/catalog';
-import type { LaneSnapshot, TrackDefinition } from '../src/types';
+import type { DriveInput, LaneSnapshot, TrackDefinition } from '../src/types';
 
 export { chooseBotInput };
 export { chooseBotBlueprint } from '../src/bots';
@@ -20,6 +20,85 @@ export interface KeyboardTiming {
   nowMs: number;
   delayMs: number;
   sentSteering: readonly SentSteering[];
+}
+
+/** External QA observations only: no simulation object or gameplay mutation. */
+export interface PrecisionStallLane {
+  tick: number;
+  gatesPassed: number;
+  resets: number;
+  finished: boolean;
+  cargo: readonly { status: LaneSnapshot['cargo'][number]['status']; health: number }[];
+  car: { position: { x: number; z: number }; speed: number; charge: number; tilt: number };
+}
+export interface PrecisionStallState {
+  scope: string;
+  gatesPassed: number;
+  resets: number;
+  anchor: { x: number; z: number };
+  startTick: number | null;
+  lastTick: number;
+  lastAcceptedSeq: number;
+  /** A held R's braking must not immediately arm another reset at the same pose. */
+  triggered: boolean;
+}
+export interface PrecisionStallSample {
+  lane: Readonly<PrecisionStallLane>;
+  track: Readonly<TrackDefinition>;
+  /** Connection, match, epoch, stage and phase identity, supplied by the runner. */
+  scope: string;
+  nowMs: number;
+  snapshotTimeMs: number;
+  lastAcceptedSeq: number;
+  /** Last actual same-scope WebSocket input; neutral if none has been observed. */
+  sentInput: Readonly<DriveInput>;
+  plannedInput: Readonly<DriveInput>;
+}
+export interface PrecisionStallEvidence {
+  startTick: number;
+  tick: number;
+  stalledTicks: number;
+  gateId: string;
+  gatesPassed: number;
+  resets: number;
+  position: { x: number; z: number };
+  charge: number;
+}
+
+/** Request the ordinary held-R action after a continuously observed upright
+ * gate stall. This repairs the QA driver's missing escape behavior; it neither
+ * changes the route/prediction nor claims to explain the initial bad approach.
+ * Timers use authoritative lane ticks, never wall-clock jumps during recovery.
+ */
+export function observePrecisionStall(previous: PrecisionStallState | null, sample: PrecisionStallSample): { state: PrecisionStallState | null; restore: boolean; evidence?: PrecisionStallEvidence } {
+  const { lane, track, scope, lastAcceptedSeq } = sample;
+  const { car } = lane;
+  const snapshotAge = sample.nowMs - sample.snapshotTimeMs;
+  const valid = [lane.tick, lane.gatesPassed, lane.resets, car.position.x, car.position.z, car.speed, car.charge, car.tilt, snapshotAge, lastAcceptedSeq].every(Number.isFinite);
+  const gate = track.orderedGates[lane.gatesPassed];
+  const hasCargo = lane.cargo.some(item => item.status === 'secured' && item.health > 0);
+  if (!valid || !scope || track.id !== 'precision' || lane.finished || !gate || !hasCargo || car.charge <= 0 || car.tilt >= 65 || snapshotAge < 0 || snapshotAge > 300 || lastAcceptedSeq < 0) return { state: null, restore: false };
+  const distanceToGate = gate.z - car.position.z;
+  if (distanceToGate <= 0 || distanceToGate > 1.5) return { state: null, restore: false };
+
+  let state = previous;
+  const moved = state && Math.hypot(car.position.x - state.anchor.x, car.position.z - state.anchor.z) >= .10;
+  if (!state || state.scope !== scope || state.gatesPassed !== lane.gatesPassed || state.resets !== lane.resets || lane.tick < state.lastTick || lastAcceptedSeq < state.lastAcceptedSeq || moved) {
+    state = { scope, gatesPassed: lane.gatesPassed, resets: lane.resets, anchor: { x: car.position.x, z: car.position.z }, startTick: null, lastTick: lane.tick, lastAcceptedSeq, triggered: false };
+  }
+  const advanced = lane.tick > state.lastTick;
+  const uninterrupted = lane.tick - state.lastTick <= 18 && (!advanced || lastAcceptedSeq > state.lastAcceptedSeq);
+  const driving = sample.sentInput.throttle > .05 && !sample.sentInput.brake && sample.plannedInput.throttle > .05 && !sample.plannedInput.brake;
+  const eligible = uninterrupted && driving && Math.abs(car.speed) < .08;
+  // Braking clears accumulation. A triggered latch remains until a real scope,
+  // gate, reset or position change so Space+R cannot request R repeatedly.
+  const startTick = eligible ? state.startTick ?? lane.tick : null;
+  const next = { ...state, startTick, lastTick: lane.tick, lastAcceptedSeq };
+  if (!eligible || next.triggered || startTick === null || lane.tick - startTick < 90) return { state: next, restore: false };
+  return {
+    state: { ...next, triggered: true }, restore: true,
+    evidence: { startTick, tick: lane.tick, stalledTicks: lane.tick - startTick, gateId: gate.id, gatesPassed: lane.gatesPassed, resets: lane.resets, position: { x: car.position.x, z: car.position.z }, charge: car.charge },
+  };
 }
 
 /** The external driver's exact keyboard policy, shared with its headless replay.

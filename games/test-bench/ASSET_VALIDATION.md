@@ -75,6 +75,32 @@ real browser execution produces a successful report.
 
 ## Required rendered checks still open
 
+The local attempt and authored-runner descriptions above are historical. Later
+production Chromium CI evidence is recorded, with exact candidate identities, in
+[ACCEPTANCE.md](ACCEPTANCE.md). Candidate 7 loaded the real assets, completed
+practice and tutorial scopes, rendered both presentation modes and exercised
+WebGL loss. Its direct normal cup failed on Precision for Alice in 3D; this is
+not a passed visual, human, audio or hardware acceptance cycle.
+
+That direct job observed 57 draw calls on Precision at CSS 1440×818, with a
+216.7 ms frame p95. The scene metric records intervals between frame callbacks
+in a window of up to 240 frames, not isolated CPU/GPU render time. Canvas2D's
+reported zero means this metric was absent, not that its frames cost no time.
+The online 2D protocol diagnostic prepared for candidate 8 does not close the
+3D failure or target-device performance requirement.
+
+A subsequent read-only source/GLB audit found no WebGL renderer recreation on
+each snapshot. Low already disables AA, shadows and particles and caps DPR at
+1.25; at the default CI DPR of 1 it still renders at the full CSS resolution,
+with standard materials and scene lighting.
+The offroad axle GLB contains 8,868 triangles across 10 primitive instances
+(node.mesh → mesh.primitives; triangle count from index accessor count / 3).
+Two installed offroad axles therefore contain 17,736 triangles and 20 such
+instances. This is static geometry accounting, not measured draw calls or proof
+of the performance bottleneck. Resolution limits, low LOD and spatial batching
+remain hypotheses requiring a controlled rendered comparison; no optimization
+or measured speedup is claimed from that inspection.
+
 1. In a real production browser, confirm the atlas colours, every selected part,
    full/empty cups, wheel travel, coil movement, chassis tilt and cargo damage.
 2. Compare the same obstacle with two different assemblies and confirm their

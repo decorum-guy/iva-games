@@ -55,9 +55,10 @@ const report = {
   workingTreeDirty: !!execFileSync('git', ['status', '--porcelain'], { cwd: root, encoding: 'utf8' }).trim(),
   scopes: [], requiredScopeFailures: [], scenarios: [], cups: [], metrics: [], coldTransfers: [], layouts: [], browserErrors: [], consoleErrors: [], consoleErrorsDropped: 0, failedAssets: [], expectedOfflineAssetFailures: [], actionErrors: [], observedGameActions: {},
   controls: { keyboardEvents: 0, touchGestures: 0, acceptedUiActions: 0 },
-  roomResponses: [], roomKeyboardActivations: [], restoreChecks: [], restoreCommands: [], restartChecks: [], driveStages: [], localDriverTraces: [],
+  roomResponses: [], roomKeyboardActivations: [], restoreChecks: [], restoreCommands: [], uprightStallRecoveries: [], restartChecks: [], driveStages: [], localDriverTraces: [],
   controller: {
     method: 'Real keyboard W/A/D/Space/E/R, with normal bot decisions and wheel-angle feedback from received own-lane snapshots',
+    uprightStall: { track: 'precision', method: 'QA-only public-snapshot stall detector; an accepted trigger requests real R with brake and neutral steering', requestedHoldMs: 750, holdTiming: '750 ms after keyboard-down acknowledgement; actual dispatch/release times are recorded', gameStateMutation: false },
     delayedPrecision: { enabled: latencyMs > 0, track: 'precision', configuredPerDirectionMs: latencyMs, horizon: 'Decision wall time plus configured input delay minus snapshot.serverTime', inputHistory: 'Last 30 actually observed browser WebSocket input frames, in send order, including frames preceding the snapshot', deliveryEstimate: 'Runner framesent observation time plus configured relay delay', wheelEstimate: 'Snapshot wheel angle replayed at 60 Hz toward each historical steering target, with rate 2.8 rad/s and the snapshot speed limit', poseEstimate: 'Constant received x/z velocity and yaw angular velocity; y, speed and all other lane fields unchanged', clockAssumption: 'Isolated runner and server share one host wall clock. Snapshot timestamp can be later than its physics step; estimates require real-browser validation.', resetScope: 'Socket connection, match, epoch, stage and phase; only controller history is cleared', gameStateMutation: false },
   },
   transport: { path: latencyMs ? 'Owned loopback TCP delay relay for HTTP and WebSocket bytes' : 'Direct owned loopback', configuredPerDirectionMs: latencyMs, publicInternetMeasurement: false },
@@ -119,6 +120,7 @@ function compactFinalReport() {
     controller: { ...report.controller, profiles: report.controller.profiles?.map(({ samples, resetObservations, ...stats }) => ({ ...stats, sampleCount: samples.length, recordedResetCount: resetObservations.length })) },
     restoreChecks: report.restoreChecks.map(({ snapshots, inputFrames, ...check }) => ({ ...check, recordedSnapshots: snapshots.length, recordedInputFrames: inputFrames.length })),
     restoreCommands: report.restoreCommands,
+    uprightStallRecoveries: report.uprightStallRecoveries,
     restartChecks: report.restartChecks,
     driveStages: report.driveStages.map(({ profiles, ...stage }) => ({ ...stage, profiles: profiles.map(({ firstObservations, trajectory, ...profile }) => ({ ...profile, firstObservationCount: firstObservations.length, retainedTrajectoryCount: trajectory.length })) })),
     localDriverTraces: report.localDriverTraces.map(({ observations, keyTransitions, ...trace }) => ({ ...trace, recordedObservations: observations.length, recordedKeyTransitions: keyTransitions.length })),
@@ -251,8 +253,25 @@ class Account {
 
 function resetKeyboardPrediction(player, reason, scope = null) {
   player.steeringHistory = []; player.predictionScope = scope;
+  clearPrecisionProgress(player, reason, scope);
   player.predictionStats.resets++;
   if (player.predictionStats.resetObservations.length < 40) player.predictionStats.resetObservations.push({ reason, ...(scope ?? {}) });
+}
+
+function clearPrecisionProgress(player, reason, nextScope = null) {
+  player.precisionStall = null;
+  const recovery = player.uprightRecovery;
+  if (recovery) recovery.scopeEnd ??= { reason, observedAtMs: Date.now(), nextScope };
+  player.uprightRecovery = null; player.uprightHoldUntil = 0;
+  // Keep uprightKeyRecord until the real R keyup, so cancellation cannot erase
+  // its actual hold duration. No application input/state is changed here.
+}
+
+function observeUprightReset(recovery, source, observation) {
+  if (!recovery || observation.matchId !== recovery.matchId || !Number.isFinite(observation.resets) || observation.resets <= recovery.resetsBefore) return;
+  if (recovery.resetEvidence.some(value => value.source === source)) return;
+  recovery.resetEvidence.push({ source, observedAtMs: Date.now(), ...observation, resetDelta: observation.resets - recovery.resetsBefore });
+  recovery.resetObserved = true;
 }
 
 function observe(player, page) {
@@ -261,6 +280,7 @@ function observe(player, page) {
   page.on('pageerror', error => report.browserErrors.push({ profile: player.name, message: error.message }));
   page.on('console', message => {
     if (message.type() !== 'error') return;
+    const observedAtMs = Date.now();
     const location = message.location();
     // Redact embedded font payloads before bounding the message, so the CSP
     // reason after a long data URL remains in the diagnostic output.
@@ -268,12 +288,12 @@ function observe(player, page) {
     const text = sanitized.text.slice(0, 1400);
     const scenario = report.scenarios.at(-1)?.name ?? 'setup';
     const previous = report.consoleErrors.find(value => value.profile === player.name && value.message === text && value.scenario === scenario);
-    if (previous) { previous.occurrences++; return; }
+    if (previous) { previous.occurrences++; previous.lastObservedAtMs = observedAtMs; return; }
     if (report.consoleErrors.length >= 30) { report.consoleErrorsDropped++; return; }
     // These are evidence for review, separate from uncaught exceptions: this
     // suite deliberately loses a WebGL context and disconnects a profile.
     const source = location.url ? location.url.startsWith('data:') ? '[data URL omitted from source]' : new URL(location.url, origin).pathname : null;
-    report.consoleErrors.push({ profile: player.name, scenario, message: text, textTruncated: sanitized.text.length > 1400, ...(sanitized.omitted.length ? { omittedDataUrls: sanitized.omitted } : {}), source, line: location.lineNumber, column: location.columnNumber, occurrences: 1 });
+    report.consoleErrors.push({ profile: player.name, scenario, message: text, textTruncated: sanitized.text.length > 1400, ...(sanitized.omitted.length ? { omittedDataUrls: sanitized.omitted } : {}), source, line: location.lineNumber, column: location.columnNumber, occurrences: 1, firstObservedAtMs: observedAtMs, lastObservedAtMs: observedAtMs, timingMethod: 'Runner console callback receipt time; not a browser event timestamp' });
   });
   const assetPath = url => { const p = new URL(url).pathname; return !p.startsWith('/api/') && (p.startsWith('/test-bench/') || p.startsWith('/assets/')); };
   page.on('requestfailed', request => {
@@ -290,6 +310,10 @@ function observe(player, page) {
       const body = request.postDataJSON();
       if (body?.payload?.type !== 'restore') return;
       const command = { profile: player.name, path: new URL(request.url()).pathname, observedRequestAtMs: Date.now(), actionId: body.actionId, expectedRevision: body.expectedRevision, phaseId: body.payload.phaseId, status: null };
+      const recovery = player.uprightRecovery;
+      if (recovery && body.payload.phaseId === recovery.phaseId && command.path.endsWith('/rooms/' + recovery.roomId + '/actions')) {
+        command.uprightRecoveryId = recovery.id; recovery.commands.push(command);
+      }
       report.restoreCommands.push(command); player.restoreByRequest.set(request, command);
     } catch { /* Non-JSON request evidence is handled by response/error checks. */ }
   });
@@ -304,6 +328,8 @@ function observe(player, page) {
         restore.status = response.status(); restore.observedResponseAtMs = Date.now();
         const reading = response.json().then(body => {
           restore.receipt = { error: body.error?.code ?? null, matchId: body.view?.matchId ?? null, phase: body.view?.phase ?? null, phaseId: body.view?.phaseId ?? null, revision: body.view?.revision ?? null, tick: body.view?.tick ?? null, resets: body.view?.you?.lane?.resets ?? null };
+          const recovery = report.uprightStallRecoveries.find(value => value.id === restore.uprightRecoveryId);
+          if (response.status() === 200 && !body.error) observeUprightReset(recovery, 'restore response receipt', { ...restore.receipt, actionId: restore.actionId });
         }).catch(error => { restore.receiptReadError = error.message; }).finally(() => player.restoreReceiptReads.delete(reading));
         player.restoreReceiptReads.add(reading);
       }
@@ -320,6 +346,8 @@ function observe(player, page) {
           const scope = { connection, roomId: frame.roomId, matchId: frame.matchId, epoch: frame.epoch, stage: frame.view.stage, phaseId: frame.view.phaseId, phase: frame.view.phase };
           if (!player.predictionScope || Object.keys(scope).some(key => player.predictionScope[key] !== scope[key])) resetKeyboardPrediction(player, 'Received snapshot changed controller scope', scope);
           player.snapshot = frame; player.snapshotConnection = connection; player.receivedAt = Date.now(); player.receivedFrames++;
+          const recovery = report.uprightStallRecoveries.findLast(value => value.profile === player.name && value.matchId === frame.matchId && value.stage === frame.view.stage && value.participantId === frame.view.you.participantId);
+          observeUprightReset(recovery, 'received public snapshot', { matchId: frame.matchId, epoch: frame.epoch, phase: frame.view.phase, phaseId: frame.view.phaseId, laneTick: frame.view.you.lane?.tick ?? null, resets: frame.view.you.lane?.resets ?? null });
           if (player.activeRestoreCheck) {
             const check = player.activeRestoreCheck;
             const observed = { observedAtMs: Date.now(), serverTime: frame.serverTime, epoch: frame.epoch, lastAcceptedSeq: frame.lastAcceptedSeq, phase: frame.view.phase, phaseId: frame.view.phaseId, stage: frame.view.stage, laneTick: frame.view.you.lane?.tick ?? null, resets: frame.view.you.lane?.resets ?? null };
@@ -378,7 +406,7 @@ async function makePlayer(account, name, locale, hasTouch = false) {
   await context.addInitScript(() => performance.setResourceTimingBufferSize(2000));
   const separator = account.cookie.indexOf('=');
   await context.addCookies([{ name: account.cookie.slice(0, separator), value: account.cookie.slice(separator + 1), url: origin }]);
-  const player = { account, name, locale, context, held: new Set(), loadedAssets: new Set(), pendingInputs: new Map(), ackTimings: [], socketConnections: 0, socketCloses: 0, receivedFrames: 0, sentInputs: 0, transportErrors: [], snapshot: null, lastInteract: 0, lastRestore: 0, driveRemainder: { throttle: 0, steering: 0 }, steeringHistory: [], predictionScope: null, predictionStats: { calls: 0, historyFrames: 0, resets: 0, resetObservations: [], horizons: [], samples: [] }, restoreByRequest: new WeakMap(), restoreReceiptReads: new Set() };
+  const player = { account, name, locale, context, held: new Set(), loadedAssets: new Set(), pendingInputs: new Map(), ackTimings: [], socketConnections: 0, socketCloses: 0, receivedFrames: 0, sentInputs: 0, transportErrors: [], snapshot: null, lastInteract: 0, lastRestore: 0, driveRemainder: { throttle: 0, steering: 0 }, steeringHistory: [], predictionScope: null, precisionStall: null, uprightRecovery: null, uprightHoldUntil: 0, uprightKeyRecord: null, predictionStats: { calls: 0, historyFrames: 0, resets: 0, resetObservations: [], horizons: [], samples: [] }, restoreByRequest: new WeakMap(), restoreReceiptReads: new Set() };
   observe(player, await context.newPage()); players.push(player); return player;
 }
 const label = (player, ru, en) => player.locale === 'ru' ? ru : en;
@@ -391,7 +419,16 @@ async function keys(player, wanted = []) {
   const next = new Set(wanted);
   const transition = async (key, direction) => {
     const dispatchedAtMs = Date.now();
+    const recovery = key === 'KeyR' ? player.uprightKeyRecord : null;
+    if (recovery) recovery[direction === 'down' ? 'keyDownDispatchedAtMs' : 'keyUpDispatchedAtMs'] = dispatchedAtMs;
     await player.page.keyboard[direction](key); report.controls.keyboardEvents++;
+    if (recovery) {
+      recovery[direction === 'down' ? 'keyDownAcknowledgedAtMs' : 'keyUpAcknowledgedAtMs'] = Date.now();
+      if (direction === 'up') {
+        recovery.holdAfterKeydownAckMs = Number.isFinite(recovery.keyDownAcknowledgedAtMs) ? dispatchedAtMs - recovery.keyDownAcknowledgedAtMs : null;
+        if (player.uprightKeyRecord === recovery) player.uprightKeyRecord = null;
+      }
+    }
     if (player.localKeyTrace) {
       const trace = player.localKeyTrace;
       trace.keyTransitionCount++;
@@ -1106,13 +1143,27 @@ async function buildStage(alice, bob, stage) {
 
 async function keyboardDrive(player) {
   const snapshot = player.snapshot;
-  if (!fresh(player) || player.snapshotConnection !== player.socketConnections || !player.predictionScope || snapshot.view.phase !== 'racing' || !snapshot.view.you.lane || snapshot.view.you.lane.finished) { await keys(player); return; }
+  if (!fresh(player) || player.snapshotConnection !== player.socketConnections || !player.predictionScope || snapshot.view.phase !== 'racing' || !snapshot.view.you.lane || snapshot.view.you.lane.finished) { clearPrecisionProgress(player, 'Driver has no fresh active racing lane'); await keys(player); return; }
   const lane = snapshot.view.you.lane, track = snapshot.view.track;
   const { decision, steering, prediction } = policy.chooseBrowserKeyboardInput(lane, track, { snapshotTimeMs: snapshot.serverTime, nowMs: Date.now(), delayMs: latencyMs, sentSteering: player.steeringHistory });
   if (prediction) {
     player.predictionStats.calls++; player.predictionStats.horizons.push(prediction.horizonMs);
     if (player.predictionStats.samples.length < 12) player.predictionStats.samples.push({ stage: snapshot.view.stage, phaseId: snapshot.view.phaseId, tick: lane.tick, ...prediction });
   }
+  const sent = player.lastSent;
+  const sentInput = sent?.matchId === snapshot.matchId && sent.epoch === snapshot.epoch && sent.payload?.phaseId === snapshot.view.phaseId ? sent.payload : { throttle: 0, steering: 0, brake: true };
+  const stalled = policy.observePrecisionStall(player.precisionStall, { lane, track, scope: JSON.stringify(player.predictionScope), nowMs: Date.now(), snapshotTimeMs: snapshot.serverTime, lastAcceptedSeq: snapshot.lastAcceptedSeq, sentInput, plannedInput: decision.input });
+  player.precisionStall = stalled.state;
+  if (track.id === 'precision' && stalled.restore && !player.held.has('KeyR')) {
+    const recovery = { id: 'upright-' + (report.uprightStallRecoveries.length + 1), profile: player.name, participantId: snapshot.view.you.participantId, roomId: snapshot.view.roomId, matchId: snapshot.matchId, stage: snapshot.view.stage, phaseId: snapshot.view.phaseId, scope: { ...player.predictionScope }, trigger: stalled.evidence, triggerObservation: observedDriveState(player), requestedHoldMs: 750, requestedAtMs: Date.now(), resetsBefore: lane.resets, resetObserved: false, resetEvidence: [], commands: [] };
+    report.uprightStallRecoveries.push(recovery); player.uprightRecovery = recovery; player.uprightKeyRecord = recovery;
+    player.lastRestore = Date.now();
+    await keys(player, ['Space', 'KeyR']);
+    player.uprightHoldUntil = recovery.keyDownAcknowledgedAtMs + recovery.requestedHoldMs;
+    return;
+  }
+  if (player.uprightRecovery && Date.now() < player.uprightHoldUntil) { await keys(player, ['Space', 'KeyR']); return; }
+  player.uprightHoldUntil = 0;
   const wanted = [];
   if (decision.input.brake) wanted.push('Space');
   else if (decision.input.throttle > .05) wanted.push('KeyW');
@@ -1134,7 +1185,7 @@ function observedDriveState(player) {
     lastAcceptedSeq: snapshot?.lastAcceptedSeq ?? null, heldKeys: [...player.held],
     sentInputFrameCount: player.sentInputs,
     lastSentInput: sent ? { seq: sent.seq, matchId: sent.matchId, epoch: sent.epoch, phaseId: sent.payload?.phaseId, throttle: sent.payload?.throttle, steering: sent.payload?.steering, brake: sent.payload?.brake } : null,
-    lane: lane ? { tick: lane.tick, position: { ...lane.car.position }, speed: lane.car.speed, yaw: lane.car.yaw, charge: lane.car.charge, wheelSteering: lane.car.wheels[0]?.steering ?? null, gatesPassed: lane.gatesPassed, interaction: lane.interaction, resets: lane.resets, finished: lane.finished, cargo: lane.cargo.map(cargo => ({ id: cargo.id, status: cargo.status, health: cargo.health })) } : null,
+    lane: lane ? { tick: lane.tick, position: { ...lane.car.position }, speed: lane.car.speed, yaw: lane.car.yaw, tilt: lane.car.tilt, tiltTicks: lane.tiltTicks, charge: lane.car.charge, wheelSteering: lane.car.wheels[0]?.steering ?? null, gatesPassed: lane.gatesPassed, interaction: lane.interaction, resets: lane.resets, finished: lane.finished, cargo: lane.cargo.map(cargo => ({ id: cargo.id, status: cargo.status, health: cargo.health })) } : null,
   };
 }
 
@@ -1221,6 +1272,15 @@ async function driveStage(alice, bob, roomId, stage) {
   } catch (error) { trace.status = 'failed'; trace.error = error.message; throw error; }
   finally {
     captureDriveStage(trace, [alice, bob], true); trace.finishedAtMs = Date.now();
+    const recoveryKeyReleases = await Promise.allSettled([alice, bob].filter(player => player.uprightKeyRecord).map(player => keys(player)));
+    trace.recoveryKeyReleaseErrors = recoveryKeyReleases.flatMap(result => result.status === 'rejected' ? [String(result.reason)] : []);
+    await Promise.allSettled([alice, bob].flatMap(player => [...player.restoreReceiptReads]));
+    for (const recovery of report.uprightStallRecoveries.filter(value => value.matchId === trace.matchId && value.stage === stage)) {
+      recovery.finalObservation = observedDriveState(recovery.profile === alice.name ? alice : bob);
+      recovery.outcome = recovery.resetObserved ? 'Reset observed; subsequent course completion is checked separately' : 'No reset observed';
+      await emitEvidence('upright-stall-recovery', recovery);
+    }
+    for (const player of [alice, bob]) clearPrecisionProgress(player, 'Drive stage ended');
     trace.completedChecks = { disconnect: saved.disconnect, restart: saved.restart, reset: saved.reset, sameProtocol: saved.sameProtocol ?? null };
     trace.restartStatus = report.restartChecks.find(check => check.matchId === trace.matchId && check.stage === stage)?.status ?? 'not attempted';
     trace.committed = [alice, bob].map(player => {

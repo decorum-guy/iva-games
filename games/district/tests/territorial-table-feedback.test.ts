@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createHash } from 'node:crypto';
 import Database from 'better-sqlite3';
+import { canonicalJson } from '@iva-games/session-kit';
 import type { Participant, StartMatchRequest } from '@iva-games/session-kit';
 import { randomStream } from '../src/random';
 import { applyTerritory, createTerritory, fallbackTerritory, viewTerritory } from '../src/territorial/core';
@@ -289,11 +290,17 @@ describe('SQLite replay and paced bots', () => {
         const delayMs = scheduled.botActionAt! - f.clock.now;
         expect(Number.isFinite(delayMs)).toBe(true);
         const range = category.startsWith('setup-') ? [1_000, 1_600] : category === 'end' ? [2_200, 3_500] :
-          category === 'human-response' ? [40_000, 40_000] : category === 'deadline-clamp' ? [400, 400] : [1_800, 5_500];
+          category === 'human-response' ? [10_000, 10_000] : category === 'deadline-clamp' ? [400, 400] : category === 'accept' ? [800, 1200] : [1_800, 5_500];
         expect(delayMs).toBeGreaterThanOrEqual(range[0]); expect(delayMs).toBeLessThanOrEqual(range[1]);
         f.clock.now = scheduled.botActionAt!;
-        const performed = await f.runtime.viewForPlayer(matchId, 'a');
-        const action = performed.history!.find(entry => entry.revision === s.revision + 1 && entry.kind !== 'offer-closed')!;
+        let performed = await f.runtime.viewForPlayer(matchId, 'a');
+        if(category==='human-response') {
+          expect(f.read(matchId).offerHistory?.at(-1)).toMatchObject({responseExpired:true});
+          expect(performed.botActionAt).toBeGreaterThan(f.clock.now);
+          f.clock.now=performed.botActionAt!;
+          performed=await f.runtime.viewForPlayer(matchId,'a');
+        }
+        const action = performed.history!.find(entry => entry.revision > s.revision && entry.kind !== 'offer-closed')!;
         expect(action).toBeDefined();
         const expectedAction = category === 'setup-home' || category === 'deadline-clamp' ? 'place' : category === 'setup-route' ? 'route' : category === 'human-response' ? 'end' : category;
         expect(action.kind).toBe(expectedAction);
@@ -314,7 +321,7 @@ describe('SQLite replay and paced bots', () => {
         sourceHashes: Object.fromEntries(files.map(file => [file, createHash('sha256').update(readFileSync(file)).digest('hex')])),
         previous: { actionLoopMaximum: 32, computeBudgetMs: 65, perActionDelayMs: 0, humanResponseWindowMs: 8_000 },
         current: { attemptsPerPollMaximum: 4, setupMs: [1_000, 1_600], importantMs: [1_800, 4_500], rareImportantMs: [4_800, 5_500],
-          endMs: [2_200, 3_500], humanResponseWindowMs: 40_000, cappedByPhaseDeadline: true, sleepsInHttpRequest: false },
+          endMs: [2_200, 3_500], humanResponseWindowMs: 10_000, cappedByPhaseDeadline: true, sleepsInHttpRequest: false },
         history: { truncated: false, legacyMissingHistoryFabricated: false, completenessField: 'historyComplete', automaticSourceField: 'history.source / latestRoll.source' },
         roundBoundary: { stateRoundMeans: 'completed rounds', displayedCurrentRound: 'state.round + 1',
           couponExample: { issuedStateRound: 1, endsAfterRound: 2, validThroughDisplayedRound: 2, absentAtDisplayedRound: 3 },
@@ -439,11 +446,42 @@ describe('SQLite replay and paced bots', () => {
     f.clock.now = afterUnavailableAnswer.botActionAt!;
     const advanced = await f.runtime.viewForPlayer(matchId, 'a');
     expect(advanced.revision).toBeGreaterThan(s.revision);
-    expect(advanced.activeParticipantId).toBe('recipient');
+    expect(advanced.botActionAt).toBeGreaterThan(f.clock.now);
     expect(f.read(matchId).offerHistory!.some(offer => offer.targetId === 'recipient' && offer.status === 'declined')).toBe(true);
   });
 
-  it('leaves forty seconds for a human counteroffer while preserving the deadline and real expiry', async () => {
+  it('lets all three bots answer within ten seconds despite polling, revisions and restart', async()=>{
+    const f=runtimeFixture();
+    const {matchId}=await f.runtime.createMatch(start([human('a',0),bot('b',1),bot('c',2),bot('d',3)]));
+    let s=f.read(matchId); s.phase='play'; s.turn=1;
+    s.players.a.hand=stock({wood:3});
+    for(const id of ['b','c','d']) s.players[id].hand=stock({brick:1});
+    s=applyTerritory(s,'a',{type:'offer',targetId:'b',give:stock({wood:2}),receive:stock({brick:1})},f.clock.now);
+    f.write(s); const before=structuredClone(s.players), sentAt=f.clock.now;
+    const last=s.offers.find(offer=>offer.targetId==='d')!;
+    let worstSeed='';
+    for(let i=0;i<10_000;i++) {
+      const seed='worst-third-reply-'+i;
+      const draw=Number.parseInt(createHash('sha256').update(canonicalJson([seed,last.id,'d'])).digest('hex').slice(0,8),16)%401;
+      if(draw===400) { worstSeed=seed; break; }
+    }
+    expect(worstSeed).not.toBe(''); f.seed(matchId,worstSeed);
+    for(let tick=0;tick<8;tick++) {
+      if(tick===1 || tick===3) { const changed=f.read(matchId); changed.revision++; delete changed.botSchedule; f.write(changed); f.reopen(); }
+      f.clock.now=sentAt+tick*1100;
+      await f.runtime.viewForPlayer(matchId,'a');
+      if(f.read(matchId).offers.every(offer=>offer.agreedAt!==undefined)) break;
+    }
+    const answered=f.read(matchId);
+    expect(answered.offers).toHaveLength(3);
+    expect(answered.offers.every(offer=>offer.agreedAt!==undefined && offer.agreedAt<=sentAt+4400)).toBe(true);
+    expect(answered.players).toEqual(before);
+    f.clock.now=sentAt+10_000; f.reopen();
+    expect((await f.runtime.viewForPlayer(matchId,'a')).offers).toHaveLength(3);
+    expect(f.read(matchId).players).toEqual(before);
+  });
+
+  it('leaves ten seconds for a human counteroffer while preserving the deadline and real expiry', async () => {
     const f = runtimeFixture();
     const { matchId } = await f.runtime.createMatch(start([bot('bot', 0), human('a', 1)]));
     let s = f.read(matchId); s.phase = 'play'; s.turn = 1; s.deadlineAt = f.clock.now + 60_000;
@@ -451,7 +489,7 @@ describe('SQLite replay and paced bots', () => {
     s = applyTerritory(s, 'bot', { type: 'offer', targetId: 'a', give: stock({ wood: 1 }), receive: stock({ brick: 1 }) }, f.clock.now);
     f.write(s);
     const offered = await f.runtime.viewForPlayer(matchId, 'a');
-    expect(offered.botActionAt).toBe(f.clock.now + 40_000);
+    expect(offered.botActionAt).toBe(f.clock.now + 10_000);
     f.clock.now += 8_001;
     f.reopen();
     expect((await f.runtime.viewForPlayer(matchId, 'a')).offers).toHaveLength(1);
