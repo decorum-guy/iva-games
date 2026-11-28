@@ -1,5 +1,11 @@
 # Iva Games — latest project direction
 
+## Обязательное правило для новых игр
+
+**Одна игра, один ИИ-исполнитель, полный цикл до сайта.** Если владелец поручил сделать игру, прочитай [порядок полного цикла](docs/iva-games/GAME_WORKFLOW.md) и доведи её сам: правила, код, ассеты, интерфейс, звук, тесты, полная браузерная приёмка, исправления, рабочая ветка и PR, разрешённый штатный выпуск, проверка на iva-games.pro. Не отдавай владельцу или следующему чату незакрытые обычные этапы. PR и зелёный CI не равны готовой игре. Недостающий доступ или непройденная обязательная проверка — блокер, а не основание объявлять выпуск.
+
+Это общее правило разработки новых игр; старые задачи и отчёты ниже описывают свои этапы. ТЗ игры может добавлять обязательные проверки. Для обычных чатов используй [инструкцию проекта ChatGPT](prompts/CHATGPT_PROJECT_INSTRUCTIONS.md).
+
 ## Active release policy: game updates follow main — 28 November 2026
 
 The owner explicitly requested that an ordinary accepted `main` update deliver the current game version through the existing CI/image/deploy pipeline, without a separate manual activation flag. For District, new rooms use the current shipped profile (`district@0.4`); the obsolete `DISTRICT_TERRITORIAL_ENABLED` setting, including an existing `false`, must not select an older profile. This instruction supersedes the previous separate host-activation requirement below. Existing lobbies and matches retain their pinned versions; keep the v0.2/v0.3/v0.4 readers and accepted game rules intact.
