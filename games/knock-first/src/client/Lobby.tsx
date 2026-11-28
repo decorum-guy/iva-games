@@ -66,7 +66,7 @@ export function KnockLanding({ language, signedIn, onCreate, onExit }: { languag
       <div className="kf-expedition-footer"><label>{t('Мест в лифте', 'Places in the lift')}<select aria-label={t('Мест в лифте', 'Places in the lift')} value={capacity} onChange={e => setCapacity(Number(e.target.value))}>{[2, 3, 4, 5].map(n => <option key={n}>{n}</option>)}</select></label>
         <button className="kf-button" onClick={() => onCreate({ ...settings, practice: true, tutorial: false }, 2)}>{t('Практика с ботом', 'Practice with a bot')}</button>
         <button className="kf-button primary" onClick={() => onCreate({ ...settings, practice: false, tutorial: false }, capacity)}>{t('Создать комнату', 'Create a room')} →</button>
-      </div><p className="kf-device-note">{t('Клавиатура и мышь или сенсорный экран. Нужен WebGL 2. Звук можно заменить направленными подписями.', 'Keyboard and mouse or touch. Requires WebGL 2. Directional captions can replace sound.')}</p>
+      </div><p className="kf-device-note">{t('Мышь и клавиатура. Нужен WebGL 2. Звук можно заменить направленными подписями.', 'Mouse and keyboard. Requires WebGL 2. Directional captions can replace sound.')}</p>
     </section>
   </div>;
 }
