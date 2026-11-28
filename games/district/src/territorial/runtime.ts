@@ -29,13 +29,15 @@ export function territorySettings(input: unknown): { mapId: string; mapVersion: 
     throw new SessionError('INVALID_SETTINGS', 'Проверьте настройки игры.');
   }
   const data = (input ?? {}) as Record<string, unknown>;
-  const { mapId = territoryMaps[0].id, mapVersion = territoryMaps[0].version, newsPreset = 'medium' } = data;
+  const { mapId = territoryMaps[0].id, mapVersion, newsPreset = 'medium' } = data;
   if (Object.keys(data).some(key => !['mapId', 'mapVersion', 'newsPreset'].includes(key)) ||
-    typeof mapId !== 'string' || typeof mapVersion !== 'string' || typeof newsPreset !== 'string' || !Object.hasOwn(newsProfiles, newsPreset)) {
+    typeof mapId !== 'string' || (mapVersion !== undefined && typeof mapVersion !== 'string') || typeof newsPreset !== 'string' || !Object.hasOwn(newsProfiles, newsPreset)) {
     throw new SessionError('INVALID_SETTINGS', 'Проверьте карту и настройку новостей.');
   }
-  try { getTerritoryMap(mapId, mapVersion); } catch { throw new SessionError('INVALID_SETTINGS', 'Выберите доступную карту.'); }
-  return { mapId, mapVersion, newsPreset: newsPreset as NewsPreset };
+  try {
+    const map = getTerritoryMap(mapId, mapVersion);
+    return { mapId, mapVersion: map.version, newsPreset: newsPreset as NewsPreset };
+  } catch { throw new SessionError('INVALID_SETTINGS', 'Выберите доступную карту.'); }
 }
 
 /** v0.4 uses sibling tables in the existing runtime volume. Published legacy
