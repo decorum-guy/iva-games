@@ -329,6 +329,7 @@ function OfferCard({ offer, view, lang, busy, onAction, onCounter, onResponse, c
       <span className="ta-offer-status"><i aria-hidden="true">{agreed ? '✓' : '·'}</i>{sending ? word(lang, 'Отправляем ответ…', 'Sending response…') : agreed ? word(lang, mine ? 'Согласен · выберите игрока' : 'Вы согласились · ждём выбора', mine ? 'Agreed · choose player' : 'Agreed · awaiting selection') : word(lang, mine ? 'Отправлено · ждём ответа' : 'Ждёт вашего ответа', mine ? 'Sent · awaiting response' : 'Awaiting your response')}{seconds !== null && <small title={activeBot ? word(lang,'Ориентир окна ответа бота','Estimated bot reply window') : word(lang,'Остаток хода','Turn remaining')}> · {activeBot?'≈':''}{seconds}{word(lang,' с','s')}</small>}</span></header>
     {!compact && <OfferTerms give={give} receive={receive} lang={lang}/>}
     {stockTotal(shortage) > 0 && <p className="ta-short">{word(lang, 'В вашей руке не хватает', 'Your hand is missing')} <ResourceStock stock={shortage} lang={lang}/></p>}
+    {offer.unavailableReason === 'inactive-pair' && <p className="ta-short">{word(lang, 'Обмен возможен только с активным игроком.', 'Trade with the active player.')}</p>}
     {offer.unavailableReason === 'author-resources' && !mine && <p className="ta-short">{word(lang, 'У автора уже нет нужных ресурсов. Попросите другие условия.', 'The sender no longer has the required resources. Ask for different terms.')}</p>}
     <div className="ta-buttons">{canChoose && <button type="button" className="ta-primary" disabled={!actionable || !canAccept} onClick={() => void respond('accept')}>✓ {word(lang,'Обменяться','Trade with')} {nameOf(view,other)}</button>}{!mine && <><button type="button" className="ta-primary" disabled={!actionable || !canAccept || agreed} onClick={() => void respond('accept')}>{word(lang, 'Принять', 'Accept')}</button>
       <button type="button" disabled={busy || sending} onClick={() => onCounter(offer)}>{word(lang, 'Другие условия', 'Counteroffer')}</button></>}
@@ -479,10 +480,10 @@ function PlayerTrade({ view, lang, busy, onAction, handPick }: Props) {
           view={view} lang={lang} busy={busy || sending} onAction={onAction} onCounter={edit} onResponse={() => tradeHeading.current?.focus({ preventScroll: true })}/>;
         if (!grouped) return render(terms);
         return <section key={key} className="ta-offer-group" data-group-id={key}>
-          <strong>{word(lang,'Ваше предложение игрокам','Your offer to players')}</strong>
+          <div className="ta-group-heading"><strong>{word(lang,'Ваше предложение игрокам','Your offer to players')}</strong>{items.length > 0 && <button type="button" className="ta-group-cancel" disabled={busy || sending} aria-label={word(lang, 'Отменить предложение всем', 'Withdraw offer for everyone')} onClick={() => void onAction({type:'cancel',offerId:items[0].id})}><span aria-hidden="true">✕</span> {word(lang, 'Отменить', 'Withdraw')}</button>}</div>
           {items.length !== 1 && <OfferTerms give={terms.give} receive={terms.receive} lang={lang}/>}
           {items.map(render)}
-          {(view.offerHistory ?? []).filter(offer => offer.groupId === key && offer.status === 'declined').map(offer => <div key={offer.id} className="ta-declined"><span className="ta-player-dot" style={{background: ['#ca4e37','#2867a8','#79498f','#2c7954'][view.players.find(player => player.participantId === offer.targetId)?.seatIndex ?? 0]}} aria-hidden="true"/>✕ {nameOf(view, offer.targetId)} · {word(lang, 'Отказ', 'Declined')}</div>)}
+          {(view.offerHistory ?? []).filter(offer => offer.groupId === key && (offer.status === 'declined' || offer.status === 'replaced')).map(offer => <div key={offer.id} className="ta-declined"><span className="ta-player-dot" style={{background: ['#ca4e37','#2867a8','#79498f','#2c7954'][view.players.find(player => player.participantId === offer.targetId)?.seatIndex ?? 0]}} aria-hidden="true"/>{offer.status === 'replaced' ? '↔' : '✕'} {nameOf(view, offer.targetId)} · {offer.status === 'replaced' ? word(lang, 'Другие условия', 'Counteroffer') : word(lang, 'Отказ', 'Declined')}</div>)}
         </section>;
       })}
     </div>

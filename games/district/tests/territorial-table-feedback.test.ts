@@ -484,7 +484,7 @@ describe('Grouped negotiations and visual production receipts', () => {
     expect(answer).toMatchObject({ type: 'offer', targetId: 'a', parentId, give: stock({ brick: 1 }), receive: stock({ wood: 1 }) });
     s = act(s, 'b', answer!);
     expect(s.offerHistory?.find(o => o.id === parentId)?.status).toBe('replaced');
-    const id = s.offers[0].id;
+    const id = s.offers.find(offer => offer.authorId === 'b' && offer.targetId === 'a')!.id;
     s = act(s, 'a', { type: 'accept', offerId: id });
     expect(s.players.a.hand).toEqual(stock({wood:1}));
     s = act(s, 'b', { type: 'accept', offerId: id });

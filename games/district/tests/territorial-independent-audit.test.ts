@@ -81,6 +81,42 @@ describe('Independent PR26 transactional and provenance audit', () => {
     expect(() => applyTerritory(state,'a',{type:'accept',offerId:id},4)).toThrow();
   });
 
+  it('keeps other recipients live after a counteroffer and isolates their responses and terms', async () => {
+    const f=await fixture();
+    await f.action('a','broadcast-counter-parent',{type:'offer',targetId:'b',give:stock({wood:1}),receive:stock({brick:1})});
+    const [forB,forC]=f.read().offers;
+    await f.action('b','counter-with-own-terms',{type:'offer',targetId:'a',parentId:forB.id,give:stock({brick:1}),receive:stock({wood:2})});
+    expect(f.read().offers.find(offer=>offer.id===forC.id)).toMatchObject({authorId:'a',targetId:'c'});
+    expect(f.read().offerHistory?.find(offer=>offer.id===forB.id)?.status).toBe('replaced');
+    await f.action('c','original-consent-c',{type:'accept',offerId:forC.id});
+    const bView=await f.view('b');
+    expect(bView.offers.every(offer=>offer.authorId==='b'||offer.targetId==='b')).toBe(true);
+    expect(JSON.stringify(bView)).not.toContain(forC.id);
+    expect(bView.history?.some(entry=>entry.reason==='consent'&&entry.actorId==='c')).toBe(false);
+    await f.action('a','choose-original-c',{type:'accept',offerId:forC.id});
+    expect(f.read().players.a.hand).toEqual(stock({wood:1,brick:1}));
+    expect(f.read().players.b.hand).toEqual(stock({brick:1}));
+    expect(f.read().players.c.hand).toEqual(stock({wood:1}));
+    expect(f.read().offerHistory?.filter(offer=>offer.status==='accepted')).toHaveLength(1);
+    expect(f.read().offers.every(offer=>offer.authorId==='b')).toBe(true);
+    expect((await f.view('b')).offerHistory?.some(offer=>offer.id===forC.id)).toBe(false);
+  });
+
+  it('broadcasts an inactive author but forbids consent or transfer between two inactive seats', async () => {
+    const f=await fixture(); const before=f.read().players;
+    await f.action('b','inactive-author-offer',{type:'offer',targetId:'a',give:stock({brick:1}),receive:stock({wood:1})});
+    const [active,other]=f.read().offers;
+    expect((await f.view('c')).offers[0]).toMatchObject({canAccept:false,unavailableReason:'inactive-pair'});
+    await expect(f.action('c','invalid-inactive-consent',{type:'accept',offerId:other.id})).rejects.toMatchObject({code:'INVALID_ACTION'});
+    expect(f.read().players).toEqual(before);
+    await f.action('a','active-seat-consent',{type:'accept',offerId:active.id});
+    expect(f.read().players).toEqual(before);
+    expect((await f.view('b')).offers.find(offer=>offer.id===active.id)?.canAccept).toBe(true);
+    await f.action('b','author-choose-active',{type:'accept',offerId:active.id});
+    expect(f.read().players.b.hand).toEqual(stock({wood:1}));
+    expect(f.read().players.c).toEqual(before.c);
+  });
+
   it('serializes competing author choices after restart and preserves the exact receipt without another transfer', async () => {
     const f = await fixture(); const before = f.read().players;
     const offers = await group(f);

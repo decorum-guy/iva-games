@@ -274,13 +274,11 @@ function deal(s: TerritoryState, id: string, action: Extract<TerritoryAction, { 
     requireAction(targets.length > 0 && targets.length <= 3 && new Set(targets).size === targets.length);
     requireAction(targets.every(target => Object.hasOwn(s.players, target) && !s.left.includes(target) && target !== id));
     requireAction(sumStock(give) && sumStock(receive) && covers(player.hand, give) && RESOURCES.every(resource => !(give[resource] && receive[resource])));
-    let parentGroup: string | undefined;
     if (parentId) {
       const parent = s.offers.find(offer => offer.id === parentId);
       requireAction(parent?.targetId === id && parent.authorId === targetId);
-      parentGroup = parent.groupId;
     }
-    closeOffers(s, offer => offer.id === parentId || !!parentGroup && offer.groupId === parentGroup || offer.authorId === id && targets.includes(offer.targetId), 'replaced', id);
+    closeOffers(s, offer => offer.id === parentId || offer.authorId === id && targets.includes(offer.targetId), 'replaced', id);
     if (!parentId) (s.volunteered ??= []).push(id);
     const groupId = 'group-' + (s.offerNumber + 1);
     for (const target of targets) s.offers.push({ id: 'offer-' + ++s.offerNumber, authorId: id, targetId: target, offeredAt: now, give: { ...give }, receive: { ...receive }, ...(parentId ? { parentId } : {}), ...(groupId ? { groupId } : {}) });
@@ -290,6 +288,7 @@ function deal(s: TerritoryState, id: string, action: Extract<TerritoryAction, { 
   const confirming = action.type === 'accept' && offer?.authorId === id && !!offer.groupId && offer.agreedAt !== undefined;
   requireAction(offer && (action.type === 'cancel' ? offer.authorId === id : offer.targetId === id || confirming));
   if (action.type === 'accept') {
+    requireAction(offer.authorId === currentId(s) || offer.targetId === currentId(s));
     const author = s.players[offer.authorId], recipient = s.players[offer.targetId];
     requireAction(covers(author.hand, offer.give) && covers(recipient.hand, offer.receive) && !s.left.includes(offer.targetId));
     if (offer.groupId && !confirming) {
@@ -619,10 +618,10 @@ export function viewTerritory(s: TerritoryState, id: string, now: number, clone 
       ...(offer.parentId ? { parentId: offer.parentId } : {}),
       ...(offer.offeredAt !== undefined ? { offeredAt: offer.offeredAt } : {}),
       ...(offer.groupId ? { groupId: offer.groupId } : {}), ...(offer.agreedAt !== undefined ? { agreedAt: offer.agreedAt } : {}),
-      canAccept: phase === 'play' && !s.left.includes(id) &&
+      canAccept: phase === 'play' && !s.left.includes(id) && (offer.authorId === currentId(s) || offer.targetId === currentId(s)) &&
         (offer.targetId === id && offer.agreedAt === undefined && covers(s.players[offer.authorId].hand, offer.give) && covers(s.players[id].hand, offer.receive) ||
           offer.authorId === id && !!offer.groupId && offer.agreedAt !== undefined && covers(s.players[id].hand, offer.give)),
-      ...(!covers(s.players[offer.authorId].hand, offer.give) ? { unavailableReason: 'author-resources' as const } :
+      ...(offer.authorId !== currentId(s) && offer.targetId !== currentId(s) ? { unavailableReason: 'inactive-pair' as const } : !covers(s.players[offer.authorId].hand, offer.give) ? { unavailableReason: 'author-resources' as const } :
         // Only the recipient can inspect their own shortage. Publishing it to the
         // sender would turn unanswered proposals into probes of a hidden hand.
         offer.targetId === id && !covers(s.players[id].hand, offer.receive) ? { unavailableReason: 'target-resources' as const } : {}),
