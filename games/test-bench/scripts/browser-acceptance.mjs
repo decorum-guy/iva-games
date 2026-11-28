@@ -51,8 +51,12 @@ const report = {
   },
   gitHead: execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim(),
   workingTreeDirty: !!execFileSync('git', ['status', '--porcelain'], { cwd: root, encoding: 'utf8' }).trim(),
-  scenarios: [], cups: [], metrics: [], coldTransfers: [], layouts: [], browserErrors: [], consoleErrors: [], consoleErrorsDropped: 0, failedAssets: [], expectedOfflineAssetFailures: [], actionErrors: [], observedGameActions: {},
+  scopes: [], requiredScopeFailures: [], scenarios: [], cups: [], metrics: [], coldTransfers: [], layouts: [], browserErrors: [], consoleErrors: [], consoleErrorsDropped: 0, failedAssets: [], expectedOfflineAssetFailures: [], actionErrors: [], observedGameActions: {},
   controls: { keyboardEvents: 0, touchGestures: 0, acceptedUiActions: 0 },
+  controller: {
+    method: 'Real keyboard W/A/D/Space/E/R, with normal bot decisions and wheel-angle feedback from received own-lane snapshots',
+    delayedPrecision: { enabled: latencyMs > 0, track: 'precision', configuredPerDirectionMs: latencyMs, horizon: 'Decision wall time plus configured input delay minus snapshot.serverTime', inputHistory: 'Last 30 actually observed browser WebSocket input frames, in send order, including frames preceding the snapshot', deliveryEstimate: 'Runner framesent observation time plus configured relay delay', wheelEstimate: 'Snapshot wheel angle replayed at 60 Hz toward each historical steering target, with rate 2.8 rad/s and the snapshot speed limit', poseEstimate: 'Constant received x/z velocity and yaw angular velocity; y, speed and all other lane fields unchanged', clockAssumption: 'Isolated runner and server share one host wall clock. Snapshot timestamp can be later than its physics step; estimates require real-browser validation.', resetScope: 'Socket connection, match, epoch, stage and phase; only controller history is cleared', gameStateMutation: false },
+  },
   transport: { path: latencyMs ? 'Owned loopback TCP delay relay for HTTP and WebSocket bytes' : 'Direct owned loopback', configuredPerDirectionMs: latencyMs, publicInternetMeasurement: false },
   openCoverage: ['Actual listening', 'Physical touch hardware', 'Human browser play'],
 };
@@ -88,6 +92,28 @@ async function extendedScenario(key, name, work) {
     report.extendedCoverage[key] = { status: 'passed', evidence };
     return evidence;
   } catch (error) { report.extendedCoverage[key] = { ...report.extendedCoverage[key], status: 'failed', error: error.message }; throw error; }
+}
+async function requiredScope(id, name, work, dependencies = []) {
+  const missing = dependencies.filter(key => report.scopes.find(scope => scope.id === key)?.status !== 'passed');
+  const row = { id, name, status: missing.length ? 'blocked' : 'running', dependencies }; report.scopes.push(row);
+  if (missing.length) {
+    row.error = 'Required prerequisites did not pass: ' + missing.join(', ');
+    report.requiredScopeFailures.push({ id, status: row.status, error: row.error });
+    return { ok: false };
+  }
+  console.info(`[test-bench browser scope] ${name}`);
+  try {
+    const value = await work(); row.status = 'passed'; return { ok: true, value };
+  } catch (error) {
+    row.status = 'failed'; row.error = error.stack ?? error.message;
+    report.requiredScopeFailures.push({ id, status: row.status, error: error.message });
+    row.failureScreens = await Promise.all(players.map(player => failureScreen(player).catch(problem => ({ profile: player.name, unavailable: problem.message }))));
+    // Release only actual UI keys. The next independent scope starts through
+    // normal navigation; no match state or storage is edited to recover a test.
+    const released = await Promise.allSettled(players.map(player => keys(player)));
+    row.inputReleaseErrors = released.flatMap((result, index) => result.status === 'rejected' ? [{ profile: players[index].name, message: String(result.reason) }] : []);
+    return { ok: false };
+  }
 }
 async function availablePort() {
   const probe = createServer();
@@ -159,6 +185,12 @@ class Account {
   }
 }
 
+function resetKeyboardPrediction(player, reason, scope = null) {
+  player.steeringHistory = []; player.predictionScope = scope;
+  player.predictionStats.resets++;
+  if (player.predictionStats.resetObservations.length < 40) player.predictionStats.resetObservations.push({ reason, ...(scope ?? {}) });
+}
+
 function observe(player, page) {
   player.page = page; player.snapshot = null; player.receivedAt = 0;
   page.setDefaultTimeout(8000);
@@ -196,12 +228,15 @@ function observe(player, page) {
   });
   page.on('websocket', socket => {
     if (!socket.url().includes('/live')) return;
-    player.socketConnections++;
+    const connection = ++player.socketConnections;
+    resetKeyboardPrediction(player, 'New socket connection');
     socket.on('framereceived', event => {
       try {
         const frame = JSON.parse(String(event.payload));
-        if (frame.type === 'snapshot' && frame.view?.you) {
-          player.snapshot = frame; player.receivedAt = Date.now(); player.receivedFrames++;
+        if (frame.type === 'snapshot' && frame.view?.you && connection === player.socketConnections) {
+          const scope = { connection, roomId: frame.roomId, matchId: frame.matchId, epoch: frame.epoch, stage: frame.view.stage, phaseId: frame.view.phaseId, phase: frame.view.phase };
+          if (!player.predictionScope || Object.keys(scope).some(key => player.predictionScope[key] !== scope[key])) resetKeyboardPrediction(player, 'Received snapshot changed controller scope', scope);
+          player.snapshot = frame; player.snapshotConnection = connection; player.receivedAt = Date.now(); player.receivedFrames++;
           // Sample the exact accepted sequence, not older inputs that might have
           // been superseded before a snapshot. Both timestamps use this runner's clock.
           const sent = player.pendingInputs.get(frame.epoch + ':' + frame.lastAcceptedSeq);
@@ -216,6 +251,14 @@ function observe(player, page) {
         const frame = JSON.parse(String(event.payload));
         if (frame.type === 'input') {
           player.sentInputs++; player.lastSent = frame;
+          const scope = player.predictionScope;
+          if (scope?.connection === connection && scope.matchId === frame.matchId && scope.epoch === frame.epoch && scope.phase === 'racing' && scope.phaseId === frame.payload?.phaseId && Number.isFinite(frame.payload?.steering)) {
+            // This is an observation of a frame the application really sent,
+            // never a synthetic input frame or a mutation of gameplay state.
+            player.steeringHistory.push({ due: Date.now() + latencyMs, steering: frame.payload.steering });
+            if (player.steeringHistory.length > 30) player.steeringHistory.shift();
+            player.predictionStats.historyFrames++;
+          }
           if (player.neutralObservation?.matchId === frame.matchId) {
             const observation = player.neutralObservation; observation.count++;
             const input = frame.payload;
@@ -229,14 +272,18 @@ function observe(player, page) {
         }
       } catch { /* Other browser frames are not game input. */ }
     });
-    socket.on('close', () => player.socketCloses++);
+    socket.on('close', () => {
+      player.socketCloses++;
+      if (connection === player.socketConnections) resetKeyboardPrediction(player, 'Current socket closed');
+    });
   });
 }
 async function makePlayer(account, name, locale, hasTouch = false) {
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, hasTouch });
+  await context.addInitScript(() => performance.setResourceTimingBufferSize(2000));
   const separator = account.cookie.indexOf('=');
   await context.addCookies([{ name: account.cookie.slice(0, separator), value: account.cookie.slice(separator + 1), url: origin }]);
-  const player = { account, name, locale, context, held: new Set(), loadedAssets: new Set(), pendingInputs: new Map(), ackTimings: [], socketConnections: 0, socketCloses: 0, receivedFrames: 0, sentInputs: 0, transportErrors: [], snapshot: null, lastInteract: 0, lastRestore: 0, driveRemainder: { throttle: 0, steering: 0 } };
+  const player = { account, name, locale, context, held: new Set(), loadedAssets: new Set(), pendingInputs: new Map(), ackTimings: [], socketConnections: 0, socketCloses: 0, receivedFrames: 0, sentInputs: 0, transportErrors: [], snapshot: null, lastInteract: 0, lastRestore: 0, driveRemainder: { throttle: 0, steering: 0 }, steeringHistory: [], predictionScope: null, predictionStats: { calls: 0, historyFrames: 0, resets: 0, resetObservations: [], horizons: [], samples: [] } };
   observe(player, await context.newPage()); players.push(player); return player;
 }
 const label = (player, ru, en) => player.locale === 'ru' ? ru : en;
@@ -305,6 +352,7 @@ async function inspect(player, name, { race = false, low = false } = {}) {
 
 async function failureScreen(player) {
   const page = player.page;
+  const local = await page.locator('.tb-race').count().then(count => count ? localHud(player) : null).catch(() => null);
   const dialog = page.locator('dialog[open]').first();
   const hasDialog = await dialog.count().catch(() => 0);
   const scope = hasDialog ? dialog : page.locator('body');
@@ -313,7 +361,7 @@ async function failureScreen(player) {
     scope.ariaSnapshot({ timeout: 2000 }).catch(error => `Unavailable: ${error.message}`),
   ]);
   return {
-    profile: player.name, path: new URL(page.url()).pathname, scope: hasDialog ? 'open dialog' : 'body',
+    profile: player.name, path: new URL(page.url()).pathname, scope: hasDialog ? 'open dialog' : 'body', localHud: local,
     visibleText: visibleText.slice(0, 1800), visibleTextTruncated: visibleText.length > 1800,
     accessibility: accessibility.slice(0, 4200), accessibilityTruncated: accessibility.length > 4200,
   };
@@ -339,36 +387,99 @@ async function measureColdTransfer(player) {
     const navigation = performance.getEntriesByType('navigation');
     const entries = [...navigation, ...resources].map(entry => {
       const url = new URL(entry.name, location.href);
-      return { path: url.protocol === 'data:' ? '[data URL omitted]' : url.pathname, origin: url.origin, entryType: entry.entryType, initiatorType: entry.initiatorType, transferSize: entry.transferSize ?? null, encodedBodySize: entry.encodedBodySize ?? null, decodedBodySize: entry.decodedBodySize ?? null, responseEndMs: entry.responseEnd, durationMs: Math.round(entry.duration * 10) / 10 };
+      return { urlKey: url.protocol === 'data:' ? '[data URL omitted]' : url.origin + url.pathname + url.search, path: url.protocol === 'data:' ? '[data URL omitted]' : url.pathname, origin: url.origin, entryType: entry.entryType, initiatorType: entry.initiatorType, transferSize: entry.transferSize ?? null, encodedBodySize: entry.encodedBodySize ?? null, decodedBodySize: entry.decodedBodySize ?? null, deliveryType: entry.deliveryType ?? null, responseStatus: entry.responseStatus ?? null, startTimeMs: entry.startTime, responseEndMs: entry.responseEnd, durationMs: Math.round(entry.duration * 10) / 10 };
     });
     return { origin: location.origin, path: location.pathname, navigationEntries: navigation.length, resourceEntries: resources.length, documentReadyState: document.readyState, fontStatus: document.fonts.status, fontErrors: [...document.fonts].filter(font => font.status === 'error').map(font => ({ family: font.family, style: font.style, weight: font.weight })), entries, capturedAtMs: Math.round(performance.now()) };
   });
-  const sameOrigin = measured.entries.filter(entry => entry.origin === measured.origin);
+  const sameOrigin = measured.entries.filter(entry => entry.origin === measured.origin).sort((a, b) => a.responseEndMs - b.responseEndMs);
   const excluded = measured.entries.filter(entry => entry.origin !== measured.origin);
-  const zeroOrUnavailable = sameOrigin.filter(entry => !Number.isFinite(entry.transferSize) || entry.transferSize <= 0 || !Number.isFinite(entry.encodedBodySize) || entry.encodedBodySize <= 0);
+  const positive = new Map(); const cachedRepeats = []; const unavailable = [];
+  for (const entry of sameOrigin) {
+    if (Number.isFinite(entry.transferSize) && entry.transferSize > 0 && Number.isFinite(entry.encodedBodySize) && entry.encodedBodySize > 0) {
+      entry.transferClassification = 'network estimate'; positive.set(entry.urlKey, entry);
+    } else if (entry.transferSize === 0 && entry.encodedBodySize > 0 && positive.get(entry.urlKey)?.encodedBodySize === entry.encodedBodySize) {
+      entry.transferClassification = 'in-scene cached repeat of an earlier measured URL'; cachedRepeats.push(entry);
+    } else { entry.transferClassification = 'incomplete or unestablished cache source'; unavailable.push(entry); }
+  }
   const record = {
     profile: player.name, context: 'Fresh independent browser context, first home navigation, before settings/reloads/catalog',
     scope: 'All same-origin navigation and resource timing entries, including portal scripts, game assets, fonts and API requests',
     ...measured, entries: sameOrigin, excludedOrigins: excluded,
     readiness, transferBytes: sameOrigin.reduce((sum, entry) => sum + (entry.transferSize ?? 0), 0),
+    transferIsBrowserEstimate: true, exactWireBytesMeasured: false, fixedHeaderAllowanceBytes: 300,
+    measurementReference: 'https://www.w3.org/TR/resource-timing/#dom-performanceresourcetiming-transfersize',
     encodedBodyBytes: sameOrigin.reduce((sum, entry) => sum + (entry.encodedBodySize ?? 0), 0),
-    zeroOrUnavailableEntries: zeroOrUnavailable,
-    timingBufferPossiblyFull: measured.resourceEntries >= 250,
+    encodedBodyBytesIncludesCachedRepeats: true,
+    transferredEncodedBodyBytes: sameOrigin.filter(entry => entry.transferSize > 0).reduce((sum, entry) => sum + (entry.encodedBodySize ?? 0), 0),
+    inSceneCachedRepeats: cachedRepeats, zeroOrUnavailableEntries: unavailable,
+    resourceTimingBufferLimit: 2000, timingBufferPossiblyFull: measured.resourceEntries >= 2000,
   };
-  const reliable = readiness.scene && readiness.fonts && readiness.networkIdle && measured.documentReadyState === 'complete' && measured.navigationEntries === 1 && measured.fontErrors.length === 0 && zeroOrUnavailable.length === 0 && excluded.length === 0 && measured.resourceEntries < 250 && !report.failedAssets.some(asset => asset.profile === player.name);
-  record.budget = { limitBytes: 6000000, reliableCompleteMeasurement: reliable, passed: reliable ? record.transferBytes <= 6000000 : null, note: reliable ? 'Browser-measured cold transfer; 6 MB decimal limit.' : 'No complete-budget assertion: readiness, omitted origins, buffer capacity, failed resources or zero/unavailable timing fields prevent a reliable complete measurement. Zero transfer may mean cache reuse; it is not replaced with asset-bank size.' };
+  const reliable = readiness.scene && readiness.fonts && readiness.networkIdle && measured.documentReadyState === 'complete' && measured.navigationEntries === 1 && measured.fontErrors.length === 0 && unavailable.length === 0 && excluded.length === 0 && measured.resourceEntries < 2000 && !report.failedAssets.some(asset => asset.profile === player.name);
+  record.budget = { limitBytes: 6000000, reliableCompleteMeasurement: reliable, passed: reliable ? record.transferBytes <= 6000000 : null, note: reliable ? 'Complete browser cold-transfer estimate with the specified fixed 300-byte header allowance, not exact wire bytes; 6 MB decimal limit. Proven in-scene cached repeats add zero network transfer.' : 'Required measurement fails: unavailable timings, unestablished cache sources, readiness, omitted origins, buffer capacity or failed resources prevent a complete estimate and valid budget comparison. Asset-bank size is never substituted.' };
   report.coldTransfers.push(record);
-  if (reliable) assert.ok(record.budget.passed, `${player.name}: complete browser-measured cold transfer ${record.transferBytes} exceeds 6,000,000 bytes`);
+  assert.ok(reliable, `${player.name}: the required complete cold-transfer estimate is unavailable; see recorded readiness and timing gaps`);
+  assert.ok(record.budget.passed, `${player.name}: complete browser cold-transfer estimate ${record.transferBytes} exceeds 6,000,000 bytes`);
   return record.budget;
 }
 
-async function settings(player, { locale = player.locale, renderer = '3d', quality = 'low', exhaustive = false } = {}) {
+async function nodePathCalibration() {
+  const sample = async url => {
+    const samples = [];
+    for (let i = 0; i < 6; i++) {
+      const began = performance.now();
+      const response = await http(url + '/health/ready', { headers: { Host: new URL(origin).host }, cache: 'no-store' });
+      assert.equal(response.status, 200); await response.arrayBuffer(); samples.push(performance.now() - began);
+    }
+    return { samplesMs: samples.map(value => Math.round(value * 10) / 10), ...timing(samples) };
+  };
+  const result = { method: 'Node fetch plus body completion against the same isolated platform, before browser launch', hostHeader: new URL(origin).host, configuredPerDirectionMs: latencyMs, pureNetworkRtt: false, directBackend: await sample(`http://127.0.0.1:${port}`), configuredPublicPath: await sample(origin) };
+  report.transport.nodeCalibration = result; return result;
+}
+
+async function browserPathProbe(player) {
+  const samples = await player.page.evaluate(async () => {
+    const result = [];
+    for (let i = 0; i < 5; i++) {
+      const url = new URL('/health/ready?bench_timing=' + crypto.randomUUID(), location.origin).href;
+      const started = performance.now();
+      const response = await fetch(url, { cache: 'no-store' });
+      if (!response.ok) throw new Error('Readiness request failed');
+      await response.arrayBuffer(); const javascriptCompletionMs = performance.now() - started;
+      // Resource entries are published asynchronously after response completion.
+      await new Promise(resolve => setTimeout(resolve, 0));
+      const entry = performance.getEntriesByName(url, 'resource').at(-1);
+      result.push({ javascriptCompletionMs, requestStart: entry?.requestStart ?? null, responseStart: entry?.responseStart ?? null, responseEnd: entry?.responseEnd ?? null, transferSize: entry?.transferSize ?? null, encodedBodySize: entry?.encodedBodySize ?? null, responseStatus: entry?.responseStatus ?? null, networkServerBodyMs: entry && entry.requestStart > 0 && entry.responseEnd >= entry.requestStart ? entry.responseEnd - entry.requestStart : null });
+    }
+    return result;
+  });
+  const valid = samples.filter(sample => Number.isFinite(sample.networkServerBodyMs) && sample.transferSize > 0 && sample.encodedBodySize > 0);
+  const result = {
+    profile: player.name, renderer: await player.page.locator('canvas.tb-scene-canvas').getAttribute('data-renderer'),
+    method: 'Resource Timing responseEnd minus requestStart; includes network, server and response body transfer. An RTT proxy, not exact pure network RTT.',
+    reference: 'https://www.w3.org/TR/resource-timing/', samples,
+    networkServerBodyMs: timing(valid.map(sample => sample.networkServerBodyMs)),
+    javascriptFetchBodyCompletionMs: timing(samples.map(sample => sample.javascriptCompletionMs)),
+    unavailableNetworkSamples: samples.length - valid.length,
+  };
+  report.transport.browserPathProbe = result;
+  assert.equal(valid.length, 5, 'All five browser probes require genuine same-origin network timing and body measurements');
+  if (latencyMs >= 50 && latencyMs <= 100) assert.ok(result.networkServerBodyMs.p50 >= 100 && result.networkServerBodyMs.p50 <= 200, 'The browser-measured network/server/body RTT proxy must be within 100–200 ms; JavaScript completion is reported separately');
+  return result;
+}
+
+async function settings(player, { locale = player.locale, renderer = '3d', quality = 'low', exhaustive = false, normalize = false } = {}) {
   const page = player.page;
   await page.getByRole('button', { name: label(player, 'Настройки', 'Settings'), exact: true }).click();
   let dialog = page.locator('dialog[open]');
   if (locale !== player.locale) { await dialog.getByLabel(label(player, 'Язык', 'Language'), { exact: true }).selectOption(locale); player.locale = locale; }
   await dialog.getByLabel(label(player, 'Вид', 'View'), { exact: true }).selectOption(renderer);
   await dialog.getByLabel(label(player, 'Качество', 'Quality'), { exact: true }).selectOption(quality);
+  if (normalize) {
+    await dialog.getByLabel(label(player, 'Размер текста', 'Text size'), { exact: true }).selectOption('100');
+    await dialog.getByLabel(label(player, 'Уменьшить движение', 'Reduce motion'), { exact: true }).uncheck();
+    await dialog.getByLabel(label(player, 'Пыль и брызги', 'Dust and spray'), { exact: true }).check();
+    await dialog.getByRole('button', { name: label(player, 'Сбросить клавиши', 'Reset keys') }).click();
+  }
   if (exhaustive) {
     await dialog.getByLabel(label(player, 'Размер текста', 'Text size'), { exact: true }).selectOption('130');
     await expect(dialog.getByLabel(label(player, 'Размер текста', 'Text size'), { exact: true })).toHaveValue('130');
@@ -390,6 +501,15 @@ async function settings(player, { locale = player.locale, renderer = '3d', quali
     await page.keyboard.press('Escape'); await expect(dialog).toHaveCount(0);
   } else await dialog.getByRole('button', { name: label(player, 'Готово', 'Done'), exact: true }).click();
   await expect(page.locator('canvas.tb-scene-canvas')).toHaveAttribute('data-renderer', renderer);
+}
+
+async function prepareProfile(player, locale, renderer) {
+  await keys(player); await player.page.setViewportSize({ width: 1440, height: 900 });
+  await player.page.goto(origin + '/games/test-bench');
+  const actualLocale = await player.page.locator('main.tb-app').getAttribute('lang');
+  assert.ok(['ru', 'en'].includes(actualLocale), 'The visible page must identify its current locale'); player.locale = actualLocale;
+  await settings(player, { locale, renderer, quality: 'low', normalize: true });
+  return { profile: player.name, locale: player.locale, renderer: await player.page.locator('canvas.tb-scene-canvas').getAttribute('data-renderer'), configuredThroughUi: true };
 }
 
 async function selectPart(player, slot, part, online = true, expectError) {
@@ -443,6 +563,41 @@ async function localDriveTo(player, target, speed = 2.2, extra = () => false, ti
   await keys(player); throw new Error(`Local keyboard driver did not reach ${target} m: ${JSON.stringify(await localHud(player))}`);
 }
 
+async function approachLoadingDock(player) {
+  await focusLane(player);
+  let brakingSince = null;
+  const hud = await until(async () => {
+    const observed = await localHud(player);
+    assert.ok(Number.isFinite(observed.z) && Number.isFinite(observed.speed), 'Dock approach requires visible minimap coordinates and rounded HUD speed');
+    assert.equal(observed.result, false, 'Dock approach must finish within the real local trial deadline');
+    const load = observed.canInteract && observed.interaction?.includes(label(player, 'Загрузить груз', 'Load cargo'));
+    const slowDown = observed.interaction?.includes(label(player, 'Остановись для погрузки', 'Stop to load'));
+    const brake = load || slowDown || observed.speed > .7;
+    await keys(player, brake ? ['Space'] : [observed.z < 3.12 ? 'KeyW' : 'KeyS']);
+    if (!brake) brakingSince = null;
+    else brakingSince ??= performance.now();
+    // Wall time alone is insufficient on a software renderer: re-read the
+    // real enabled loading control and low HUD speed after holding the brake.
+    if (load && observed.speed <= .3 && brakingSince !== null && performance.now() - brakingSince >= 400) {
+      const fresh = await localHud(player);
+      if (fresh.canInteract && fresh.interaction?.includes(label(player, 'Загрузить груз', 'Load cargo')) && fresh.speed <= .3) return fresh;
+    }
+    return false;
+  }, 'enabled Load cargo control after at least 400 ms braking and a fresh visible speed at most 0.3 m/s', 40000, 100);
+  return hud;
+}
+
+async function restartPractice(player) {
+  await keys(player);
+  const before = await localHud(player);
+  await player.page.locator('.tb-local-footer').getByRole('button', { name: new RegExp(label(player, 'Начать заново', 'Restart')) }).click();
+  const after = await until(async () => {
+    const hud = await localHud(player);
+    return Number.isFinite(hud.z) && hud.z < 1 && hud.speed <= .1 && !hud.result && hud.cargo.length === 3 && hud.cargo.every(cargo => cargo.status === 'at-dock') && hud;
+  }, 'Restart creates a fresh stationary practice lane with three docked capsules');
+  return { method: 'Actual Restart button after releasing all keyboard controls', before, after };
+}
+
 async function practiceChecks(alice, bob) {
   await scenario('Every catalog part can be selected on a legal practice build', async () => {
     await alice.page.goto(origin + '/games/test-bench?mode=practice'); await expect(alice.page.locator('.tb-builder')).toBeVisible();
@@ -478,6 +633,7 @@ async function practiceChecks(alice, bob) {
     await top.click();
     const starts = [];
     for (const presetId of ['universal', 'gentle']) {
+      let resetAfterFault = null;
       await preset(alice, presetId, false);
       await page.getByRole('button', { name: /Проверить/ }).click();
       await expect(page.locator('.tb-race')).toBeVisible();
@@ -497,12 +653,13 @@ async function practiceChecks(alice, bob) {
         const fallback = await localHud(alice); assert.ok(fallback.z >= before.z - .05, 'Renderer fallback must preserve the lane');
         await page.getByRole('button', { name: 'Вернуть 3D', exact: true }).click();
         await expect(page.locator('canvas.tb-scene-canvas')).toHaveAttribute('data-renderer', '3d');
+        resetAfterFault = await restartPractice(alice);
       }
-      await localDriveTo(alice, 3.1, 1.7, hud => hud.canInteract && hud.speed <= .35);
+      const dock = await approachLoadingDock(alice);
       await keys(alice); await expect(page.locator('.tb-interact')).toBeEnabled(); await page.locator('.tb-interact').click();
       const loaded = await until(async () => { const hud = await localHud(alice); return hud.cargo.length === 3 && hud.cargo.every(cargo => cargo.status === 'secured' && cargo.health > 0) && hud; }, 'all three capsules are secured before the same-obstacle comparison');
       const reached = await localDriveTo(alice, 16, 2.4);
-      starts.push({ preset: presetId, x: reached.x, z: reached.z, speed: reached.speed, charge: reached.charge, remainingSeconds: reached.timer, loading: { x: loaded.x, z: loaded.z, cargo: loaded.cargo }, endingCargo: reached.cargo });
+      starts.push({ preset: presetId, resetAfterFault, x: reached.x, z: reached.z, speed: reached.speed, charge: reached.charge, remainingSeconds: reached.timer, loading: { approach: dock, x: loaded.x, z: loaded.z, cargo: loaded.cargo }, endingCargo: reached.cargo });
       await inspect(alice, `practice-${presetId}-same-ribs`, { race: true, low: true });
       await keys(alice); await page.locator('.tb-local-footer').getByRole('button', { name: /В мастерскую/ }).click();
       await expect(page.locator('.tb-builder')).toBeVisible();
@@ -620,7 +777,7 @@ async function tutorial(player) {
   const next = () => page.locator('.tb-race-lesson .tb-primary');
   await localDriveTo(player, 14, 3, hud => hud.next); await keys(player); await next().click();
   await until(async () => (await localHud(player)).z < 1, 'tutorial restarts at the dock lesson');
-  await localDriveTo(player, 3.1, 1.7, hud => hud.canInteract && hud.speed <= .35);
+  await approachLoadingDock(player);
   await keys(player); const load = page.locator('.tb-interact'); await expect(load).toBeEnabled(); await load.focus(); await load.press('Space');
   await expect(page.locator('.tb-cargo-slot')).toHaveClass(/secured/); await next().click();
   await focusLane(player); await keys(player, ['KeyW']);
@@ -632,7 +789,7 @@ async function tutorial(player) {
   await next().click();
   await until(async () => (await localHud(player)).z < 1, 'tutorial restarts for the slow comparison');
   await expect(page.locator('.tb-race-lesson p b')).toHaveText(String(fast.health));
-  await localDriveTo(player, 3.1, 1.7, hud => hud.canInteract && hud.speed <= .35);
+  await approachLoadingDock(player);
   await keys(player); await page.locator('.tb-interact').click(); await expect(page.locator('.tb-cargo-slot')).toHaveClass(/secured/);
   await localDriveTo(player, 14, .85, hud => hud.next, 45000);
   await until(async () => (await localHud(player)).next, 'tutorial holds its slow goal through the required settling period', 10000, 40);
@@ -708,10 +865,16 @@ async function createCup(alice, bob) {
   await roomAction(bob, bob.page.getByRole('button', { name: /^I’m ready/ }), '/ready');
   await expect(alice.page.getByRole('button', { name: /Начать кубок/ })).toBeEnabled({ timeout: 8000 });
   await inspect(alice, 'ru-four-seat-lobby'); await inspect(bob, 'en-four-seat-lobby');
+  const priorConnections = [alice, bob].map(player => player.socketConnections);
   room = (await roomAction(alice, alice.page.getByRole('button', { name: /Начать кубок/ }), '/start')).room;
-  await Promise.all([alice, bob].map(player => waitView(player, value => !!value, 'personalized live cup snapshot')));
+  // The start response can still be in 'starting' with a null matchId. Bind
+  // its created room to the first new connection, then require the same
+  // authoritative match identity in the second independent profile.
+  await waitView(alice, current => alice.snapshotConnection > priorConnections[0] && current.roomId === room.roomId && !!current.matchId && (!room.matchId || current.matchId === room.matchId), 'new live connection for the created cup room');
+  const matchId = view(alice).matchId;
+  await waitView(bob, current => bob.snapshotConnection > priorConnections[1] && current.roomId === room.roomId && current.matchId === matchId, 'second profile receives the same newly created cup');
   assert.notEqual(view(alice).you.participantId, view(bob).you.participantId);
-  return { roomId: room.roomId, matchId: view(alice).matchId, labelledBotSeats: 2, capacities: options, readyUnready: true };
+  return { roomId: room.roomId, matchId, labelledBotSeats: 2, capacities: options, readyUnready: true, initialConnections: [alice, bob].map((player, index) => ({ profile: player.name, prior: priorConnections[index], observed: player.snapshotConnection })) };
 }
 
 async function buildStage(alice, bob, stage) {
@@ -765,12 +928,13 @@ async function buildStage(alice, bob, stage) {
 
 async function keyboardDrive(player) {
   const snapshot = player.snapshot;
-  if (!fresh(player) || snapshot.view.phase !== 'racing' || !snapshot.view.you.lane || snapshot.view.you.lane.finished) { await keys(player); return; }
+  if (!fresh(player) || player.snapshotConnection !== player.socketConnections || !player.predictionScope || snapshot.view.phase !== 'racing' || !snapshot.view.you.lane || snapshot.view.you.lane.finished) { await keys(player); return; }
   const lane = snapshot.view.you.lane, track = snapshot.view.track;
-  const decision = policy.chooseBotInput(lane, track, 'normal');
-  const desired = decision.input.steering * (33 - 16 * Math.min(1, lane.car.speed / policy.PARTS[lane.blueprint.motor].maxSpeed)) * Math.PI / 180;
-  const actual = lane.car.wheels[0]?.steering ?? 0;
-  const steering = desired > .02 ? actual < desired ? 1 : 0 : desired < -.02 ? actual > desired ? -1 : 0 : 0;
+  const { decision, steering, prediction } = policy.chooseBrowserKeyboardInput(lane, track, { snapshotTimeMs: snapshot.serverTime, nowMs: Date.now(), delayMs: latencyMs, sentSteering: player.steeringHistory });
+  if (prediction) {
+    player.predictionStats.calls++; player.predictionStats.horizons.push(prediction.horizonMs);
+    if (player.predictionStats.samples.length < 12) player.predictionStats.samples.push({ stage: snapshot.view.stage, phaseId: snapshot.view.phaseId, tick: lane.tick, ...prediction });
+  }
   const wanted = [];
   if (decision.input.brake) wanted.push('Space');
   else if (decision.input.throttle > .05) wanted.push('KeyW');
@@ -837,8 +1001,10 @@ async function driveStage(alice, bob, roomId, stage) {
     }
     if (!snapshots && current.every(state => state?.you.lane?.tick > 150)) {
       for (const player of [alice, bob]) await keys(player, ['Space']);
-      await inspect(alice, `stage-${stage + 1}-race-3d`, { race: true, low: true });
-      await inspect(bob, `stage-${stage + 1}-race-2d`, { race: true });
+      for (const player of [alice, bob]) {
+        const renderer = await player.page.locator('canvas.tb-scene-canvas').getAttribute('data-renderer');
+        await inspect(player, `stage-${stage + 1}-race-${renderer}`, { race: true, low: true });
+      }
       for (const player of [alice, bob]) await focusLane(player);
       snapshots = true;
     }
@@ -1032,17 +1198,20 @@ async function zeroScoreTieCup(alice, bob) {
 }
 
 async function returnToOriginalCup(alice, bob, original) {
+  const observations = [];
   for (const player of [alice, bob]) {
+    const priorConnection = player.socketConnections;
     await keys(player); await player.page.goto(origin + '/rooms/' + original.roomId);
-    await waitView(player, current => current.matchId === original.matchId && current.roomId === original.roomId && current.phase === 'finished', 'original four-seat cup is restored from its saved room');
+    await waitView(player, current => player.snapshotConnection > priorConnection && current.matchId === original.matchId && current.roomId === original.roomId && current.phase === 'finished', 'a new room connection restores the original finished four-seat cup');
     assert.deepEqual(view(player).standings, original.standings);
     assert.deepEqual(view(player).stages, original.stages);
     assert.equal(view(player).players.length, 4);
     assert.equal(view(player).players.filter(value => value.controller.kind === 'bot').length, 2);
     await expect(player.page.locator('.tb-results h1')).toHaveText(label(player, 'Кубок завершён', 'Cup complete'));
     await assertVisibleStandings(player, original.standings);
+    observations.push({ profile: player.name, priorConnection, restoredSnapshotConnection: player.snapshotConnection, restoredEpoch: player.snapshot.epoch });
   }
-  return { originalRoomId: original.roomId, originalMatchId: original.matchId, profiles: 2, savedStandingsIdentical: true, savedStagesIdentical: true, normalFourSeatCup: true, readyForOriginalRematch: true };
+  return { originalRoomId: original.roomId, originalMatchId: original.matchId, profiles: 2, observations, savedStandingsIdentical: true, savedStagesIdentical: true, normalFourSeatCup: true, readyForOriginalRematch: true };
 }
 
 async function rematch(alice, bob, prior) {
@@ -1089,6 +1258,7 @@ try {
   policy = await import(pathToFileURL(join(fixtureDirectory, 'qa-driver.mjs')).href);
   port = await availablePort(); if (latencyMs) relay = await delayedLoopback(port, latencyMs);
   origin = `http://127.0.0.1:${relay?.port ?? port}`; await start();
+  await requiredScope('nodeCalibration', 'Node direct/backend and configured-path calibration before launching Chromium', nodePathCalibration);
   browser = await chromium.launch({ headless: true, args: ['--enable-unsafe-swiftshader', '--disable-background-timer-throttling', '--disable-renderer-backgrounding', '--disable-backgrounding-occluded-windows'], ...(process.env.IVA_CHROMIUM_PATH ? { executablePath: process.env.IVA_CHROMIUM_PATH } : {}) });
   report.browserVersion = browser.version();
   const accountA = await new Account().register('bench_ui_alice'), accountB = await new Account().register('bench_ui_bob');
@@ -1096,40 +1266,72 @@ try {
   const friendship = await accountA.request('/friend-requests', { playerId: accountB.user.playerId });
   await accountB.request(`/friend-requests/${friendship.requestId}/accept`, {});
   const alice = await makePlayer(accountA, 'alice', 'ru'), bob = await makePlayer(accountB, 'bob', 'ru', true);
-  await scenario('Home scenes, RU/EN preferences, focus and settings errors', async () => {
+  await requiredScope('coldHome', 'Capture the complete first-home browser transfer estimate before settings', async () => {
     for (const player of [alice, bob]) await player.page.goto(origin + '/games/test-bench');
-    await Promise.all([alice, bob].map(measureColdTransfer));
-    const healthRoundTrips = await alice.page.evaluate(async () => {
-      const samples = [];
-      for (let i = 0; i < 5; i++) { const start = performance.now(); const response = await fetch('/health/ready', { cache: 'no-store' }); if (!response.ok) throw new Error('Readiness request failed'); await response.arrayBuffer(); samples.push(performance.now() - start); }
-      return samples;
-    });
-    report.transport.browserHealthRoundTripMs = timing(healthRoundTrips);
-    if (latencyMs >= 50 && latencyMs <= 100) assert.ok(report.transport.browserHealthRoundTripMs.p50 >= 100 && report.transport.browserHealthRoundTripMs.p50 <= 200, 'The measured delayed browser path must be within the requested 100–200ms RTT band');
+    // Both fresh measurements must settle before any settings/navigation from
+    // a later independent scope; one failure must not race the other capture.
+    const captured = await Promise.allSettled([alice, bob].map(measureColdTransfer));
+    const errors = captured.flatMap(result => result.status === 'rejected' ? [result.reason] : []);
+    if (errors.length) throw new AggregateError(errors, 'One or both cold-home measurements failed');
     await expect(alice.page.locator('canvas.tb-scene-canvas')).toHaveAttribute('data-renderer', '3d');
+    await expect(bob.page.locator('canvas.tb-scene-canvas')).toHaveAttribute('data-renderer', '3d');
+  });
+  await requiredScope('preferences', 'Home scenes, RU/EN preferences, focus and settings errors', async () => scenario('Home scenes, RU/EN preferences, focus and settings errors', async () => {
+    for (const player of [alice, bob]) {
+      await player.page.goto(origin + '/games/test-bench');
+      player.locale = await player.page.locator('main.tb-app').getAttribute('lang');
+    }
     await settings(alice, { exhaustive: true, renderer: '3d', quality: 'low' });
     await settings(bob, { locale: 'en', renderer: '2d', quality: 'low', exhaustive: true });
     await inspect(alice, 'home-ru-3d', { low: true }); await inspect(bob, 'home-en-2d');
     return { independentContexts: 2, localizations: ['ru', 'en'], renderers: ['3d', '2d'], keyRebindAndReset: true, duplicateKeyError: true, text130: true };
+  }));
+  await requiredScope('practice', 'Independent practice: catalog, loaded comparison, pause, WebGL loss and short touch layout', async () => {
+    await prepareProfile(alice, 'ru', '3d'); await prepareProfile(bob, 'en', '2d');
+    await practiceChecks(alice, bob);
   });
-  await practiceChecks(alice, bob);
-  if (extended) await extendedScenario('looseCargoPickup', 'Extended: survive a real cargo fall, collect it with E and retain all three cells', () => survivingLoosePickup(bob));
-  await scenario('Complete the six-step tutorial through visible HUD and real keys', () => tutorial(alice));
-  const finished = await cup(alice, bob);
+  const lesson = await requiredScope('tutorial', 'Independent six-step tutorial with actual local physics', async () => {
+    await prepareProfile(alice, 'ru', '3d');
+    return scenario('Complete the six-step tutorial through visible HUD and real keys', () => tutorial(alice));
+  });
+  if (!lesson.ok) report.tutorial = 'failed';
+  await requiredScope('onlinePreparation', 'Configure both online renderers through normal settings UI', async () => {
+    const renderers = [await prepareProfile(alice, 'ru', latencyMs ? '2d' : '3d'), await prepareProfile(bob, 'en', '2d')];
+    report.onlineRenderers = { reason: latencyMs ? 'Both profiles use 2D for delayed-path driving; separate 3D practice checks are retained' : 'Direct-path Alice uses 3D and Bob uses 2D', profiles: renderers };
+  });
+  await requiredScope('browserNetwork', 'Resource Timing path interval and separate JavaScript completion after renderer settings', () => browserPathProbe(alice), ['onlinePreparation']);
+  // A failed measurement/practice/tutorial still makes the overall run fail,
+  // but does not suppress independent online evidence through normal UI.
+  const finished = await requiredScope('normalCup', 'Independent normal three-stage cup: two keyboard drivers and two explicit bots', () => cup(alice, bob), ['onlinePreparation']);
+  const original = finished.ok ? { ...finished.value, standings: structuredClone(view(alice).standings), stages: structuredClone(view(alice).stages) } : null;
   if (extended) {
-    const original = { ...finished, standings: structuredClone(view(alice).standings), stages: structuredClone(view(alice).stages) };
-    await extendedScenario('zeroScoreTieCup', 'Extended: separate zero-score tie cup, two humans, no bots, three real deadlines', () => zeroScoreTieCup(alice, bob));
-    await extendedScenario('originalFinishedCupReturn', 'Extended: both profiles return to the saved original four-seat cup before its rematch', () => returnToOriginalCup(alice, bob, original));
+    const pickup = await requiredScope('looseCargoPickup', 'Independent extended surviving loose-cargo pickup after the normal cup attempt', async () => {
+      await prepareProfile(bob, 'en', '2d');
+      return extendedScenario('looseCargoPickup', 'Extended: survive a real cargo fall, collect it with E and retain all three cells', () => survivingLoosePickup(bob));
+    });
+    if (!pickup.ok && report.extendedCoverage.looseCargoPickup.status === 'not started') report.extendedCoverage.looseCargoPickup = { status: 'blocked', error: 'Normal UI preparation for this independent target failed' };
+    const tie = await requiredScope('zeroScoreTieCup', 'Independent targeted zero-score tie with three real deadlines', async () => {
+      await prepareProfile(alice, 'ru', latencyMs ? '2d' : '3d'); await prepareProfile(bob, 'en', '2d');
+      return extendedScenario('zeroScoreTieCup', 'Extended: separate zero-score tie cup, two humans, no bots, three real deadlines', () => zeroScoreTieCup(alice, bob));
+    });
+    if (!tie.ok && report.extendedCoverage.zeroScoreTieCup.status === 'not started') report.extendedCoverage.zeroScoreTieCup = { status: 'blocked', error: 'Normal UI preparation for this independent target failed' };
+    const restored = await requiredScope('originalFinishedCupReturn', 'Restore and verify the saved normal cup before its rematch', () => extendedScenario('originalFinishedCupReturn', 'Extended: both profiles return to the saved original four-seat cup before its rematch', () => returnToOriginalCup(alice, bob, original)), ['normalCup']);
+    if (!restored.ok && report.extendedCoverage.originalFinishedCupReturn.status === 'not started') report.extendedCoverage.originalFinishedCupReturn = { status: 'blocked', error: 'The normal cup did not complete; there is no accepted saved final to restore' };
   }
-  await scenario('Rematch preserves explicit bots, invites the friend and starts a new cup', () => rematch(alice, bob, finished));
-  assert.deepEqual(report.browserErrors, [], 'Uncaught browser application errors');
-  assert.deepEqual(report.failedAssets, [], 'Failed production game assets');
-  assert.deepEqual(report.actionErrors, [], 'Unexpected rejected UI gameplay actions');
-  for (const player of players) assert.deepEqual(player.transportErrors, [], `${player.name}: transport error frames`);
+  await requiredScope('rematch', 'Rematch of the completed normal cup', () => scenario('Rematch preserves explicit bots, invites the friend and starts a new cup', () => rematch(alice, bob, finished.value)), ['normalCup', ...(extended ? ['originalFinishedCupReturn'] : [])]);
   report.assetLoads = players.map(player => ({ profile: player.name, glbs: [...player.loadedAssets].filter(path => path.endsWith('.glb')).length, files: player.loadedAssets.size, receivedSnapshots: player.receivedFrames, sentInputFrames: player.sentInputs, socketConnections: player.socketConnections, socketCloses: player.socketCloses }));
   report.transport.inputToAcknowledgedSnapshotMs = players.map(player => ({ profile: player.name, ...timing(player.ackTimings) }));
-  for (const player of players) assert.ok(player.ackTimings.length > 20, 'Actual browser input acknowledgements must be measured');
-  assert.ok(report.assetLoads[0].glbs >= 30, 'The real renderer must load final exported GLBs across workshop and trials');
+  await requiredScope('observedErrors', 'All attempted scopes retain application, asset, action and transport errors', async () => {
+    assert.deepEqual(report.browserErrors, [], 'Uncaught browser application errors');
+    assert.deepEqual(report.failedAssets, [], 'Failed production game assets');
+    assert.deepEqual(report.actionErrors, [], 'Unexpected rejected UI gameplay actions');
+    for (const player of players) assert.deepEqual(player.transportErrors, [], `${player.name}: transport error frames`);
+  });
+  await requiredScope('completedCupEvidence', 'Completed-cup asset and input acknowledgement evidence', async () => {
+    for (const player of players) assert.ok(player.ackTimings.length > 20, 'Actual browser input acknowledgements must be measured');
+    assert.ok(report.assetLoads[0].glbs >= 30, 'The real renderer must load final exported GLBs across workshop and trials');
+  }, ['normalCup']);
+  if (report.requiredScopeFailures.length) throw new Error('Required browser scopes failed or were blocked: ' + report.requiredScopeFailures.map(scope => scope.id + ' (' + scope.status + ')').join(', '));
   report.status = 'passed automated scope';
 } catch (error) {
   failure = error; report.status = 'failed'; report.error = error.stack ?? error.message;
@@ -1138,7 +1340,7 @@ try {
   for (const player of players) {
     // Keep the observed names and visible state in the console's final report:
     // CI deliberately uploads no screenshots, traces or report artifacts.
-    report.failureScreens.push(await failureScreen(player));
+    report.failureScreens.push(await failureScreen(player).catch(problem => ({ profile: player.name, unavailable: problem.message })));
     await player.page.screenshot({ path: join(output, `${player.name}-failure.png`), fullPage: true }).catch(() => {});
     await writeFile(join(output, `${player.name}-failure.txt`), await player.page.locator('body').innerText().catch(() => 'Page unavailable'));
   }
@@ -1146,7 +1348,13 @@ try {
   const cargoEvents = report.cups.flatMap(value => value.stages).flatMap(value => Object.values(value.events ?? {}));
   if (!cargoEvents.some(value => value.lost > 0 && value['picked-up'] > 0) && report.extendedCoverage.looseCargoPickup.status !== 'passed') report.openCoverage.push('A surviving loose cargo pickup was not observed in this browser run; separate targeted exercise remains required');
   if (report.extendedCoverage.zeroScoreTieCup.status !== 'passed') report.openCoverage.push('An exact tied final result was not constructed by this real-input run; scoring tests are separate evidence');
+  const incompleteColdProfiles = report.coldTransfers.filter(value => !value.budget.reliableCompleteMeasurement).map(value => value.profile);
+  if (incompleteColdProfiles.length || report.coldTransfers.length < 2) report.openCoverage.push('A complete browser cold-transfer budget estimate remains unavailable for ' + (incompleteColdProfiles.join(', ') || 'one or both fresh profiles'));
   report.transport.inputToAcknowledgedSnapshotMs = players.map(player => ({ profile: player.name, ...timing(player.ackTimings) }));
+  report.controller.profiles = players.map(player => {
+    const { horizons, ...stats } = player.predictionStats;
+    return { profile: player.name, ...stats, predictionHorizonMs: timing(horizons) };
+  });
   try { await cleanup(); } catch (error) { failure ??= error; report.status = 'failed'; report.cleanupError = error.message; }
   await mkdir(output, { recursive: true }); await writeFile(join(output, 'report.json'), JSON.stringify(report, null, 2) + '\n');
   console.info(JSON.stringify({ ...report, layouts: report.layouts.map(({ name, profile, width, height, scrollWidth, controls }) => ({ name, profile, width, height, scrollWidth, offscreen: controls.filter(control => control.visible && !control.inViewport) })) }));
