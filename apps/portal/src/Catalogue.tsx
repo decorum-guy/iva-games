@@ -82,7 +82,7 @@ export function Catalogue({ page, games, user, busy, offline, retry, onPlay, onA
                 {launch ? <a className="button small primary" href={launch}>{t("Играть", "Play")}</a>
                   : <button className={`button small ${available ? "primary" : "secondary"}`} disabled={busy}
                     onClick={() => available ? onPlay(game) : onAbout(game)}>
-                    {available ? !user ? t("Войти и играть", "Sign in to play") : !user.emailVerified
+                    {available ? !user ? t("Войти и играть", "Sign in to play") : !(user.emailVerified || user.telegramVerified)
                       ? t("Подтвердить почту", "Confirm email") : t("Собрать стол", "Gather a table") : t("Об игре", "About game")}
                   </button>}
               </div>
