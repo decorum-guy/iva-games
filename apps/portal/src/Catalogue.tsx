@@ -4,6 +4,7 @@ import { PortalLink } from "./navigation";
 import type { Game, User } from "./types";
 import { gameDescription, gameTitle } from "./gameCopy";
 import { chessHomeUrl } from "./links";
+import { GameCardAction, GameCardArt, GameCardStatus } from './GameCard';
 
 // Guest launch links are independent of availability in platform rooms.
 export const chessLaunchUrls: Partial<Record<string, string>> = launchUrls({ development: import.meta.env.DEV, overrides: import.meta.env });
@@ -68,23 +69,24 @@ export function Catalogue({ page, games, user, busy, offline, retry, onPlay, onA
           const launch = chessLaunchUrls[game.gameId];
           const available = game.status === "available";
           return <article className={`game-tile game-${game.gameId}`} key={game.gameId}>
-            <GameArt kind={game.gameId} />
+            <GameCardArt gameId={game.gameId} lang={lang} />
             <div className="game-tile-body">
               <div className="game-topline"><h2>{gameTitle(game, lang)}</h2>
-                <span className={`tag ${available || launch ? "success" : ""}`}>{available || launch
-                  ? t("Можно играть", "Ready to play") : t("Скоро здесь", "Coming soon")}</span></div>
+                <GameCardStatus gameId={game.gameId} lang={lang} playable={available || !!launch} /></div>
               <p>{gameDescription(game.gameId, lang)}</p>
               <div className="game-bottom">
                 <span className="game-players"><Icon name="friends" size={18} />
                   {game.minPlayers === game.maxPlayers ? game.minPlayers : `${game.minPlayers}–${game.maxPlayers}`}
                   {game.supportsBots && <span className="bot-capability"><Icon name="robot" size={17} />{t("Боты", "Bots")}</span>}
                 </span>
-                {launch ? <a className="button small primary" href={launch}>{t("Играть", "Play")}</a>
-                  : <button className={`button small ${available ? "primary" : "secondary"}`} disabled={busy}
-                    onClick={() => available ? onPlay(game) : onAbout(game)}>
-                    {available ? !user ? t("Войти и играть", "Sign in to play") : !(user.emailVerified || user.telegramVerified)
-                      ? t("Подтвердить почту", "Confirm email") : t("Собрать стол", "Gather a table") : t("Об игре", "About game")}
-                  </button>}
+                <GameCardAction gameId={game.gameId} lang={lang}>
+                  {launch ? <a className="button small primary" href={launch}>{t("Играть", "Play")}</a>
+                    : <button className={`button small ${available ? "primary" : "secondary"}`} disabled={busy}
+                      onClick={() => available ? onPlay(game) : onAbout(game)}>
+                      {available ? !user ? t("Войти и играть", "Sign in to play") : !(user.emailVerified || user.telegramVerified)
+                        ? t("Подтвердить почту", "Confirm email") : t("Собрать стол", "Gather a table") : t("Об игре", "About game")}
+                    </button>}
+                </GameCardAction>
               </div>
             </div>
           </article>;

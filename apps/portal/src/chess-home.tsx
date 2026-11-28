@@ -3,7 +3,8 @@ import './styles.css';
 import { chessGames } from '@iva-games/game-registry';
 import { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { GameArt, Icon } from './ui';
+import { Icon } from './ui';
+import { GameCardAction, GameCardArt, GameCardStatus } from './GameCard';
 
 type Language = 'ru' | 'en';
 
@@ -49,15 +50,17 @@ function ChessHome() {
         </div>
         <div className="game-grid catalogue-games">
           {chessGames.map(game => <article className={`game-tile game-${game.gameId}`} key={game.gameId}>
-            <GameArt kind={game.gameId} />
+            <GameCardArt gameId={game.gameId} lang={lang} />
             <div className="game-tile-body">
               <div className="game-topline"><h2>{game.title[lang]}</h2>
-                <span className="tag success">{t('Можно играть', 'Ready to play')}</span></div>
+                <GameCardStatus gameId={game.gameId} lang={lang} playable /></div>
               <p>{game.description[lang]}</p>
               <div className="game-bottom">
                 <span className="game-players"><Icon name="friends" size={18} />
                   {game.minPlayers === game.maxPlayers ? game.minPlayers : `${game.minPlayers}–${game.maxPlayers}`}</span>
-                <a className="button small primary" href={game.chess.route}>{t('Играть', 'Play')}</a>
+                <GameCardAction gameId={game.gameId} lang={lang}>
+                  <a className="button small primary" href={game.chess.route}>{t('Играть', 'Play')}</a>
+                </GameCardAction>
               </div>
             </div>
           </article>)}
