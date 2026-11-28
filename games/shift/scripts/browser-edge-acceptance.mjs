@@ -68,7 +68,8 @@ import { PlatformService } from ${from('apps/platform/src/service.ts')};
 import { createPlatformHttpServer } from ${from('apps/platform/src/http.ts')};
 import { loadPlatformConfig } from ${from('apps/platform/src/config.ts')};
 import { createShiftRegistration } from ${from('games/shift/src/server/runtime.ts')};
-export { stepMatch, TIMING, worldPosition } from ${from('games/shift/src/core/index.ts')};
+export { stepMatch, TIMING, worldPosition, WIRE_VERSION, RULES_VERSION, CONTENT_VERSION } from ${from('games/shift/src/core/index.ts')};
+export { LIVE_PROTOCOL, parseLiveClientFrame } from ${from('packages/session-kit/src/index.ts')};
 export async function startControlledServer(directory: string, port: number, portal: string) {
   const origin = 'http://127.0.0.1:' + port;
   const config = loadPlatformConfig({ NODE_ENV: 'development', PLATFORM_HOST: '127.0.0.1', PLATFORM_PORT: String(port),
@@ -95,7 +96,7 @@ export async function startControlledServer(directory: string, port: number, por
 }
 `);
 await build({ root: ROOT, configFile: join(ROOT,'vite.platform.config.ts'), logLevel:'silent', build:{ssr:fixtureEntry,outDir:join(runDirectory,'runtime'),emptyOutDir:true,minify:false,rollupOptions:{output:{entryFileNames:'runtime.mjs'}}}});
-const {startControlledServer,stepMatch,TIMING,worldPosition}=await import(pathToFileURL(join(runDirectory,'runtime/runtime.mjs')).href);
+const {startControlledServer,stepMatch,TIMING,worldPosition,WIRE_VERSION,RULES_VERSION,CONTENT_VERSION,LIVE_PROTOCOL,parseLiveClientFrame}=await import(pathToFileURL(join(runDirectory,'runtime/runtime.mjs')).href);
 report.fixtureRuntimeSha256=hash(await readFile(join(runDirectory,'runtime/runtime.mjs')));
 const log=value=>process.stdout.write(JSON.stringify(value)+'\n');
 async function until(test,label,ms=12000){const end=Date.now()+ms;while(Date.now()<end){const result=await test();if(result)return result;await delay(25);}throw new Error('Timeout: '+label);}
@@ -144,18 +145,88 @@ async function seedRoom(service,host,guest,kind){
   await service.platform.reconcile();
   return until(async()=>{const r=(await host.request(`/rooms/${room.roomId}`)).room;return r.state==='playing'&&r.matchId?r:null;},'normal room start');
 }
+const scopeOf = ({ protocol, wireVersion, roomId, matchId, epoch }) => ({ protocol, wireVersion, roomId, matchId, epoch });
+function immutableJson(value) {
+  if (value && typeof value === 'object' && !Object.isFrozen(value)) {
+    for (const child of Object.values(value)) immutableJson(child);
+    Object.freeze(value);
+  }
+  return value;
+}
+function auditServerFrame(frame, roomId, previousScope) {
+  assert.ok(frame && typeof frame === 'object' && !Array.isArray(frame));
+  assert.equal(frame.protocol, LIVE_PROTOCOL); assert.equal(frame.wireVersion, WIRE_VERSION);
+  assert.equal(frame.roomId, roomId); assert.equal(frame.gameId, 'shift');
+  assert.equal(frame.rulesVersion, RULES_VERSION); assert.equal(frame.contentVersion, CONTENT_VERSION);
+  assert.equal(typeof frame.matchId, 'string'); assert.ok(frame.matchId.length > 0);
+  assert.equal(typeof frame.epoch, 'string'); assert.ok(frame.epoch.length > 0);
+  const scope = scopeOf(frame);
+  if (previousScope) assert.deepEqual(scope, previousScope, 'A socket keeps its authenticated shared scope');
+  const fields = ['protocol', 'wireVersion', 'roomId', 'matchId', 'epoch', 'gameId', 'rulesVersion', 'contentVersion', 'type'];
+  if (frame.type === 'snapshot') {
+    fields.push('tick', 'serverTime', 'lastAcceptedSeq', 'view');
+    assert.ok(Number.isSafeInteger(frame.tick) && frame.tick >= 0);
+    assert.ok(Number.isFinite(frame.serverTime));
+    assert.ok(Number.isSafeInteger(frame.lastAcceptedSeq) && frame.lastAcceptedSeq >= -1);
+    assert.equal(frame.tick, frame.view.tick); assert.equal(frame.lastAcceptedSeq, frame.view.self.lastAcceptedSeq);
+    assert.equal(frame.rulesVersion, frame.view.rulesVersion); assert.equal(frame.contentVersion, frame.view.contentVersion);
+    assert.equal(frame.wireVersion, frame.view.wireVersion);
+  } else if (frame.type === 'receipt') {
+    fields.push('actionId', 'tick', 'result');
+    assert.ok(Number.isSafeInteger(frame.tick) && frame.tick >= 0);
+    assert.equal(frame.actionId, frame.result?.actionId);
+    assert.equal(typeof frame.result?.accepted, 'boolean');
+  } else {
+    assert.equal(frame.type, 'error'); fields.push('code', 'message');
+    if (Object.hasOwn(frame, 'actionId')) fields.push('actionId');
+  }
+  assert.deepEqual(Object.keys(frame).sort(), fields.sort(), 'Only the documented shared server fields cross the wire');
+  return scope;
+}
+
 async function openPeer(browser,client,room,language,errors){
   const context=await browser.newContext({viewport:{width:1366,height:950},storageState:client.storageState()});
   await context.addInitScript(({language})=>{
     localStorage.setItem('iva-shift.preferences.v1',JSON.stringify({lang:language,mode:'2d',quality:'low',reducedMotion:false,effects:true,volume:0,ambience:0}));
   },{language});
   const page=await context.newPage();page.setDefaultTimeout(12000);
-  const peer={context,page,view:null,frames:0,commands:[],inputs:[],receipts:[],errors:[],language};
+  const peer={context,page,view:null,frames:0,commands:[],inputs:[],receipts:[],errors:[],language,scopeChecks:0,staleSocketFramesIgnored:0,wireCommandEnvelopes:new Map()};
   page.on('pageerror',error=>{peer.errors.push(safeError(error));errors.push(safeError(error));});
   page.on('websocket',socket=>{
-    if(!socket.url().includes('/live?'))return;
-    socket.on('framereceived',({payload})=>{const f=JSON.parse(String(payload));if(f.type==='snapshot'){peer.view=f.view;peer.frames++;}else if(f.type==='receipt')peer.receipts.push(f);else if(f.type==='error'){peer.errors.push('wire:'+f.code);errors.push('wire:'+f.code);}});
-    socket.on('framesent',({payload})=>{const f=JSON.parse(String(payload));if(f.type==='command')peer.commands.push(f);if(f.type==='input'){peer.inputs.push(f.payload);if(peer.inputs.length>150)peer.inputs.shift();}});
+    const url=new URL(socket.url());
+    if(!/\/api\/platform\/v1\/rooms\/[^/]+\/live$/.test(url.pathname))return;
+    const fail=error=>{const message=safeError(error);peer.errors.push(message);errors.push(message);};
+    try{
+      assert.equal(url.pathname,`/api/platform/v1/rooms/${encodeURIComponent(room.roomId)}/live`);
+      assert.equal(url.search,'');assert.equal(url.hash,'');assert.equal(url.username,'');assert.equal(url.password,'');
+    }catch(error){fail(error);return;}
+    peer.activeSocket=socket;let connectionScope=null;
+    socket.on('framereceived',({payload})=>{try{
+      if(peer.activeSocket!==socket){peer.staleSocketFramesIgnored++;return;}
+      const f=JSON.parse(String(payload)),scope=auditServerFrame(f,room.roomId,connectionScope);
+      if(!connectionScope)assert.equal(f.type,'snapshot','First shared frame is a full personalized snapshot');
+      connectionScope=scope;peer.scopeChecks++;
+      if(f.type==='snapshot'){peer.liveScope=scope;peer.view=immutableJson(f.view);peer.frames++;}
+      else if(f.type==='receipt'){assert.equal(f.result.seatId,peer.view.self.seatId);peer.receipts.push(immutableJson(f));}
+      else if(f.type==='error'){peer.errors.push('wire:'+f.code);errors.push('wire:'+f.code);}
+    }catch(error){fail(error);}});
+    socket.on('framesent',({payload})=>{try{
+      assert.ok(connectionScope,'Client waits for its shared scope');
+      const f=parseLiveClientFrame(JSON.parse(String(payload)),connectionScope);peer.scopeChecks++;
+      if(f.type==='command'){
+        assert.equal(f.actionId,f.payload.actionId);
+        if(f.payload.type==='shift')assert.equal(f.expectedRevision,f.payload.expectedBoardRevision);
+        const key=`${f.matchId}:${f.actionId}`,envelope={actionId:f.actionId,expectedRevision:f.expectedRevision,payload:f.payload};
+        const prior=peer.wireCommandEnvelopes.get(key);
+        if(prior)assert.deepEqual(envelope,prior,'UI retries preserve payload and revision across sockets');
+        else peer.wireCommandEnvelopes.set(key,immutableJson(envelope));
+        peer.commands.push(immutableJson(f));
+      }
+      if(f.type==='input'){
+        assert.equal(f.seq,f.payload.seq);
+        peer.inputs.push(immutableJson({...f.payload,seq:f.seq}));if(peer.inputs.length>150)peer.inputs.shift();
+      }
+    }catch(error){fail(error);}});
   });
   await page.goto(client.origin+'/rooms/'+room.roomId);await page.locator('.shift-match').waitFor();await until(()=>peer.view,'first genuine WS snapshot');return peer;
 }
@@ -332,7 +403,7 @@ async function runCase(kind){
       // The final view must survive normal authenticated HTTP recovery after reload.
       await first.page.reload();await first.page.locator('.shift-result.draw').waitFor();assert.equal(await first.page.locator('.shift-result h1').innerText(),'Ничья');result.reloadPreserved=true;
     }
-    assert.deepEqual(errors,[]);result.passed=true;result.authenticatedBrowserContexts=kind==='rematch'?3:2;result.maxConcurrentAuthenticatedBrowserContexts=2;result.frames=peers.map(p=>p.frames);result.uiCommands=peers.map(p=>p.commands.length);
+    assert.deepEqual(errors,[]);result.passed=true;result.authenticatedBrowserContexts=kind==='rematch'?3:2;result.maxConcurrentAuthenticatedBrowserContexts=2;result.frames=peers.map(p=>p.frames);result.uiCommands=peers.map(p=>p.commands.length);result.sharedTransport={protocol:LIVE_PROTOCOL,wireVersion:WIRE_VERSION,scopeChecks:peers.map(p=>p.scopeChecks),staleSocketFramesIgnored:peers.map(p=>p.staleSocketFramesIgnored)};
     log({fixture:kind,cycle,passed:true,tick:result.after?.tick??second.view.tick,method:'checkpoint + controlled authoritative clock + real built UI and authenticated WS'});
     return result;
   }catch(error){result.errors.push(safeError(error));throw error;}finally{

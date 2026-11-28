@@ -1,5 +1,6 @@
 import { catalogueDefaults } from '@iva-games/game-registry';
-import type { LiveGameSession } from '@iva-games/session-kit';
+import { isRealtimeRuntime } from '@iva-games/session-kit';
+import type { RealtimeGameRuntime } from '@iva-games/session-kit';
 import { createHash, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
 import { chmodSync } from 'node:fs';
 import { hash, verify } from '@node-rs/argon2';
@@ -790,27 +791,40 @@ export class PlatformService {
     const { runtime, matchId } = this.matchRuntime(actor, roomId);
     return this.runtimeCall(runtime.viewForPlayer(matchId, actor));
   }
-  openLiveSession(actor: string, roomId: string, expectedMatchId: string, wireVersion: string): LiveGameSession {
-    const { runtime, matchId } = this.matchRuntime(actor, roomId);
-    if (matchId !== expectedMatchId) fail('MATCH_CHANGED', 'Откройте текущую партию', 409);
-    if (!runtime.openLiveSession || runtime.wireVersion !== wireVersion) fail('INCOMPATIBLE_VERSION', 'Обновите страницу', 409);
-    return runtime.openLiveSession(matchId, actor);
-  }
-  isLiveMember(actor: string, roomId: string, matchId: string): boolean {
-    return !!this.row("SELECT 1 AS ok FROM rooms r JOIN room_members m ON m.room_id=r.room_id WHERE r.room_id=? AND r.match_id=? AND m.player_id=? AND r.state IN ('playing','finished')", roomId, matchId, actor);
-  }
   /** Preserve the closed match in its runtime; reuse this room and its agreed roster. */
   rematch(actor: string, roomId: string, input: Record<string, unknown>): Room {
     const row = this.host(actor, roomId);
     this.revision(row, input.expectedRevision);
     if (row.state !== 'finished') fail('MATCH_NOT_FINISHED', 'Дождитесь завершения матча', 409);
     const game = this.games.get(String(row.game_id));
-    if (!game?.runtime?.openLiveSession) fail('ACTION_UNAVAILABLE', 'Создайте новую комнату', 409);
+    if (!isRealtimeRuntime(game?.runtime)) fail('ACTION_UNAVAILABLE', 'Создайте новую комнату', 409);
     this.roomGameVersion(game, row);
     this.run('DELETE FROM start_commands WHERE room_id=? AND completed_at IS NOT NULL', roomId);
     this.run("UPDATE rooms SET state='lobby',match_id=NULL,outcome_json=NULL,revision=revision+1 WHERE room_id=?", roomId);
     this.run('UPDATE room_members SET ready=CASE WHEN player_id IS NULL THEN 1 ELSE 0 END WHERE room_id=?', roomId);
     return this.roomView(roomId);
+  }
+  /** The gateway rechecks the live session and membership before every input.
+   * Read-only session checks avoid writing SQLite at the simulation rate. */
+  realtimeAccess(token: string | undefined, roomId: string, touch = false): {
+    runtime: RealtimeGameRuntime; playerId: string; matchId: string;
+    gameId: string; rulesVersion: string; contentVersion: string;
+  } {
+    const session = this.getSession(token, touch);
+    if (!session?.playerId) fail('UNAUTHENTICATED', 'Войдите в аккаунт', 401);
+    let match: { runtime: NonNullable<GameRegistration['runtime']>; matchId: string };
+    try { match = this.matchRuntime(session.playerId, roomId); }
+    catch (error) {
+      // A rematch returns the room to its lobby. Its previous live scope has
+      // ended; use the shared gateway's terminal scope error to release it.
+      if (error instanceof PlatformError && error.code === 'MATCH_NOT_STARTED') fail('LIVE_SCOPE_MISMATCH', 'Откройте текущую партию', 409);
+      throw error;
+    }
+    const { runtime, matchId } = match;
+    if (!isRealtimeRuntime(runtime)) fail('LIVE_UNAVAILABLE', 'Соединение игры пока недоступно', 409);
+    const room = this.roomRow(roomId);
+    return { runtime, playerId: session.playerId, matchId, gameId: String(room.game_id),
+      rulesVersion: String(room.rules_version), contentVersion: String(room.content_version) };
   }
   async matchAction(actor: string, roomId: string, input: Record<string, unknown>): Promise<unknown> {
     const { runtime, matchId } = this.matchRuntime(actor, roomId);

@@ -1,4 +1,5 @@
 import { ShiftRuntime } from '../src/server/runtime';
+import { randomUUID } from 'node:crypto';
 import type { StartMatchRequest } from '@iva-games/session-kit';
 import type { ShiftView } from '../src/core/types';
 
@@ -14,14 +15,15 @@ const request: StartMatchRequest = {
 };
 const runtime = new ShiftRuntime({ databasePath: process.argv[2], autoTick: false });
 const { matchId } = await runtime.createMatch(request);
-const lease = runtime.openLiveSession(matchId, 'player-0');
+const epoch = randomUUID();
+await runtime.liveConnect(matchId, 'player-0', epoch);
 runtime.advanceTicks(211);
-const before = lease.snapshot().view as ShiftView;
-const command = { type: 'shift', roundId: before.round, controllerEpoch: lease.controllerEpoch, roomId: 'O', expectedBoardRevision: before.boardRevision };
-const queued = lease.command('crash-shift-action', command);
+const before = (await runtime.liveSnapshot(matchId, 'player-0', epoch)).view as ShiftView;
+const command = { type: 'shift', roundId: before.round, controllerEpoch: before.self.controllerEpoch, roomId: 'O', expectedBoardRevision: before.boardRevision };
+const queued = runtime.applyAction(matchId, 'player-0', { actionId: 'crash-shift-action', expectedRevision: before.boardRevision, payload: command });
 runtime.advanceTicks();
 const receipt = await queued;
-const moving = lease.snapshot().view as ShiftView;
+const moving = (await runtime.liveSnapshot(matchId, 'player-0', epoch)).view as ShiftView;
 process.send?.({ matchId, receipt, command, tick: moving.tick, motion: moving.motion });
 // No shutdown handler: this test must exercise SQLite recovery, not close().
 setInterval(() => {}, 1000);

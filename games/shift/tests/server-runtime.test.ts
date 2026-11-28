@@ -4,6 +4,7 @@ import { dirname, join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { fork } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
 import { build } from 'vite';
 import type { Participant, StartMatchRequest } from '@iva-games/session-kit';
 import type { Receipt, ShiftView } from '../src/core/types';
@@ -26,6 +27,21 @@ function fixture() {
   const directory = mkdtempSync(join(tmpdir(), 'iva-shift-runtime-'));
   const f = { directory, runtime: new ShiftRuntime({ databasePath: join(directory, 'runtime.sqlite'), autoTick: false }) };
   active.push(f); return f;
+}
+
+// Test convenience over the published game hooks. Production uses the common
+// gateway, whose string epoch is separate from the core's numeric controller.
+async function openControl(runtime: ShiftRuntime, matchId: string, playerId: string, epoch = randomUUID()) {
+  const initial = await runtime.liveConnect(matchId, playerId, epoch);
+  return {
+    epoch, controllerEpoch: (initial.view as ShiftView).self.controllerEpoch, initial,
+    snapshot: () => runtime.liveSnapshot(matchId, playerId, epoch),
+    input: (payload: unknown) => runtime.liveInput(matchId, playerId, { epoch, seq: (payload as { seq: number }).seq, payload }),
+    command: (actionId: string, payload: unknown) => runtime.applyAction(matchId, playerId, {
+      actionId, expectedRevision: (payload as { expectedBoardRevision?: number }).expectedBoardRevision ?? 0, payload,
+    }),
+    close: () => runtime.liveDisconnect(matchId, playerId, epoch),
+  };
 }
 
 describe('durable Shift runtime', () => {
@@ -56,9 +72,9 @@ describe('durable Shift runtime', () => {
 
   it('batches opposing shifts, persists the accepted receipt, and survives restart during a move', async () => {
     const f = fixture(), { matchId } = await f.runtime.createMatch(request());
-    const teal = f.runtime.openLiveSession(matchId, 'player-0'), amber = f.runtime.openLiveSession(matchId, 'player-2');
+    const teal = await openControl(f.runtime, matchId, 'player-0'), amber = await openControl(f.runtime, matchId, 'player-2');
     f.runtime.advanceTicks(211);
-    const view = teal.snapshot().view as ShiftView;
+    const view = (await teal.snapshot()).view as ShiftView;
     const a = { type: 'shift', roundId: view.round, controllerEpoch: teal.controllerEpoch, roomId: 'O', expectedBoardRevision: view.boardRevision };
     const b = { ...a, roomId: 'F', controllerEpoch: amber.controllerEpoch };
     const first = teal.command('shift-action-a', a), second = amber.command('shift-action-b', b);
@@ -66,13 +82,13 @@ describe('durable Shift runtime', () => {
     const [one, two] = await Promise.all([first, second]) as Receipt[];
     expect([one.accepted, two.accepted].filter(Boolean)).toHaveLength(1);
     expect(one.accepted).toBe(true);
-    const moving = teal.snapshot().view as ShiftView;
+    const moving = (await teal.snapshot()).view as ShiftView;
     expect(moving.motion?.roomId).toBe('O');
     expect(await teal.command('shift-action-a', a)).toEqual(one);
     f.runtime.close();
     f.runtime = new ShiftRuntime({ databasePath: join(f.directory, 'runtime.sqlite'), autoTick: false });
-    const resumed = f.runtime.openLiveSession(matchId, 'player-0');
-    const restored = resumed.snapshot().view as ShiftView;
+    const resumed = await openControl(f.runtime, matchId, 'player-0');
+    const restored = (await resumed.snapshot()).view as ShiftView;
     expect(restored.motion?.roomId).toBe('O');
     expect(restored.recoveryTicksRemaining).toBe(150);
     const frozen = restored.tick;
@@ -82,43 +98,106 @@ describe('durable Shift runtime', () => {
     const recoveryReceipt = await pendingRecovery as Receipt;
     expect(recoveryReceipt).toMatchObject({ accepted: false, reason: 'PHASE', tick: frozen });
     f.runtime.advanceTicks(149);
-    expect((resumed.snapshot().view as ShiftView).tick).toBe(frozen);
+    expect(((await resumed.snapshot()).view as ShiftView).tick).toBe(frozen);
     f.runtime.advanceTicks(20);
-    const arrived = resumed.snapshot().view as ShiftView;
+    const arrived = (await resumed.snapshot()).view as ShiftView;
     expect(arrived.motion).toBeNull(); expect(arrived.board[7]).toBe('O'); expect(arrived.board[4]).toBeNull();
     // A rejected recovery key cannot turn into a later action when the client retries.
     expect(await resumed.command('recovery-rejected-action', duringRecovery)).toEqual(recoveryReceipt);
     expect(await resumed.command('shift-action-a', a)).toEqual(one);
-    expect((resumed.snapshot().view as ShiftView).boardRevision).toBe(arrived.boardRevision);
+    expect(((await resumed.snapshot()).view as ShiftView).boardRevision).toBe(arrived.boardRevision);
   });
 
   it('replaces controller epochs, ignores stale closing sockets, and rejects malformed pilot input', async () => {
     const { runtime } = fixture(), { matchId } = await runtime.createMatch(request());
-    const first = runtime.openLiveSession(matchId, 'player-0'), second = runtime.openLiveSession(matchId, 'player-0');
-    expect(first.isCurrent()).toBe(false); expect(second.isCurrent()).toBe(true);
-    first.close(); expect(second.isCurrent()).toBe(true);
+    const first = await openControl(runtime, matchId, 'player-0'), second = await openControl(runtime, matchId, 'player-0');
+    await expect(first.snapshot()).rejects.toMatchObject({ code: 'STALE_EPOCH' });
+    expect(second.controllerEpoch).toBeGreaterThan(first.controllerEpoch);
+    first.close(); expect(((await second.snapshot()).view as ShiftView).self.connected).toBe(true);
     expect(() => first.input({})).toThrow();
     expect(() => second.input({ type: 'input', roundId: 1, controllerEpoch: second.controllerEpoch, seq: 1, moveX: Infinity, moveZ: 0, aim: 0, fireHeld: false })).toThrow();
     expect(() => second.input({ type: 'input', roundId: 1, controllerEpoch: first.controllerEpoch, seq: 1, moveX: 0, moveZ: 0, aim: 0, fireHeld: false })).toThrow();
   });
 
+  it('acknowledges only consumed pilot sequences, drops inactive input, times out silently, and resets only for a new shared epoch', async () => {
+    const { runtime } = fixture(), input = request();
+    input.settings = { ...input.settings, initialNavigators: { teal: 'seat-1', amber: 'seat-3' } };
+    const { matchId } = await runtime.createMatch(input), first = await openControl(runtime, matchId, 'player-0');
+    const payload = { type: 'input', roundId: 1, controllerEpoch: first.controllerEpoch, seq: 1, moveX: 1, moveZ: 0, aim: 0.25, fireHeld: false };
+    const ownPose = (view: unknown) => {
+      const self = (view as ShiftView).actors.find(actor => actor.seatId === 'seat-0')!;
+      return { spaceId: self.spaceId, x: self.x, z: self.z };
+    };
+    first.input(payload); // Preparation input must never wait until the round starts.
+    runtime.advanceTicks(211);
+    expect((await first.snapshot()).lastAcceptedSeq).toBe(-1);
+    expect(ownPose((await first.snapshot()).view)).toEqual(ownPose(first.initial.view));
+    expect(() => runtime.liveInput(matchId, 'player-0', { epoch: first.epoch, seq: 9, payload: { ...payload, seq: 10 } })).toThrow(expect.objectContaining({ code: 'INVALID_INPUT' }));
+    first.input({ ...payload, seq: 10 });
+    first.input({ ...payload, seq: 9, moveX: -1 }); // Cannot overwrite a fresher coalesced input.
+    expect((await first.snapshot()).lastAcceptedSeq).toBe(-1);
+    runtime.advanceTicks();
+    const consumed = await first.snapshot();
+    expect(consumed.lastAcceptedSeq).toBe(10);
+    expect((consumed.view as ShiftView).self.lastAcceptedSeq).toBe(10);
+    expect(ownPose(consumed.view).x).toBeGreaterThan(ownPose(first.initial.view).x);
+    runtime.advanceTicks(8);
+    const timedOut = ownPose((await first.snapshot()).view);
+    runtime.advanceTicks(4);
+    expect(ownPose((await first.snapshot()).view)).toEqual(timedOut);
+    expect((await runtime.liveConnect(matchId, 'player-0', first.epoch)).lastAcceptedSeq).toBe(10);
+    const replacement = await openControl(runtime, matchId, 'player-0');
+    expect(replacement.initial.lastAcceptedSeq).toBe(-1);
+    expect(replacement.controllerEpoch).toBeGreaterThan(first.controllerEpoch);
+    first.close();
+    replacement.input({ ...payload, controllerEpoch: replacement.controllerEpoch, seq: 0, moveX: -1 });
+    runtime.advanceTicks();
+    expect((await replacement.snapshot()).lastAcceptedSeq).toBe(0);
+    expect(ownPose((await replacement.snapshot()).view).x).toBeLessThan(timedOut.x);
+    expect(() => first.input({ ...payload, seq: 11 })).toThrow(expect.objectContaining({ code: 'STALE_EPOCH' }));
+    expect(() => replacement.input({ ...payload, seq: 1 })).toThrow(expect.objectContaining({ code: 'STALE_EPOCH' }));
+    replacement.input({ ...payload, controllerEpoch: replacement.controllerEpoch, roundId: 2, seq: 1 });
+    runtime.advanceTicks();
+    expect((await replacement.snapshot()).lastAcceptedSeq).toBe(0);
+    replacement.close();
+    const stopped = ownPose(await runtime.viewForPlayer(matchId, 'player-0'));
+    runtime.advanceTicks();
+    expect(ownPose(await runtime.viewForPlayer(matchId, 'player-0'))).toEqual(stopped);
+    await expect(replacement.snapshot()).rejects.toMatchObject({ code: 'STALE_EPOCH' });
+  });
+
+  it('enforces the shared action revision shape while preserving core receipt replay before epoch checks', async () => {
+    const { runtime } = fixture(), { matchId } = await runtime.createMatch(request());
+    const control = await openControl(runtime, matchId, 'player-0');
+    const payload = { type: 'shift', roundId: 1, controllerEpoch: control.controllerEpoch, roomId: 'O', expectedBoardRevision: 0 };
+    await expect(runtime.applyAction(matchId, 'player-0', { actionId: 'revision-mismatch', expectedRevision: 1, payload })).rejects.toMatchObject({ code: 'INVALID_INPUT' });
+    await expect(runtime.applyAction(matchId, 'player-0', { actionId: 'short', expectedRevision: 0, payload })).rejects.toMatchObject({ code: 'INVALID_ACTION' });
+    const pending = control.command('committed-before-takeover', payload);
+    runtime.advanceTicks(); const receipt = await pending;
+    const replacement = await openControl(runtime, matchId, 'player-0');
+    expect(await replacement.command('committed-before-takeover', payload)).toEqual(receipt);
+    const stale = replacement.command('uncommitted-old-epoch', payload);
+    runtime.advanceTicks();
+    expect(await stale).toMatchObject({ accepted: false, reason: 'STALE_EPOCH' });
+  });
+
   it('flushes a pending discrete command during graceful shutdown before its receipt resolves', async () => {
     const f = fixture(), { matchId } = await f.runtime.createMatch(request());
-    const lease = f.runtime.openLiveSession(matchId, 'player-0');
+    const lease = await openControl(f.runtime, matchId, 'player-0');
     const payload = { type: 'shift', roundId: 1, controllerEpoch: lease.controllerEpoch, roomId: 'O', expectedBoardRevision: 0 };
     const pending = lease.command('shutdown-command', payload);
     f.runtime.close();
     const receipt = await pending as Receipt;
     expect(receipt.accepted).toBe(false);
     f.runtime = new ShiftRuntime({ databasePath: join(f.directory, 'runtime.sqlite'), autoTick: false });
-    const next = f.runtime.openLiveSession(matchId, 'player-0');
+    const next = await openControl(f.runtime, matchId, 'player-0');
     expect(await next.command('shutdown-command', payload)).toEqual(receipt);
   });
 
   it('evicts completed residents, keeps final receipt replay durable, and starts a distinct rematch', async () => {
     const f = fixture(), input = request(), first = await f.runtime.createMatch(input);
     const residentCount = (): number => (Reflect.get(f.runtime, 'matches') as Map<string, unknown>).size;
-    const firstLease = f.runtime.openLiveSession(first.matchId, 'player-0');
+    const firstLease = await openControl(f.runtime, first.matchId, 'player-0');
     const payload = { type: 'shift', roundId: 1, controllerEpoch: firstLease.controllerEpoch, roomId: 'O', expectedBoardRevision: 0 };
     const pending = firstLease.command('before-finish-receipt', payload);
     f.runtime.advanceTicks(); const receipt = await pending;
@@ -130,13 +209,15 @@ describe('durable Shift runtime', () => {
     expect(completed.finished).toBe(true);
     await f.runtime.viewForPlayer(first.matchId, 'player-0');
     expect(residentCount()).toBe(0); // Historical HTTP reads do not join the 30 Hz clock.
-    const resultTab = f.runtime.openLiveSession(first.matchId, 'player-0');
-    const takeover = f.runtime.openLiveSession(first.matchId, 'player-0');
-    resultTab.close(); expect(takeover.isCurrent()).toBe(true); expect(residentCount()).toBe(1);
+    const resultTab = await openControl(f.runtime, first.matchId, 'player-0');
+    const takeover = await openControl(f.runtime, first.matchId, 'player-0');
+    resultTab.close(); expect(((await takeover.snapshot()).view as ShiftView).self.connected).toBe(true); expect(residentCount()).toBe(1);
     expect(await takeover.command('before-finish-receipt', payload)).toEqual(receipt);
-    expect(() => takeover.command('before-finish-receipt', { ...payload, roomId: 'F' })).toThrow(expect.objectContaining({ code: 'ACTION_CONFLICT' }));
-    for (let index = 0; index < 100; index++) expect(() => takeover.command(`after-finish-${index}`, { ...payload, controllerEpoch: takeover.controllerEpoch })).toThrow(expect.objectContaining({ code: 'MATCH_FINISHED' }));
-    expect((takeover.snapshot().view as ShiftView).phase).toBe('finished');
+    await expect(takeover.command('before-finish-receipt', { ...payload, roomId: 'F' })).rejects.toMatchObject({ code: 'ACTION_CONFLICT' });
+    for (let index = 0; index < 100; index++) await expect(takeover.command(`after-finish-${index}`, { ...payload, controllerEpoch: takeover.controllerEpoch })).rejects.toMatchObject({ code: 'MATCH_FINISHED' });
+    const finalSnapshot = await takeover.snapshot();
+    expect((finalSnapshot.view as ShiftView).phase).toBe('finished');
+    expect((await takeover.snapshot()).view).toBe(finalSnapshot.view); // Cached per active epoch, not a new public protocol hint.
     takeover.close(); expect(residentCount()).toBe(0);
     const second = await f.runtime.createMatch({ ...input, startCommandId: 'fresh-rematch-start' });
     expect(second.matchId).not.toBe(first.matchId);
@@ -147,9 +228,9 @@ describe('durable Shift runtime', () => {
     const final = await f.runtime.viewForPlayer(first.matchId, 'player-0') as ShiftView;
     expect(final.phase).toBe('finished'); expect(final.recoveryTicksRemaining).toBe(0);
     expect(residentCount()).toBe(1); // Only the unfinished rematch was restored.
-    const restoredFinal = f.runtime.openLiveSession(first.matchId, 'player-0');
+    const restoredFinal = await openControl(f.runtime, first.matchId, 'player-0');
     expect(await restoredFinal.command('before-finish-receipt', payload)).toEqual(receipt);
-    expect(() => restoredFinal.command('after-restart-finish', { ...payload, controllerEpoch: restoredFinal.controllerEpoch })).toThrow(expect.objectContaining({ code: 'MATCH_FINISHED' }));
+    await expect(restoredFinal.command('after-restart-finish', { ...payload, controllerEpoch: restoredFinal.controllerEpoch })).rejects.toMatchObject({ code: 'MATCH_FINISHED' });
     restoredFinal.close(); expect(residentCount()).toBe(1);
   }, 30_000);
 
@@ -177,13 +258,13 @@ describe('durable Shift runtime', () => {
         child.kill('SIGKILL'); expect(await exited).toBe('SIGKILL');
       } finally { if (child.exitCode === null && child.signalCode === null) child.kill('SIGKILL'); }
       runtime = new ShiftRuntime({ databasePath, autoTick: false });
-      const controller = runtime.openLiveSession(message.matchId, 'player-0');
-      const recovered = controller.snapshot().view as ShiftView;
+      const controller = await openControl(runtime, message.matchId, 'player-0');
+      const recovered = (await controller.snapshot()).view as ShiftView;
       expect(recovered.tick).toBe(message.tick); expect(recovered.motion).toEqual(message.motion);
       expect(recovered.recoveryTicksRemaining).toBe(150);
       expect(await controller.command('crash-shift-action', message.command)).toEqual(message.receipt);
       runtime.advanceTicks(150 + 17);
-      const complete = controller.snapshot().view as ShiftView;
+      const complete = (await controller.snapshot()).view as ShiftView;
       expect(complete.motion).toBeNull(); expect(complete.board[7]).toBe('O'); expect(complete.board[4]).toBeNull();
     } finally {
       runtime?.close(); rmSync(directory, { recursive: true, force: true }); rmSync(compiled, { recursive: true, force: true });

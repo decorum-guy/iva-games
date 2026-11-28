@@ -5,7 +5,9 @@ import { tmpdir } from 'node:os';
 import type { AddressInfo } from 'node:net';
 import { request as httpRequest } from 'node:http';
 import { WebSocket } from 'ws';
-import type { ShiftView } from '@iva-games/shift/core';
+import { LIVE_PROTOCOL } from '@iva-games/session-kit';
+import type { LiveScope, LiveServerScope } from '@iva-games/session-kit';
+import type { Receipt, ShiftView } from '@iva-games/shift/core';
 import { createShiftRegistration } from '@iva-games/shift/runtime';
 import { PlatformService } from '../src/service';
 import { MemoryMailbox } from '../src/mail';
@@ -14,7 +16,11 @@ import type { Room } from '../src/types';
 
 const cleanup: (() => Promise<void>)[] = [];
 afterEach(async () => { try { for (const close of cleanup.splice(0)) await close(); } finally { vi.useRealTimers(); } });
-type Frame = { type: string; view?: ShiftView; actionId?: string; code?: string; controllerEpoch?: number; result?: { accepted: boolean; reason?: string } };
+type Frame = LiveServerScope & { type: string; view?: ShiftView; actionId?: string; code?: string; tick?: number; serverTime?: number; lastAcceptedSeq?: number; result?: Receipt };
+function scope(frame: Frame): LiveScope {
+  const { protocol, wireVersion, roomId, matchId, epoch } = frame;
+  return { protocol, wireVersion, roomId, matchId, epoch };
+}
 async function fixture() {
   const directory = await mkdtemp(join(tmpdir(), 'iva-shift-live-'));
   const shift = createShiftRegistration({ databasePath: join(directory, 'runtime.sqlite'), autoTick: false });
@@ -41,9 +47,9 @@ async function fixture() {
     return { id: created.user.playerId, token: created.token, session: created.session };
   }
   type Player = Awaited<ReturnType<typeof signup>>;
-  function connect(player: Player, room: Room, headers: Record<string, string> = {}, version = 'shift-wire@1') {
+  function connect(player: Player, room: Room, headers: Record<string, string> = {}, suffix = '') {
     const frames: Frame[] = [];
-    const socket = new WebSocket(`${base}/api/platform/v1/rooms/${room.roomId}/live?matchId=${room.matchId}&version=${encodeURIComponent(version)}`, { headers: {
+    const socket = new WebSocket(`${base}/api/platform/v1/rooms/${room.roomId}/live${suffix}`, { headers: {
       Host: 'shift.test', Origin: 'http://shift.test', Cookie: `iva_dev_session=${player.token}`, ...headers,
     } });
     sockets.push(socket);
@@ -56,7 +62,21 @@ async function fixture() {
     });
     return { socket, frames, wait };
   }
-  async function room(host: Player, other: Player, size: 2 | 3 = 2) {
+  async function post(player: Player, roomId: string, action: string, body: unknown) {
+    return new Promise<{ status: number; body: unknown }>((resolve, reject) => {
+      const request = httpRequest({ hostname: '127.0.0.1', port: (server.address() as AddressInfo).port,
+        path: `/api/platform/v1/rooms/${roomId}/${action}`, method: 'POST', headers: {
+          Host: 'shift.test', Origin: 'http://shift.test', Cookie: `iva_dev_session=${player.token}`,
+          'Content-Type': 'application/json', 'X-CSRF-Token': player.session.csrfToken, 'Idempotency-Key': `http-${action}-fixture`,
+        },
+      }, response => {
+        let raw = ''; response.setEncoding('utf8'); response.on('data', chunk => { raw += String(chunk); });
+        response.on('end', () => { try { resolve({ status: response.statusCode!, body: JSON.parse(raw) }); } catch (error) { reject(error); } });
+      });
+      request.on('error', reject); request.end(JSON.stringify(body));
+    });
+  }
+  async function room(host: Player, other: Player, size: 2 | 3 = 2, humanPilots = false) {
     const friends = platform.requestFriend(host.id, other.id); platform.respondFriend(other.id, friends.requestId, 'accept');
     let room = platform.createRoom(host.id, { gameId: 'shift', capacity: size * 2, settings: { teamSize: size } });
     const invitation = platform.invite(host.id, room.roomId, other.id);
@@ -65,14 +85,14 @@ async function fixture() {
     const teams = Object.fromEntries(room.members.map((p, index) => [p.participantId, index % 2 ? 'amber' : 'teal']));
     room = platform.changeSettings(host.id, room.roomId, { expectedRevision: room.revision, settings: {
       arena: 'foundry', teamSize: size, rotateRoles: false, difficulty: 'normal', teams,
-      initialNavigators: { teal: room.members[0].participantId, amber: room.members[1].participantId },
+      initialNavigators: { teal: room.members[humanPilots ? 2 : 0].participantId, amber: room.members[humanPilots ? 3 : 1].participantId },
     } });
     platform.setReady(host.id, room.roomId, { expectedRevision: room.revision, ready: true });
     platform.setReady(other.id, room.roomId, { expectedRevision: room.revision, ready: true });
     platform.startRoom(host.id, room.roomId, { expectedRevision: room.revision }); await platform.reconcile();
     return platform.getRoom(host.id, room.roomId);
   }
-  return { platform, shift, server, stop, signup, connect, room };
+  return { platform, shift, server, stop, signup, connect, room, post };
 }
 
 describe('shared authenticated live gateway with Shift', () => {
@@ -82,6 +102,12 @@ describe('shared authenticated live gateway with Shift', () => {
     expect(room.state).toBe('playing');
     const first = f.connect(a, room), second = f.connect(b, room);
     const [fa, fb] = await Promise.all([first.wait(frame => frame.type === 'snapshot'), second.wait(frame => frame.type === 'snapshot')]);
+    for (const frame of [fa, fb]) {
+      expect(frame).toMatchObject({ protocol: LIVE_PROTOCOL, wireVersion: 'shift-wire@1', roomId: room.roomId, matchId: room.matchId,
+        gameId: 'shift', rulesVersion: room.rulesVersion, contentVersion: room.contentVersion, lastAcceptedSeq: -1 });
+      expect(frame.epoch).toEqual(expect.any(String)); expect(frame.serverTime).toEqual(expect.any(Number));
+      expect(frame).not.toHaveProperty('controllerEpoch'); expect(frame).not.toHaveProperty('version');
+    }
     expect(fa.view!.self.team).toBe('teal'); expect(fb.view!.self.team).toBe('amber');
     expect(fa.view!.actors.every(actor => actor.team === 'teal')).toBe(true);
     expect(fb.view!.actors.every(actor => actor.team === 'amber')).toBe(true);
@@ -89,11 +115,11 @@ describe('shared authenticated live gateway with Shift', () => {
     expect(JSON.stringify(fa)).not.toContain(b.id);
     f.shift.runtime.advanceTicks(211);
     const active = await f.platform.matchView(a.id, room.roomId) as ShiftView;
-    first.socket.send(JSON.stringify({ type: 'command', version: 'shift-wire@1', actionId: 'live-shift-teal', payload: {
-      type: 'shift', roundId: active.round, controllerEpoch: fa.controllerEpoch, roomId: 'O', expectedBoardRevision: active.boardRevision,
+    first.socket.send(JSON.stringify({ ...scope(fa), type: 'command', actionId: 'live-shift-teal', expectedRevision: active.boardRevision, payload: {
+      type: 'shift', roundId: active.round, controllerEpoch: fa.view!.self.controllerEpoch, roomId: 'O', expectedBoardRevision: active.boardRevision,
     } }));
-    second.socket.send(JSON.stringify({ type: 'command', version: 'shift-wire@1', actionId: 'live-shift-amber', payload: {
-      type: 'shift', roundId: active.round, controllerEpoch: fb.controllerEpoch, roomId: 'F', expectedBoardRevision: active.boardRevision,
+    second.socket.send(JSON.stringify({ ...scope(fb), type: 'command', actionId: 'live-shift-amber', expectedRevision: active.boardRevision, payload: {
+      type: 'shift', roundId: active.round, controllerEpoch: fb.view!.self.controllerEpoch, roomId: 'F', expectedBoardRevision: active.boardRevision,
     } }));
     // Both socket callbacks enqueue before the explicit authoritative tick.
     await new Promise(resolve => setTimeout(resolve, 25)); f.shift.runtime.advanceTicks();
@@ -105,7 +131,7 @@ describe('shared authenticated live gateway with Shift', () => {
     expect(one.motion).toEqual(two.motion);
   });
 
-  it('synchronously stops live snapshot timers and leases before the platform databases close', async () => {
+  it('stops shared snapshot scheduling and drains hooks before the platform databases close', async () => {
     // Real sockets and databases; only interval dispatch is controlled so a
     // queued snapshot cannot hide behind a lucky close-event ordering.
     vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
@@ -125,23 +151,34 @@ describe('shared authenticated live gateway with Shift', () => {
     expect(sessionReads).not.toHaveBeenCalled();
   });
 
-  it('rejects foreign origins, missing sessions, non-members, mismatched matches and wire versions', async () => {
+  it('rejects foreign origins, missing sessions, non-members and query credentials before upgrade', async () => {
     const f = await fixture(), a = await f.signup('auth_a'), b = await f.signup('auth_b'), outside = await f.signup('auth_out');
     const room = await f.room(a, b);
-    for (const [player, headers, version, candidate] of [
-      [a, { Origin: 'http://foreign.test' }, 'shift-wire@1', room],
-      [a, { Cookie: '' }, 'shift-wire@1', room],
-      [outside, {}, 'shift-wire@1', room],
-      [a, {}, 'shift-wire@2', room],
-      [a, {}, 'shift-wire@1', { ...room, matchId: 'another-match' }],
+    for (const [player, headers, suffix] of [
+      [a, { Origin: 'http://foreign.test' }, ''],
+      [a, { Cookie: '' }, ''],
+      [outside, {}, ''],
+      [a, {}, '?matchId=another-match'],
+      [a, {}, '?version=shift-wire%401'],
     ] as const) {
-      const client = f.connect(player, candidate, headers, version);
+      const client = f.connect(player, room, headers, suffix);
       const status = await new Promise<number>(resolve => client.socket.once('unexpected-response', (_req, response) => { response.resume(); resolve(response.statusCode!); client.socket.terminate(); }));
       expect(status).toBeGreaterThanOrEqual(400);
     }
   });
 
-  it('releases a controller lease when a later WebSocket handshake field is rejected', async () => {
+  it('rejects a forged match, transport epoch or game wire version on an authenticated channel', async () => {
+    const f = await fixture(), a = await f.signup('scope_a'), b = await f.signup('scope_b'), room = await f.room(a, b);
+    for (const change of [{ matchId: 'another-match' }, { epoch: 'unowned-epoch' }, { wireVersion: 'shift-wire@2' }]) {
+      const client = f.connect(a, room), initial = await client.wait(frame => frame.type === 'snapshot');
+      const closed = new Promise<number>(resolve => client.socket.once('close', resolve));
+      client.socket.send(JSON.stringify({ ...scope(initial), ...change, type: 'input', seq: 1, payload: {} }));
+      expect((await client.wait(frame => frame.type === 'error')).code).toBe('LIVE_SCOPE_MISMATCH');
+      expect(await closed).toBe(4003);
+    }
+  });
+
+  it('does not acquire a controller when a WebSocket handshake field is rejected', async () => {
     const f = await fixture(), a = await f.signup('handshake_a'), b = await f.signup('handshake_b');
     const room = await f.room(a, b);
     const rejected = f.connect(a, room, { 'Sec-WebSocket-Protocol': ',' });
@@ -160,63 +197,97 @@ describe('shared authenticated live gateway with Shift', () => {
     const first = f.connect(a, room), initial = await first.wait(frame => frame.type === 'snapshot');
     const oldClosed = new Promise<number>(resolve => first.socket.once('close', resolve));
     const second = f.connect(a, room), replacement = await second.wait(frame => frame.type === 'snapshot');
-    expect(replacement.controllerEpoch).toBeGreaterThan(initial.controllerEpoch!);
+    expect(replacement.epoch).not.toBe(initial.epoch);
+    expect(replacement.view!.self.controllerEpoch).toBeGreaterThan(initial.view!.self.controllerEpoch);
     expect(await oldClosed).toBe(4001);
     const revoked = new Promise<number>(resolve => second.socket.once('close', resolve));
     f.platform.revokeSession(a.session.sessionHash);
     expect(await revoked).toBe(4003);
   });
 
-  it('sends each finished view once without rebuilding it and still enforces takeover and revocation', async () => {
+  it('keeps final filtered views on the shared channel and still enforces takeover and revocation', async () => {
     const f = await fixture(), a = await f.signup('final_a'), b = await f.signup('final_b');
     const room = await f.room(a, b);
-    const openLive = f.platform.openLiveSession.bind(f.platform), snapshotCalls: number[] = [];
-    vi.spyOn(f.platform, 'openLiveSession').mockImplementation((...args) => {
-      const lease = openLive(...args), originalSnapshot = lease.snapshot.bind(lease), index = snapshotCalls.length;
-      snapshotCalls.push(0);
-      lease.snapshot = () => { snapshotCalls[index]++; return originalSnapshot(); };
-      return lease;
-    });
+    const snapshots = vi.spyOn(f.shift.runtime, 'liveSnapshot');
     const first = f.connect(a, room); await first.wait(frame => frame.type === 'snapshot');
     // A normal match completes through fixed steps and public-view substitute bots.
     f.shift.runtime.advanceTicks(16_000);
     const final = await first.wait(frame => frame.type === 'snapshot' && frame.view?.phase === 'finished');
-    expect(final).not.toHaveProperty('finished'); // The terminal hint stays internal.
-    const callsAtFinal = snapshotCalls[0], auth = vi.spyOn(f.platform, 'getSession');
+    expect(final).not.toHaveProperty('finished'); // The published contract has no transport terminal hint.
+    const callsAtFinal = snapshots.mock.calls.length, auth = vi.spyOn(f.platform, 'getSession');
     await new Promise(resolve => setTimeout(resolve, 250));
-    expect(first.frames.filter(frame => frame.type === 'snapshot' && frame.view?.phase === 'finished')).toHaveLength(1);
-    expect(snapshotCalls[0]).toBe(callsAtFinal);
+    const repeats = first.frames.filter(frame => frame.type === 'snapshot' && frame.view?.phase === 'finished');
+    expect(repeats.length).toBeGreaterThan(1);
+    expect(repeats.every(frame => JSON.stringify(frame.view) === JSON.stringify(final.view))).toBe(true);
+    expect(snapshots.mock.calls.length).toBeGreaterThan(callsAtFinal);
     expect(auth).toHaveBeenCalled();
     const oldClosed = new Promise<number>(resolve => first.socket.once('close', resolve));
     const second = f.connect(a, room), replacement = await second.wait(frame => frame.type === 'snapshot');
     expect(replacement.view?.phase).toBe('finished');
-    expect(replacement.controllerEpoch).toBeGreaterThan(final.controllerEpoch!);
+    expect(replacement.epoch).not.toBe(final.epoch);
+    expect(replacement.view!.self.controllerEpoch).toBeGreaterThan(final.view!.self.controllerEpoch);
     expect(await oldClosed).toBe(4001);
-    await new Promise(resolve => setTimeout(resolve, 200));
-    expect(second.frames.filter(frame => frame.type === 'snapshot')).toHaveLength(1);
-    expect(snapshotCalls[1]).toBe(1);
     const revoked = new Promise<number>(resolve => second.socket.once('close', resolve));
     f.platform.revokeSession(a.session.sessionHash);
     expect(await revoked).toBe(4003);
   }, 30_000);
 
-  it('accepts a bounded input burst after network jitter while continuing to limit a flood', async () => {
-    const f = await fixture(), a = await f.signup('jitter_a'), b = await f.signup('jitter_b'), room = await f.room(a, b);
+  it('acknowledges consumed pilot input and preserves the shared rolling rate limit across reconnects', async () => {
+    const f = await fixture(), a = await f.signup('jitter_a'), b = await f.signup('jitter_b'), room = await f.room(a, b, 2, true);
     const client = f.connect(a, room), first = await client.wait(frame => frame.type === 'snapshot');
-    let seq = 0;
-    const sendInputs = (count: number) => { for (let i = 0; i < count; i++) client.socket.send(JSON.stringify({ type: 'input', version: 'shift-wire@1', payload: {
-      type: 'input', roundId: first.view!.round, controllerEpoch: first.controllerEpoch, seq: ++seq, moveX: 0, moveZ: 0, aim: 0, fireHeld: false,
-    } })); };
-    let start = client.frames.length;
-    sendInputs(6); await client.wait(frame => frame.type === 'snapshot', start);
-    expect(client.frames.slice(start).filter(frame => frame.code === 'INPUT_RATE')).toHaveLength(0);
-    start = client.frames.length;
-    sendInputs(60); await client.wait(frame => frame.code === 'INPUT_RATE', start);
+    expect(first.view!.self.role).toBe('pilot');
+    f.shift.runtime.advanceTicks(211);
+    const input = vi.spyOn(f.shift.runtime, 'liveInput');
+    const send = (socket: WebSocket, snapshot: Frame, seq: number) => socket.send(JSON.stringify({ ...scope(snapshot), type: 'input', seq, payload: {
+      type: 'input', roundId: snapshot.view!.round, controllerEpoch: snapshot.view!.self.controllerEpoch, seq, moveX: 0, moveZ: 0, aim: 0, fireHeld: false,
+    } }));
+    for (let seq = 1; seq <= 40; seq++) send(client.socket, first, seq);
+    await vi.waitFor(() => expect(input.mock.calls.some(call => call[2].seq === 30)).toBe(true));
+    expect(input.mock.calls.every(call => call[2].seq <= 30)).toBe(true);
+    expect((await f.platform.matchView(a.id, room.roomId) as ShiftView).self.lastAcceptedSeq).toBe(-1);
+    f.shift.runtime.advanceTicks();
+    expect((await client.wait(frame => frame.type === 'snapshot' && frame.lastAcceptedSeq === 30)).view!.self.lastAcceptedSeq).toBe(30);
     expect(client.socket.readyState).toBe(WebSocket.OPEN);
-    await new Promise(resolve => setTimeout(resolve, 400));
-    start = client.frames.length;
-    sendInputs(6); await client.wait(frame => frame.type === 'snapshot', start);
-    expect(client.frames.slice(start).filter(frame => frame.code === 'INPUT_RATE')).toHaveLength(0);
+    const next = f.connect(a, room), replacement = await next.wait(frame => frame.type === 'snapshot');
+    expect(replacement.lastAcceptedSeq).toBe(-1); expect(replacement.epoch).not.toBe(first.epoch);
+    const calls = input.mock.calls.length;
+    send(next.socket, replacement, 0);
+    await new Promise(resolve => setTimeout(resolve, 100));
+    expect(input.mock.calls).toHaveLength(calls); // Reconnect grants no fresh input quota.
+    f.shift.runtime.advanceTicks();
+    expect((await f.platform.matchView(a.id, room.roomId) as ShiftView).self.lastAcceptedSeq).toBe(-1);
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    send(next.socket, replacement, 1);
+    await vi.waitFor(() => expect(input.mock.calls.length).toBeGreaterThan(calls));
+    f.shift.runtime.advanceTicks();
+    await next.wait(frame => frame.type === 'snapshot' && frame.lastAcceptedSeq === 1);
+    expect([...client.frames, ...next.frames].filter(frame => frame.type === 'error')).toEqual([]);
+  });
+
+  it('replays one committed shift through HTTP and a new shared epoch without repeating its effect', async () => {
+    const f = await fixture(), a = await f.signup('replay_a'), b = await f.signup('replay_b'), room = await f.room(a, b);
+    const client = f.connect(a, room), first = await client.wait(frame => frame.type === 'snapshot');
+    f.shift.runtime.advanceTicks(211);
+    const view = await f.platform.matchView(a.id, room.roomId) as ShiftView;
+    const command = { actionId: 'http-ws-replay-shift', expectedRevision: view.boardRevision, payload: {
+      type: 'shift', roundId: view.round, controllerEpoch: first.view!.self.controllerEpoch, roomId: 'O', expectedBoardRevision: view.boardRevision,
+    } };
+    const apply = vi.spyOn(f.shift.runtime, 'applyAction');
+    client.socket.send(JSON.stringify({ ...scope(first), type: 'command', ...command }));
+    await vi.waitFor(() => expect(apply).toHaveBeenCalledTimes(1));
+    f.shift.runtime.advanceTicks();
+    const committed = await client.wait(frame => frame.type === 'receipt' && frame.actionId === command.actionId);
+    expect(committed.result).toMatchObject({ accepted: true, actionId: command.actionId, tick: view.tick + 1 });
+    expect(committed.result).not.toHaveProperty('view');
+    expect(await f.post(a, room.roomId, 'actions', command)).toEqual({ status: 200, body: { view: committed.result } });
+    const next = f.connect(a, room), replacement = await next.wait(frame => frame.type === 'snapshot');
+    expect(replacement.view!.motion?.roomId).toBe('O');
+    expect(replacement.view!.self.controllerEpoch).not.toBe(command.payload.controllerEpoch);
+    next.socket.send(JSON.stringify({ ...scope(replacement), type: 'command', ...command }));
+    expect((await next.wait(frame => frame.type === 'receipt' && frame.actionId === command.actionId)).result).toEqual(committed.result);
+    const afterReplay = await f.platform.matchView(a.id, room.roomId) as ShiftView;
+    expect(afterReplay.tick).toBe(view.tick + 1); expect(afterReplay.motion).toEqual(replacement.view!.motion);
+    expect(afterReplay.boardRevision).toBe(replacement.view!.boardRevision);
   });
 
   it('rejects invalid lobby capacity and resets human readiness after team changes', async () => {
@@ -271,12 +342,16 @@ describe('shared authenticated live gateway with Shift', () => {
     const finished = f.platform.getRoom(a.id, room.roomId);
     expect(finished.state).toBe('finished');
     expect(() => f.platform.rematch(b.id, room.roomId, { expectedRevision: finished.revision })).toThrow();
-    const disconnected = new Promise<number>(resolve => client.socket.once('close', resolve));
+    const disconnected = new Promise<number>((resolve, reject) => {
+      const timeout = setTimeout(() => reject(new Error(`Old rematch channel stayed open: ${client.frames.slice(-4).map(frame => frame.code ?? frame.type).join(',')}`)), 2000);
+      client.socket.once('close', code => { clearTimeout(timeout); resolve(code); });
+    });
     const again = f.platform.rematch(a.id, room.roomId, { expectedRevision: finished.revision });
     expect(again.state).toBe('lobby'); expect(again.matchId).toBeNull();
     expect(again.members.map(p => p.participantId)).toEqual(room.members.map(p => p.participantId));
     expect(again.members.filter(p => p.playerId).every(p => !p.ready)).toBe(true);
-    expect(await disconnected).toBe(4004);
+    expect(await disconnected).toBe(4003);
+    await expect(f.platform.matchView(a.id, room.roomId)).rejects.toMatchObject({ code: 'MATCH_NOT_STARTED' });
     f.platform.setReady(a.id, again.roomId, { expectedRevision: again.revision, ready: true });
     f.platform.setReady(b.id, again.roomId, { expectedRevision: again.revision, ready: true });
     f.platform.startRoom(a.id, again.roomId, { expectedRevision: again.revision }); await f.platform.reconcile();

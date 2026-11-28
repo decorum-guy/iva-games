@@ -58,15 +58,54 @@ async function screenshot(page, name) { await page.bringToFront(); await page.sc
 async function until(test, label, timeout = 12000) { const end = Date.now() + timeout; while (Date.now() < end) { for (const peer of observedPeers) if (peer.failure) throw peer.failure; const result = await test(); if (result) return result; await delay(45); } throw new Error(`Timed out: ${label}`); }
 const compiled = join(directory, 'policy');
 const entry = join(directory, 'policy-entry.ts');
-await writeFile(entry, `export { chooseBotCommands } from ${JSON.stringify(join(ROOT, 'games/shift/src/bots/policy.ts'))};\nexport { lineOfSight, worldPosition } from ${JSON.stringify(join(ROOT, 'games/shift/src/core/index.ts'))};\n`);
+await writeFile(entry, `export { chooseBotCommands } from ${JSON.stringify(join(ROOT, 'games/shift/src/bots/policy.ts'))};\nexport { lineOfSight, worldPosition, WIRE_VERSION, RULES_VERSION, CONTENT_VERSION } from ${JSON.stringify(join(ROOT, 'games/shift/src/core/index.ts'))};\nexport { LIVE_PROTOCOL, parseLiveClientFrame } from ${JSON.stringify(join(ROOT, 'packages/session-kit/src/index.ts'))};\n`);
 await build({ root: ROOT, configFile: false, logLevel: 'silent', build: { ssr: entry, outDir: compiled, emptyOutDir: true, minify: false } });
-const { chooseBotCommands, lineOfSight, worldPosition } = await import(pathToFileURL(join(compiled, 'policy-entry.js')).href);
+const { chooseBotCommands, lineOfSight, worldPosition, WIRE_VERSION, RULES_VERSION, CONTENT_VERSION, LIVE_PROTOCOL, parseLiveClientFrame } = await import(pathToFileURL(join(compiled, 'policy-entry.js')).href);
+
+const scopeOf = ({ protocol, wireVersion, roomId, matchId, epoch }) => ({ protocol, wireVersion, roomId, matchId, epoch });
+function immutableJson(value) {
+  if (value && typeof value === 'object' && !Object.isFrozen(value)) {
+    for (const child of Object.values(value)) immutableJson(child);
+    Object.freeze(value);
+  }
+  return value;
+}
+function auditServerFrame(frame, roomId, previousScope) {
+  assert.ok(frame && typeof frame === 'object' && !Array.isArray(frame));
+  assert.equal(frame.protocol, LIVE_PROTOCOL); assert.equal(frame.wireVersion, WIRE_VERSION);
+  assert.equal(frame.roomId, roomId); assert.equal(frame.gameId, 'shift');
+  assert.equal(frame.rulesVersion, RULES_VERSION); assert.equal(frame.contentVersion, CONTENT_VERSION);
+  assert.equal(typeof frame.matchId, 'string'); assert.ok(frame.matchId.length > 0);
+  assert.equal(typeof frame.epoch, 'string'); assert.ok(frame.epoch.length > 0);
+  const scope = scopeOf(frame);
+  if (previousScope) assert.deepEqual(scope, previousScope, 'A socket keeps its authenticated shared scope');
+  const fields = ['protocol', 'wireVersion', 'roomId', 'matchId', 'epoch', 'gameId', 'rulesVersion', 'contentVersion', 'type'];
+  if (frame.type === 'snapshot') {
+    fields.push('tick', 'serverTime', 'lastAcceptedSeq', 'view');
+    assert.ok(Number.isSafeInteger(frame.tick) && frame.tick >= 0);
+    assert.ok(Number.isFinite(frame.serverTime));
+    assert.ok(Number.isSafeInteger(frame.lastAcceptedSeq) && frame.lastAcceptedSeq >= -1);
+    assert.equal(frame.tick, frame.view.tick); assert.equal(frame.lastAcceptedSeq, frame.view.self.lastAcceptedSeq);
+    assert.equal(frame.rulesVersion, frame.view.rulesVersion); assert.equal(frame.contentVersion, frame.view.contentVersion);
+    assert.equal(frame.wireVersion, frame.view.wireVersion);
+  } else if (frame.type === 'receipt') {
+    fields.push('actionId', 'tick', 'result');
+    assert.ok(Number.isSafeInteger(frame.tick) && frame.tick >= 0);
+    assert.equal(frame.actionId, frame.result?.actionId);
+    assert.equal(typeof frame.result?.accepted, 'boolean');
+  } else {
+    assert.equal(frame.type, 'error'); fields.push('code', 'message');
+    if (Object.hasOwn(frame, 'actionId')) fields.push('actionId');
+  }
+  assert.deepEqual(Object.keys(frame).sort(), fields.sort(), 'Only the documented shared server fields cross the wire');
+  return scope;
+}
 
 function instrumentBrowser(options = {}) {
   const NativeWebSocket = window.WebSocket;
   const NativeAudioContext = window.AudioContext;
   const latency = options.oneWayDelayMs || 0;
-  const state = { sockets: [], active: null, automated: false, sent: 0, oneWayDelayMs: latency,
+  const state = { sockets: [], active: null, scope: null, automated: false, sent: 0, oneWayDelayMs: latency,
     inputMetrics: { ui: 0, policy: 0, peakPerSecond: 0, recent: [] }, audioContexts: [], activeGesture: null, gestures: { pointers: 0, keys: 0, trustedKeys: 0 } };
   window.addEventListener('pointerdown', () => { state.gestures.pointers++; }, true);
   window.addEventListener('keydown', event => {
@@ -87,7 +126,7 @@ function instrumentBrowser(options = {}) {
         if (frame.type === 'input') {
           const now = performance.now(), metrics = state.inputMetrics;
           metrics[source]++; metrics.recent = metrics.recent.filter(event => now - event.at < 1000);
-          metrics.recent.push({ at: now, source, seq: frame.payload.seq, epoch: frame.payload.controllerEpoch });
+          metrics.recent.push({ at: now, source, seq: frame.seq, epoch: frame.epoch });
           metrics.peakPerSecond = Math.max(metrics.peakPerSecond, metrics.recent.length);
         }
       } catch { /* The server still validates malformed native messages. */ }
@@ -99,8 +138,8 @@ function instrumentBrowser(options = {}) {
   window.WebSocket = class extends NativeWebSocket {
     constructor(url, protocols) {
       super(url, protocols);
-      if (String(url).includes('/live?')) {
-        state.sockets.push(this); state.active = this;
+      if (/\/api\/platform\/v1\/rooms\/[^/]+\/live$/.test(new URL(String(url), location.href).pathname)) {
+        state.sockets.push(this); state.active = this; state.scope = null;
         if (latency) {
           const delayed = new WeakSet();
           this.addEventListener('message', event => {
@@ -110,6 +149,17 @@ function instrumentBrowser(options = {}) {
             setTimeout(() => { if (this.readyState === NativeWebSocket.OPEN) this.dispatchEvent(copy); }, latency);
           }, true);
         }
+        this.addEventListener('message', event => {
+          if (state.active !== this) return;
+          try {
+            const frame = JSON.parse(String(event.data));
+            if (frame.type === 'snapshot' && frame.protocol === 'iva-live@1' && frame.wireVersion === 'shift-wire@1') {
+              const { protocol, wireVersion, roomId, matchId, epoch } = frame;
+              state.scope = { protocol, wireVersion, roomId, matchId, epoch };
+            }
+          } catch { /* The Node-side observer rejects malformed or wrongly scoped frames. */ }
+        });
+        this.addEventListener('close', () => { if (state.active === this) state.scope = null; });
       }
     }
     send(data) {
@@ -119,10 +169,10 @@ function instrumentBrowser(options = {}) {
       return nativeSend(this, data, 'ui');
     }
   };
-  state.send = command => {
-    const socket = state.active; if (!socket || socket.readyState !== NativeWebSocket.OPEN) return false;
-    const frame = command.type === 'input' ? { type: 'input', version: 'shift-wire@1', payload: command }
-      : { type: 'command', version: 'shift-wire@1', actionId: command.actionId, payload: command };
+  state.send = (command, expectedRevision) => {
+    const socket = state.active; if (!socket || socket.readyState !== NativeWebSocket.OPEN || !state.scope) return false;
+    const frame = command.type === 'input' ? { ...state.scope, type: 'input', seq: command.seq, payload: command }
+      : { ...state.scope, type: 'command', actionId: command.actionId, expectedRevision, payload: command };
     nativeSend(socket, JSON.stringify(frame), 'policy'); state.sent++; return true;
   };
   state.disconnect = () => state.active?.close(1000, 'acceptance mid-move reconnect');
@@ -173,7 +223,7 @@ function auditView(view, peer) {
 }
 
 function watchPage(page, name, game) {
-  const peer = { page, name, game, view: null, frames: 0, sockets: 0, errors: [], http: [], receipts: new Map(), receiptCounts: new Map(), commandsSentAt: new Map(), receiptLatencyMs: [], closes: [], roles: new Set(), motions: new Set(), samples: [], recent: new Map(), memory: { seq: 0, counter: 0, nextDecisionTick: 0, recentRooms: [] }, lastDriveTick: -1, failure: null };
+  const peer = { page, name, game, view: null, frames: 0, sockets: 0, errors: [], http: [], receipts: new Map(), receiptCounts: new Map(), commandsSentAt: new Map(), receiptLatencyMs: [], closes: [], roles: new Set(), motions: new Set(), samples: [], recent: new Map(), commandEnvelopes: new Map(), wireCommandEnvelopes: new Map(), scopeChecks: 0, staleSocketFramesIgnored: 0, memory: { seq: 0, counter: 0, nextDecisionTick: 0, recentRooms: [] }, lastDriveTick: -1, failure: null };
   observedPeers.push(peer);
   page.on('pageerror', error => { peer.errors.push(error.message); });
   page.on('response', response => {
@@ -188,16 +238,26 @@ function watchPage(page, name, game) {
   });
   page.on('requestfailed', request => { if (new URL(request.url()).pathname.startsWith('/api/platform/')) peer.http.push({ path: new URL(request.url()).pathname, failed: request.failure()?.errorText }); });
   page.on('websocket', ws => {
-    if (!ws.url().includes('/live?')) return;
-    peer.sockets++;
+    const url = new URL(ws.url());
+    if (!/\/api\/platform\/v1\/rooms\/[^/]+\/live$/.test(url.pathname)) return;
+    try {
+      assert.equal(url.pathname, `/api/platform/v1/rooms/${encodeURIComponent(game.roomId)}/live`);
+      assert.equal(url.search, ''); assert.equal(url.hash, ''); assert.equal(url.username, ''); assert.equal(url.password, '');
+    } catch (error) { peer.failure ||= error; return; }
+    peer.sockets++; peer.activeSocket = ws; peer.recent.clear();
+    let connectionScope = null, wireScope = null;
     const receive = ({ payload }) => {
       try {
+        // A newer socket owns this observer. Buffered old messages never replace
+        // its personalized view or random shared epoch, even during delayed delivery.
+        if (peer.activeSocket !== ws) { peer.staleSocketFramesIgnored++; return; }
         const frame = JSON.parse(String(payload));
+        const scope = auditServerFrame(frame, game.roomId, connectionScope);
+        if (!connectionScope) assert.equal(frame.type, 'snapshot', 'The first server frame is a complete personalized snapshot');
+        connectionScope = scope; peer.scopeChecks++;
         if (frame.type === 'snapshot') {
-          // A closing socket may deliver its last buffered snapshot after a
-          // replacement has already acquired a newer controller epoch.
-          if (peer.matchId === frame.matchId && peer.controllerEpoch > frame.controllerEpoch) return;
-          peer.controllerEpoch = frame.controllerEpoch;
+          peer.liveScope = scope;
+          immutableJson(frame.view);
           auditView(frame.view, peer); peer.view = frame.view; peer.matchId = frame.matchId; peer.frames++; peer.recent.set(frame.tick, frame.view);
           while (peer.recent.size > 40) peer.recent.delete(peer.recent.keys().next().value);
           if (peer.frames === 1 || frame.view.phase !== peer.previousPhase) peer.samples.push({ type: 'phase', tick: frame.tick, view: frame.view });
@@ -208,13 +268,38 @@ function watchPage(page, name, game) {
             assert.notEqual(frame.view.self.seatId, same.self.seatId); game.comparedFrames++;
           }
         } else if (frame.type === 'receipt') {
-          peer.receipts.set(frame.actionId, frame.result); peer.receiptCounts.set(frame.actionId, (peer.receiptCounts.get(frame.actionId) || 0) + 1);
+          assert.equal(frame.result.seatId, peer.view.self.seatId, 'Receipt belongs to this authenticated seat');
+          peer.receipts.set(frame.actionId, immutableJson(frame.result)); peer.receiptCounts.set(frame.actionId, (peer.receiptCounts.get(frame.actionId) || 0) + 1);
           if (peer.commandsSentAt.has(frame.actionId)) peer.receiptLatencyMs.push(performance.now() - peer.commandsSentAt.get(frame.actionId));
         }
         else if (frame.type === 'error') { peer.errors.push(`wire:${frame.code}`); }
       } catch (error) { peer.failure ||= error; }
     };
-    ws.on('framereceived', frame => { if (game.oneWayDelayMs) setTimeout(() => receive(frame), game.oneWayDelayMs); else receive(frame); });
+    ws.on('framereceived', frame => {
+      try {
+        const parsed = JSON.parse(String(frame.payload));
+        const scope = auditServerFrame(parsed, game.roomId, wireScope);
+        if (!wireScope) assert.equal(parsed.type, 'snapshot', 'The first actual wire frame is a full snapshot');
+        wireScope = scope;
+      } catch (error) { peer.failure ||= error; return; }
+      if (game.oneWayDelayMs) setTimeout(() => receive(frame), game.oneWayDelayMs); else receive(frame);
+    });
+    ws.on('framesent', ({ payload }) => {
+      try {
+        assert.ok(wireScope, 'Client waits for a personalized snapshot before sending');
+        const frame = parseLiveClientFrame(JSON.parse(String(payload)), wireScope);
+        if (frame.type === 'input') assert.equal(frame.seq, frame.payload.seq, 'Shared and game input sequence agree');
+        else {
+          assert.equal(frame.actionId, frame.payload.actionId);
+          if (frame.payload.type === 'shift') assert.equal(frame.expectedRevision, frame.payload.expectedBoardRevision);
+          const key = `${frame.matchId}:${frame.actionId}`, envelope = { actionId: frame.actionId, expectedRevision: frame.expectedRevision, payload: frame.payload };
+          const prior = peer.wireCommandEnvelopes.get(key);
+          if (prior) assert.deepEqual(envelope, prior, 'Every UI/policy retry keeps its original payload and revision across sockets');
+          else peer.wireCommandEnvelopes.set(key, immutableJson(envelope));
+        }
+        peer.scopeChecks++;
+      } catch (error) { peer.failure ||= error; }
+    });
     ws.on('close', () => peer.closes.push(Date.now()));
   });
   return peer;
@@ -254,10 +339,11 @@ async function lobbyTouchTargets(game) {
 }
 
 async function keyboardAudioInFreshContext(game) {
-  const old = game.peers[0], oldEpoch = old.view.self.controllerEpoch;
+  const old = game.peers[0], oldEpoch = old.view.self.controllerEpoch, oldSharedEpoch = old.liveScope.epoch;
   const replacement = await createBrowserPeer(game, 'pilot');
   await replacement.page.goto(game.url, { waitUntil: 'domcontentloaded' });
   await until(() => replacement.view?.self.controllerEpoch > oldEpoch, 'Fresh audio-only keyboard context acquires its ordinary seat');
+  assert.notEqual(replacement.liveScope.epoch, oldSharedEpoch, 'Takeover obtains a fresh shared epoch');
   game.peers[0] = replacement;
   await replacement.page.locator('.shift-scene canvas').first().waitFor();
   const before = await replacement.page.evaluate(() => window.__shiftAcceptance.audioAudit());
@@ -289,13 +375,27 @@ async function keyboardAudioInFreshContext(game) {
   });
 }
 
-async function send(peer, commands) {
-  for (const command of commands) if (command.actionId) peer.commandsSentAt.set(command.actionId, performance.now());
-  return bounded(peer.page.evaluate(commands => commands.map(command => window.__shiftAcceptance.send(command)), commands), `${peer.game.label}/${peer.name} wire send`);
+const commandRevisions = new WeakMap();
+async function send(peer, commands, creationView = peer.view) {
+  const packets = commands.map(command => {
+    if (command.type === 'input') return { command };
+    peer.commandsSentAt.set(command.actionId, performance.now());
+    let packet = peer.commandEnvelopes.get(command.actionId);
+    if (packet) assert.deepEqual(command, packet.command, 'A retry preserves the complete original game payload');
+    else {
+      packet = immutableJson({ command: structuredClone(command), expectedRevision: command.type === 'shift' ? command.expectedBoardRevision : commandRevisions.get(command) ?? creationView.boardRevision });
+      peer.commandEnvelopes.set(command.actionId, packet);
+    }
+    return packet;
+  });
+  return bounded(peer.page.evaluate(packets => packets.map(({ command, expectedRevision }) => window.__shiftAcceptance.send(command, expectedRevision)), packets), `${peer.game.label}/${peer.name} wire send`);
 }
 async function automated(peer, enabled = true) { await peer.page.evaluate(enabled => { window.__shiftAcceptance.automated = enabled; }, enabled); }
 async function receipt(peer, id) { return until(() => peer.receipts.get(id), `${peer.name} receipt ${id}`); }
-const scoped = (peer, command) => ({ roundId: peer.view.round, controllerEpoch: peer.view.self.controllerEpoch, actionId: randomUUID(), ...command });
+const scoped = (peer, command) => {
+  const payload = { roundId: peer.view.round, controllerEpoch: peer.view.self.controllerEpoch, actionId: randomUUID(), ...command };
+  commandRevisions.set(payload, peer.view.boardRevision); return payload;
+};
 
 async function lobby(game, detailed) {
   const [host, guest] = game.peers, url = game.url;
@@ -351,7 +451,7 @@ async function lobby(game, detailed) {
   }
   assert.ok(await host.page.locator('.shift-match-tools').getByRole('button', { name: 'EN', exact: true }).isVisible(), 'Host keeps RU after lobby → match');
   assert.ok(await guest.page.locator('.shift-match-tools').getByRole('button', { name: 'RU', exact: true }).isVisible(), 'Guest keeps saved EN after lobby → match');
-  check('Two independent authenticated browser seats start from ready lobby', { game: game.label, format: `${game.teamSize}v${game.teamSize}`, arena: game.arena });
+  check('Two independent authenticated browser seats start from ready lobby', { game: game.label, format: `${game.teamSize}v${game.teamSize}`, arena: game.arena, protocol: LIVE_PROTOCOL, pinnedRulesVersion: host.liveScope && host.view.rulesVersion, personalizedSharedScopes: true });
 }
 
 async function contentionAndReconnect(game) {
@@ -378,15 +478,16 @@ async function contentionAndReconnect(game) {
   const receipts = await Promise.all(game.peers.map((peer, i) => receipt(peer, commands[i].actionId)));
   assert.equal(receipts.filter(r => r.accepted).length, 1, 'One shaft receives exactly one concurrent winner');
   await until(() => host.view.motion, 'Move visible');
-  const motion = { ...host.view.motion }, oldEpoch = guest.view.self.controllerEpoch;
+  const motion = { ...host.view.motion }, oldEpoch = guest.view.self.controllerEpoch, oldSharedEpoch = guest.liveScope.epoch;
   await guest.page.evaluate(() => window.__shiftAcceptance.disconnect());
   await until(() => guest.view.self.controllerEpoch > oldEpoch, 'Browser reconnect epoch');
+  assert.notEqual(guest.liveScope.epoch, oldSharedEpoch, 'Reconnect obtains a fresh shared epoch');
   await until(() => !guest.view.motion && guest.view.board[motion.to] === motion.roomId, 'Move docks after reconnect');
   const priorCount = host.receiptCounts.get(commands[0].actionId);
   await send(host, [commands[0]]); await until(() => host.receiptCounts.get(commands[0].actionId) > priorCount, 'Repeated durable receipt');
   assert.deepEqual(await receipt(host, commands[0].actionId), receipts[0]);
   report.coverage.contention = true; report.coverage.midMoveReconnect = true;
-  check('Contending navigators, public join forecast, disabled reason, mid-move socket reconnect and idempotent receipt', { game: game.label, receipts, oldEpoch, newEpoch: guest.view.self.controllerEpoch });
+  check('Contending navigators, public join forecast, disabled reason, mid-move socket reconnect and idempotent receipt', { game: game.label, receipts, oldEpoch, newEpoch: guest.view.self.controllerEpoch, sharedEpochChanged: true });
 }
 
 async function crashAndTakeover(game) {
@@ -395,10 +496,11 @@ async function crashAndTakeover(game) {
   const option = peer.view.shiftOptions.find(o => o.allowed);
   const command = scoped(peer, { type: 'shift', roomId: option.roomId, expectedBoardRevision: peer.view.boardRevision });
   await send(peer, [command]); const accepted = await receipt(peer, command.actionId); assert.equal(accepted.accepted, true);
-  const epochs = game.peers.map(p => p.view.self.controllerEpoch);
+  const epochs = game.peers.map(p => p.view.self.controllerEpoch), sharedEpochs = game.peers.map(p => p.liveScope.epoch);
   // A real process kill after the normal durable acknowledgement, without editing SQLite.
   await game.demo.restart({ crash: true });
   await until(() => game.peers.every((p, i) => p.view.self.controllerEpoch > epochs[i] && p.view.recoveryTicksRemaining > 0), 'Both browsers receive recovered frozen checkpoint');
+  game.peers.forEach((p, i) => assert.notEqual(p.liveScope.epoch, sharedEpochs[i], 'Restart reconnect obtains a fresh shared epoch'));
   assert.equal(peer.view.motion?.roomId, option.roomId); const recoveredTick = peer.view.tick;
   const count = peer.receiptCounts.get(command.actionId); await send(peer, [command]);
   await until(() => peer.receiptCounts.get(command.actionId) > count, 'Receipt survives actual process crash');
@@ -414,11 +516,12 @@ async function crashAndTakeover(game) {
   report.coverage.processCrashDuringMove = true;
   check('Actual SIGKILL after acknowledged move, frozen checkpoint, same durable receipt and reconnect', { game: game.label, recoveredTick });
 
-  const old = game.peers[1], oldEpoch = old.view.self.controllerEpoch, seat = old.view.self.seatId;
+  const old = game.peers[1], oldEpoch = old.view.self.controllerEpoch, oldSharedEpoch = old.liveScope.epoch, seat = old.view.self.seatId;
   const page = await old.page.context().newPage(); page.setDefaultTimeout(12000);
   const replacement = watchPage(page, old.name, game);
   await page.goto(game.url, { waitUntil: 'domcontentloaded' });
   await until(() => replacement.view?.self.controllerEpoch > oldEpoch, 'Second tab obtains new controller epoch');
+  assert.notEqual(replacement.liveScope.epoch, oldSharedEpoch, 'Second tab obtains a fresh shared epoch');
   assert.equal(replacement.view.self.seatId, seat);
   await old.page.locator('.shift-connection').waitFor();
   assert.match(await old.page.locator('.shift-connection').innerText(), /другой вкладке|Another tab/i);
@@ -433,7 +536,7 @@ async function crashAndTakeover(game) {
     assert.equal(control.automated, true); assert.equal(control.socketState, 1);
   }
   report.coverage.controllerTakeover = true;
-  check('Second-tab controller takeover leaves first tab visibly inactive', { game: game.label, oldEpoch, newEpoch: replacement.view.self.controllerEpoch });
+  check('Second-tab controller takeover leaves first tab visibly inactive', { game: game.label, oldEpoch, newEpoch: replacement.view.self.controllerEpoch, sharedEpochChanged: true });
 }
 
 async function drive(game) {
@@ -445,7 +548,7 @@ async function drive(game) {
       const view = peer.view; if (!view || view.tick === peer.lastDriveTick) return;
       peer.lastDriveTick = view.tick;
       const commands = chooseBotCommands(view, peer.memory);
-      if (commands.length) await send(peer, commands);
+      if (commands.length) await send(peer, commands, view);
     }));
     const view = game.peers[0].view;
     if (view && view.round !== announcedRound) { announcedRound = view.round; log({ game: game.label, phase: view.phase, round: view.round, score: view.score }); }
@@ -472,7 +575,7 @@ async function drive(game) {
   }
   const result = { game: game.label, arena: game.arena, teamSize: game.teamSize, matchId: game.peers[0].matchId, result: { score: final.score, winner: final.winner, rounds: final.rounds }, realSeconds: Math.round((Date.now() - started) / 1000), comparedFrames: game.comparedFrames,
     injectedOneWayDelayMs: game.oneWayDelayMs,
-    peers: game.peers.map(p => ({ name: p.name, frames: p.frames, roles: [...p.roles], socketConnections: p.sockets, moves: p.motions.size, inputMetrics: { ui: p.inputMetrics?.ui, policy: p.inputMetrics?.policy, peakPerSecond: p.inputMetrics?.peakPerSecond },
+    peers: game.peers.map(p => ({ name: p.name, frames: p.frames, roles: [...p.roles], socketConnections: p.sockets, sharedProtocol: LIVE_PROTOCOL, scopeChecks: p.scopeChecks, staleSocketFramesIgnored: p.staleSocketFramesIgnored, moves: p.motions.size, inputMetrics: { ui: p.inputMetrics?.ui, policy: p.inputMetrics?.policy, peakPerSecond: p.inputMetrics?.peakPerSecond },
       ...(p.receiptLatencyMs.length ? { observedReceiptLatencyMs: { minimum: Math.round(Math.min(...p.receiptLatencyMs)), maximum: Math.round(Math.max(...p.receiptLatencyMs)) } } : {}) })) };
   report.matches.push(result);
   await writeFile(join(directory, `${game.label}-frames.json`), JSON.stringify(game.peers.map(p => ({ name: p.name, samples: p.samples, final: p.view })), null, 2), { mode: 0o600 });

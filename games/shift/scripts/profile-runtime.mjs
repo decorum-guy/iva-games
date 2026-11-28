@@ -53,7 +53,7 @@ const report = {
   settings: { matchCount: 6, teamSize: 3, difficulty, rotateRoles: true, humanSeatsPerMatch: 2, initialHumanConnections: 0, warmupSteps, targetSteps, snapshotEverySteps: 2, filteredProfilesPerMatch: 2 },
   methodology: {
     advanceTicks: 'One ordinary advanceTicks(1) call covering all six resident matches, including bots and synchronous SQLite checkpoints.',
-    snapshots: 'Two filtered viewForPlayer calls per match every second step, followed by ordinary snapshot-frame JSON encoding. No live leases are opened, so disconnected human substitutes remain enabled.',
+    snapshots: 'Two filtered viewForPlayer calls per match every second step, followed by representative iva-live@1 snapshot-frame JSON encoding with a fixed sample epoch. No transport or live leases are opened, so disconnected human substitutes remain enabled.',
     combined: 'Measured advance duration plus whole snapshot-batch duration where due; includes small snapshot bookkeeping/assertion overhead. Untimed status guards are excluded.',
     scheduling: 'Fixed steps are intentionally executed faster than wall time. This is a work-cost profile, not real-time scheduling or end-to-end latency.',
     threshold: '25 ms is the stated 75% budget of a 30 Hz tick. Timing is reported, never asserted as a CI test.',
@@ -70,6 +70,7 @@ for (const [name, path] of [['cpuMax', '/sys/fs/cgroup/cpu.max'], ['memoryMax', 
 const entry = join(directory, 'profile-entry.ts'), compiled = join(directory, 'compiled');
 await writeFile(entry,
   `export { ShiftRuntime } from ${JSON.stringify(join(ROOT, 'games/shift/src/server/runtime.ts'))};\n` +
+  `export { LIVE_PROTOCOL } from ${JSON.stringify(join(ROOT, 'packages/session-kit/src/realtime.ts'))};\n` +
   `export { RULES_VERSION, CONTENT_VERSION, WIRE_VERSION, BOT_VERSION, TICK_RATE, TIMING } from ${JSON.stringify(join(ROOT, 'games/shift/src/core/index.ts'))};\n`,
   { mode: 0o600 });
 await build({ root: ROOT, configFile: false, logLevel: 'silent', ssr: { noExternal: ['@iva-games/session-kit'] },
@@ -80,13 +81,13 @@ report.sourceChangedDuringCompile = false;
 for (const [file, hash] of Object.entries(sourceHashes)) if (sha256(await readFile(join(ROOT, file))) !== hash) report.sourceChangedDuringCompile = true;
 assert.equal(report.sourceChangedDuringCompile, false, 'Profile sources changed during compilation; run against a stable snapshot');
 
-const { ShiftRuntime, RULES_VERSION, CONTENT_VERSION, WIRE_VERSION, BOT_VERSION, TICK_RATE, TIMING } = await import(pathToFileURL(bundle).href);
+const { ShiftRuntime, LIVE_PROTOCOL, RULES_VERSION, CONTENT_VERSION, WIRE_VERSION, BOT_VERSION, TICK_RATE, TIMING } = await import(pathToFileURL(bundle).href);
 assert.ok(warmupSteps >= Math.max(TIMING.preparation, TIMING.substitute), 'Warmup must include normal preparation and substitute activation');
 report.settings.tickRate = TICK_RATE;
 report.settings.snapshotRateEquivalent = TICK_RATE / 2;
 report.settings.tickBudgetMs = 1000 / TICK_RATE;
 report.settings.processingBudgetMs = 1000 / TICK_RATE * 0.75;
-report.versions = { RULES_VERSION, CONTENT_VERSION, WIRE_VERSION, BOT_VERSION };
+report.versions = { LIVE_PROTOCOL, RULES_VERSION, CONTENT_VERSION, WIRE_VERSION, BOT_VERSION };
 const databasePath = join(directory, 'runtime.sqlite');
 const runtime = new ShiftRuntime({ databasePath, autoTick: false });
 const matches = [], measurements = [], profileMeasurements = [];
@@ -112,7 +113,9 @@ async function takeSnapshots(step, record) {
     const start = performance.now();
     const view = await runtime.viewForPlayer(match.matchId, playerId);
     const generated = performance.now();
-    const encoded = JSON.stringify({ type: 'snapshot', version: WIRE_VERSION, matchId: match.matchId, controllerEpoch: view.self.controllerEpoch, tick: view.tick, view });
+    const encoded = JSON.stringify({ protocol: LIVE_PROTOCOL, wireVersion: WIRE_VERSION, roomId: match.roomId, matchId: match.matchId,
+      epoch: 'representative-profile-epoch', gameId: 'shift', rulesVersion: RULES_VERSION, contentVersion: CONTENT_VERSION,
+      type: 'snapshot', tick: view.tick, serverTime: Date.now(), lastAcceptedSeq: view.self.lastAcceptedSeq, view });
     const finished = performance.now();
     const encodedBytes = Buffer.byteLength(encoded);
     phases.set(match.matchId, view.phase);
@@ -135,7 +138,7 @@ try {
     });
     const created = await runtime.createMatch({ roomId: `profile-room-${index}`, startCommandId: `profile-start-${index}`,
       rulesVersion: RULES_VERSION, contentVersion: CONTENT_VERSION, participants, settings: { arena, teamSize: 3, rotateRoles: true, difficulty } });
-    matches.push({ ...created, arena, label: `${arena}-${index + 1}`, profiles: [`profile-${index}-player-0`, `profile-${index}-player-3`] });
+    matches.push({ ...created, roomId: `profile-room-${index}`, arena, label: `${arena}-${index + 1}`, profiles: [`profile-${index}-player-0`, `profile-${index}-player-3`] });
   }
   // No sockets are opened: the two human seats get ordinary disconnected substitutes.
   // Both warmup and sample use the same 30 Hz-equivalent, every-other-step view cadence.

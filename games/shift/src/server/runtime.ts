@@ -3,9 +3,9 @@ import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { chmodSync, mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { canonicalJson, SessionError } from '@iva-games/session-kit';
-import type { ActionEnvelope, GameRegistration, GameRuntime, LiveGameSession, Participant, StartMatchRequest } from '@iva-games/session-kit';
+import type { ActionEnvelope, GameRegistration, Participant, RealtimeGameRuntime, RealtimeInput, RealtimeSnapshot, StartMatchRequest } from '@iva-games/session-kit';
 import { BOT_VERSION, CONTENT_VERSION, RULES_VERSION, TICK_RATE, WIRE_VERSION, connectSeat, createMatch, disconnectSeat, normalizeSettings, recoverMatch, viewForSeat } from '../core/index';
-import type { InputCommand, QueuedCommand, Receipt, Seat, ShiftCommandPayload, ShiftSettings, ShiftState, TeamId } from '../core/types';
+import type { InputCommand, QueuedCommand, Receipt, Seat, ShiftCommandPayload, ShiftSettings, ShiftState, ShiftView, TeamId } from '../core/types';
 import { advanceWithBots } from '../bots/index';
 
 export interface ShiftRoomSettings extends ShiftSettings {
@@ -15,7 +15,8 @@ export interface ShiftRoomSettings extends ShiftSettings {
 interface MatchRow { match_id: string; room_id: string; start_command_id: string; request_hash: string; roster: string; state: string; finished: number }
 interface ReceiptRow { request_hash: string; response: string }
 interface Pending { seatId: string; command: ShiftCommandPayload; hash: string; resolve(value: Receipt): void; reject(error: unknown): void; promise: Promise<Receipt> }
-interface Resident { state: ShiftState; roster: Participant[]; queue: Pending[]; pending: Map<string, Pending>; inputs: Map<string, InputCommand>; checkpointTick: number; failed: boolean; connections: number }
+interface Control { epoch: string; controllerEpoch: number; lastReceivedSeq: number; finalView?: ShiftView }
+interface Resident { state: ShiftState; roster: Participant[]; queue: Pending[]; pending: Map<string, Pending>; inputs: Map<string, InputCommand>; checkpointTick: number; failed: boolean; controls: Map<string, Control> }
 const identifier = (value: unknown): value is string => typeof value === 'string' && /^[A-Za-z0-9:_-]{1,128}$/.test(value);
 const fingerprint = (value: unknown): string => createHash('sha256').update(canonicalJson(value)).digest('hex');
 function fail(code: string, message = 'Действие сейчас недоступно', status = 409): never { throw new SessionError(code, message, status); }
@@ -132,7 +133,7 @@ function parseCommand(value: unknown, actionId?: string): ShiftCommandPayload {
 }
 
 /** One owner per match. Socket callbacks only enqueue; a fixed step resolves all contenders. */
-export class ShiftRuntime implements GameRuntime {
+export class ShiftRuntime implements RealtimeGameRuntime {
   readonly wireVersion = WIRE_VERSION;
   private readonly db: Database.Database;
   private readonly matches = new Map<string, Resident>();
@@ -198,14 +199,14 @@ export class ShiftRuntime implements GameRuntime {
     const state = createMatch(settings, seatsFor(settings, input.participants), randomBytes(4).readUInt32LE());
     const roster = structuredClone(input.participants);
     this.db.prepare('INSERT INTO shift_matches VALUES (?,?,?,?,?,?,0)').run(matchId, input.roomId, input.startCommandId, hash, JSON.stringify(roster), JSON.stringify(state));
-    this.matches.set(matchId, { state, roster, queue: [], pending: new Map(), inputs: new Map(), checkpointTick: state.tick, failed: false, connections: 0 });
+    this.matches.set(matchId, { state, roster, queue: [], pending: new Map(), inputs: new Map(), checkpointTick: state.tick, failed: false, controls: new Map() });
     return { matchId };
   }
 
   private restore(row: MatchRow): Resident {
     const state = JSON.parse(row.state) as ShiftState;
     if (state.rulesVersion !== RULES_VERSION || state.contentVersion !== CONTENT_VERSION || state.wireVersion !== WIRE_VERSION) fail('INCOMPATIBLE_VERSION', 'Не удалось открыть эту партию');
-    const entry: Resident = { state, roster: JSON.parse(row.roster) as Participant[], queue: [], pending: new Map(), inputs: new Map(), checkpointTick: state.tick, failed: false, connections: 0 };
+    const entry: Resident = { state, roster: JSON.parse(row.roster) as Participant[], queue: [], pending: new Map(), inputs: new Map(), checkpointTick: state.tick, failed: false, controls: new Map() };
     // Completed HTTP reads use the durable final state without populating the
     // simulation clock's resident map. A live result page acquires its own lease.
     if (state.phase !== 'finished') this.matches.set(row.match_id, entry);
@@ -224,7 +225,7 @@ export class ShiftRuntime implements GameRuntime {
     return p?.participantId ?? fail('FORBIDDEN', 'Вы не участник этой партии', 403);
   }
   private releaseFinished(matchId: string, entry: Resident): void {
-    if (entry.state.phase === 'finished' && entry.connections === 0 && entry.pending.size === 0 && this.matches.get(matchId) === entry) {
+    if (entry.state.phase === 'finished' && entry.controls.size === 0 && entry.pending.size === 0 && this.matches.get(matchId) === entry) {
       entry.inputs.clear(); this.matches.delete(matchId);
     }
   }
@@ -280,7 +281,11 @@ export class ShiftRuntime implements GameRuntime {
   }
   async applyAction(matchId: string, playerId: string, envelope: ActionEnvelope): Promise<unknown> {
     const entry = this.resident(matchId); const seatId = this.human(entry, playerId);
-    if (!identifier(envelope.actionId)) fail('INVALID_ACTION');
+    if (typeof envelope.actionId !== 'string' || !/^[A-Za-z0-9._:-]{8,100}$/.test(envelope.actionId) || !nonnegativeInteger(envelope.expectedRevision)) fail('INVALID_ACTION');
+    // The shared envelope mirrors the board revision. Interact/ping retain
+    // their core preconditions; only shifts are conditional on this revision.
+    const payload = object(envelope.payload);
+    if (payload.type === 'shift' && envelope.expectedRevision !== payload.expectedBoardRevision) fail('INVALID_INPUT', 'Проверьте версию плана', 400);
     return this.enqueue(matchId, entry, seatId, envelope.actionId, envelope.payload);
   }
   private enqueue(matchId: string, entry: Resident, seatId: string, actionId: string, raw: unknown): Promise<Receipt> {
@@ -302,39 +307,63 @@ export class ShiftRuntime implements GameRuntime {
     entry.queue.push(pending); entry.pending.set(key, pending); return promise;
   }
 
-  openLiveSession(matchId: string, playerId: string): LiveGameSession {
+  async liveConnect(matchId: string, playerId: string, epoch: string): Promise<RealtimeSnapshot> {
+    if (typeof epoch !== 'string' || !/^[A-Za-z0-9._:-]{8,128}$/.test(epoch)) fail('INVALID_INPUT', 'Обновите соединение', 400);
     const entry = this.resident(matchId), seatId = this.human(entry, playerId);
-    const epoch = connectSeat(entry.state, seatId);
+    if (entry.controls.get(seatId)?.epoch === epoch) return this.liveSnapshot(matchId, playerId, epoch);
+    const controllerEpoch = connectSeat(entry.state, seatId);
     entry.inputs.delete(seatId);
+    entry.controls.set(seatId, { epoch, controllerEpoch, lastReceivedSeq: -1 });
     this.persist(matchId, entry);
-    entry.connections++;
     this.matches.set(matchId, entry);
-    let closed = false;
-    const current = (): boolean => !closed && !this.closed && !entry.failed && entry.state.actors[seatId]?.controllerEpoch === epoch;
-    return {
-      wireVersion: WIRE_VERSION, controllerEpoch: epoch,
-      isCurrent: current,
-      input: raw => {
-        if (!current()) fail('STALE_EPOCH');
-        const command = parseCommand(raw) as InputCommand;
-        if (command.controllerEpoch !== epoch) fail('STALE_EPOCH');
-        entry.inputs.set(seatId, command);
-      },
-      command: (actionId, payload) => {
-        if (!current()) fail('STALE_EPOCH');
-        return this.enqueue(matchId, entry, seatId, actionId, payload);
-      },
-      snapshot: () => {
-        if (!current()) fail('STALE_EPOCH');
-        return { tick: entry.state.tick, view: viewForSeat(entry.state, seatId), finished: entry.state.phase === 'finished' };
-      },
-      close: () => {
-        if (closed) return;
-        closed = true; entry.connections--;
-        if (!this.closed && !entry.failed) { disconnectSeat(entry.state, seatId, epoch); this.persist(matchId, entry); }
-        this.releaseFinished(matchId, entry);
-      },
-    };
+    return this.liveSnapshot(matchId, playerId, epoch);
+  }
+
+  private control(entry: Resident, seatId: string, epoch: string): Control {
+    const control = entry.controls.get(seatId);
+    if (!control || control.epoch !== epoch || entry.state.actors[seatId]?.controllerEpoch !== control.controllerEpoch) fail('STALE_EPOCH', 'Управление перешло в другую вкладку');
+    return control;
+  }
+
+  liveInput(matchId: string, playerId: string, input: RealtimeInput): void {
+    const entry = this.resident(matchId), seatId = this.human(entry, playerId), control = this.control(entry, seatId, input.epoch);
+    const command = parseCommand(input.payload) as InputCommand;
+    if (!nonnegativeInteger(input.seq) || input.seq !== command.seq) fail('INVALID_INPUT', 'Проверьте последовательность управления', 400);
+    if (command.controllerEpoch !== control.controllerEpoch) fail('STALE_EPOCH');
+    if (input.seq <= control.lastReceivedSeq) return;
+    control.lastReceivedSeq = input.seq;
+    // Do not retain a late round/preparation packet for a later active tick.
+    // The core independently validates scope again when it consumes the input,
+    // and neutralizes a silent pilot after its existing eight-tick timeout.
+    if (command.roundId !== entry.state.round || entry.state.phase !== 'active' || entry.state.recoveryTicksRemaining > 0 || entry.state.actors[seatId].role !== 'pilot') return;
+    entry.inputs.set(seatId, command);
+  }
+
+  async liveSnapshot(matchId: string, playerId: string, epoch: string): Promise<RealtimeSnapshot> {
+    const entry = this.resident(matchId), seatId = this.human(entry, playerId), control = this.control(entry, seatId, epoch);
+    let view = control.finalView;
+    if (!view) {
+      view = viewForSeat(entry.state, seatId);
+      if (entry.state.phase === 'finished') control.finalView = view;
+    }
+    return { tick: entry.state.tick, serverTime: Date.now(), lastAcceptedSeq: entry.state.actors[seatId].lastAcceptedSeq, view };
+  }
+
+  liveDisconnect(matchId: string, playerId: string, epoch: string): void {
+    if (this.closed) return;
+    const entry = this.matches.get(matchId);
+    if (!entry) return;
+    const seatId = this.human(entry, playerId), control = entry.controls.get(seatId);
+    // A delayed close from a replaced controller cannot neutralize its heir.
+    if (!control || control.epoch !== epoch) return;
+    entry.controls.delete(seatId); entry.inputs.delete(seatId);
+    if (!entry.failed) {
+      disconnectSeat(entry.state, seatId, control.controllerEpoch);
+      const actor = entry.state.actors[seatId];
+      actor.input = { moveX: 0, moveZ: 0, aim: actor.aim, fireHeld: false };
+      this.persist(matchId, entry);
+    }
+    this.releaseFinished(matchId, entry);
   }
 
   close(): void {

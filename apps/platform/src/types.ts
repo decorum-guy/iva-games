@@ -1,4 +1,4 @@
-import type { GameRegistration as SessionRegistration, LiveGameSession } from '@iva-games/session-kit';
+import type { GameRegistration as SessionRegistration } from '@iva-games/session-kit';
 
 export type Difficulty = 'easy' | 'normal' | 'hard';
 export type Controller =
@@ -47,8 +47,6 @@ export interface GameRuntime {
     actionId: string; expectedRevision: number; payload: unknown;
   }): Promise<unknown>;
   status?(matchId: string): Promise<{ finished: boolean; outcome?: unknown }>;
-  wireVersion?: string;
-  openLiveSession?(matchId: string, playerId: string): LiveGameSession;
 }
 export interface GameRegistration extends Pick<SessionRegistration, 'resolveRoomVersion' | 'validateRoom' | 'reconcileRoster'> {
   gameId: string;

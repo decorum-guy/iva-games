@@ -26,27 +26,12 @@ export interface ActionEnvelope {
   payload: unknown;
 }
 
-/** A single authenticated controller lease. Implementations never expose server state. */
-export interface LiveGameSession {
-  readonly controllerEpoch: number;
-  readonly wireVersion: string;
-  input(payload: unknown): void;
-  command(actionId: string, payload: unknown): Promise<unknown>;
-  /** Optional internal hint: the immutable final view needs one reliable send. */
-  snapshot(): { tick: number; view: unknown; finished?: boolean };
-  isCurrent(): boolean;
-  close(): void;
-}
-
 /** The platform authenticates accounts; the runtime rechecks the frozen roster. */
 export interface GameRuntime {
   createMatch(input: StartMatchRequest): Promise<{ matchId: string }>;
   viewForPlayer(matchId: string, playerId: string): Promise<unknown>;
   applyAction(matchId: string, playerId: string, command: ActionEnvelope): Promise<unknown>;
   status(matchId: string): Promise<{ finished: boolean; outcome?: unknown }>;
-  /** Opt-in real-time channel sharing platform authentication and room membership. */
-  wireVersion?: string;
-  openLiveSession?(matchId: string, playerId: string): LiveGameSession;
 }
 
 export interface GameRegistration {
