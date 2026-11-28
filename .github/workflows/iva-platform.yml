@@ -31,6 +31,7 @@ jobs:
       - run: npm run build:all
       - run: npm run platform:smoke
       - run: npx playwright install --with-deps chromium
+      - run: npm run chess-home:e2e -- --workers=1
       - run: npm run portal:e2e -- --workers=1
       - run: node scripts/profile-avatar-browser.mjs
       - run: npm run district:browser

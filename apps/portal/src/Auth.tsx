@@ -5,6 +5,7 @@ import { PlatformError, request } from "./api";
 import { PortalLink } from "./navigation";
 import { TelegramSignIn } from "./TelegramSignIn";
 import type { AuthMethods } from "./types";
+import { chessHomeUrl } from "./links";
 
 export type Entrance = { kind: "verify" | "reset"; token: string } | null;
 export function readEntrance(): Entrance {
@@ -152,7 +153,7 @@ export function Auth({
           ) : !entrance && auth?.email === false ? (
             <div className="telegram-sign-in">
               <p>{t("Вход через Telegram пока недоступен. Гостевые шахматы уже можно открыть.", "Telegram sign-in is currently unavailable. You can still play chess as a guest.")}</p>
-              <PortalLink href="/chess" className="button secondary wide">{t("К шахматам", "Go to chess")}</PortalLink>
+              <PortalLink href={chessHomeUrl} className="button secondary wide">{t("К шахматам", "Go to chess")}</PortalLink>
             </div>
           ) : entrance?.kind === "verify" ? (
             <>

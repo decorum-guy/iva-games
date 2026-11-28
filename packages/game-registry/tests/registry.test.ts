@@ -29,7 +29,9 @@ describe('declarative game registration', () => {
     expect(chessEntryForPath('/future-chess-impostor', registry)).toBe('index.html');
   });
   it('keeps the known game routes and independent room capabilities', () => {
-    expect(launchUrls().remorse).toBe('https://chess.iva-games.pro/');
+    expect(launchUrls().remorse).toBe('https://chess.iva-games.pro/remorse/');
+    expect(chessEntryForPath('/')).toBe('index.html');
+    expect(chessEntryForPath('/remorse/')).toBe('remorse/index.html');
     expect(chessEntryForPath('/overdrive/')).toBe('overdrive/index.html');
     expect(chessEntryForPath('/colossus/')).toBe('colossus/index.html');
     expect(catalogueDefaults().find(game => game.gameId === 'colossus')?.status).toBe('unavailable');
@@ -45,7 +47,7 @@ describe('declarative game registration', () => {
     if (kind === 'protocol') entry.chess!.developmentUrl = 'javascript:alert(1)';
     expect(() => validateRegistry(registry)).toThrow();
   });
-  it.each(['workspace', 'health', 'database-file', 'database-env', 'reserved-route', 'missing-root', 'invalid-port', 'unknown-field', 'missing-protocol'] as const)('rejects invalid %s declarations before build/deploy', kind => {
+  it.each(['workspace', 'health', 'database-file', 'database-env', 'reserved-route', 'root-game', 'invalid-port', 'unknown-field', 'missing-protocol'] as const)('rejects invalid %s declarations before build/deploy', kind => {
     const registry = future();
     const entry = registry.games.at(-1)!;
     if (kind === 'workspace') entry.chess!.workspace = '@chess-2/colossus';
@@ -53,7 +55,7 @@ describe('declarative game registration', () => {
     if (kind === 'database-file') entry.chess!.database = { file: 'colossus.sqlite', environment: 'FUTURE_DATABASE_PATH' };
     if (kind === 'database-env') entry.chess!.database = { file: 'future-chess.sqlite', environment: 'COLOSSUS_DATABASE_PATH' };
     if (kind === 'reserved-route') entry.chess!.route = '/api/';
-    if (kind === 'missing-root') registry.games = registry.games.filter(game => game.chess?.route !== '/');
+    if (kind === 'root-game') entry.chess!.route = '/';
     if (kind === 'invalid-port') entry.chess!.developmentUrl = 'http://127.0.0.1:999999/';
     if (kind === 'missing-protocol') Object.assign(entry.chess!, { health: { path: '/api/future-chess/health', rulesVersion: 'future-v1' } });
     if (kind === 'unknown-field') Object.assign(entry.chess!, { command: 'run-anything' });
@@ -69,6 +71,8 @@ describe('declarative game registration', () => {
       await copyFile(join(root, 'scripts/compose-client.mjs'), join(temporary, 'scripts/compose-client.mjs'));
       await copyFile(join(root, 'packages/game-registry/src/index.ts'), join(temporary, 'packages/game-registry/src/index.ts'));
       await writeFile(join(temporary, 'packages/game-registry/games.json'), JSON.stringify(future()));
+      await mkdir(join(temporary, 'apps/portal/chess-home/dist'), { recursive: true });
+      await writeFile(join(temporary, 'apps/portal/chess-home/dist/index.html'), '<title>Chess catalogue</title>');
       for (const game of chessRegistrations(future())) {
         const directory = join(temporary, game.chess.source, 'dist');
         await mkdir(join(directory, 'assets'), { recursive: true });
@@ -78,7 +82,8 @@ describe('declarative game registration', () => {
       await promisify(execFile)(process.execPath, ['--experimental-strip-types', join(temporary, 'scripts/compose-client.mjs')]);
       expect(await readFile(join(temporary, 'dist/future-chess/index.html'), 'utf8')).toBe('<title>future-chess</title>');
       expect(await readFile(join(temporary, 'dist/assets/future-chess.js'), 'utf8')).toBe('/* future-chess */');
-      expect(await readFile(join(temporary, 'dist/index.html'), 'utf8')).toBe('<title>remorse</title>');
+      expect(await readFile(join(temporary, 'dist/index.html'), 'utf8')).toBe('<title>Chess catalogue</title>');
+      expect(await readFile(join(temporary, 'dist/remorse/index.html'), 'utf8')).toBe('<title>remorse</title>');
     } finally { await rm(temporary, { recursive: true, force: true }); }
   });
 });

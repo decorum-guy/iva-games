@@ -9,7 +9,7 @@ import { cornerMate, localDuel, optionalMate, ordinaryCheck, passiveMate } from 
 async function load(page: Page, record: MatchRecord, reduced = false) {
   await page.addInitScript(reduced => localStorage.setItem('remorse-settings-v1',
     JSON.stringify({ board: '2d', reduce: reduced, sound: false })), reduced)
-  await page.goto('/')
+  await page.goto('/remorse/')
   await page.getByTestId('mode-hotseat').waitFor()
   await seedRecords(page, [record], `game/${record.id}`)
   await page.reload()

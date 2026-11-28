@@ -153,7 +153,8 @@ function attributes(tag) {
 async function inspectEntry(layout, result, origin, route, game, expectedEntry, sourceFiles) {
   const expected = await readFile(join(root, layout.output, expectedEntry))
   const html = (await verifyBytes(origin, route, expected)).toString('utf8')
-  const sourceHtml = await readFile(join(root, 'games', 'chess', game, 'index.html'), 'utf8')
+  const sourceHtml = await readFile(game === 'chess-home'
+    ? join(root, 'apps/portal/chess-home/index.html') : join(root, 'games', 'chess', game, 'index.html'), 'utf8')
   const expectedTitle = sourceHtml.match(/<title>[^<]+<\/title>/)?.[0]
   if (!expectedTitle) throw new Error(`Missing title in ${game} source index.html`)
   check(html.includes(expectedTitle), `${layout.name}: ${route} serves ${game} entry`)
@@ -195,7 +196,7 @@ try {
 
   const layouts = [
     { name: 'combined', output: 'dist', games, workspace: false,
-      entries: [['/', 'remorse', 'index.html'], ['/overdrive/', 'overdrive', 'overdrive/index.html'], ['/colossus/', 'colossus', 'colossus/index.html']] },
+      entries: [['/', 'chess-home', 'index.html'], ['/remorse/', 'remorse', 'remorse/index.html'], ['/overdrive/', 'overdrive', 'overdrive/index.html'], ['/colossus/', 'colossus', 'colossus/index.html']] },
     { name: 'standalone-remorse', output: 'games/chess/remorse/dist', games: ['remorse'], workspace: true,
       entries: [['/', 'remorse', 'index.html']] },
     { name: 'standalone-overdrive', output: 'games/chess/overdrive/dist', games: ['overdrive'], workspace: true,

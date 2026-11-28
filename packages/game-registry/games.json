@@ -19,8 +19,8 @@
       "chess": {
         "workspace": "@chess-2/remorse",
         "source": "games/chess/remorse",
-        "route": "/",
-        "developmentUrl": "http://127.0.0.1:4173/",
+        "route": "/remorse/",
+        "developmentUrl": "http://127.0.0.1:4173/remorse/",
         "health": {
           "path": "/api/health",
           "protocol": "remorse-online-v1",

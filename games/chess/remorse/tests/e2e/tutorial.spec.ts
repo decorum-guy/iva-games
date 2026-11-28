@@ -146,7 +146,7 @@ for (const locale of ['ru', 'en'] as const) {
         localStorage.setItem('remorse-settings-v1', JSON.stringify({ board: '2d', locale, sound: false }))
       }
     }, locale)
-    await page.goto('/')
+    await page.goto('/remorse/')
     await expect(page.getByTestId('mode-learn')).toBeVisible()
     await restoreTutorialCheckpoint(page, startLesson(7, 1))
     await play(page, move('g7', 'h8', 'bishop'), false)
@@ -290,7 +290,7 @@ async function verifyContinuation(page: Page, locale: 'en' | 'ru', mobile: boole
 
 test('a held explanation survives the rules and menu, and restarting from the menu preserves a rated game', async ({ page }) => {
   const t = translator('en')
-  await page.goto('/')
+  await page.goto('/remorse/')
   await expect(page.getByTestId('mode-learn')).toBeVisible()
   await changeLanguage(page, 'en')
   await page.getByTestId('flat-mode').click()
@@ -348,7 +348,7 @@ for (const locale of ['ru', 'en'] as const) {
     test('the lesson 3 finish is a visible Continue action and lesson 4 highlights the permitted king move', async ({ page }, testInfo) => {
       const mobile = locale === 'en' || testInfo.project.name === 'webkit'
       await page.setViewportSize(mobile ? { width: 360, height: 800 } : { width: 1280, height: 800 })
-      await page.goto('/')
+      await page.goto('/remorse/')
       await expect(page.getByTestId('mode-learn')).toBeVisible()
       await changeLanguage(page, locale)
       await page.getByTestId('flat-mode').click()
@@ -405,7 +405,7 @@ for (const locale of ['ru', 'en'] as const) {
       await page.setViewportSize(mobile ? { width: 360, height: 800 } : { width: 1280, height: 800 })
       const errors: string[] = []
       page.on('pageerror', error => errors.push(error.message))
-      await page.goto('/')
+      await page.goto('/remorse/')
       await expect(page.locator('html')).toHaveAttribute('lang', 'ru')
       if (locale === 'en') await changeLanguage(page, 'en')
       else await expect(page.locator('html')).toHaveAttribute('lang', 'ru')

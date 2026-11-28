@@ -33,6 +33,18 @@ for (const registration of chessGames) {
   }
 }
 
+// The collection has its own entry. Game assets still share their existing
+// origin-relative URLs so saves, rooms and previously loaded resources survive.
+const catalogue = join(root, 'apps/portal/chess-home/dist')
+const catalogueEntries = await collect(catalogue)
+if (!catalogueEntries.includes('index.html')) throw new Error('Build the chess catalogue before composing clients')
+for (const entry of catalogueEntries) {
+  const bytes = await readFile(join(catalogue, entry))
+  const previous = files.get(entry)
+  if (previous && !previous.equals(bytes)) throw new Error(`Conflicting chess catalogue build output: ${entry}`)
+  files.set(entry, bytes)
+}
+
 await mkdir(join(root, '.qa'), { recursive: true })
 const staging = await mkdtemp(join(root, '.qa', 'client-compose-'))
 try {

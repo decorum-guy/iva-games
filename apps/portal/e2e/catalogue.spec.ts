@@ -49,7 +49,7 @@ test('guests can browse two distinct collections with direct links, reload and h
   await expect(page.getByRole('heading', { name: 'Форсаж', exact: true })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Район', exact: true })).toHaveCount(0);
   await expect(page.getByRole('article').filter({ has: page.getByRole('heading', { name: 'Remorse', exact: true }) }).getByRole('link', { name: 'Играть', exact: true }))
-    .toHaveAttribute('href', 'http://127.0.0.1:4173/');
+    .toHaveAttribute('href', 'http://127.0.0.1:4173/remorse/');
   await expect(page.getByRole('article').filter({ has: page.getByRole('heading', { name: 'Колосс', exact: true }) }).getByRole('link', { name: 'Играть', exact: true }))
     .toHaveAttribute('href', 'http://127.0.0.1:5195/');
   await page.getByRole('navigation', { name: 'Разделы игр' }).getByRole('link', { name: 'Другие игры', exact: true }).click();

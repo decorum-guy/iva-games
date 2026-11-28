@@ -9,6 +9,7 @@ import { DistrictMapSelect, DistrictLobbyMap } from "./DistrictMap";
 import type { AvatarChoice } from "./types";
 import { friendRequestFeedback } from "./socialFeedback";
 import { Catalogue } from "./Catalogue";
+import { chessHomeUrl } from "./links";
 import { gameDescription, gameTitle } from "./gameCopy";
 import { go, PortalLink, readRoute } from "./navigation";
 import type { Route } from "./navigation";
@@ -615,7 +616,7 @@ export default function App() {
             className="guest-games"
             aria-label={t("Разделы игр", "Game collections")}
           >
-            <PortalLink className="button secondary small" href="/chess">
+            <PortalLink className="button secondary small" href={chessHomeUrl}>
               {t("Шахматы", "Chess")}
             </PortalLink>
             <PortalLink className="button secondary small" href="/games">

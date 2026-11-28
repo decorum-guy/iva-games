@@ -61,7 +61,7 @@ export function validateRegistry(input: unknown): Registry {
       databaseFiles.add(chess.database.file); databaseEnvs.add(chess.database.environment);
     }
   }
-  if (!routes.has('/')) throw new Error('The chess collection needs exactly one root client');
+  if (routes.has('/')) throw new Error('The chess collection root is reserved for the catalogue');
   return value;
 }
 export const gameRegistry = validateRegistry(manifest);

@@ -155,6 +155,16 @@ class ImageInputsTest(unittest.TestCase):
         self.assertNotEqual(after['chess'], self.before['chess'])
         self.assertEqual(after['platform'], self.before['platform'])
 
+    def test_shared_chess_catalogue_source_invalidates_both_images(self):
+        self.write('apps/portal/src/chess-home.tsx', 'export const fixture = 2;')
+        self.stage()
+        after = self.hashes()
+        self.assertTrue(all(after[name] != self.before[name] for name in self.before))
+
+    def test_portal_only_navigation_does_not_invalidate_chess(self):
+        self.write('apps/portal/src/links.ts', 'export const fixture = 2;')
+        self.assert_platform_only()
+
     def test_service_build_script_changes_are_scoped_and_recursive(self):
         self.root_package['scripts']['build:platform'] += ' --minify'
         self.save_manifests()
