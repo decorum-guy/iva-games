@@ -332,7 +332,7 @@ function OfferCard({ offer, view, lang, busy, onAction, onCounter, onResponse, c
     {offer.unavailableReason === 'author-resources' && !mine && <p className="ta-short">{word(lang, 'У автора уже нет нужных ресурсов. Попросите другие условия.', 'The sender no longer has the required resources. Ask for different terms.')}</p>}
     <div className="ta-buttons">{canChoose && <button type="button" className="ta-primary" disabled={!actionable || !canAccept} onClick={() => void respond('accept')}>✓ {word(lang,'Обменяться','Trade with')} {nameOf(view,other)}</button>}{!mine && <><button type="button" className="ta-primary" disabled={!actionable || !canAccept || agreed} onClick={() => void respond('accept')}>{word(lang, 'Принять', 'Accept')}</button>
       <button type="button" disabled={busy || sending} onClick={() => onCounter(offer)}>{word(lang, 'Другие условия', 'Counteroffer')}</button></>}
-      <button type="button" disabled={!actionable} onClick={() => void respond(mine ? 'cancel' : 'decline')}>✕ {word(lang, mine ? 'Отозвать' : 'Отклонить', mine ? 'Withdraw' : 'Decline')}</button></div>
+      <button type="button" disabled={!actionable} aria-label={word(lang, mine ? 'Отозвать' : 'Отклонить', mine ? 'Withdraw' : 'Decline')} onClick={() => void respond(mine ? 'cancel' : 'decline')}>✕ {word(lang, mine ? 'Отозвать' : 'Отклонить', mine ? 'Withdraw' : 'Decline')}</button></div>
     {failed && <p className="ta-feedback" role="status">{word(lang, 'Ответ не подтверждён. Проверьте состояние сделки.', 'The response was not confirmed. Check the offer status.')}</p>}
   </article>;
 }
@@ -453,8 +453,9 @@ function PlayerTrade({ view, lang, busy, onAction, handPick }: Props) {
     if (bundle) bundle.push(offer);
     else bundles.set(key, [offer]);
   }
+  const latestClosedGroup = (view.offerHistory ?? []).filter(offer => offer.authorId === own).at(-1)?.groupId;
   for (const offer of view.offerHistory ?? []) {
-    if (offer.authorId === own && offer.groupId && offer.status === 'declined' && offer.closedTurn === view.turn && !(view.offerHistory ?? []).some(closed => closed.groupId === offer.groupId && closed.status !== 'declined') && !bundles.has(offer.groupId)) {
+    if (offer.authorId === own && offer.groupId === latestClosedGroup && offer.groupId && !view.offers.some(active => active.authorId === own) && offer.status === 'declined' && offer.closedTurn === view.turn && !(view.offerHistory ?? []).some(closed => closed.groupId === offer.groupId && closed.status !== 'declined') && !bundles.has(offer.groupId)) {
       bundles.set(offer.groupId, []);
     }
   }
@@ -474,12 +475,12 @@ function PlayerTrade({ view, lang, busy, onAction, handPick }: Props) {
       {[...bundles].map(([key, items]) => {
         const terms = items[0] ?? (view.offerHistory ?? []).find(offer => offer.groupId === key)!;
         const grouped = terms.authorId === own && !!terms.groupId;
-        const render = (offer: TerritoryOffer) => <OfferCard key={offer.id} offer={offer} compact={grouped}
+        const render = (offer: TerritoryOffer) => <OfferCard key={offer.id} offer={offer} compact={grouped && items.length > 1}
           view={view} lang={lang} busy={busy || sending} onAction={onAction} onCounter={edit} onResponse={() => tradeHeading.current?.focus({ preventScroll: true })}/>;
         if (!grouped) return render(terms);
         return <section key={key} className="ta-offer-group" data-group-id={key}>
           <strong>{word(lang,'Ваше предложение игрокам','Your offer to players')}</strong>
-          <OfferTerms give={terms.give} receive={terms.receive} lang={lang}/>
+          {items.length !== 1 && <OfferTerms give={terms.give} receive={terms.receive} lang={lang}/>}
           {items.map(render)}
           {(view.offerHistory ?? []).filter(offer => offer.groupId === key && offer.status === 'declined').map(offer => <div key={offer.id} className="ta-declined"><span className="ta-player-dot" style={{background: ['#ca4e37','#2867a8','#79498f','#2c7954'][view.players.find(player => player.participantId === offer.targetId)?.seatIndex ?? 0]}} aria-hidden="true"/>✕ {nameOf(view, offer.targetId)} · {word(lang, 'Отказ', 'Declined')}</div>)}
         </section>;

@@ -240,9 +240,9 @@ try {
   await expect(desktopEditor.locator('.ta-trade-count')).toHaveCount(0);
   const desktopLayout = await desktop.locator('.ta-trade-window').evaluate(element => ({
     width: element.clientWidth, height: element.clientHeight, scrollHeight: element.scrollHeight,
-    recipientWidth: element.querySelector('.ta-draft-target select').getBoundingClientRect().width,
+    broadcasts: !element.querySelector('.ta-draft-target select'),
   }));
-  assert.ok(desktopLayout.width <= 340 && desktopLayout.recipientWidth < desktopLayout.width * .65, JSON.stringify(desktopLayout));
+  assert.ok(desktopLayout.width <= 340 && desktopLayout.broadcasts, JSON.stringify(desktopLayout));
   assert.ok(desktopLayout.scrollHeight <= desktopLayout.height + 1, JSON.stringify(desktopLayout));
   assert.ok((await touchPoint(desktopEditor.getByRole('button', { name: 'I receive + Ore', exact: true }))).receivesPointer);
   await expect(desktopEditor.getByRole('button', { name: 'Send offer', exact: true })).toBeInViewport();
@@ -287,7 +287,7 @@ try {
   await receiver.reload();
   await expect(receiver.locator(`[data-offer-id="${entry.expected.offerId}"]`)).toHaveCount(0);
   await expectTradeHistory(receiver, /Offer closed · Turn ended/);
-  await expect(receiver.locator('.territory-player-trade')).toHaveCount(0);
+  await expect(receiver.locator('.territory-player-trade').filter({hasText:/\S/})).toHaveCount(0);
   await expect(receiver.locator('.territory-action-receipt')).toHaveCount(0);
   await expect(editor).toContainText('Closed: the turn ended');
   await expect(tradeCount(receiver, 'I give', 'brick')).toHaveText('2');
@@ -322,7 +322,10 @@ try {
   await expect(receiver.locator(`[data-offer-id="${sent.id}"][data-offer-status="waiting"]`)).toContainText('Sent · awaiting response');
   const before = await view(entry, authorIndex);
   await expect(author.locator(`[data-offer-id="${sent.id}"]`).getByRole('button', { name: 'Accept', exact: true })).toBeEnabled();
-  const accepted = await action(author, author.locator(`[data-offer-id="${sent.id}"]`).getByRole('button', { name: 'Accept', exact: true }));
+  const consent = await action(author, author.locator(`[data-offer-id="${sent.id}"]`).getByRole('button', { name: 'Accept', exact: true }));
+  assert.deepEqual(consent.you.hand,before.you.hand);
+  await action(receiver,receiver.locator(`[data-offer-id="${sent.id}"]`).getByRole('button',{name:/Trade with/}));
+  const accepted=await view(entry,authorIndex);
   assert.equal(accepted.you.hand.wood, before.you.hand.wood - 3);
   assert.equal(accepted.you.hand.brick, before.you.hand.brick + 2);
   await expect(author.locator('.ta-section-heading h4')).toBeFocused();
@@ -333,7 +336,7 @@ try {
   await expectTradeHistory(receiver, /Trade completed/, '· Accepted: trade completed');
   await expectTradeHistory(author, /Trade completed.*Paid:.*Received:/);
   for (const page of [author, receiver]) {
-    await expect(page.locator('.territory-player-trade')).toHaveCount(0);
+    await expect(page.locator('.territory-player-trade').filter({hasText:/\S/})).toHaveCount(0);
     await expect(page.locator('.territory-action-receipt')).toHaveCount(0);
   }
   passed('counteroffer survives expiry and reload, commits the exact transfer once, then disappears from the panel and remains in history');
@@ -355,7 +358,10 @@ try {
   await expect(counterPage.locator('.territory-action-receipt')).toHaveCount(0);
   await expect(initialAuthorPage.locator(`[data-offer-id="${counter.id}"]`).getByRole('button', { name: 'Accept', exact: true })).toBeEnabled();
   const beforeCounterAccepted = await view(entry, entry.hostIndex);
-  const afterCounterAccepted = await action(initialAuthorPage, initialAuthorPage.locator(`[data-offer-id="${counter.id}"]`).getByRole('button', { name: 'Accept', exact: true }));
+  const counterConsent = await action(initialAuthorPage, initialAuthorPage.locator(`[data-offer-id="${counter.id}"]`).getByRole('button', { name: 'Accept', exact: true }));
+  assert.deepEqual(counterConsent.you.hand,beforeCounterAccepted.you.hand);
+  await action(counterPage,counterPage.locator(`[data-offer-id="${counter.id}"]`).getByRole('button',{name:/Trade with/}));
+  const afterCounterAccepted=await view(entry,entry.hostIndex);
   assert.equal(afterCounterAccepted.you.hand.wood, beforeCounterAccepted.you.hand.wood - 3);
   assert.equal(afterCounterAccepted.you.hand.brick, beforeCounterAccepted.you.hand.brick + 2);
   await expect(counterPage.locator(`[data-offer-id="${counter.id}"]`)).toHaveCount(0);
@@ -376,7 +382,6 @@ try {
   entry = await open('trade-draft');
   const lostPage = pages[entry.hostIndex];
   await openTrade(lostPage);
-  await lostPage.locator('.ta-trade-editor').getByLabel('Trade with', { exact: true }).selectOption(entry.expected.otherId);
   for (const resource of resources) {
     await setTradeCount(lostPage, 'I give', resource, resource === 'wood' ? 2 : 0);
     await setTradeCount(lostPage, 'I receive', resource, resource === 'brick' ? 1 : 0);
@@ -408,10 +413,11 @@ try {
   await action(pages[entry.guestIndex], pages[entry.guestIndex].getByRole('button', { name: 'Decline', exact: true }));
   for (const page of pages) {
     await expect(page.locator(`[data-offer-id="${entry.expected.offerId}"]`)).toHaveCount(0);
-    await expect(page.locator('.territory-player-trade')).toHaveCount(0);
+    await expect(page.locator('.territory-player-trade').filter({hasText:/\S/})).toHaveCount(0);
     await expectTradeHistory(page, /Trade declined/, '· Declined');
   }
-  passed('declined offers disappear automatically and both parties see the decision in history');
+  await expect(pages[entry.hostIndex].locator('.ta-declined')).toContainText('Declined');
+  passed('declined active offers disappear and the author retains a visible response with history');
   entry = await open('trade-draft');
   await action(pages[entry.hostIndex], pages[entry.hostIndex].getByRole('button', { name: 'Withdraw', exact: true }));
   for (const page of pages) {
@@ -420,7 +426,7 @@ try {
     await expect(page.locator(`[data-offer-id="${entry.expected.offerId}"]`)).toHaveCount(0);
     await expect(page.locator('.ta-offers-panel')).toBeHidden();
     await expectTradeHistory(page, /Offer withdrawn/, '· Withdrawn');
-    await expect(page.locator('.territory-player-trade')).toHaveCount(0);
+    await expect(page.locator('.territory-player-trade').filter({hasText:/\S/})).toHaveCount(0);
     await expect(page.locator('.territory-action-receipt')).toHaveCount(0);
   }
   passed('withdrawn offers stay out of the panel after reload and both parties see the decision in history');
@@ -747,12 +753,18 @@ try {
     const response = receiver.waitForResponse(response => response.request().method() === 'POST' && response.url().endsWith('/actions'));
     await nativeTap(receiver, offer.getByRole('button', { name: height === 600 ? 'Принять' : 'Отклонить', exact: true }));
     const answered = await response; assert.equal(answered.status(), 200);
-    const outcome = (await answered.json()).view;
+    let outcome = (await answered.json()).view;
+    if (height === 600) {
+      assert.ok(outcome.offers.find(item=>item.id===entry.expected.offerId).agreedAt!==undefined);
+      await nativeTap(sender,sender.getByRole('button',{name:'Показать сделки',exact:true}));
+      await action(sender,sender.locator(`[data-offer-id="${entry.expected.offerId}"]`).getByRole('button',{name:/Обменяться/}));
+      outcome=await view(entry,entry.guestIndex);
+    }
     assert.equal(outcome.offerHistory.find(item => item.id === entry.expected.offerId).status, height === 600 ? 'accepted' : 'declined');
     await expect(receiver.locator('.ta-offers-panel')).toBeHidden();
-    await expect(sender.getByRole('button', { name: 'Показать сделки', exact: true })).toBeHidden();
-    await expect(receiver.locator('.territory-player-trade')).toHaveCount(0);
-    await expect(sender.locator('.territory-player-trade')).toHaveCount(0);
+    if (height === 600) await expect(sender.getByRole('button', { name: 'Показать сделки', exact: true })).toBeHidden();
+    await expect(receiver.locator('.territory-player-trade').filter({hasText:/\S/})).toHaveCount(0);
+    await expect(sender.locator('.territory-player-trade').filter({hasText:/\S/})).toHaveCount(0);
     // An empty or collapsed panel does not suppress a newly arriving offer.
     if (height === 844) await receiver.screenshot({ path: join(harness.directory, 'trade-closed-ru130-390x844.png') });
     const newOffer = await post(entry, entry.hostIndex, { type: 'offer', targetId: entry.expected.otherId, give: stock({ wood: 1 }), receive: stock({ brick: 1 }) });
