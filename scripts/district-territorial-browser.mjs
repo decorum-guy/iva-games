@@ -545,11 +545,11 @@ try {
           const consentView = await current(client);
           assert.deepEqual(consentView.you.hand, view.you.hand, 'Consent cannot transfer the author hand');
           for (const [i,p] of pages.entries()) assert.deepEqual(await geometry(p), beforeGeometry[i], 'Offer appearance/consent keeps board and page geometry');
+          await mkdir(artifacts, {recursive:true});
+          for (const [i,p] of pages.entries()) await p.screenshot({path:join(artifacts,i ? 'trade-mobile.png' : 'trade-desktop.png')});
           await clickAction(page, page.locator('.ta-offer').filter({hasText: other.players.find(p=>p.participantId===other.you.participantId).displayName}).getByRole('button', {name: /^✓ Trade with/}));
           await expect(page.locator('.ta-offer[data-offer-status=agreed]')).toHaveCount(0);
           for (const [i,p] of pages.entries()) assert.deepEqual(await geometry(p), beforeGeometry[i], 'Offer removal keeps board and page geometry');
-          await mkdir(artifacts, {recursive:true});
-          for (const [i,p] of pages.entries()) await p.screenshot({path:join(artifacts,i ? 'trade-mobile.png' : 'trade-desktop.png')});
           result.tradeGeometry = beforeGeometry;
           result.trade = true;
         } else await post(client, view, action);
