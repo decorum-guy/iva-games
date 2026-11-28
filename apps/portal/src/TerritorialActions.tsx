@@ -1,4 +1,4 @@
-import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { RESOURCES, emptyStock } from '@iva-games/district/territorial';
 import type { CardKind, CouponKind, Resource, Stock, TerritoryAction, TerritoryOffer, TerritoryOfferStatus, TerritoryPricing, TerritoryView } from '@iva-games/district/territorial';
 import type { BoardSelection } from './TerritorialBoard';
@@ -204,32 +204,52 @@ function Coupons({ view, lang, onShowCouponRoutes, selectedCouponId }: Props) {
   </details>;
 }
 
+const BANK_RECEIPT_MS = 4_000;
+type BankAttempt = { revision: number; turn: number; give: Resource; receive: Resource; rate: number };
+
 function BankTrade({ view, lang, busy, onAction, handPick, active }: Props & { active: boolean }) {
   const [give, setGive] = useState<Resource>('wood'), [receive, setReceive] = useState<Resource>('brick');
+  const [sending, setSending] = useState(false);
+  const [receipt, setReceipt] = useState<BankAttempt | null>(null);
+  const [failed, setFailed] = useState(false);
+  const awaitingBank = useRef<BankAttempt | null>(null);
+  const bankOpen = useRef(active);
   const picked = useRef(handPick?.serial);
+  useLayoutEffect(() => {
+    bankOpen.current = active;
+    if (!active) setReceipt(null);
+  }, [active]);
+  useEffect(() => {
+    if (!receipt) return;
+    const timer = window.setTimeout(() => setReceipt(current => current === receipt ? null : current), BANK_RECEIPT_MS);
+    return () => window.clearTimeout(timer);
+  }, [receipt]);
   useEffect(() => {
     if (!handPick || picked.current === handPick.serial) return;
     picked.current = handPick.serial;
     if (active && !busy) { setGive(handPick.resource); setReceipt(null); }
   }, [handPick, active, busy]);
-  const [sending, setSending] = useState(false);
-  const [receipt, setReceipt] = useState<{ give: Resource; receive: Resource; rate: number } | null>(null);
-  const [failed, setFailed] = useState(false);
-  const awaitingBank = useRef<{ revision: number; give: Resource; receive: Resource; rate: number } | null>(null);
   const rate = view.legal.bank[give], cost = { [give]: rate };
   const canTrade = view.activeParticipantId === view.you.participantId && view.phase === 'play';
   const available = view.bank[receive] > 0;
   const same = give === receive;
   const shortage = missingStock(view.you.hand, cost);
+  const visibleReceipt = active && receipt?.turn === view.turn ? receipt : null;
+  const confirmBank = useCallback((attempt: BankAttempt) => {
+    // Polling and the POST response can confirm the same exchange in either order.
+    if (awaitingBank.current !== attempt) return;
+    awaitingBank.current = null;
+    setFailed(false);
+    if (bankOpen.current) setReceipt(attempt);
+  }, []);
   useEffect(() => {
     const pending = awaitingBank.current;
     if (!pending) return;
     const committed = view.history?.find(entry => entry.kind === 'bank' && entry.actorId === view.you.participantId &&
-      entry.revision > pending.revision && entry.paid?.[pending.give] === pending.rate && entry.received?.[pending.receive] === 1);
-    if (!committed) return;
-    awaitingBank.current = null;
-    setReceipt({ give: pending.give, receive: pending.receive, rate: pending.rate }); setFailed(false);
-  }, [view.history, view.you.participantId]);
+      entry.turn === pending.turn && entry.revision > pending.revision &&
+      entry.paid?.[pending.give] === pending.rate && entry.received?.[pending.receive] === 1);
+    if (committed) confirmBank(pending);
+  }, [view.history, view.you.participantId, confirmBank]);
   return <section className="ta-section ta-bank" aria-label={word(lang, 'Обмен с банком', 'Bank exchange')}>
     <div className="ta-form">
       <div className="ta-exchange"><div><ResourceChoice lang={lang} value={give} set={resource => { setGive(resource); setReceipt(null); }} label={word(lang, 'Отдаю', 'I give')} disabled={busy || sending}/>
@@ -246,16 +266,16 @@ function BankTrade({ view, lang, busy, onAction, handPick, active }: Props & { a
         !available ? <p>{word(lang, 'Этот ресурс закончился в банке.', 'The bank has run out of this resource.')}</p> : stockTotal(shortage) > 0 ? <p className="ta-short">{word(lang, 'Не хватает', 'Missing')} <ResourceStock stock={shortage} lang={lang}/></p> : null}
       <button type="button" className="ta-primary" disabled={busy || sending || !canTrade || same || !available || stockTotal(shortage) > 0} onClick={async () => {
         setSending(true); setFailed(false); setReceipt(null);
-        awaitingBank.current = { revision: view.revision, give, receive, rate };
+        const attempt = { revision: view.revision, turn: view.turn, give, receive, rate };
+        awaitingBank.current = attempt;
         try {
-          if (await onAction({ type: 'bank', give, receive }) === true) {
-            awaitingBank.current = null; setReceipt({ give, receive, rate });
-          } else if (awaitingBank.current) setFailed(true);
-        } catch { if (awaitingBank.current) setFailed(true); }
+          if (await onAction({ type: 'bank', give, receive }) === true) confirmBank(attempt);
+          else if (awaitingBank.current === attempt) setFailed(true);
+        } catch { if (awaitingBank.current === attempt) setFailed(true); }
         finally { setSending(false); }
       }}>{sending ? word(lang, 'Обмениваем…', 'Exchanging…') : word(lang, 'Обменять', 'Exchange')} {rate} → 1</button>
-      {receipt && <div className="ta-feedback ta-success" role="status"><strong>{word(lang, 'Обмен выполнен', 'Exchange completed')}</strong>
-        <span>− <ResourceStock lang={lang} stock={{ [receipt.give]: receipt.rate }}/> · + <ResourceStock lang={lang} stock={{ [receipt.receive]: 1 }}/></span></div>}
+      {visibleReceipt && <div className="ta-feedback ta-success" role="status"><strong>{word(lang, 'Обмен выполнен', 'Exchange completed')}</strong>
+        <span>− <ResourceStock lang={lang} stock={{ [visibleReceipt.give]: visibleReceipt.rate }}/> · + <ResourceStock lang={lang} stock={{ [visibleReceipt.receive]: 1 }}/></span></div>}
       {failed && <p className="ta-feedback" role="status">{word(lang, 'Обмен не подтверждён. Условия сохранены; проверьте сообщение о связи.', 'The exchange was not confirmed. Your terms are kept; check the connection message.')}</p>}
       <details className="ta-bank-stock"><summary>{word(lang, 'Ресурсы банка', 'Bank resources')}</summary>
         <ResourceStock stock={view.bank} lang={lang} showZero bank/>

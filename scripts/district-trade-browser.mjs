@@ -1,6 +1,6 @@
 /** Real HTTP/SQLite browser acceptance for the District trade and card interface.
  * Run after npm run build:portal. No game API is mocked and no external messages are sent.
- * A request is briefly held before forwarding; real offer/bank responses are dropped after commit.
+ * Requests and acknowledgements can be held or dropped around real commits.
  * These cases check acknowledgement handling without replacing server results.
  */
 import assert from 'node:assert/strict';
@@ -53,6 +53,17 @@ async function openTrade(page) {
   // A restored draft is already open after a reload; the new map control toggles it.
   if (await toggle.getAttribute('aria-expanded') !== 'true') await toggle.click();
   await expect(page.locator('.ta-trade-window')).toBeVisible();
+}
+async function openBank(page) {
+  await openTrade(page);
+  await page.getByRole('button', { name: 'Bank', exact: true }).click();
+  const bank = page.locator('.ta-bank');
+  await expect(bank).toBeVisible();
+  return bank;
+}
+async function closeTrade(page) {
+  await page.getByRole('button', { name: 'Close trade', exact: true }).click();
+  await expect(page.locator('.ta-trade-window')).toBeHidden();
 }
 function tradeCount(page, side, resource) {
   return page.locator('.ta-trade-editor').getByRole('group', { name: side, exact: true })
@@ -418,49 +429,138 @@ try {
   await post(entry, entry.hostIndex, { type: 'offer', targetId: entry.expected.otherId, give: stock({ wood: 4 }), receive: stock({ brick: 1 }) });
   const bankPage = pages[entry.hostIndex], recipientPage = pages[entry.guestIndex];
   await bankPage.reload();
-  await openTrade(bankPage);
-  await bankPage.getByRole('button', { name: 'Bank', exact: true }).click();
+  const bank = await openBank(bankPage);
+  const receipt = bank.getByText('Exchange completed', { exact: true });
   const bankBefore = await view(entry, entry.hostIndex);
-  await bankPage.locator('.ta-bank').getByLabel('I receive', { exact: true }).selectOption('grain');
+  await bank.getByLabel('I receive', { exact: true }).selectOption('grain');
   const rate = bankBefore.legal.bank.wood;
-  const exchanged = await action(bankPage, bankPage.locator('.ta-bank').getByRole('button', { name: `Exchange ${rate} → 1`, exact: true }));
+  const exchanged = await action(bankPage, bank.getByRole('button', { name: `Exchange ${rate} → 1`, exact: true }));
   assert.equal(exchanged.you.hand.wood, bankBefore.you.hand.wood - rate);
   assert.equal(exchanged.you.hand.grain, bankBefore.you.hand.grain + 1);
-  await expect(bankPage.locator('.ta-bank')).toContainText('Exchange completed');
+  await expect(receipt).toBeVisible();
   await expect(recipientPage.locator('.ta-offer:not(.is-closed)').getByRole('button', { name: 'Accept', exact: true })).toBeDisabled();
   await expect(recipientPage.locator('.ta-offer:not(.is-closed)')).toContainText('The sender no longer has the required resources');
-  passed('bank transfer has visible receipt and exact quantities; stale sender resource offer cannot be accepted');
+  await expect(receipt).toHaveCount(0, { timeout: 7_000 });
+  await expect(bank).toBeVisible();
+  await bank.getByLabel('I give', { exact: true }).selectOption('brick');
+  const brickRate = exchanged.legal.bank.brick;
+  const nextExchange = await action(bankPage, bank.getByRole('button', { name: `Exchange ${brickRate} → 1`, exact: true }));
+  assert.equal(nextExchange.you.hand.brick, exchanged.you.hand.brick - brickRate);
+  await expect(receipt).toBeVisible();
+  const nextTurn = await action(bankPage, bankPage.getByRole('button', { name: 'End turn', exact: true }));
+  assert.equal(nextTurn.turn, exchanged.turn + 1);
+  await expect(receipt).toHaveCount(0);
+  await closeTrade(bankPage);
+  await openBank(bankPage);
+  await expect(receipt).toHaveCount(0);
+  await expectTradeHistory(bankPage, /Bank exchange completed.*Paid:.*Received:/);
+  passed('a real bank exchange displays exact payment, expires while open and stays in history after the next turn and reopening');
 
   entry = await open('trade-draft');
   const lostBankPage = pages[entry.hostIndex];
-  await openTrade(lostBankPage);
-  await lostBankPage.getByRole('button', { name: 'Bank', exact: true }).click();
-  await lostBankPage.locator('.ta-bank').getByLabel('I receive', { exact: true }).selectOption('grain');
+  const lostBank = await openBank(lostBankPage);
+  const lostReceipt = lostBank.getByText('Exchange completed', { exact: true });
+  const bankUnconfirmed = lostBank.getByText('The exchange was not confirmed.', { exact: false });
+  await lostBank.getByLabel('I receive', { exact: true }).selectOption('grain');
   const lostBankBefore = await view(entry, entry.hostIndex);
   const lostBankRate = lostBankBefore.legal.bank.wood;
   const lostBankPattern = `**/api/platform/v1/rooms/${entry.roomId}/actions`;
-  let bankResponseLost = false, committedBankView;
+  const bankMatchPattern = `**/api/platform/v1/rooms/${entry.roomId}/match`;
+  const forwardBank = Promise.withResolvers();
+  const releasePoll = Promise.withResolvers();
+  releaseHeldRequest = () => { forwardBank.resolve(); releasePoll.resolve(); };
+  let committedBankView;
+  let snapshotHeld = false;
+  const bankCommands = [];
+  await lostBankPage.route(bankMatchPattern, async route => {
+    snapshotHeld = true;
+    await releasePoll.promise;
+    await route.continue();
+  });
+  await expect.poll(() => snapshotHeld, { timeout: 8_000 }).toBe(true);
   await lostBankPage.route(lostBankPattern, async route => {
-    if (!bankResponseLost && route.request().postDataJSON()?.payload?.type === 'bank') {
-      bankResponseLost = true;
+    const command = route.request().postDataJSON();
+    if (command?.payload?.type === 'bank') bankCommands.push(command);
+    if (command?.payload?.type === 'bank' && bankCommands.length === 1) {
+      await forwardBank.promise;
       const serverResponse = await route.fetch();
       assert.equal(serverResponse.ok(), true);
       committedBankView = (await serverResponse.json()).view;
       await route.abort('connectionclosed');
     } else await route.continue();
   });
-  await lostBankPage.locator('.ta-bank').getByRole('button', { name: `Exchange ${lostBankRate} → 1`, exact: true }).click();
-  await expect(lostBankPage.locator('.territory-notice').getByRole('button', { name: 'Retry', exact: true })).toBeVisible();
-  await expect(lostBankPage.locator('.ta-bank')).toContainText('Exchange completed');
+  const bankSending = lostBank.getByRole('button', { name: `Exchanging… ${lostBankRate} → 1`, exact: true });
+  await lostBank.getByRole('button', { name: `Exchange ${lostBankRate} → 1`, exact: true }).click();
+  await expect(bankSending).toBeVisible();
+  await closeTrade(lostBankPage);
+  await openBank(lostBankPage);
+  await expect(bankSending).toBeDisabled();
+  await expect(lostReceipt).toHaveCount(0);
+  assert.equal((await view(entry, entry.hostIndex)).revision, lostBankBefore.revision);
+  forwardBank.resolve();
+  const bankRetry = lostBankPage.locator('.territory-notice').getByRole('button', { name: 'Retry', exact: true });
+  await expect(bankRetry).toBeVisible();
+  await expect(bankUnconfirmed).toBeVisible();
+  await closeTrade(lostBankPage);
+  await openBank(lostBankPage);
+  await expect(bankUnconfirmed).toBeVisible();
+  await expect(lostReceipt).toHaveCount(0);
   assert.ok(committedBankView);
   assert.equal(committedBankView.you.hand.wood, lostBankBefore.you.hand.wood - lostBankRate);
   assert.equal(committedBankView.you.hand.grain, lostBankBefore.you.hand.grain + 1);
-  const replayedBank = await action(lostBankPage, lostBankPage.locator('.territory-notice').getByRole('button', { name: 'Retry', exact: true }));
+  releasePoll.resolve();
+  await expect(lostReceipt).toBeVisible();
+  await expect(bankUnconfirmed).toHaveCount(0);
+  await closeTrade(lostBankPage);
+  await openBank(lostBankPage);
+  await expect(lostReceipt).toHaveCount(0);
+  const replayedBank = await action(lostBankPage, bankRetry);
   assert.equal(replayedBank.revision, committedBankView.revision);
   assert.deepEqual((await view(entry, entry.hostIndex)).you.hand, committedBankView.you.hand);
-  await expect(lostBankPage.locator('.ta-bank')).not.toContainText('The exchange was not confirmed');
+  assert.equal(bankCommands.length, 2);
+  assert.deepEqual(bankCommands[0], bankCommands[1]);
+  await expect(lostReceipt).toHaveCount(0);
+  await expect(bankUnconfirmed).toHaveCount(0);
   await lostBankPage.unroute(lostBankPattern);
-  passed('lost bank response recovers the receipt from explicit server history; Retry cannot execute the exchange twice');
+  await lostBankPage.unroute(bankMatchPattern);
+  releaseHeldRequest = undefined;
+  passed('closing the bank preserves a pending or unconfirmed exchange, and a real late acknowledgement resolves it without a repeat charge');
+
+  entry = await open('trade-draft');
+  const lateBankPage = pages[entry.hostIndex];
+  const lateBank = await openBank(lateBankPage);
+  const lateBefore = await view(entry, entry.hostIndex);
+  const lateRate = lateBefore.legal.bank.wood;
+  const latePattern = `**/api/platform/v1/rooms/${entry.roomId}/actions`;
+  await lateBank.getByLabel('I receive', { exact: true }).selectOption('grain');
+  const commitBank = Promise.withResolvers();
+  const returnBank = Promise.withResolvers();
+  releaseHeldRequest = () => { commitBank.resolve(); returnBank.resolve(); };
+  await lateBankPage.route(latePattern, async route => {
+    await commitBank.promise;
+    const response = await route.fetch();
+    await returnBank.promise;
+    await route.fulfill({ response });
+  });
+  const lateResponse = lateBankPage.waitForResponse(response => response.request().method() === 'POST' && response.url().endsWith('/actions'));
+  await lateBank.getByRole('button', { name: `Exchange ${lateRate} → 1`, exact: true }).click();
+  await closeTrade(lateBankPage);
+  commitBank.resolve();
+  await expect(lateBankPage.locator('.territory-hand [data-resource="grain"] > b')).toHaveText(String(lateBefore.you.hand.grain + 1));
+  await openBank(lateBankPage);
+  const lateReceipt = lateBank.getByText('Exchange completed', { exact: true });
+  await expect(lateReceipt).toHaveCount(0);
+  returnBank.resolve();
+  const lateAccepted = await lateResponse;
+  assert.equal(lateAccepted.status(), 200);
+  const lateConfirmed = (await lateAccepted.json()).view;
+  assert.equal(lateConfirmed.you.hand.wood, lateBefore.you.hand.wood - lateRate);
+  await expect(lateBank.getByRole('button', { name: `Exchange ${lateRate} → 1`, exact: true })).toBeVisible();
+  await expect(lateReceipt).toHaveCount(0);
+  await expectTradeHistory(lateBankPage, /Bank exchange completed.*Paid:.*Received:/);
+  await lateBankPage.unroute(latePattern);
+  releaseHeldRequest = undefined;
+  passed('a result recovered while Bank is closed stays in history, and the older POST acknowledgement cannot revive the notice');
 
   entry = await open('trade-draft');
   const shortageView = await post(entry, entry.hostIndex, { type: 'offer', targetId: entry.expected.otherId, give: stock({ wood: 1 }), receive: stock({ brick: 5 }) });
