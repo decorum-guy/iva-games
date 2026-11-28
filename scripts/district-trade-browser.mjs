@@ -419,7 +419,7 @@ try {
   await expect(pages[entry.hostIndex].locator('.ta-declined')).toContainText('Declined');
   passed('declined active offers disappear and the author retains a visible response with history');
   entry = await open('trade-draft');
-  await action(pages[entry.hostIndex], pages[entry.hostIndex].getByRole('button', { name: 'Withdraw', exact: true }));
+  await action(pages[entry.hostIndex], pages[entry.hostIndex].getByRole('button', { name: 'Withdraw offer for everyone', exact: true }));
   for (const page of pages) {
     await page.reload();
     await expect(page.locator('.territory-match')).toBeVisible();
