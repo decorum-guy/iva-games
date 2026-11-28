@@ -1,5 +1,11 @@
 # Iva Games — состояние реализации
 
+## District broadcast trade candidate — 28 November 2026
+
+[PR #43](https://github.com/decorum-guy/iva-games/pull/43) broadcasts new v0.4 proposals to every other participant and requires separate author selection after consent, including two-seat rooms. Decline/cancellation transfers nothing; bots use the same protocol. Persisted addressed proposals and v0.2/v0.3 readers remain compatible. A permanent player-status row fixes the reproduced board jump.
+
+197 District tests, 324 platform tests, TypeScript/ESLint, foundation build and a real isolated HTTP/SQLite browser trade with a bot passed. Desktop and emulated phone geometry remained equal before/after consent and completion; consent did not change the author's hand. The earlier full run finished 12 rounds with recovery. [Exact builds, scenarios and the final bot recovery distinction](DISTRICT_BROADCAST_TRADE_2026_11_28.md). Final CI is checked on the PR head; merge and production delivery are not claimed here.
+
 ## Колосс: последние два звука выбраны владельцем — 28 ноября 2026
 
 Владелец приложил `colossus-armor-and-shield-review.md` и поручил продолжить работу с выбранными звуками. Приняты **A «Круглый щит»** для `armour` и **A «Мягкий блок»** для `shield`. Вместе с прежними 15 принятыми эффектами это закрывает выбор всего банка; повторно выбирать эти два звука не требуется. [Точное решение, SHA-256 и проверки](../colossus/AUDIO_SELECTION_2026_11_28.md).
