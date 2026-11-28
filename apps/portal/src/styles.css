@@ -1460,6 +1460,13 @@ button {
   font-size: 11px;
 }
 /* Lobby. */
+.room-list-tools {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-bottom: 14px;
+}
 .room-list {
   display: grid;
   gap: 13px;

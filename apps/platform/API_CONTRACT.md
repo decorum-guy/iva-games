@@ -56,7 +56,9 @@ Members contain `participantId,playerId,handle,displayName,seatIndex,ready,contr
 
 | Method and path | JSON body | Result |
 |---|---|---|
-| GET `/rooms` | — | `{rooms:Room[]}`; own memberships, all active first followed by up to 50 terminal rooms |
+| GET `/rooms` | — | `{rooms:Room[],hiddenRoomCount:number}`; own memberships, all active first followed by up to 50 visible terminal rooms |
+| POST `/rooms/history/clear` | `{}` | `{ok:true}`; hide this player's finished/cancelled rooms from their list, without deleting them |
+| POST `/rooms/history/restore` | `{}` | `{ok:true}`; show this player's finished/cancelled rooms again |
 | POST `/rooms` | `{gameId,capacity,title?,settings?}` | `{room}` |
 | GET `/rooms/:roomId` | — | `{room}`; membership required |
 | POST `/rooms/:roomId/join` | `{}` | `{room}`; accepted unexpired reservation or existing membership |
