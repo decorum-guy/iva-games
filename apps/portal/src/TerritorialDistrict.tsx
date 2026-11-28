@@ -225,7 +225,7 @@ function TerritorialPlayers({ view, lang }: { view: TerritoryView; lang: Languag
   return <ul className="territory-players">
     {view.players.map(player => <li key={player.participantId} className={player.participantId === view.activeParticipantId && !view.outcome ? "is-active" : ""}>
       <span className="territory-seat" style={{ background: colors[player.seatIndex] }}>{player.seatIndex + 1}</span>
-      <span className="territory-person"><strong>{player.displayName}</strong>
+      <span className="territory-person"><strong title={player.displayName}>{player.displayName}</strong>
         <small title={ru ? 'Рука — число ресурсов; путь — длина пути; разв. — карты развития' : 'Hand = resource count; route = route length; dev. = development cards'}>{player.isBot || player.left ? ru ? "Бот · " : "Bot · " : ""}{ru ? "Рес." : "Res."} {player.handCount}
           {" · "}{ru ? "Путь" : "Route"} {player.longestRoute}{` · ${ru ? "Разв." : "Dev."} ${player.cardCount}`}</small>
       </span>

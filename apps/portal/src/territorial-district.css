@@ -153,9 +153,11 @@
   .territory-players { gap: 5px; }
   .territory-players > li { padding: 5px 6px; grid-template-columns: 18px minmax(0,1fr) auto; column-gap: 5px; }
   .territory-seat { width: 18px; height: 21px; font-size: 11px; }
-  .territory-person strong { font-size: 11px; }
-  .territory-person small { font-size: 9px; }
-  .territory-points { font-size: 17px; }
+  .territory-person { grid-template-columns: minmax(0, 1fr); }
+  .territory-person > :is(strong, small) { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  .territory-person strong { font-size: calc(11px * var(--table-text-scale)); }
+  .territory-person small { font-size: calc(9px * var(--table-text-scale)); }
+  .territory-points { min-width: max-content; font-size: calc(17px * var(--table-text-scale)); }
   .territory-layout { grid-template-columns: minmax(0,1fr) minmax(270px,310px); gap: 7px; }
   .territory-statusbar { grid-template-columns: 1fr 1fr; gap: 6px; }
   .territory-phase { padding: 7px 9px; }
@@ -182,7 +184,7 @@
   .territory-tool > span { display: none; }
   .territory-tool:has(svg) { min-width: 44px; }
   .territory-players { display: flex; overflow-x: auto; scrollbar-width: none; }
-  .territory-players > li { flex: 1 0 145px; }
+  .territory-players > li { flex: 1 0 calc(145px * var(--table-text-scale)); }
   .territory-statusbar { grid-template-columns: minmax(0,1fr); gap: 4px; }
   .territory-phase { padding: 5px 9px; gap: 1px; }
   .territory-phase-heading strong { font-size: 12px; }
