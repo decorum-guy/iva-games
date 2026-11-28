@@ -287,7 +287,10 @@ export function TerritorialPractice() {
         <TerritorialBoard map={view.map} buildings={view.buildings} routes={view.routes} players={view.players} lang={lang}
           blockedTileId={view.blockedTileId} selection={selection} onSelect={setSelection} candidates={candidates}
           newsArea={territorialNewsArea(news)} />
-      </div><div className="territory-hand"><ResourceStock stock={view.you.hand} lang={lang} showZero appearance="cards"/></div></div>
+      </div><section className="territory-hand" aria-label={t('Ваша рука', 'Your hand')}>
+        <div className="territory-hand-heading"><strong>{t('Ваши ресурсы', 'Your resources')}</strong><small>{Object.values(view.you.hand).reduce((a,b) => a+b,0)} {t('в руке', 'in hand')}</small></div>
+        <ResourceStock stock={view.you.hand} lang={lang} showZero appearance="cards"/>
+      </section></div>
       <aside className="territory-inspector">
         <div className="territory-panel-scroll">
         <article className="territory-lesson">
