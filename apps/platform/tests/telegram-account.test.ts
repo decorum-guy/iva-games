@@ -40,7 +40,7 @@ describe('Telegram accounts and the private bot menu', () => {
   });
 
   async function call(path: string, body?: unknown, headers: Record<string, string> = {}) {
-    return new Promise<{ status: number; cookie?: string; cookies?: string[]; body: ReturnType<typeof JSON.parse> }>((resolve, reject) => {
+    return new Promise<{ status: number; cookie?: string; body: ReturnType<typeof JSON.parse> }>((resolve, reject) => {
       const req = httpRequest(base + path, {
         method: body === undefined ? 'GET' : 'POST',
         headers: { host: 'games.example.test', origin: ORIGIN, 'content-type': 'application/json', ...headers },
@@ -48,7 +48,6 @@ describe('Telegram accounts and the private bot menu', () => {
         const chunks: Buffer[] = [];
         res.on('data', chunk => chunks.push(Buffer.from(chunk)));
         res.on('end', () => resolve({ status: res.statusCode!, cookie: res.headers['set-cookie']?.[0]?.split(';')[0],
-          cookies: res.headers['set-cookie']?.map(value => value.split(';')[0]),
           body: JSON.parse(Buffer.concat(chunks).toString()) }));
         res.on('error', reject);
       });
@@ -60,21 +59,16 @@ describe('Telegram accounts and the private bot menu', () => {
   async function browser() {
     let cookie = '';
     let csrf = '';
-    const jar = new Map<string, string>();
-    const updateCookies = (cookies?: string[]) => {
-      for (const value of cookies ?? []) jar.set(value.split('=')[0], value);
-      cookie = [...jar.values()].join('; ');
-    };
     return {
       async session() {
         const response = await call('/api/platform/v1/session', undefined, { cookie });
-        updateCookies(response.cookies);
+        if (response.cookie) cookie = response.cookie;
         csrf = response.body.csrfToken;
         return response.body;
       },
       async post(path: string, body: unknown) {
         const response = await call('/api/platform/v1' + path, body, { 'x-csrf-token': csrf, cookie });
-        updateCookies(response.cookies);
+        if (response.cookie) cookie = response.cookie;
         return response;
       },
       async get(path: string) {
@@ -129,25 +123,6 @@ describe('Telegram accounts and the private bot menu', () => {
     const client = await browser();
     const { attemptId, code } = await challenge(client, 72000, 'ru');
     expect((await client.post('/auth/telegram/finish', { attemptId, code })).body).toEqual({ profileRequired: true });
-  });
-
-  it('sends repeat login codes to the remembered chat and offers a fallback on delivery failure', async () => {
-    const { user } = await register(72030, 'remembered');
-    const messages: Array<{ chatId: string; text: string; copyCode?: { value: string } }> = [];
-    const transport = { async sendMessage(message: { chatId: string; text: string; copyCode?: { value: string } }) {
-      messages.push(message);
-      return { outcome: 'accepted' as const, messageId: '1' };
-    } };
-    const auth = new TelegramAuth(platform, BOT, () => now, transport);
-    const device = auth.rememberDevice(user.playerId, undefined)!;
-    const session = platform.createSession(null).session;
-    const sent = await auth.start(session, 'ru', device);
-    expect(sent.delivery).toBe('sent');
-    expect(messages[0].chatId).toBe('72030');
-    expect(auth.finish(session, { attemptId: sent.attemptId, code: messages[0].copyCode!.value })).toMatchObject({ user: { playerId: user.playerId } });
-    const failed = new TelegramAuth(platform, BOT, () => now, { sendMessage: async () => { throw new Error('blocked'); } });
-    expect((await failed.start(platform.createSession(null).session, 'ru', device)).delivery).toBe('failed');
-    expect((await auth.start(platform.createSession(null).session, 'ru', device, true)).delivery).toBe('open_bot');
   });
 
   async function register(id: number, handle: string) {

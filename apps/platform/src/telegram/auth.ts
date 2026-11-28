@@ -5,7 +5,6 @@ import { PlatformError } from '../types.js';
 import type { SessionRecord } from '../types.js';
 import { TelegramAccountBot } from './account-bot.js';
 import type { BotReply } from './account-bot.js';
-import type { TelegramMessage } from '@iva-games/telegram-transport';
 
 const TTL = 10 * 60_000;
 const MAX_FAILURES = 5;
@@ -23,8 +22,7 @@ type Attempt = {
   locale: string;
 };
 
-export type TelegramAuthConfig = { botId: string; botUsername: string; webhookSecret: string; codeKey: Uint8Array;
-  botToken?: string; proxyUrl?: string };
+export type TelegramAuthConfig = { botId: string; botUsername: string; webhookSecret: string; codeKey: Uint8Array };
 
 function object(value: unknown): Record<string, unknown> | undefined {
   return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : undefined;
@@ -44,53 +42,19 @@ export class TelegramAuth {
     private readonly platform: PlatformService,
     private readonly config: TelegramAuthConfig,
     private readonly now: () => number = Date.now,
-    private readonly transport?: { sendMessage(message: TelegramMessage): Promise<{ outcome: 'accepted'; messageId: string }> },
   ) { this.bot = new TelegramAccountBot(platform, config.botId, config.botUsername); }
 
-  rememberDevice(playerId: string, previous: string | undefined): string | undefined {
-    const db = this.platform.db;
-    const account = db.prepare('SELECT telegram_user_id FROM telegram_login_accounts WHERE bot_id=? AND player_id=?')
-      .get(this.config.botId, playerId) as { telegram_user_id: string } | undefined;
-    if (!account) return undefined;
-    if (previous && /^[A-Za-z0-9_-]{43}$/.test(previous) && db.prepare(
-      'SELECT 1 FROM telegram_auth_devices WHERE token_hash=? AND bot_id=? AND telegram_user_id=? AND expires_at>?',
-    ).get(digest(previous), this.config.botId, account.telegram_user_id, this.now())) return undefined;
-    const token = randomBytes(32).toString('base64url');
-    db.prepare('DELETE FROM telegram_auth_devices WHERE expires_at<=?').run(this.now());
-    db.prepare('INSERT INTO telegram_auth_devices VALUES (?,?,?,?)').run(digest(token), this.config.botId, account.telegram_user_id, this.now() + 180 * 86400_000);
-    return token;
-  }
-
-  async start(session: SessionRecord, locale: unknown, device?: string, otherAccount = false): Promise<{ attemptId: string; deepLink: string; delivery: 'sent' | 'open_bot' | 'failed' }> {
+  start(session: SessionRecord, locale: unknown): { attemptId: string; deepLink: string } {
     if (session.playerId) throw new PlatformError('AUTH_ALREADY_SIGNED_IN', 'Вы уже вошли', 409);
     const attemptId = randomUUID();
     const token = randomBytes(32).toString('base64url');
     const now = this.now();
-    const remembered = !otherAccount && device && /^[A-Za-z0-9_-]{43}$/.test(device)
-      ? this.platform.db.prepare(`SELECT d.telegram_user_id FROM telegram_auth_devices d JOIN telegram_login_accounts a
-          ON a.bot_id=d.bot_id AND a.telegram_user_id=d.telegram_user_id WHERE d.token_hash=? AND d.bot_id=? AND d.expires_at>?`)
-        .get(digest(device), this.config.botId, now) as { telegram_user_id: string } | undefined : undefined;
-    const pending = !otherAccount ? this.platform.db.prepare(`SELECT telegram_user_id FROM telegram_auth_attempts
-      WHERE session_hash=? AND bot_id=? AND telegram_user_id IS NOT NULL AND expires_at>? AND used_at IS NULL ORDER BY expires_at DESC LIMIT 1`)
-      .get(session.sessionHash, this.config.botId, now) as { telegram_user_id: string } | undefined : undefined;
-    const telegramId = remembered?.telegram_user_id ?? pending?.telegram_user_id;
     this.platform.db.transaction(() => {
       this.platform.db.prepare('DELETE FROM telegram_auth_attempts WHERE expires_at<=? OR (session_hash=? AND used_at IS NULL)').run(now, session.sessionHash);
-      this.platform.db.prepare(`INSERT INTO telegram_auth_attempts (id,session_hash,bot_id,token_hash,expires_at,locale,telegram_user_id)
-        VALUES (?,?,?,?,?,?,?)`).run(attemptId, session.sessionHash, this.config.botId, digest(token), now + TTL, locale === 'en' ? 'en' : 'ru', telegramId ?? null);
+      this.platform.db.prepare(`INSERT INTO telegram_auth_attempts (id,session_hash,bot_id,token_hash,expires_at,locale)
+        VALUES (?,?,?,?,?,?)`).run(attemptId, session.sessionHash, this.config.botId, digest(token), now + TTL, locale === 'en' ? 'en' : 'ru');
     }).immediate();
-    const result = { attemptId, deepLink: `https://t.me/${this.config.botUsername}?start=a1_${token}` };
-    if (!telegramId) return { ...result, delivery: 'open_bot' };
-    if (!this.transport) return { ...result, delivery: 'failed' };
-    this.platform.rateLimit(`telegram-auth-recipient:${this.config.botId}:${telegramId}`, 3, 60_000);
-    const attempt = this.platform.db.prepare('SELECT * FROM telegram_auth_attempts WHERE id=?').get(attemptId) as Attempt;
-    const reply = this.codeReply(attempt, telegramId);
-    try {
-      await this.transport.sendMessage({ chatId: telegramId, text: reply.text,
-        copyCode: { value: this.code(attempt), offset: reply.entities![0].offset,
-          buttonText: locale === 'en' ? 'Copy code' : 'Скопировать код' } });
-      return { ...result, delivery: 'sent' };
-    } catch { return { ...result, delivery: 'failed' }; }
+    return { attemptId, deepLink: `https://t.me/${this.config.botUsername}?start=a1_${token}` };
   }
 
   private code(attempt: Attempt): string {
@@ -98,21 +62,6 @@ export class TelegramAuth {
     const bytes = createHmac('sha256', this.config.codeKey)
       .update(`telegram-auth-v1:${this.config.botId}:${attempt.id}:${attempt.telegram_user_id}`).digest();
     return [...bytes.subarray(0, 8)].map(byte => ALPHABET[byte & 31]).join('');
-  }
-
-  private codeReply(attempt: Attempt, telegramId: string): Extract<BotReply, { method: 'sendMessage' }> {
-    const code = this.code(attempt);
-    const prefix = attempt.locale === 'en' ? 'Iva Games code: ' : 'Код Iva Games: ';
-    return {
-      method: 'sendMessage', chat_id: telegramId,
-      text: `${prefix}${code}\n${attempt.locale === 'en'
-        ? 'Enter it on iva-games.pro in the browser where you requested it. Never share this code.'
-        : 'Введите его на iva-games.pro в браузере, где вы запросили код. Никому его не сообщайте.'}`,
-      entities: [{ type: 'code', offset: prefix.length, length: code.length }],
-      reply_markup: { inline_keyboard: [[{
-        text: attempt.locale === 'en' ? 'Copy code' : 'Скопировать код', copy_text: { text: code },
-      }]] },
-    };
   }
 
   webhook(input: unknown): BotReply {
@@ -158,7 +107,18 @@ export class TelegramAuth {
       return { ...row, telegram_user_id: telegramId };
     }).immediate();
     if (!attempt) return { ok: true };
-    return this.codeReply(attempt, telegramId);
+    const code = this.code(attempt);
+    const prefix = attempt.locale === 'en' ? 'Iva Games code: ' : 'Код Iva Games: ';
+    return {
+      method: 'sendMessage', chat_id: telegramId,
+      text: `${prefix}${code}\n${attempt.locale === 'en'
+        ? 'Enter it on iva-games.pro in the browser where you requested it. Never share this code.'
+        : 'Введите его на iva-games.pro в браузере, где вы запросили код. Никому его не сообщайте.'}`,
+      entities: [{ type: 'code', offset: prefix.length, length: code.length }],
+      reply_markup: { inline_keyboard: [[{
+        text: attempt.locale === 'en' ? 'Copy code' : 'Скопировать код', copy_text: { text: code },
+      }]] },
+    };
   }
 
   finish(session: SessionRecord, input: Record<string, unknown>): AuthenticationResult | { profileRequired: true } {
