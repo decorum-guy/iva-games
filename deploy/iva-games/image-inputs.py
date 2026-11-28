@@ -22,7 +22,9 @@ SPEC = {
     'chess': {
         'roots': ['apps/server'],
         'build': 'build',
-        'files': ['Dockerfile', 'games/chess', 'apps/server', 'packages/engine-sdk', 'packages/session-kit',
+        'files': ['Dockerfile', 'games/chess', 'apps/server', 'apps/portal/chess-home', 'apps/portal/src/chess-home.tsx', 'apps/portal/src/ui.tsx',
+                  'apps/portal/src/types.ts', 'apps/portal/src/AvatarArt.tsx', 'apps/portal/src/navigation.tsx', 'apps/portal/src/styles.css',
+                  'packages/engine-sdk', 'packages/session-kit',
                   'vite.config.ts', 'vite.server.config.ts', 'tsconfig.json', 'scripts/compose-client.mjs', 'scripts/build-chess.mjs', 'scripts/check-game-registry.mjs', 'scripts/chess-health.mjs'],
         'compatibility': ['apps/server/src/store.ts', ':(glob)apps/server/src/**/store.ts',
                           ':(glob)games/chess/**/src/core/**', ':(glob)games/chess/**/src/online/protocol.ts'],

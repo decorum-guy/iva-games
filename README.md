@@ -6,7 +6,7 @@
 
 **Для нового верхнеуровневого чата:** прочитай [AGENTS.md](AGENTS.md), [полную роль](prompts/TOP_LEVEL_CHAT.md) и актуальный верх [BUILD_STATUS](docs/iva-games/BUILD_STATUS.md), затем сверь ветки, PR и проверки. Активационная фраза: **«Ты верхнеуровневый чат, ознакомься с документами проекта»**.
 
-Публичные адреса: [iva-games.pro](https://iva-games.pro/) — выбор раздела, [/chess](https://iva-games.pro/chess) — шахматы, [/games](https://iva-games.pro/games) — остальные игры. Просмотр каталога не требует входа. Гостевые [REMORSE](https://chess.iva-games.pro/) и [Форсаж](https://chess.iva-games.pro/overdrive/) открываются отдельно. Источники текущего состояния публикации и приёмки перечислены в [BUILD_STATUS](docs/iva-games/BUILD_STATUS.md); порядок доставки — в [руководстве выпуска](docs/iva-games/RELEASE_IVA_GAMES_PRO.md).
+Адреса выпуска: [iva-games.pro](https://iva-games.pro/) — выбор раздела, [шахматная коллекция](https://chess.iva-games.pro/) и [/games](https://iva-games.pro/games) — остальные игры. Просмотр каталога не требует входа. Гостевые [REMORSE](https://chess.iva-games.pro/remorse/), [Форсаж](https://chess.iva-games.pro/overdrive/) и [Колосс](https://chess.iva-games.pro/colossus/) открываются отдельно. Состояние фактической доставки и приёмки перечислено в [BUILD_STATUS](docs/iva-games/BUILD_STATUS.md); порядок доставки — в [руководстве выпуска](docs/iva-games/RELEASE_IVA_GAMES_PRO.md).
 
 **Решение владельца от 25 ноября 2026 года:** развивать общую платформу с аккаунтами, друзьями, комнатами и приглашениями, а «Район» проектировать как социальную экономическую игру со сделками, событиями и обязательными ботами. «Гавань» остаётся второй выбранной концепцией. Telegram использует существующий прокси `kz-bot`.
 

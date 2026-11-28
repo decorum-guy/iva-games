@@ -113,7 +113,7 @@ for (const path of healthPaths) {
   }
 }
 
-for (const path of kind === 'chess' ? chess.map(game => game.chess.route) : ['/']) {
+for (const path of kind === 'chess' ? ['/', ...chess.map(game => game.chess.route)] : ['/']) {
   const response = await get(path);
   assert.match(response.headers.get('content-type') ?? '', /text\/html/);
   const html = await response.text();

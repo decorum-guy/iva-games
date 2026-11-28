@@ -43,7 +43,7 @@ async function cellCenter(canvas: Locator, square: string, flipped = false) {
 test.use({ reducedMotion: 'reduce' })
 
 test('the flat board accepts a normal desktop drag and a mobile tap move', async ({ page, hasTouch }) => {
-  await page.goto('/')
+  await page.goto('/remorse/')
   await page.getByTestId('flat-mode').click()
   await startHotseat(page)
   const from = page.locator('[data-square="e2"]')
@@ -74,7 +74,7 @@ test('live 3D hotseat accepts pointer input, flips and recovers the same game af
     if (response.url().includes('/assets/chess/') && !response.ok()) failedAssets.push(response.url())
   })
 
-  await page.goto('/')
+  await page.goto('/remorse/')
   const canvas = await readyCanvas(page)
   await startHotseat(page)
   await topCamera(page)
@@ -147,7 +147,7 @@ test('live 3D hotseat accepts pointer input, flips and recovers the same game af
 test('a failed chess model leaves a playable 2D board and retries the asset on demand', async ({ page }) => {
   const model = '**/assets/chess/chess_set_1k.gltf'
   await page.route(model, route => route.abort('failed'))
-  await page.goto('/')
+  await page.goto('/remorse/')
   await expect(page.getByTestId('fallback')).toBeVisible({ timeout: 15000 })
   await startHotseat(page)
   await page.locator('[data-square="e2"]').click()
@@ -169,7 +169,7 @@ test('studio lighting stays playable without its optional HDR reflection map', a
     missingReflection = true
     return route.abort('failed')
   })
-  await page.goto('/')
+  await page.goto('/remorse/')
   await readyCanvas(page)
   await expect.poll(() => missingReflection).toBe(true)
   await expect(page.getByTestId('fallback')).toHaveCount(0)
@@ -205,7 +205,7 @@ test('both armies render their distinct surface states at the ordinary camera in
     { side: 'black', type: 'rook', square: 'h6', affliction: 'bloodlust' },
   ] })
   const session = createMatch({ mode: 'hotseat', human: null, level: null, provenance: 'import' }, { root })
-  await page.goto('/')
+  await page.goto('/remorse/')
   await readyCanvas(page)
   await page.getByTestId('settings').click()
   await page.getByTestId('import-file').setInputFiles({
@@ -240,7 +240,7 @@ test('both armies render their distinct surface states at the ordinary camera in
 
 test('a manual 3D flip uses the larger canvas throughout one continuous orbit', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'no-preference' })
-  await page.goto('/')
+  await page.goto('/remorse/')
   await readyCanvas(page)
   await startHotseat(page)
   const stage = page.locator('.board-stage')
