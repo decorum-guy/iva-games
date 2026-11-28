@@ -66,13 +66,18 @@ function instrumentBrowser(options = {}) {
   const NativeAudioContext = window.AudioContext;
   const latency = options.oneWayDelayMs || 0;
   const state = { sockets: [], active: null, automated: false, sent: 0, oneWayDelayMs: latency,
-    inputMetrics: { ui: 0, policy: 0, peakPerSecond: 0, recent: [] }, audioContexts: [], gestures: { pointers: 0, keys: 0, trustedKeys: 0 } };
+    inputMetrics: { ui: 0, policy: 0, peakPerSecond: 0, recent: [] }, audioContexts: [], activeGesture: null, gestures: { pointers: 0, keys: 0, trustedKeys: 0 } };
   window.addEventListener('pointerdown', () => { state.gestures.pointers++; }, true);
-  window.addEventListener('keydown', event => { state.gestures.keys++; if (event.isTrusted) state.gestures.trustedKeys++; }, true);
+  window.addEventListener('keydown', event => {
+    state.gestures.keys++; if (event.isTrusted) state.gestures.trustedKeys++;
+    const gesture = { type: 'keyboard', trusted: event.isTrusted, inMatch: event.target instanceof Element && !!event.target.closest('.shift-match') };
+    state.activeGesture = gesture;
+    setTimeout(() => { if (state.activeGesture === gesture) state.activeGesture = null; }, 0);
+  }, true);
   if (NativeAudioContext) window.AudioContext = class extends NativeAudioContext {
-    constructor(...args) { super(...args); state.audioContexts.push(this); }
+    constructor(...args) { super(...args); state.audioContexts.push({ context: this, initialState: this.state, createdDuring: state.activeGesture }); }
   };
-  state.audioAudit = () => ({ contexts: state.audioContexts.map(context => ({ state: context.state, sampleRate: context.sampleRate })), gestures: { ...state.gestures } });
+  state.audioAudit = () => ({ contexts: state.audioContexts.map(record => ({ state: record.context.state, sampleRate: record.context.sampleRate, initialState: record.initialState, createdDuring: record.createdDuring })), gestures: { ...state.gestures } });
   const nativeSend = (socket, data, source) => {
     const transmit = () => {
       if (socket.readyState !== NativeWebSocket.OPEN) return;
@@ -255,17 +260,18 @@ async function keyboardAudioInFreshContext(game) {
     await replacement.page.keyboard.press('Tab');
   }
   assert.ok(reachedGame, 'Keyboard focus reaches the actual match without a pointer');
+  const beforeGameKey = await replacement.page.evaluate(() => window.__shiftAcceptance.audioAudit());
   await replacement.page.keyboard.press('Tab');
   const after = await until(async () => {
     const audit = await replacement.page.evaluate(() => window.__shiftAcceptance.audioAudit());
-    return audit.contexts.some(context => context.state === 'running') && audit;
+    return audit.contexts.some(context => context.state === 'running' && context.createdDuring?.trusted && context.createdDuring?.inMatch) && audit;
   }, 'Trusted online keyboard gesture unlocks native AudioContext');
   assert.equal(after.gestures.pointers, 0); assert.ok(after.gestures.trustedKeys > 0);
   await old.page.locator('.shift-connection').waitFor();
   assert.match(await old.page.locator('.shift-connection').innerText(), /другой вкладке|Another tab/i);
   game.peers[0] = replacement; await automated(replacement);
   check('Fresh authenticated online context unlocks native AudioContext through keyboard before any pointer', {
-    game: game.label, before, after, classification: 'Browser AudioContext state only; no listening or speaker-output claim',
+    game: game.label, before, beforeGameKey, after, classification: 'Browser AudioContext state only; no listening or speaker-output claim',
   });
 }
 
