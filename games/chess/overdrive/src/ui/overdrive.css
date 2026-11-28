@@ -63,3 +63,10 @@
   .od-arena-column:has(>.od-board-host.is-3d){max-width:calc((100dvh - 140px)*1.12)}
   .od-header .od-new-game{min-height:34px;padding-block:5px}
 }
+
+.od-new-options>summary,.od-more-options>summary { cursor:pointer;color:var(--od-quiet,#a6b7c6);padding:12px 0;font-size:14px; }
+.od-new-options[open]>summary { margin-bottom:6px; }
+.od-more-options { margin-top:12px; }
+.od-friend-options { display:grid;gap:12px;margin:24px 0; }
+.od-setup-links>button { justify-content:center;min-height:48px;font-size:16px; }
+.od-dialog .od-new-options>.od-start { width:100%;margin-top:22px; }

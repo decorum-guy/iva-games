@@ -1,7 +1,7 @@
 import { inflateSync } from 'node:zlib';
 import type { Page } from '@playwright/test';
 import { BOSSES, HUNT_BOSSES } from '../../src/core/data';
-import { activate, beginHunt, board, cell, commands, expect, guard, lesson, menu, openEnglish, response, test } from './helpers';
+import { activate, chooseMode, beginHunt, board, cell, commands, expect, guard, lesson, menu, openEnglish, response, test } from './helpers';
 
 /** Read screenshots in memory; no reference snapshots or screenshot artifacts are published. */
 function pixelEvidence(png: Buffer) {
@@ -136,7 +136,7 @@ test('Warden has its own 3D model and a promoted piece stays playable across vie
   await expect(lesson(page)).toContainText('The ray missed');
   await menu(page);
 
-  await activate(page.locator('.mode-tabs').getByRole('button', { name: 'Practice', exact: true }));
+  await chooseMode(page, 'Practice');
   await beginHunt(page, '3d');
   await activate(page.getByRole('button', { name: 'Position editor', exact: true }));
   const editor = page.getByRole('dialog', { name: 'Position editor', exact: true });

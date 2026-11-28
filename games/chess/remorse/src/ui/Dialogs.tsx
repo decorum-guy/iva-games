@@ -77,7 +77,7 @@ export function SetupDialog({ t, hotseat, durable, busy, pending, onStart, onClo
     onStart({ mode: hotseat ? 'hotseat' : rated ? 'rated' : 'practice', level: hotseat ? null : level, human, names, provenance: 'standard' });
   }
 
-  return <Dialog closeLabel={t('nav.close')} title={t(hotseat ? 'home.hotseat' : 'home.playAI')} onClose={onClose}>
+  return <Dialog closeLabel={t('nav.close')} title={t('home.new')} onClose={onClose}>
     <form className="setup-form" onSubmit={submit}>
       {onMode && <div className="segmented" aria-label={t('home.new')} role="group">
         <button type="button" aria-pressed={!hotseat} onClick={() => onMode(false)}>{t('home.playAI')}</button>
@@ -91,6 +91,10 @@ export function SetupDialog({ t, hotseat, durable, busy, pending, onStart, onClo
         <p className="field-note">{t(!durable ? 'error.storage' : rated ? 'setup.ratedPolicy' : 'setup.practicePolicy')}</p>
         <LevelPicker t={t} value={level} onChange={setLevel} />
         <details className="setup-rating-help"><summary>{t('setup.aboutRating')}</summary><p className="field-note">{t('setup.botScale')}</p></details>
+      </>}
+      <details className="setup-more">
+        <summary>{t('setup.more')}</summary>
+        {!hotseat && <>
         <fieldset>
           <legend>{t('setup.yourSide')}</legend>
           <div className="segmented side-picker">
@@ -112,6 +116,7 @@ export function SetupDialog({ t, hotseat, durable, busy, pending, onStart, onClo
         <input name="secondPlayer" type="text" value={blackName} onChange={event => setBlackName(event.target.value)}
           maxLength={48} placeholder={t('side.black')} autoComplete="off" />
       </label>}
+      </details>
       {locked && <div className="resume-warning">
         <strong>{t('setup.activeRated')}</strong>
         <button type="button" className="button" onClick={() => onResume(pending.id)} disabled={busy} data-testid="resume-rated">{t('home.resumeRated')}</button>

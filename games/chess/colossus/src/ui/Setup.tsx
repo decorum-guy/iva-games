@@ -16,6 +16,9 @@ export interface SetupProps {
   tutorialDone: boolean;
   hasSave: boolean;
   hasPractice: boolean;
+  saveFinished: boolean;
+  hasUnfinishedLocalSave: boolean;
+  practiceFinished: boolean;
   reducedMotion?: boolean;
   onContinue: (practice: boolean) => void;
   saveNotices: { normal: SaveNotice; practice: SaveNotice };
@@ -52,6 +55,8 @@ export function Setup(p: SetupProps) {
   const [cards, setCards] = useState(p.initial.bossCards ?? true);
   const [deckOpen, setDeckOpen] = useState(false);
   const [joinOpen, setJoinOpen] = useState(false);
+  const [friendsOpen, setFriendsOpen] = useState(false);
+  const [replaceOpen, setReplaceOpen] = useState(false);
   const [link, setLink] = useState('');
   const [name, setName] = useState('');
   const [coopCampaign, setCoopCampaign] = useState(false);
@@ -84,11 +89,15 @@ export function Setup(p: SetupProps) {
   const saveNotice = mode === 'practice' ? p.saveNotices.practice : p.saveNotices.normal;
   const chosen = BOSSES[option.boss ?? boss];
   const startLabel = p.busy ? c.pending : mode === 'coop' && network ? c.createRoom : {
-    hunt: c.play,
+    hunt: p.lang === 'ru' ? 'Начать партию' : 'Start game',
     campaign: p.lang === 'ru' ? 'Начать поход' : 'Begin campaign',
     practice: p.lang === 'ru' ? 'Открыть практику' : 'Open practice',
     coop: p.lang === 'ru' ? 'Начать вдвоём' : 'Play together',
   }[mode];
+
+  const hasCurrent = mode === 'practice' ? p.hasPractice : p.hasSave;
+  const canContinue = hasCurrent && !(mode === 'practice' ? p.practiceFinished : p.saveFinished);
+  const begin = () => { if ((mode === 'practice' ? canContinue : p.hasUnfinishedLocalSave) && !(mode === 'coop' && network)) setReplaceOpen(true); else p.onStart(option, mode === 'coop' && network); };
 
   return <section className="setup-screen" data-focus-modality={keyboardFocus ? 'keyboard' : 'pointer'}>
     <div className="setup-world">
@@ -115,18 +124,10 @@ export function Setup(p: SetupProps) {
     </div>
     <div className="setup-controls">
       <header className="setup-heading">
-        <h2>{p.lang === 'ru' ? 'Новая игра' : 'New game'}</h2>
+        <h2>{p.lang === 'ru' ? 'Новая партия' : 'New game'}</h2>
+        {mode !== 'hunt' && <p className="setup-current-mode">{c[mode]} · {modeDescriptions[p.lang][mode]}</p>}
         <p className="setup-premise">{p.lang === 'ru' ? 'Восемь фигур против великана. Его следующий удар известен заранее.' : 'Eight pieces against a giant. See its next strike before you act.'}</p>
       </header>
-      <fieldset className="setup-mode">
-        <legend>{c.mode}</legend>
-        <div className="mode-tabs">
-          {(['hunt', 'campaign', 'coop', 'practice'] as const).map(m => <button
-            type="button" key={m} className={mode === m ? 'active' : ''} onClick={() => setMode(m)} aria-pressed={mode === m}
-          ><span>{c[m]}</span><span className="mode-check" aria-hidden="true">{mode === m ? '✓' : ''}</span></button>)}
-        </div>
-        <p className="mode-description">{modeDescriptions[p.lang][mode]}</p>
-      </fieldset>
       <div className="difficulty-field">
         <label className="field-label" htmlFor="colossus-difficulty">{c.difficulty}</label>
         <select id="colossus-difficulty" className="difficulty-select" value={difficulty} aria-describedby="colossus-difficulty-description" onChange={event => setDifficulty(event.target.value as Difficulty)}>
@@ -138,6 +139,17 @@ export function Setup(p: SetupProps) {
             : `${DIFFICULTIES[difficulty].commands} commands per round. The boss rests after 3 combat responses.`}
         </p>
       </div>
+      <details className="setup-more">
+        <summary>{p.lang === 'ru' ? 'Другие режимы и колода' : 'More modes and deck'}</summary>
+      <fieldset className="setup-mode">
+        <legend>{c.mode}</legend>
+        <div className="mode-tabs">
+          {(['hunt', 'campaign', 'coop', 'practice'] as const).map(m => <button
+            type="button" key={m} className={mode === m ? 'active' : ''} onClick={() => setMode(m)} aria-pressed={mode === m}
+          ><span>{c[m]}</span><span className="mode-check" aria-hidden="true">{mode === m ? '✓' : ''}</span></button>)}
+        </div>
+        <p className="mode-description">{modeDescriptions[p.lang][mode]}</p>
+      </fieldset>
       {mode === 'coop' && <div className="coop-choice">
         <div className="segmented" role="group" aria-label={c.coop}>
           <button type="button" className={!network ? 'active' : ''} aria-pressed={!network} onClick={() => setNetwork(false)}>{c.localCoop}</button>
@@ -156,6 +168,7 @@ export function Setup(p: SetupProps) {
           <svg className="deck-chevron" aria-hidden="true" viewBox="0 0 16 16"><path d="m6 3 5 5-5 5" /></svg>
         </button>
       </div>
+      </details>
       {!valid && <p className="error-text">{c.deckError}</p>}
       {p.error && <p className="error-text" role="alert">{p.error}</p>}
       {(saveNotice.damaged || saveNotice.archived) && <div className="save-notice">
@@ -163,14 +176,15 @@ export function Setup(p: SetupProps) {
         <button type="button" className="secondary-button" onClick={() => p.onDownloadSave(mode === 'practice')}>{c.downloadSave}</button>
       </div>}
       <div className="start-actions">
-        <button type="button" data-testid="start-game" className="primary-button" disabled={!valid || p.busy} onClick={() => p.onStart(option, mode === 'coop' && network)}>{startLabel}</button>
-        {(mode === 'practice' ? p.hasPractice : p.hasSave) && <button type="button" className="secondary-button" disabled={p.busy} onClick={() => p.onContinue(mode === 'practice')}>{c.continue}</button>}
+        {canContinue && <button type="button" className="primary-button" disabled={p.busy} onClick={() => p.onContinue(mode === 'practice')}>{c.continue}</button>}
+        <button type="button" data-testid="start-game" className={canContinue ? 'secondary-button' : 'primary-button'} disabled={!valid || p.busy} onClick={begin}>{canContinue ? (p.lang === 'ru' ? 'Новая партия' : 'New game') : startLabel}</button>
       </div>
-      <button type="button" className="tutorial-invitation" onClick={p.onTutorial}>
+      <button type="button" className="tutorial-invitation" aria-label={p.lang === 'ru' ? 'Обучение' : 'Tutorial'} onClick={p.onTutorial}>
         <span className="training-emblem" aria-hidden="true">◇</span>
-        <span><b>{p.tutorialDone ? c.learnAgain : c.learn}</b><small>{p.lang === 'ru' ? 'Смотритель · короткий учебный бой' : 'The Warden · a short guided battle'}</small></span>
+        <span><b>{p.lang === 'ru' ? 'Обучение' : 'Tutorial'}</b><small>{p.lang === 'ru' ? 'Смотритель · короткий учебный бой' : 'The Warden · a short guided battle'}</small></span>
       </button>
-      <div className="setup-links"><button type="button" onClick={() => setJoinOpen(true)}>{c.joinRoom} · {c.online}</button></div>
+      {hasCurrent && !canContinue && <button type="button" className="secondary-button" onClick={() => p.onContinue(mode === 'practice')}>{p.lang === 'ru' ? 'Последний результат' : 'Last result'}</button>}
+      <div className="setup-links"><button type="button" data-testid="mode-friend" onClick={() => setFriendsOpen(true)}>{p.lang === 'ru' ? 'С другом' : 'With a friend'}</button></div>
     </div>
     {bestiary && <Bestiary language={p.lang} difficulty={difficulty} records={p.records} initialBoss={bestiary} onClose={() => setBestiary(null)} reducedMotion={p.reducedMotion} />}
     {deckOpen && <Modal title={c.deck} onClose={() => setDeckOpen(false)} className="collection-modal">
@@ -183,6 +197,17 @@ export function Setup(p: SetupProps) {
         }}
       >{STARTER_CARDS.includes(card.id) && <span className="card-status">{c.mandatory}</span>}</Card>)}</div>
       <button type="button" className="primary-button" onClick={() => setDeckOpen(false)} disabled={!valid}>{c.apply}</button>
+    </Modal>}
+    {friendsOpen && <Modal title={p.lang === 'ru' ? 'С другом' : 'With a friend'} onClose={() => setFriendsOpen(false)}>
+      <div className="friend-options">
+        <button type="button" className="secondary-button" onClick={() => { setMode('coop'); setNetwork(false); setFriendsOpen(false); }}>{p.lang === 'ru' ? 'На одном устройстве' : 'On one device'}</button>
+        <button type="button" className="secondary-button" onClick={() => { setMode('coop'); setNetwork(true); setFriendsOpen(false); }}>{p.lang === 'ru' ? 'По сети' : 'Online'}</button>
+        <button type="button" className="secondary-button" onClick={() => { setFriendsOpen(false); setJoinOpen(true); }}>{c.joinRoom}</button>
+      </div>
+    </Modal>}
+    {replaceOpen && <Modal title={p.lang === 'ru' ? 'Начать новую партию?' : 'Start a new game?'} onClose={() => setReplaceOpen(false)}>
+      <p>{p.lang === 'ru' ? 'Незаконченная партия в этом режиме будет заменена.' : 'The unfinished game in this mode will be replaced.'}</p>
+      <div className="friend-options"><button type="button" className="secondary-button" onClick={() => setReplaceOpen(false)}>{p.lang === 'ru' ? 'Отмена' : 'Cancel'}</button><button type="button" className="primary-button" onClick={() => { setReplaceOpen(false); p.onStart(option, mode === 'coop' && network); }}>{p.lang === 'ru' ? 'Начать новую' : 'Start new game'}</button></div>
     </Modal>}
     {joinOpen && <Modal title={c.joinRoom} onClose={() => setJoinOpen(false)}>
       <label className="field-label">{c.name}<input value={name} onChange={event => setName(event.target.value)} maxLength={32} autoComplete="nickname" /></label>

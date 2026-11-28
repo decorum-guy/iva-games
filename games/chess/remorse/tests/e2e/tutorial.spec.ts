@@ -296,6 +296,7 @@ test('a held explanation survives the rules and menu, and restarting from the me
   await page.getByTestId('flat-mode').click()
   await page.getByTestId('mode-ai').click()
   await page.getByTestId('setup-rated').click()
+  await page.locator('.setup-more > summary').click();
   await page.getByTestId('setup-white').click()
   await page.getByTestId('setup-start').click()
   await expect(playfield(page)).toHaveAttribute('data-mode', 'rated')
@@ -636,6 +637,7 @@ for (const locale of ['ru', 'en'] as const) {
       expect(await boardIdentity(page)).toEqual(completed)
       await page.getByTestId('lesson-new').click()
       await page.getByTestId('setup-practice').click()
+      await page.locator('.setup-more > summary').click();
       await page.getByTestId('setup-white').click()
       await page.getByTestId('setup-start').click()
       await expect(playfield(page)).toHaveAttribute('data-mode', 'practice')

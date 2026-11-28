@@ -598,6 +598,7 @@ test('real audio plays the opening worker move and the confirmed resignation', a
   expect((await nativeAudio(page)).context).toBe('none')
   await page.getByTestId('mode-ai').click()
   await page.getByTestId('setup-practice').click()
+  await page.locator('.setup-more > summary').click();
   await page.getByTestId('setup-black').click()
   await page.getByTestId('setup-start').click()
   await expect(playfield(page)).toHaveAttribute('data-turn', '1')

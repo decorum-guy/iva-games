@@ -5,6 +5,7 @@ import type { BoardSelection } from './TerritorialBoard';
 import { ResourceIcon, ResourceStock, resourceName } from './TerritorialResources';
 import { counterDraft, emptyTradeDraft, inspectTradeDraft, missingStock, parseTradeDraft, stockTotal, tradeDraftKey } from './territorialTradeDraft';
 import type { TradeDraft } from './territorialTradeDraft';
+import { TradeStatusIcon } from './TradeStatusIcon';
 import './territorial-actions.css';
 
 export { ResourceIcon, ResourceStock, resourceName } from './TerritorialResources';
@@ -323,13 +324,13 @@ function OfferCard({ offer, view, lang, busy, onAction, onCounter, onResponse, c
     <div className="ta-response-chip">{identity}
       {mine ? canChoose ? <button type="button" className="ta-primary" disabled={!actionable || !canAccept}
         aria-label={`${word(lang,'Обменяться','Trade with')} ${name}`} title={offer.unavailableReason==='inactive-pair' ? word(lang,'Обмен возможен только с активным игроком','Trade with the active player') : word(lang,'Выбрать игрока','Choose player')}
-        onClick={()=>void respond('accept')}>✅</button> : <span role="img" aria-label={word(lang,'Ждём ответа','Awaiting response')}>🤔</span>
-        : agreed ? <span role="img" aria-label={word(lang,'Согласие отправлено · ждём выбора','Agreed · awaiting selection')}>✅</span>
+        onClick={()=>void respond('accept')}><TradeStatusIcon status="accept"/></button> : <span role="img" aria-label={word(lang,'Ждём ответа','Awaiting response')}><TradeStatusIcon status="waiting"/></span>
+        : agreed ? <span role="img" aria-label={word(lang,'Согласие отправлено · ждём выбора','Agreed · awaiting selection')}><TradeStatusIcon status="accept"/></span>
         : <button type="button" className="ta-primary" disabled={!actionable || !canAccept} aria-label={word(lang,'Принять','Accept')} aria-description={shortageText}
-          title={shortageText ?? (offer.unavailableReason==='author-resources' ? word(lang,'У автора не хватает ресурсов','Sender lacks resources') : word(lang,'Принять','Accept'))} onClick={()=>void respond('accept')}>✅</button>}
+          title={shortageText ?? (offer.unavailableReason==='author-resources' ? word(lang,'У автора не хватает ресурсов','Sender lacks resources') : word(lang,'Принять','Accept'))} onClick={()=>void respond('accept')}><TradeStatusIcon status="accept"/></button>}
       {!mine && <><button type="button" disabled={busy || sending} aria-label={word(lang,'Другие условия','Counteroffer')} title={word(lang,'Другие условия','Counteroffer')} onClick={()=>onCounter(offer)}>↔</button>
-        <button type="button" disabled={!actionable} aria-label={word(lang,'Отклонить','Decline')} title={word(lang,'Отклонить','Decline')} onClick={()=>void respond('decline')}>❌</button></>}
-      {mine && !offer.groupId && <button type="button" disabled={!actionable} aria-label={word(lang,'Отозвать','Withdraw')} onClick={()=>void respond('cancel')}>❌</button>}
+        <button type="button" disabled={!actionable} aria-label={word(lang,'Отклонить','Decline')} title={word(lang,'Отклонить','Decline')} onClick={()=>void respond('decline')}><TradeStatusIcon status="decline"/></button></>}
+      {mine && !offer.groupId && <button type="button" disabled={!actionable} aria-label={word(lang,'Отозвать','Withdraw')} onClick={()=>void respond('cancel')}><TradeStatusIcon status="decline"/></button>}
     </div>
     {failed && <p className="ta-feedback" role="status">{word(lang,'Ответ не подтверждён. Повторите.','Response not confirmed. Retry.')}</p>}
   </article>;
@@ -478,8 +479,8 @@ function PlayerTrade({ view, lang, busy, onAction, handPick }: Props) {
           view={view} lang={lang} busy={busy || sending} onAction={onAction} onCounter={edit} onResponse={() => tradeHeading.current?.focus({ preventScroll: true })}/>;
         if (!grouped) return render(terms);
         return <section key={key} className="ta-offer-group" data-group-id={key}>
-          <div className="ta-group-heading"><OfferTerms give={terms.give} receive={terms.receive} lang={lang} author={nameOf(view,terms.authorId)}/>{items.length > 0 ? <button type="button" className="ta-group-cancel" disabled={busy || sending} aria-label={word(lang,'Отменить предложение всем','Withdraw offer for everyone')} title={word(lang,'Отменить предложение','Withdraw offer')} onClick={()=>void onAction({type:'cancel',offerId:items[0].id})}>❌</button> : <span className="ta-group-cancel-space" aria-hidden="true"/>}</div>
-          <div className="ta-response-list">{[...items, ...(view.offerHistory ?? []).filter(offer=>offer.groupId===key && (offer.status==='declined'||offer.status==='replaced'||offer.responseExpired))].sort((a,b)=>(view.players.find(player=>player.participantId===a.targetId)?.seatIndex??0)-(view.players.find(player=>player.participantId===b.targetId)?.seatIndex??0)).map(offer=>items.some(active=>active.id===offer.id) ? render(offer) : <div key={offer.id} className="ta-closed-response"><span className="ta-player-dot" style={{background:['#ca4e37','#2867a8','#79498f','#2c7954'][view.players.find(player=>player.participantId===offer.targetId)?.seatIndex??0]}} title={nameOf(view,offer.targetId)}>{(view.players.find(player=>player.participantId===offer.targetId)?.seatIndex??0)+1}</span><span role="img" aria-label={`${nameOf(view,offer.targetId)} · ${'responseExpired' in offer && offer.responseExpired ? word(lang,'Нет ответа за 10 секунд','No response in 10 seconds') : word(lang,'Нет согласия','Not agreed')}`}>❌</span></div>)}
+          <div className="ta-group-heading"><OfferTerms give={terms.give} receive={terms.receive} lang={lang} author={nameOf(view,terms.authorId)}/>{items.length > 0 ? <button type="button" className="ta-group-cancel" disabled={busy || sending} aria-label={word(lang,'Отменить предложение всем','Withdraw offer for everyone')} title={word(lang,'Отменить предложение','Withdraw offer')} onClick={()=>void onAction({type:'cancel',offerId:items[0].id})}><TradeStatusIcon status="decline"/></button> : <span className="ta-group-cancel-space" aria-hidden="true"/>}</div>
+          <div className="ta-response-list">{[...items, ...(view.offerHistory ?? []).filter(offer=>offer.groupId===key && (offer.status==='declined'||offer.status==='replaced'||offer.responseExpired))].sort((a,b)=>(view.players.find(player=>player.participantId===a.targetId)?.seatIndex??0)-(view.players.find(player=>player.participantId===b.targetId)?.seatIndex??0)).map(offer=>items.some(active=>active.id===offer.id) ? render(offer) : <div key={offer.id} className="ta-closed-response"><span className="ta-player-dot" style={{background:['#ca4e37','#2867a8','#79498f','#2c7954'][view.players.find(player=>player.participantId===offer.targetId)?.seatIndex??0]}} title={nameOf(view,offer.targetId)}>{(view.players.find(player=>player.participantId===offer.targetId)?.seatIndex??0)+1}</span><span role="img" aria-label={`${nameOf(view,offer.targetId)} · ${'responseExpired' in offer && offer.responseExpired ? word(lang,'Нет ответа за 10 секунд','No response in 10 seconds') : word(lang,'Нет согласия','Not agreed')}`}><TradeStatusIcon status="decline"/></span></div>)}
           </div>
         </section>;
       })}

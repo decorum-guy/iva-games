@@ -8,6 +8,7 @@ import { exportMatch } from '../../src/session/save'
 const surface = (page: Page) => page.locator('[data-renderer="3d"][data-scene-ready="true"]')
 
 async function startHotseat(page: Page) {
+  await page.getByTestId('mode-friend').click()
   await page.getByTestId('mode-hotseat').click()
   await page.getByTestId('setup-start').click()
   await expect(page.getByTestId('playfield')).toHaveAttribute('data-mode', 'hotseat')

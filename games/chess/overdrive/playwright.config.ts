@@ -7,6 +7,7 @@ const gameRoot = fileURLToPath(new URL('.', import.meta.url))
 
 const port = process.env.OVERDRIVE_TEST_PORT ?? '5198'
 const origin = `http://127.0.0.1:${port}`
+const prebuilt = process.env.OVERDRIVE_E2E_PREBUILT === '1'
 const chromiumLaunch = { args: ['--mute-audio'], ...(process.env.OVERDRIVE_CHROMIUM_PATH ? { executablePath: process.env.OVERDRIVE_CHROMIUM_PATH } : {}) }
 
 export default defineConfig({
@@ -24,7 +25,7 @@ export default defineConfig({
   ],
   webServer: {
     cwd: repository,
-    command: 'npm run build && node dist-server/main.js',
+    command: prebuilt ? 'node dist-server/main.js' : 'npm run build && node dist-server/main.js',
     env: { PORT: port, HOST: '127.0.0.1', PUBLIC_ORIGIN: origin,
       DATABASE_PATH: `.qa/overdrive-e2e-remorse-${port}-${process.pid}.sqlite`,
       OVERDRIVE_DATABASE_PATH: `.qa/overdrive-e2e-${port}-${process.pid}.sqlite` },

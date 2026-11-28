@@ -27,7 +27,7 @@ import { projectPromotion, promotionEvents } from './promotionProjection';
 import { OnlinePanel, OnlineSetup } from './OnlinePanel';
 
 type Modal =
-  | { kind: 'settings' | 'rules' | 'profile' | 'saves' | 'resign' | 'draw' | 'exit' | 'restart' | 'restart-all' | 'repeat' | 'technical' }
+  | { kind: 'settings' | 'rules' | 'profile' | 'saves' | 'resign' | 'draw' | 'exit' | 'restart' | 'restart-all' | 'repeat' | 'technical' | 'friends' }
   | { kind: 'setup'; hotseat: boolean; choice?: boolean }
   | { kind: 'online'; invitation?: { roomId: string; invite: string } }
   | { kind: 'capture'; side: Side };
@@ -206,6 +206,8 @@ export function App() {
   const pending = snap.matches.find(match => match.id === snap.profile.ratedId);
   const resume = snap.matches.find(match => match.status === 'open' && match.config.mode !== 'rated') ??
     (!snap.durable && game?.record.status === 'open' ? game.record : undefined);
+
+  const homeContinue = pending ?? resume;
 
   useEffect(() => {
     void cabinet.initialize().then(() => {
@@ -497,28 +499,22 @@ export function App() {
         </div>}
         {view === 'home' ? <section className="home-panel">
           <div className="home-intro">
-            <h1>{t('home.title')}</h1><p className="home-introduction" data-testid="home-introduction">{t('home.prompt')}</p>
+            <h1>{t('home.title')}</h1><p className="home-introduction" data-testid="home-introduction">{t('home.shortPrompt')}</p>
           </div>
           {notice}
           {storageNotice}
           {snap.ready ? <div className="play-options">
-            {pending && <button type="button" className="button primary mode-button" disabled={Boolean(snap.storageProblem)} onClick={() => resumeGame(pending.id)} data-testid="home-resume-rated">
-              <Icon name="history" /><span>{t('home.resumeRated')}</span><Icon name="right" />
+            {homeContinue && <button type="button" className="button primary mode-button" disabled={Boolean(snap.storageProblem)} onClick={() => resumeGame(homeContinue.id)} data-testid={pending ? 'home-resume-rated' : 'home-resume'}>
+              <Icon name="history" /><span>{t('home.continue')}</span><Icon name="right" />
             </button>}
-            {resume && <button type="button" className={`button ${pending ? '' : 'primary'} mode-button`} disabled={Boolean(snap.storageProblem)} onClick={() => resumeGame(resume.id)} data-testid="home-resume">
-              <Icon name="history" /><span>{t('home.resume')}</span><Icon name="right" />
-            </button>}
-            <button type="button" className={`button ${pending || resume ? '' : 'primary'} mode-button`} data-testid="mode-ai" onClick={() => openSetup(false, false)}>
-              <Icon name="helmet" /><span>{t('home.playAI')}</span><Icon name="right" />
-            </button>
-            <button type="button" className="button mode-button" data-testid="mode-hotseat" onClick={() => openSetup(true, false)}>
-              <Icon name="local" /><span>{t('home.hotseat')}</span><Icon name="right" />
-            </button>
-            <button type="button" className="button mode-button" data-testid="mode-online" onClick={() => { cabinet.dismissOnlineError(); setModal({ kind: 'online' }); }}>
-              <Icon name="online" /><span>{nt('play')}</span><Icon name="right" />
+            <button type="button" className={`button ${homeContinue ? '' : 'primary'} mode-button`} data-testid="mode-ai" onClick={() => openSetup()}>
+              <Icon name="helmet" /><span>{t('home.new')}</span><Icon name="right" />
             </button>
             <button type="button" className="button mode-button" data-testid="mode-learn" disabled={!snap.durable} onClick={() => { void cabinet.learn(); setFlip(false); }}>
-              <Icon name="bookOpen" /><span>{t(learning?.complete ? 'home.learnResult' : learning ? 'home.resumeLearn' : 'home.learn')}</span><Icon name="right" />
+              <Icon name="bookOpen" /><span>{t('home.tutorial')}</span><Icon name="right" />
+            </button>
+            <button type="button" className="button mode-button" data-testid="mode-friend" onClick={() => setModal({ kind: 'friends' })}>
+              <Icon name="local" /><span>{t('home.friend')}</span><Icon name="right" />
             </button>
           </div> : <p role="status">{t('storage.opening')}</p>}
           <div className="home-footer">
@@ -617,6 +613,12 @@ export function App() {
     {modal?.kind === 'setup' && <SetupDialog t={t} hotseat={modal.hotseat} pending={pending} durable={snap.durable} busy={!snap.ready || snap.busy}
       onClose={close} onResume={resumeGame} onStart={config => { void cabinet.startGame(config).then(ok => { if (ok) { close(); setFlip(false); } }); }}
       onRelease={id => { void cabinet.closeRated(id); }} onMode={modal.choice ? hotseat => setModal({ ...modal, hotseat }) : undefined} />}
+    {modal?.kind === 'friends' && <Dialog title={t('home.friend')} closeLabel={t('nav.close')} onClose={close}>
+      <div className="play-options">
+        <button type="button" className="button" data-testid="mode-hotseat" onClick={() => openSetup(true, false)}>{t('home.sameDevice')}</button>
+        <button type="button" className="button" data-testid="mode-online" onClick={() => { cabinet.dismissOnlineError(); setModal({ kind: 'online' }); }}>{t('home.online')}</button>
+      </div>
+    </Dialog>}
     {modal?.kind === 'online' && <OnlineSetup t={t} locale={settings.locale} invitation={modal.invitation} previousRoom={lastRoom()}
       busy={!snap.ready || snap.onlineWorking} error={snap.onlineError} onClose={close}
       onCreate={(name, side) => { void cabinet.createRoom(name, side).then(ok => { if (ok) { close(); setFlip(false); } }); }}

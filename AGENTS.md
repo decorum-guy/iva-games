@@ -1,5 +1,9 @@
 # Iva Games — latest project direction
 
+## Chess menus — shared player journey, 28 November 2026
+
+Follow [the chess entry contract](docs/iva-games/CHESS_ENTRY_FLOW.md) for all current and future chess variants: New game / Continue, Tutorial, With a friend, Settings. Preserve each game's visual identity. Put rare options behind an explicit disclosure, protect unfinished saves, and verify desktop/mobile RU/EN entry and recovery before release. Do not add another first-screen section for each new feature.
+
 ## Обязательное правило для новых игр
 
 **Одна игра, один ИИ-исполнитель, полный цикл до сайта.** Если владелец поручил сделать игру, прочитай [порядок полного цикла](docs/iva-games/GAME_WORKFLOW.md) и доведи её сам: правила, код, ассеты, интерфейс, звук, тесты, полная браузерная приёмка, исправления, рабочая ветка и PR, разрешённый штатный выпуск, проверка на iva-games.pro. Не отдавай владельцу или следующему чату незакрытые обычные этапы. PR и зелёный CI не равны готовой игре. Недостающий доступ или непройденная обязательная проверка — блокер, а не основание объявлять выпуск.

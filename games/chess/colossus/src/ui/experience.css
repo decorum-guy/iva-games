@@ -370,3 +370,10 @@ select { appearance:none; padding-right:2.3rem; background-image:url("data:image
 }
 
 @layer colossus { .deck-button>span:last-child { margin-left:0; font-size:inherit; color:inherit; } .deck-button b { font-size:1rem; } }
+
+.setup-more { border-top:1px solid #70817944;padding-top:4px; }
+.setup-more>summary { cursor:pointer;color:#bdc9c6;font-size:.875rem;padding:12px 0; }
+.setup-more[open]>.setup-mode { margin:10px 0 18px; }
+.setup-more .coop-choice { margin-bottom:18px; }
+.setup-current-mode { color:#d6c190;font-size:.875rem;margin-top:8px; }
+.friend-options { display:grid;gap:12px;margin-top:20px; }
