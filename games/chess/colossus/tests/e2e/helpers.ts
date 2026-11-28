@@ -24,14 +24,17 @@ export async function mobileIntent(page: Page, expanded: boolean) {
   if (await toggle.isVisible() && (await toggle.getAttribute('aria-expanded') === 'true') !== expanded) await activate(toggle);
 }
 export async function openEnglish(page: Page, view: '2d' | '3d' = '2d') {
+  // Set up presentation preferences here. The language and settings controls
+  // are exercised separately with actual keyboard and touch input.
+  await page.addInitScript(view => {
+    const key = 'colossus.settings.v1';
+    if (!localStorage.getItem(key)) {
+      localStorage.setItem(key, JSON.stringify({ lang: 'en', view, sound: true, reduced: true, theme: 'ivory' }));
+    }
+  }, view);
   await page.goto('/colossus/');
   await expect(page.locator('.setup-screen')).toBeVisible();
-  if (await page.locator('.language-switch').textContent() === 'EN') await activate(page.locator('.language-switch'));
-  await activate(page.getByRole('button', { name: 'Settings', exact: true }));
-  const dialog = page.getByRole('dialog', { name: 'Settings', exact: true });
-  await activate(dialog.getByRole('button', { name: view.toUpperCase(), exact: true }));
-  await dialog.getByRole('checkbox', { name: 'Reduce motion', exact: true }).check();
-  await activate(dialog.getByRole('button', { name: 'Close / Закрыть', exact: true }));
+  await expect(page.locator('.language-switch')).toHaveText('RU');
 }
 export async function beginHunt(page: Page, view: '2d' | '3d' = '2d') {
   await activate(page.getByTestId('start-game'));

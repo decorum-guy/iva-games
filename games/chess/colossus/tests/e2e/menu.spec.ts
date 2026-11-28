@@ -54,6 +54,11 @@ async function controlPaint(control: Locator) {
 
 test('menu preserves native pointer focus, accessible keyboard focus and clear mode actions at 130% text', async ({ page }) => {
   await openEnglish(page);
+  const language = page.locator('.language-switch');
+  await activate(language);
+  await expect(page.getByRole('button', { name: 'Настройки', exact: true })).toBeVisible();
+  await activate(language);
+  await expect(page.getByRole('button', { name: 'Settings', exact: true })).toBeVisible();
   await page.addStyleTag({ content: 'html { font-size: 130%; }' });
   const setup = page.locator('.setup-screen');
   const difficulty = page.getByRole('combobox', { name: 'Difficulty', exact: true });
