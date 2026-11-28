@@ -106,13 +106,13 @@
     "units": "metres",
     "up": "+Y",
     "forward": "-Z",
-    "triangles": 3252,
-    "bytes": 90316,
+    "triangles": 2804,
+    "bytes": 80304,
     "meshPrimitives": 1,
     "dimensionsXYZ": [
-      0.122,
-      0.309,
-      0.068
+      0.064,
+      0.277,
+      0.122
     ],
     "bodyDimensionsXYZ": null,
     "collision": null,
@@ -120,7 +120,8 @@
     "skinCount": 0,
     "anchors": [
       "Grip",
-      "StrikeTip"
+      "StrikeTip",
+      "StrikeRear"
     ],
     "notes": ""
   },
@@ -288,12 +289,12 @@
     "units": "metres",
     "up": "+Y",
     "forward": "-Z",
-    "triangles": 33872,
-    "bytes": 1385496,
+    "triangles": 33536,
+    "bytes": 1346972,
     "meshPrimitives": 3,
     "dimensionsXYZ": [
       0.875,
-      0.22541,
+      0.22085,
       0.8369
     ],
     "bodyDimensionsXYZ": null,

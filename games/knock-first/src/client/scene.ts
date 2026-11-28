@@ -8,7 +8,7 @@ import { predictPlayerPosition } from './prediction';
 import type { Floor, KnockLevel, PlayerView, PublicActor, PublicBattery, Vec3 } from '../core/types';
 import { FirstPersonControls } from './controls';
 import { KnockAudio } from './audio';
-import { restoreRigPose, solveArmGrip, solvePalmGrip, solveCarryStance } from './rig';
+import { restoreRigPose, solveArmGrip, solvePalmGrip, solveCarryStance, solveToolContact } from './rig';
 import { buildArchitecture } from './architecture';
 import { createEchoMaterial, createWorldMaterials, makeSign, makePhysicalSign } from './materials';
 import type { KnockControlInput, SceneAction, SceneContextStatus, SceneHandle, SceneSettings, SceneStats, SoundCaption, SoundTestKind } from './sceneTypes';
@@ -106,12 +106,14 @@ export class KnockWorld implements SceneHandle {
   private ownBeacon: THREE.Object3D | null = null;
   private signs = new THREE.Group();
   private propZones = new Map<string, THREE.Group>();
+  private resonatorContacts = new Map<string, THREE.Object3D>();
   private socketLights: THREE.Mesh<THREE.SphereGeometry, THREE.MeshStandardMaterial>[] = [];
   private lamps: THREE.PointLight[] = [];
   private flashlight = new THREE.SpotLight('#d9cbb0', 16, 2.6, 1.05, 0.65, 1.5);
   private marks = new Map<string, THREE.Group>();
   private timers = new Map<string, ModelInstance>();
   private handPulseAt = -10;
+  private knockContact: { position: THREE.Vector3; normal: THREE.Vector3 } | null = null;
   private motionSpeed = 0;
   private handClearance = 1;
   private viewmodelDepthScale = { value: 1 };
@@ -171,7 +173,19 @@ export class KnockWorld implements SceneHandle {
       this.ownInitialised = false; this.controls.setLook(view.self.yaw, view.self.pitch);
     }
     const knownEvents = new Set(this.view.events.map(event => event.id));
-    if (view.events.some(event => !knownEvents.has(event.id) && event.actorId === view.self.id && ['knock', 'resonator', 'click'].includes(event.type) && view.time - event.at < 0.4)) this.handPulseAt = performance.now() / 1000;
+    const strike = view.events.find(event => !knownEvents.has(event.id) && event.actorId === view.self.id && ['knock', 'resonator', 'click'].includes(event.type) && view.time - event.at < 0.4);
+    if (strike) {
+      this.handPulseAt = performance.now() / 1000;
+      this.knockContact = null;
+      const echo = view.echoes.find(wave => Math.abs(wave.at - strike.at) < .05);
+      if (strike.type === 'resonator' && echo) {
+        const resonator = this.level.resonators.find(r => vector(r.position).distanceTo(vector(echo.source)) < .5);
+        if (resonator) {
+          const point=this.resonatorContacts.get(resonator.id);
+          if(point)this.knockContact={position:point.getWorldPosition(new THREE.Vector3()),normal:vector(resonator.normal)};
+        }
+      } else if (strike.type === 'knock') this.knockContact = this.wallStrikeContact();
+    }
     if (view.tick !== this.view.tick) this.snapshotAt = performance.now();
     this.view = view; this.audio.update(view); this.lastServerPosition.copy(vector(view.self.position));
   }
@@ -419,16 +433,17 @@ export class KnockWorld implements SceneHandle {
       panel.add(door.scene.clone(true));
     }
     const statics: Promise<void>[] = [];
-    const addModel = async (name: string, at: Vec3, yaw = 0, scale = 1, parent: THREE.Object3D = this.scene) => {
+    const addModel = async (name: string, at: Vec3, yaw = 0, scale = 1, parent: THREE.Object3D = this.scene, id?: string) => {
       const asset = await this.asset(name); if (!asset || !this.alive) return;
       const model = asset.scene.clone(true); position(model, at); model.rotation.y = yaw; model.scale.setScalar(scale);
       model.traverse(object => { const mesh = object as THREE.Mesh; if (mesh.isMesh) { mesh.castShadow = mesh.receiveShadow = true; } }); parent.add(model);
+      if(name==='resonator'&&id){const contact=model.getObjectByName('KnockPoint');if(contact)this.resonatorContacts.set(id,contact);}
     };
     const lift = this.level.zones.find(z => z.safe)!;
     statics.push(addModel('lift', lift.center), addModel('cabinet', this.level.cabinet));
     statics.push(addModel('archive-box', { ...this.level.cabinet, y: this.level.cabinet.y + 1.3 }));
     for (const socket of this.level.sockets) statics.push(addModel('socket', socket));
-    for (const resonator of this.level.resonators) statics.push(addModel('resonator', { ...resonator.position, y: resonator.position.y - 1.05 }, Math.PI / 2, 1, this.propZones.get(resonator.zoneId)));
+    for (const resonator of this.level.resonators) statics.push(addModel('resonator', { ...resonator.position, y: resonator.position.y - 1.05 }, Math.PI / 2, 1, this.propZones.get(resonator.zoneId), resonator.id));
     for (const pedestal of this.level.pedestals) statics.push(addModel('pallet', { ...pedestal.position, y: pedestal.position.y - 0.202 }, 0, 1, this.propZones.get(pedestal.zoneId)));
     for (const zone of this.level.zones.filter(z => !z.safe)) {
       const group = this.propZones.get(zone.id)!;
@@ -635,6 +650,21 @@ export class KnockWorld implements SceneHandle {
     return vector(predictPlayerPosition(this.level, this.view, input, age));
   }
 
+  private wallStrikeContact(): { position: THREE.Vector3; normal: THREE.Vector3 } | null {
+    this.camera.updateWorldMatrix(true, false);
+    const origin=this.camera.getWorldPosition(new THREE.Vector3()), direction=this.camera.getWorldDirection(new THREE.Vector3());
+    const ray=new THREE.Ray(origin,direction);let nearest=1.1;let result: { position: THREE.Vector3; normal: THREE.Vector3 } | null=null;
+    for(const wall of this.level.walls){
+      const center=vector(wall.position),half=vector(wall.size).multiplyScalar(.5);
+      const box=new THREE.Box3(center.clone().sub(half),center.clone().add(half));
+      const hit=ray.intersectBox(box,new THREE.Vector3());if(!hit||origin.distanceTo(hit)>=nearest)continue;
+      nearest=origin.distanceTo(hit);const offset=hit.clone().sub(center);
+      const axis=(['x','y','z'] as ('x'|'y'|'z')[]).sort((a,b)=>Math.abs(Math.abs(offset[a])-half[a])-Math.abs(Math.abs(offset[b])-half[b]))[0];
+      const normal=new THREE.Vector3();normal[axis]=Math.sign(offset[axis]);result={position:hit.addScaledVector(normal,.002),normal};
+    }
+    return result;
+  }
+
   private measureHandClearance(): number {
     this.camera.updateWorldMatrix(true,false);
     const direction=this.camera.getWorldDirection(new THREE.Vector3()); let closest=1;
@@ -744,6 +774,11 @@ export class KnockWorld implements SceneHandle {
       if (this.view.self.carrying) this.gripForActor(this.handModel, this.view.self);
     }
     this.tuckHands(delta);
+    const strikeAge=now/1000-this.handPulseAt;
+    if(this.knockContact && this.handModel && this.strikerModel && !this.view.self.carrying && strikeAge>=0 && strikeAge<.55){
+      const amount=strikeAge<.28?THREE.MathUtils.smoothstep(strikeAge,.09,.28):1-THREE.MathUtils.smoothstep(strikeAge,.31,.55);
+      solveToolContact(this.handModel.body,this.strikerModel,this.knockContact.position,this.knockContact.normal,amount);
+    }
     if (this.strikerModel) this.strikerModel.visible = !this.view.self.carrying && this.view.self.status === 'active';
     if (this.ownBeacon) { this.ownBeacon.visible = this.view.self.status !== 'active'; this.ownBeacon.position.copy(this.ownPosition).add(new THREE.Vector3(0.35, 0.03, -0.25)); }
     this.updateEcho(this.view.time + Math.min(age, 0.15));

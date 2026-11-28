@@ -102,3 +102,39 @@ right handle are less readable than the Amnesia reference; glove material and
 sleeve construction still need art review. Carry/door contact and the full
 route package remain unfinished. The source and evidence are published for
 review and continued work, not as completed or accepted graphics.
+
+
+## Hero contact revision after coordinator play
+
+Owner corrections: remove all nonfunctional wrist boxes/needles and separate
+black tabs; keep the continuous glove/sleeve base; avoid both a claw and a limp
+left wrist; narrow the striker grip and show a real closed grasp; face the
+working tool end forward and actually touch the pipe plate during Q.
+
+The new striker grip is approximately 30–32 mm across instead of 48–56 mm
+including the earlier large rings. Rings across the fingers are removed.
+Each finger has separate MCP/PIP/DIP flex and slight spread fitted against the
+actual skinned GLB surface. The CPU regression now checks weighted mesh
+vertices around the handle, not just wrist/PalmGrip coordinates. It prevents
+deep penetration and a detached grasp. Visual approval remains separate.
+
+StrikeTip is on the working face and StrikeRear defines its normal. The actual
+GLB face points forward throughout the authored knock. A permitted own
+knock/resonator event starts an arm-chain contact gesture to the rendered
+KnockPoint or an allowed wall. The solver preserves arm segment lengths and
+retains the finger grasp. Its contact test covers surfaces at 0.3/0.6/0.9 m.
+The resonator marker is on the plate face, not 9 mm in front of it. This is
+client presentation of an event already received, not a new rules command.
+
+Real-client evidence: `.qa/art/strike-contact.mp4`, `strike-contact-full.png`,
+`strike-contact-sequence.png`, source video
+`strike-client/page@cb6fb6d99151040394b1abb2d878b194.webm`. This was a real Q
+advancing tutorial 03→04, with the integrated Terra interface. The sequence
+shows the tool arriving at the plate and returning with its grasp maintained.
+The later 8 mm anchor correction uses the model's actual named anchor.
+
+Live door opening and taking the T battery were also exercised. The initial
+`carry-paired.png` filename is misleading: its snapshot has only one holder,
+so it is not evidence of paired carry. Old battery grip diameter/usable length
+and two-hand target spacing still require correction and actual review. No
+claim of completed carry/route acceptance is made at this checkpoint.

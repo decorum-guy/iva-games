@@ -7,7 +7,7 @@ from pathlib import Path
 
 ROOT=Path(__file__).resolve().parent.parent
 OUT=ROOT/'public'/'knock-first'
-REPO='https://github.com/decorum-guy/iva-games/blob/feat/knock-first/games/knock-first/'
+REPO='https://github.com/decorum-guy/iva-games/blob/codex/knock-first-astra-3d-20261128/games/knock-first/'
 
 
 def digest(path):return hashlib.sha256(path.read_bytes()).hexdigest()
