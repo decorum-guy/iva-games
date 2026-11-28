@@ -375,7 +375,12 @@ export class TelegramService {
     this.skipJobs('binding_id=?', [bindingId], 'unreachable');
   }
   private message(job: JobRow): TelegramMessage {
-    if (job.kind === 'proof') return { chatId: job.chat_id, text: `Код подключения: ${this.decryptProof(job)}\n\nВведите его на сайте Iva Games.` };
+    if (job.kind === 'proof') {
+      const prefix = 'Код подключения: ';
+      const code = this.decryptProof(job);
+      return { chatId: job.chat_id, text: `${prefix}${code}\n\nВведите его на сайте Iva Games.`,
+        copyCode: { value: code, offset: prefix.length, buttonText: 'Скопировать код' } };
+    }
     const invite = this.invitation(job.invitation_id!)!;
     const name = stripControls(invite.inviter_name).slice(0, 40);
     const title = stripControls(invite.title).slice(0, 60);

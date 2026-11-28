@@ -102,17 +102,28 @@ describe('Telegram accounts and the private bot menu', () => {
       message: { chat: { id, type: 'private' }, from: { id: Number(BOT.botId), is_bot: true } } },
   });
   type Browser = Awaited<ReturnType<typeof browser>>;
-  async function challenge(client: Browser, id: number) {
+  async function challenge(client: Browser, id: number, locale = 'en') {
     await client.session();
-    const issued = await client.post('/auth/telegram/start', { locale: 'en' });
+    const issued = await client.post('/auth/telegram/start', { locale });
     expect(issued.status).toBe(201);
     const payload = new URL(issued.body.deepLink).searchParams.get('start');
     const sender = command(id, `/start ${payload}`);
     const response = await webhook(sender);
-    expect(response.body).toMatchObject({ method: 'sendMessage', chat_id: String(id), protect_content: true });
-    const code = /code: ([A-Z2-7]{8})/.exec(response.body.text)![1];
+    expect(response.body).toMatchObject({ method: 'sendMessage', chat_id: String(id) });
+    const code = /(?:code|Iva Games): ([A-Z2-7]{8})/.exec(response.body.text)![1];
+    expect(response.body.protect_content).not.toBe(true);
+    expect(response.body.entities).toEqual([{ type: 'code', offset: response.body.text.indexOf(code), length: code.length }]);
+    expect(response.body.reply_markup.inline_keyboard).toEqual([[{
+      text: locale === 'en' ? 'Copy code' : 'Скопировать код', copy_text: { text: code },
+    }]]);
     return { attemptId: issued.body.attemptId as string, code, sender };
   }
+
+  it('formats the Russian login code as copyable text with a native copy button', async () => {
+    const client = await browser();
+    const { attemptId, code } = await challenge(client, 72000, 'ru');
+    expect((await client.post('/auth/telegram/finish', { attemptId, code })).body).toEqual({ profileRequired: true });
+  });
 
   async function register(id: number, handle: string) {
     const client = await browser();

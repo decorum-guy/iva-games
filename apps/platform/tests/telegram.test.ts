@@ -108,6 +108,7 @@ describe('Telegram linking: real durable state, injected transport only', () => 
     expect(f.transport.messages).toHaveLength(0);
     const ciphertext = job(f).secret_ciphertext;
     await f.service.drain(); const proof = code(f.transport.messages[0]);
+    expect(f.transport.messages[0].copyCode).toEqual({ value: proof, offset: 'Код подключения: '.length, buttonText: 'Скопировать код' });
     expect(ciphertext).not.toContain(proof); expect(job(f).secret_ciphertext).toBeNull();
     const result = f.service.confirm(owner, { attemptId: attempt.attemptId, proofCode: proof.toLowerCase(), consent: false });
     expect(result).toMatchObject({ linked: true, status: 'active', notificationsEnabled: false });

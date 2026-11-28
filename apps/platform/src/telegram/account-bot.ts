@@ -5,12 +5,13 @@ import type { AvatarStyle, PublicPlayer } from '../types.js';
 const PAGE = 12;
 const COMMAND = /^\/(start|profile|friends|requests|name)(?:_(\d{1,5}))?(?:@([A-Za-z0-9_]+))?(?: (.*))?$/;
 type KeyboardButton = { text: string; style?: 'primary' | 'success' | 'danger' };
-type InlineKeyboardButton = KeyboardButton & ({ callback_data: string } | { url: string });
+type InlineKeyboardButton = KeyboardButton & ({ callback_data: string } | { url: string } | { copy_text: { text: string } });
 type Language = (ru: string, en: string) => string;
 export type BotReply =
   | { ok: true }
   | { method: 'answerCallbackQuery'; callback_query_id: string; text: string }
-  | { method: 'sendMessage'; chat_id: string; text: string; protect_content?: true;
+  | { method: 'sendMessage'; chat_id: string; text: string;
+      entities?: Array<{ type: 'code'; offset: number; length: number }>;
       reply_markup?: { inline_keyboard: InlineKeyboardButton[][] } | { keyboard: KeyboardButton[][]; resize_keyboard: true } };
 
 const label = (player: PublicPlayer): string =>
