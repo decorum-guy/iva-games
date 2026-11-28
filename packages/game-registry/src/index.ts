@@ -17,6 +17,10 @@ export interface GameRegistration {
   maxPlayers: number;
   /** Guest launch and platform-account rooms are independent capabilities. */
   roomStatus: 'planned' | 'unavailable' | 'runtime';
+  /** Optional comfort advice for catalogue cards; never an input requirement. */
+  inputRecommendation?: 'mouse';
+  /** Omit for all devices. Independent of optional input comfort advice. */
+  deviceAvailability?: 'desktop-only';
   chess?: ChessRegistration;
 }
 export interface Registry { version: 1; chessOrigin: string; games: GameRegistration[] }
@@ -34,10 +38,12 @@ export function validateRegistry(input: unknown): Registry {
   const ids = new Set<string>(), routes = new Set<string>(), sources = new Set<string>(), workspaces = new Set<string>();
   const healthPaths = new Set<string>(), databaseFiles = new Set<string>(), databaseEnvs = new Set<string>();
   for (const game of value.games) {
-    objectFields(game, ['gameId', 'collectionId', 'title', 'description', 'minPlayers', 'maxPlayers', 'roomStatus', 'chess'], 'game');
+    objectFields(game, ['gameId', 'collectionId', 'title', 'description', 'minPlayers', 'maxPlayers', 'roomStatus', 'inputRecommendation', 'deviceAvailability', 'chess'], 'game');
     if (typeof game.gameId !== 'string' || !/^[a-z][a-z0-9-]*$/.test(game.gameId) || ids.has(game.gameId)) throw new Error('Invalid/duplicate game ID');
     ids.add(game.gameId);
     if (!['chess', 'other'].includes(game.collectionId) || !['planned', 'unavailable', 'runtime'].includes(game.roomStatus)) throw new Error(`Invalid game capabilities: ${game.gameId}`);
+    if (game.inputRecommendation !== undefined && game.inputRecommendation !== 'mouse') throw new Error(`Invalid input recommendation: ${game.gameId}`);
+    if (game.deviceAvailability !== undefined && game.deviceAvailability !== 'desktop-only') throw new Error(`Invalid device availability: ${game.gameId}`);
     for (const field of ['title', 'description'] as const) {
       objectFields(game[field], ['ru', 'en'], field);
       for (const lang of ['ru', 'en'] as const) if (typeof game[field][lang] !== 'string' || !game[field][lang].trim()) throw new Error(`Missing ${field}/${lang}: ${game.gameId}`);
@@ -70,6 +76,23 @@ export function chessRegistrations(registry: Registry = gameRegistry) {
 }
 export const chessGames = chessRegistrations();
 export function registration(gameId: string) { return gameRegistry.games.find(game => game.gameId === gameId); }
+export interface GameDeviceInfo {
+  userAgent?: string;
+  platform?: string;
+  maxTouchPoints?: number;
+  userAgentData?: { mobile?: boolean };
+}
+/** Device identity, not viewport or pointer capability. iPadOS may advertise a desktop Mac UA. */
+export function isMobileDevice(device: GameDeviceInfo = {}): boolean {
+  const userAgent = device.userAgent ?? '';
+  return device.userAgentData?.mobile === true
+    || /Android|iPhone|iPad|iPod|Mobile|IEMobile|Opera Mini/i.test(userAgent)
+    || (device.platform === 'MacIntel' && /Macintosh/i.test(userAgent) && (device.maxTouchPoints ?? 0) > 1);
+}
+/** Shared by catalogue actions and pre-controller game guards. Does not mutate readiness or rooms. */
+export function isGameAvailableOnDevice(gameId: string, device: GameDeviceInfo = {}): boolean {
+  return registration(gameId)?.deviceAvailability !== 'desktop-only' || !isMobileDevice(device);
+}
 export function launchUrls(options: { development?: boolean; overrides?: Record<string, unknown>; registry?: Registry } = {}): Record<string, string> {
   const registry = options.registry ?? gameRegistry;
   return Object.fromEntries(registry.games.filter(game => !!game.chess).map(game => {
