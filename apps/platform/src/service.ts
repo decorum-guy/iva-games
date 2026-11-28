@@ -3,12 +3,14 @@ import { chmodSync } from 'node:fs';
 import { hash, verify } from '@node-rs/argon2';
 import type Database from 'better-sqlite3';
 import { openPlatformDatabase } from './database.js';
+import { normalizeAvatarPhoto } from './avatar-photo.js';
 import { AVATARS, PlatformError } from './types.js';
-import type { Account, AvatarStyle, Controller, Difficulty, GameRegistration, Invitation, MailTransport, Participant, PublicPlayer, Room, SessionRecord, StartMatchCommand } from './types.js';
+import type { Account, AvatarChoice, Controller, Difficulty, GameRegistration, Invitation, MailTransport, Participant, PublicPlayer, Room, SessionRecord, StartMatchCommand } from './types.js';
 
 const DAY = 86_400_000;
 const INVITE_TTL = 30 * 60_000;
 const RESERVATION_TTL = 2 * 60_000;
+const LEGACY_AVATARS = new Set(['king', 'queen', 'rook', 'bishop', 'knight', 'pawn']);
 // The library's Argon2id enum value is 2; its ambient const enum cannot be imported with verbatim modules.
 const PASSWORD_OPTIONS = { algorithm: 2 as const, memoryCost: 19_456, timeCost: 2, parallelism: 1, outputLen: 32 };
 type Row = Record<string, string | number | null>;
@@ -146,8 +148,14 @@ export class PlatformService {
   }
   publicPlayer(playerId: string): PublicPlayer {
     const row = this.playerRow(playerId);
-    const avatar = this.row('SELECT avatar FROM player_avatar WHERE player_id=?', playerId)?.avatar as AvatarStyle | undefined;
-    return { playerId, handle: String(row.handle), displayName: String(row.display_name), ...(avatar ? { avatar } : {}) };
+    const extra = this.row('SELECT avatar,photo_version FROM player_avatar_extra WHERE player_id=?', playerId);
+    const avatar = (extra?.avatar ?? this.row('SELECT avatar FROM player_avatar WHERE player_id=?', playerId)?.avatar) as AvatarChoice | undefined;
+    return { playerId, handle: String(row.handle), displayName: String(row.display_name), ...(avatar ? { avatar } : {}),
+      ...(extra?.avatar === 'photo' && extra.photo_version ? { avatarVersion: String(extra.photo_version) } : {}) };
+  }
+  avatarPhoto(playerId: string, viewerId?: string): Buffer | undefined {
+    if (viewerId && viewerId !== playerId && this.blocked(viewerId, playerId)) return undefined;
+    return (this.db.prepare("SELECT photo FROM player_avatar_extra WHERE player_id=? AND avatar='photo'").get(playerId) as { photo: Buffer } | undefined)?.photo;
   }
   account(playerId: string): Account {
     const row = this.playerRow(playerId);
@@ -258,12 +266,29 @@ export class PlatformService {
     }).immediate();
   }
   updateProfile(playerId: string, input: Record<string, unknown>): Account {
+    if (input.avatarPhoto !== undefined && input.avatar !== 'photo') fail('INVALID_AVATAR_PHOTO', 'Выберите подходящее фото');
+    const photo = input.avatarPhoto === undefined ? undefined : normalizeAvatarPhoto(input.avatarPhoto);
     return this.db.transaction(() => {
       this.run('UPDATE players SET display_name=? WHERE player_id=?', displayNameField(input.displayName), playerId);
-      if (input.avatar === null) this.run('DELETE FROM player_avatar WHERE player_id=?', playerId);
+      if (input.avatar === null) {
+        this.run('DELETE FROM player_avatar WHERE player_id=?', playerId);
+        this.run('DELETE FROM player_avatar_extra WHERE player_id=?', playerId);
+      }
       else if (input.avatar !== undefined) {
-        if (typeof input.avatar !== 'string' || !Object.hasOwn(AVATARS, input.avatar)) fail('INVALID_INPUT', 'Выберите аватар');
-        this.run('INSERT INTO player_avatar VALUES (?,?) ON CONFLICT(player_id) DO UPDATE SET avatar=excluded.avatar', playerId, input.avatar);
+        if (typeof input.avatar !== 'string' || (input.avatar !== 'photo' && !Object.hasOwn(AVATARS, input.avatar))) fail('INVALID_INPUT', 'Выберите аватар');
+        if (input.avatar === 'photo') {
+          if (photo) {
+            this.run('DELETE FROM player_avatar WHERE player_id=?', playerId);
+            this.db.prepare("INSERT INTO player_avatar_extra(player_id,avatar,photo,photo_version) VALUES (?,'photo',?,?) ON CONFLICT(player_id) DO UPDATE SET avatar=excluded.avatar,photo=excluded.photo,photo_version=excluded.photo_version")
+              .run(playerId, photo.bytes, photo.version);
+          } else if (!this.avatarPhoto(playerId)) fail('INVALID_AVATAR_PHOTO', 'Выберите подходящее фото');
+        } else if (LEGACY_AVATARS.has(input.avatar)) {
+          this.run('DELETE FROM player_avatar_extra WHERE player_id=?', playerId);
+          this.run('INSERT INTO player_avatar VALUES (?,?) ON CONFLICT(player_id) DO UPDATE SET avatar=excluded.avatar', playerId, input.avatar);
+        } else {
+          this.run('DELETE FROM player_avatar WHERE player_id=?', playerId);
+          this.run('INSERT INTO player_avatar_extra(player_id,avatar,photo,photo_version) VALUES (?,?,NULL,NULL) ON CONFLICT(player_id) DO UPDATE SET avatar=excluded.avatar,photo=NULL,photo_version=NULL', playerId, input.avatar);
+        }
       }
       return this.account(playerId);
     }).immediate();
@@ -457,10 +482,11 @@ export class PlatformService {
     if (resetReady) this.run("UPDATE room_members SET ready=CASE WHEN player_id IS NULL THEN 1 ELSE 0 END WHERE room_id=?", roomId);
   }
   private participants(roomId: string): Participant[] {
-    return this.rows('SELECT m.*,p.handle,p.display_name AS account_name,a.avatar FROM room_members m LEFT JOIN players p ON p.player_id=m.player_id LEFT JOIN player_avatar a ON a.player_id=m.player_id WHERE room_id=? ORDER BY seat_index', roomId).map(row => ({
+    return this.rows('SELECT m.*,p.handle,p.display_name AS account_name,a.avatar AS legacy_avatar,e.avatar AS extra_avatar,e.photo_version FROM room_members m LEFT JOIN players p ON p.player_id=m.player_id LEFT JOIN player_avatar a ON a.player_id=m.player_id LEFT JOIN player_avatar_extra e ON e.player_id=m.player_id WHERE room_id=? ORDER BY seat_index', roomId).map(row => ({
       participantId: String(row.participant_id), playerId: row.player_id ? String(row.player_id) : null,
       handle: row.handle ? String(row.handle) : '', displayName: String(row.account_name ?? row.display_name),
-      ...(row.avatar ? { avatar: row.avatar as AvatarStyle } : {}),
+      ...(row.extra_avatar || row.legacy_avatar ? { avatar: (row.extra_avatar ?? row.legacy_avatar) as AvatarChoice } : {}),
+      ...(row.extra_avatar === 'photo' && row.photo_version ? { avatarVersion: String(row.photo_version) } : {}),
       seatIndex: Number(row.seat_index), ready: !!row.ready, controller: JSON.parse(String(row.controller_json)) as Controller,
     }));
   }

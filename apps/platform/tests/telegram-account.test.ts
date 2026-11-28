@@ -1,6 +1,10 @@
 import { once } from 'node:events';
+import { mkdtempSync, rmSync } from 'node:fs';
 import { request as httpRequest } from 'node:http';
 import type { AddressInfo } from 'node:net';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { decode, encode } from 'jpeg-js';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { loadPlatformConfig } from '../src/config.js';
 import { createPlatformHttpServer } from '../src/http.js';
@@ -68,6 +72,20 @@ describe('Telegram accounts and the private bot menu', () => {
       },
       async get(path: string) {
         return call('/api/platform/v1' + path, undefined, { cookie });
+      },
+      async getPhoto(playerId: string) {
+        return new Promise<{ status: number; type?: string; bytes: Buffer }>((resolve, reject) => {
+          const req = httpRequest(`${base}/api/platform/v1/avatars/${playerId}`, {
+            headers: { host: 'games.example.test', cookie },
+          }, res => {
+            const chunks: Buffer[] = [];
+            res.on('data', chunk => chunks.push(Buffer.from(chunk)));
+            res.on('end', () => resolve({ status: res.statusCode!, type: res.headers['content-type'], bytes: Buffer.concat(chunks) }));
+            res.on('error', reject);
+          });
+          req.on('error', reject);
+          req.end();
+        });
       },
     };
   }
@@ -181,6 +199,55 @@ describe('Telegram accounts and the private bot menu', () => {
     expect((await webhook(callback(72022, 'avatar:rook'))).body.text).toContain('Avatar saved');
     expect((await webhook(command(72022, '/name Boris'))).body.text).toContain('Boris');
     expect((await boris.client.session()).user).toMatchObject({ avatar: 'rook', displayName: 'Boris' });
+  });
+
+  it('stores a photo safely, shares it with players, and keeps old and new avatar choices compatible', async () => {
+    const alice = await register(72031, 'photo_alice');
+    const boris = await register(72032, 'photo_boris');
+    const pixels = Buffer.alloc(256 * 256 * 4);
+    for (let i = 0; i < pixels.length; i += 4) {
+      pixels[i] = (i / 4) % 256; pixels[i + 1] = 140; pixels[i + 2] = 80; pixels[i + 3] = 255;
+    }
+    const input = encode({ data: pixels, width: 256, height: 256, comments: ['private camera metadata'] }, 80).data;
+    const avatarPhoto = `data:image/jpeg;base64,${input.toString('base64')}`;
+    const saved = await alice.client.post('/profile', { displayName: 'Alice Photo', avatar: 'photo', avatarPhoto });
+    expect(saved.status).toBe(200);
+    expect(saved.body.user).toMatchObject({ displayName: 'Alice Photo', avatar: 'photo', avatarVersion: expect.any(String) });
+    expect(JSON.stringify(saved.body)).not.toContain(avatarPhoto);
+    const photo = await boris.client.getPhoto(alice.user.playerId);
+    expect(photo).toMatchObject({ status: 200, type: 'image/jpeg' });
+    expect(decode(photo.bytes).width).toBe(256);
+    expect(photo.bytes.includes(Buffer.from('private camera metadata'))).toBe(false);
+    const anonymous = await browser();
+    expect((await anonymous.getPhoto(alice.user.playerId)).status).toBe(401);
+    expect((await boris.client.get('/players?handle=photo_alice')).body.players[0]).toMatchObject({
+      avatar: 'photo', avatarVersion: saved.body.user.avatarVersion,
+    });
+    expect((await webhook(command(72031, '/name Alice Again'))).body.text).toContain('Alice Again');
+    expect((await alice.client.session()).user.avatar).toBe('photo');
+
+    const dir = mkdtempSync(join(tmpdir(), 'iva-avatar-test-'));
+    try {
+      const path = join(dir, 'platform.sqlite');
+      await platform.db.backup(path);
+      const reopened = new PlatformService({ databasePath: path, publicOrigin: ORIGIN });
+      try {
+        expect(reopened.account(alice.user.playerId)).toMatchObject({ avatar: 'photo', avatarVersion: saved.body.user.avatarVersion });
+        expect(reopened.avatarPhoto(alice.user.playerId)).toEqual(photo.bytes);
+      } finally { reopened.close(); }
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+
+    for (const invalid of ['data:image/svg+xml;base64,PHN2Zz4=', 'data:image/jpeg;base64,AAAA', `data:image/jpeg;base64,${'A'.repeat(174_800)}`]) {
+      expect((await alice.client.post('/profile', { displayName: 'Should not save', avatar: 'photo', avatarPhoto: invalid })).status).toBe(400);
+    }
+    expect((await alice.client.session()).user).toMatchObject({ displayName: 'Alice Again', avatar: 'photo' });
+    expect((await boris.client.post('/blocks', { playerId: alice.user.playerId })).status).toBe(200);
+    expect((await boris.client.getPhoto(alice.user.playerId)).status).toBe(404);
+    expect((await alice.client.post('/profile', { displayName: 'Alice', avatar: 'fox' })).body.user.avatar).toBe('fox');
+    expect((await alice.client.getPhoto(alice.user.playerId)).status).toBe(404);
+    expect((await alice.client.post('/profile', { displayName: 'Alice', avatar: 'knight' })).body.user.avatar).toBe('knight');
+    expect((await webhook(callback(72031, 'avatar:astronaut'))).body.text).toContain('Avatar saved');
+    expect((await alice.client.session()).user.avatar).toBe('astronaut');
   });
 
   it('accepts complete bot settings while the previous email transport is disabled', () => {

@@ -5,13 +5,16 @@ export type Controller =
   | { kind: 'human'; playerId: string }
   | { kind: 'bot'; botProfileId: string; botVersion: string; difficulty: Difficulty };
 
-export const AVATARS = { king: '♚', queen: '♛', rook: '♜', bishop: '♝', knight: '♞', pawn: '♟' } as const;
+export const AVATARS = { king: '♚', queen: '♛', rook: '♜', bishop: '♝', knight: '♞', pawn: '♟',
+  fox: '🦊', cat: '🐱', owl: '🦉', robot: '🤖', astronaut: '👩‍🚀', dragon: '🐉', dice: '🎲', comet: '☄️' } as const;
 export type AvatarStyle = keyof typeof AVATARS;
+export type AvatarChoice = AvatarStyle | 'photo';
 export interface PublicPlayer {
   playerId: string;
   handle: string;
   displayName: string;
-  avatar?: AvatarStyle;
+  avatar?: AvatarChoice;
+  avatarVersion?: string;
 }
 export interface Account extends PublicPlayer {
   email: string;
@@ -23,7 +26,8 @@ export interface Participant {
   playerId: string | null;
   handle: string;
   displayName: string;
-  avatar?: AvatarStyle;
+  avatar?: AvatarChoice;
+  avatarVersion?: string;
   seatIndex: number;
   ready: boolean;
   controller: Controller;
