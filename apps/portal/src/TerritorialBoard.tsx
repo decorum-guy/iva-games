@@ -216,7 +216,7 @@ export function TerritorialBoard({ map, lang, buildings, routes, players, blocke
       onBlur:()=>setHoverLabel(''),onMouseEnter:()=>setHoverLabel(label),onMouseLeave:()=>setHoverLabel('')};
   };
   const paintId = (id:string) => uid+'-'+id;
-  return <div className={'territorial-board' + (blockMode ? ' tb-block-mode' : '')} data-territory-map={map.id}>
+  return <div className={'territorial-board' + (blockMode ? ' tb-block-mode' : '')} data-territory-map={map.id} data-large-board={map.tiles.length >= 40 || undefined}>
     <svg ref={svg} className="tb-surface" viewBox={viewBox} aria-label={map.name[lang]} role="group" onPointerDown={handleDown} onPointerMove={handleMove} onPointerUp={finishDrag} onPointerCancel={finishDrag} onPointerLeave={e=>{if(!e.currentTarget.hasPointerCapture(e.pointerId)) finishDrag(e);}}
       onKeyDown={event => {
         if (event.key === '+' || event.key === '=') { event.preventDefault(); zoomBy(1.35); }

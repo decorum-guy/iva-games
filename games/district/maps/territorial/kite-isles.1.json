@@ -1,0 +1,181 @@
+{
+  "schemaVersion": 3,
+  "profile": "district@0.4",
+  "id": "kite-isles",
+  "version": "1",
+  "name": {
+    "ru": "Острова коршунов",
+    "en": "Kite Isles"
+  },
+  "supportedPlayers": [2, 3, 4],
+  "landmasses": 3,
+  "sectors": [
+    {
+      "id": "pines",
+      "name": {
+        "ru": "Северные сосны",
+        "en": "Northern Pines"
+      },
+      "tiles": [
+        [-1, 0, "wood", 12, ["woodland"]],
+        [0, 0, "brick", 4, ["floodplain"]],
+        [1, 0, "grain", 2, []],
+        [-2, 1, "wool", 4, []],
+        [-1, 1, "grain", 10, ["floodplain"]],
+        [0, 1, "wood", 3, ["woodland"]],
+        [1, 1, "wood", 9, ["woodland"]]
+      ]
+    },
+    {
+      "id": "chalk",
+      "name": {
+        "ru": "Меловой берег",
+        "en": "Chalk Coast"
+      },
+      "tiles": [
+        [-3, 2, "grain", 10, []],
+        [-2, 2, "brick", 12, ["floodplain"]],
+        [-1, 2, "brick", 10, []],
+        [0, 2, "wool", 2, []],
+        [1, 2, "ore", 9, ["floodplain"]],
+        [-2, 3, "grain", 5, []],
+        [-1, 3, "wool", 8, []],
+        [0, 3, "grain", 2, ["floodplain"]]
+      ]
+    },
+    {
+      "id": "gull",
+      "name": {
+        "ru": "Чаячья бухта",
+        "en": "Gull Cove"
+      },
+      "tiles": [
+        [5, 0, "ore", 5, []],
+        [6, 0, "ore", 8, ["floodplain"]],
+        [7, 0, "brick", 12, []],
+        [4, 1, "grain", 6, []],
+        [5, 1, "ore", 4, ["floodplain"]],
+        [6, 1, "wood", 9, ["woodland"]],
+        [7, 1, "wood", 9, ["woodland"]]
+      ]
+    },
+    {
+      "id": "nest",
+      "name": {
+        "ru": "Гнездовье",
+        "en": "The Rookery"
+      },
+      "tiles": [
+        [4, 2, "wool", 10, ["floodplain"]],
+        [5, 2, "grain", 8, []],
+        [6, 2, "wood", 4, ["woodland"]],
+        [3, 3, "wood", 6, ["woodland"]],
+        [4, 3, "ore", 2, []],
+        [5, 3, "ore", 11, []],
+        [6, 3, "brick", 8, ["floodplain"]]
+      ]
+    },
+    {
+      "id": "spire",
+      "name": {
+        "ru": "Шпиль",
+        "en": "The Spire"
+      },
+      "tiles": [
+        [4, 4, "brick", 2, []],
+        [5, 4, "wool", 3, ["floodplain"]]
+      ]
+    },
+    {
+      "id": "haven",
+      "name": {
+        "ru": "Зелёная гавань",
+        "en": "Green Haven"
+      },
+      "tiles": [
+        [-2, 5, "grain", 5, ["floodplain"]],
+        [-1, 5, "wool", 9, []],
+        [0, 5, "wool", 12, []],
+        [-3, 6, "wool", 5, ["floodplain"]],
+        [-2, 6, "ore", 11, []],
+        [-1, 6, "grain", 4, []],
+        [0, 6, "ore", 8, ["floodplain"]],
+        [1, 6, "brick", 3, []]
+      ]
+    },
+    {
+      "id": "copper",
+      "name": {
+        "ru": "Медные холмы",
+        "en": "Copper Hills"
+      },
+      "tiles": [
+        [-4, 7, "wood", 11, ["woodland"]],
+        [-3, 7, "wool", 11, []],
+        [-2, 7, "wool", 12, []],
+        [-1, 7, "wood", 5, ["woodland"]],
+        [0, 7, "brick", 10, []],
+        [1, 7, "wood", 11, ["woodland"]],
+        [-4, 8, "ore", 3, []],
+        [-3, 8, "brick", 6, []],
+        [-2, 8, "grain", 3, ["floodplain"]],
+        [-1, 8, "brick", 6, []]
+      ]
+    }
+  ],
+  "ferries": [
+    {
+      "a": [1, 2, 1],
+      "b": [4, 1, 4],
+      "eventSectorId": "chalk"
+    },
+    {
+      "a": [-1, 3, 3],
+      "b": [-2, 5, 0],
+      "eventSectorId": "chalk"
+    },
+    {
+      "a": [3, 3, 3],
+      "b": [1, 6, 0],
+      "eventSectorId": "nest"
+    }
+  ],
+  "ports": [
+    {
+      "at": [-1, 3, 4],
+      "resource": null
+    },
+    {
+      "at": [-1, 0, 5],
+      "resource": "wood"
+    },
+    {
+      "at": [1, 0, 1],
+      "resource": "ore"
+    },
+    {
+      "at": [4, 4, 3],
+      "resource": "grain"
+    },
+    {
+      "at": [5, 0, 0],
+      "resource": null
+    },
+    {
+      "at": [7, 1, 1],
+      "resource": "brick"
+    },
+    {
+      "at": [-2, 8, 3],
+      "resource": "wool"
+    },
+    {
+      "at": [-2, 5, 5],
+      "resource": null
+    },
+    {
+      "at": [1, 7, 1],
+      "resource": "ore"
+    }
+  ]
+}

@@ -1,0 +1,188 @@
+{
+  "schemaVersion": 3,
+  "profile": "district@0.4",
+  "id": "lantern-strait",
+  "version": "1",
+  "name": {
+    "ru": "Фонарный пролив",
+    "en": "Lantern Strait"
+  },
+  "supportedPlayers": [2, 3, 4],
+  "landmasses": 2,
+  "sectors": [
+    {
+      "id": "bluff",
+      "name": {
+        "ru": "Белый утёс",
+        "en": "White Bluff"
+      },
+      "tiles": [
+        [-1, 0, "grain", 9, []],
+        [0, 0, "brick", 8, ["floodplain"]],
+        [1, 0, "grain", 11, []],
+        [-3, 1, "wool", 12, []],
+        [-2, 1, "brick", 8, []],
+        [-1, 1, "ore", 11, ["floodplain"]],
+        [0, 1, "wool", 12, []],
+        [1, 1, "brick", 5, []]
+      ]
+    },
+    {
+      "id": "beacon",
+      "name": {
+        "ru": "Маячная коса",
+        "en": "Beacon Spit"
+      },
+      "tiles": [
+        [-3, 2, "wood", 3, ["woodland"]],
+        [-2, 2, "grain", 2, ["floodplain"]],
+        [-1, 2, "ore", 4, []],
+        [0, 2, "grain", 6, []],
+        [-4, 3, "wood", 4, ["woodland"]],
+        [-3, 3, "wool", 2, ["floodplain"]],
+        [-2, 3, "grain", 5, []],
+        [-1, 3, "wood", 3, ["woodland"]]
+      ]
+    },
+    {
+      "id": "cedars",
+      "name": {
+        "ru": "Кедровый склон",
+        "en": "Cedar Slope"
+      },
+      "tiles": [
+        [-4, 4, "wood", 10, ["woodland"]],
+        [-3, 4, "brick", 11, []],
+        [-2, 4, "grain", 4, []],
+        [-4, 5, "wood", 11, ["woodland"]],
+        [-3, 5, "wood", 9, ["woodland"]]
+      ]
+    },
+    {
+      "id": "gates",
+      "name": {
+        "ru": "Ветряные ворота",
+        "en": "Wind Gates"
+      },
+      "tiles": [
+        [-5, 6, "wool", 10, []],
+        [-4, 6, "wood", 6, ["woodland"]]
+      ]
+    },
+    {
+      "id": "rill",
+      "name": {
+        "ru": "Серебряный ручей",
+        "en": "Silver Brook"
+      },
+      "tiles": [
+        [5, 0, "brick", 5, []],
+        [6, 0, "wool", 6, ["floodplain"]],
+        [4, 1, "ore", 8, []],
+        [5, 1, "brick", 2, ["floodplain"]],
+        [6, 1, "grain", 9, []],
+        [7, 1, "ore", 10, []]
+      ]
+    },
+    {
+      "id": "steps",
+      "name": {
+        "ru": "Каменные ступени",
+        "en": "Stone Steps"
+      },
+      "tiles": [
+        [3, 2, "wood", 4, ["woodland"]],
+        [4, 2, "wood", 12, ["woodland"]],
+        [5, 2, "wood", 9, ["woodland"]],
+        [6, 2, "wool", 6, []],
+        [7, 2, "ore", 2, ["floodplain"]],
+        [2, 3, "grain", 8, []],
+        [3, 3, "ore", 5, ["floodplain"]],
+        [4, 3, "brick", 5, []],
+        [5, 3, "ore", 4, []],
+        [6, 3, "wool", 3, ["floodplain"]]
+      ]
+    },
+    {
+      "id": "granaries",
+      "name": {
+        "ru": "Житницы",
+        "en": "Granaries"
+      },
+      "tiles": [
+        [1, 4, "ore", 9, []],
+        [2, 4, "brick", 3, ["floodplain"]],
+        [3, 4, "grain", 6, []],
+        [4, 4, "wool", 12, []],
+        [5, 4, "brick", 3, ["floodplain"]],
+        [0, 5, "wool", 2, []],
+        [1, 5, "grain", 10, ["floodplain"]],
+        [2, 5, "ore", 12, []],
+        [3, 5, "wool", 11, []]
+      ]
+    },
+    {
+      "id": "sail",
+      "name": {
+        "ru": "Парусный мыс",
+        "en": "Sail Cape"
+      },
+      "tiles": [
+        [-1, 6, "wood", 10, ["woodland"]],
+        [0, 6, "ore", 8, ["floodplain"]],
+        [1, 6, "brick", 3, []]
+      ]
+    }
+  ],
+  "ferries": [
+    {
+      "a": [-2, 4, 2],
+      "b": [-1, 6, 5],
+      "eventSectorId": "cedars"
+    },
+    {
+      "a": [0, 2, 2],
+      "b": [1, 4, 5],
+      "eventSectorId": "beacon"
+    },
+    {
+      "a": [1, 1, 1],
+      "b": [3, 2, 5],
+      "eventSectorId": "bluff"
+    }
+  ],
+  "ports": [
+    {
+      "at": [-4, 6, 3],
+      "resource": null
+    },
+    {
+      "at": [1, 0, 1],
+      "resource": "wood"
+    },
+    {
+      "at": [-3, 1, 5],
+      "resource": "ore"
+    },
+    {
+      "at": [-1, 3, 2],
+      "resource": "grain"
+    },
+    {
+      "at": [5, 0, 0],
+      "resource": null
+    },
+    {
+      "at": [-1, 6, 4],
+      "resource": "brick"
+    },
+    {
+      "at": [5, 4, 2],
+      "resource": "wool"
+    },
+    {
+      "at": [1, 6, 1],
+      "resource": null
+    }
+  ]
+}

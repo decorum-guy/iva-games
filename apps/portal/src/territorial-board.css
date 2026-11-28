@@ -127,3 +127,11 @@
   .tb-area-caption { max-width: calc(100% - 22px); font-size: 11px; }
   .tb-news-frame > * { stroke-width: 3; }
 }
+
+@media (max-width: 620px) {
+  .territory-map-first:has([data-large-board]) .territory-layout {
+    grid-template-rows: minmax(255px, 1.55fr) minmax(145px, 1fr);
+  }
+  .territorial-board[data-large-board] .tb-surface { height: calc(100% - 50px); }
+  .territorial-board[data-large-board] .tb-navigation { bottom: 0; right: 4px; padding: 2px; }
+}

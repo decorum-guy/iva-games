@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { applyTerritory, createTerritory, currentId, viewTerritory } from '../src/territorial/core';
+import { COSTS, emptyStock } from '../src/territorial/types';
 import azure from '../maps/territorial/azure-bay.2.json';
 import four from '../maps/territorial/four-islands.2.json';
 import { getTerritoryMap, territoryMaps, validateTerritoryMap } from '../src/territorial/maps';
@@ -6,7 +8,8 @@ import { getTerritoryMap, territoryMaps, validateTerritoryMap } from '../src/ter
 describe('district@0.4 territorial geography', () => {
   it('pins separate room-compatible IDs and map versions', () => {
     expect(territoryMaps.map(map => [map.id, map.version, map.landmasses, map.tiles.length])).toEqual([
-      ['azure-bay', '2', 1, 20], ['longwater', '1', 1, 51], ['two-shores', '2', 2, 22], ['four-islands', '2', 4, 20],
+      ['azure-bay', '2', 1, 20], ['longwater', '1', 1, 51], ['lantern-strait', '1', 2, 51],
+      ['two-shores', '2', 2, 22], ['kite-isles', '1', 3, 49], ['four-islands', '2', 4, 20],
     ]);
     expect(() => getTerritoryMap('azure-bay', '1')).toThrow();
     const snapshot = getTerritoryMap('azure-bay', '2');
@@ -28,7 +31,31 @@ describe('district@0.4 territorial geography', () => {
     }
     for (const sector of map.sectors) expect(sector.polygon.length).toBeGreaterThanOrEqual(6);
   });
-  it('accepts a fourth geography from map data alone', () => {
+  it.each(['longwater', 'lantern-strait', 'kite-isles'])('%s supports each maritime crossing and each port rate', mapId => {
+    const map = getTerritoryMap(mapId);
+    const participants = ['a', 'b'].map((id, seatIndex) => ({
+      participantId: id, seatIndex, displayName: id, playerId: id, controller: { kind: 'human' as const, playerId: id },
+    }));
+    const start = () => createTerritory({ matchId: 'coast', roomId: 'coast', participants, map, seed: mapId, now: 0, preset: 'medium' });
+    for (const edge of map.edges.filter(item => item.kind === 'sea')) {
+      const state = start();
+      const id = currentId(state);
+      const opening = applyTerritory(state, id, { type: 'place', nodeId: edge.a }, 1);
+      opening.phase = 'play';
+      opening.players[id].hand = { ...emptyStock(), ...COSTS.sea };
+      const built = applyTerritory(opening, id, { type: 'route', edgeId: edge.id }, 2);
+      expect(built.routes[edge.id]).toBe(id);
+      expect(built.players[id].hand).toEqual(emptyStock());
+    }
+    for (const port of map.ports) {
+      const state = start();
+      const id = currentId(state);
+      const opening = applyTerritory(state, id, { type: 'place', nodeId: port.nodeId }, 1);
+      opening.phase = 'play';
+      expect(viewTerritory(opening, id, 2).legal.bank[port.resource ?? 'wood']).toBe(port.resource ? 2 : 3);
+    }
+  });
+  it('accepts a further geography from map data alone', () => {
     const cove = structuredClone(azure);
     cove.id = 'heron-cove';
     cove.name = { ru: 'Бухта цапли', en: 'Heron Cove' };
