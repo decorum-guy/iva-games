@@ -318,19 +318,33 @@ async function newsFixtures(clients, pages, guest) {
     }
   }
 }
-async function training(page, roomId) {
+async function training(page, roomId, touch = false) {
   await page.goto(origin + '/district-training?room=' + roomId);
   await page.getByRole('button', { name: 'EN', exact: true }).click();
   const lesson = page.locator('.territory-lesson');
+  let checkedNewsLayout = false;
   for (let step = 0; step < 12; step++) {
     if (await lesson.getByRole('link', { name: 'Play', exact: true }).isVisible()) break;
     const highlighted = page.locator('.tb-target.is-available').first();
     if (await highlighted.count()) await highlighted.focus().then(() => highlighted.press('Enter'));
-    if (await page.getByRole('button', { name: 'Dismiss news', exact: true }).isVisible()) await page.getByRole('button', { name: 'Dismiss news', exact: true }).click();
     const button = lesson.locator('button.primary');
+    const issue = page.locator('.tn-issue');
+    if (!checkedNewsLayout && await issue.isVisible()) {
+      const [lessonBox, issueBox, textBox] = await Promise.all([
+        lesson.boundingBox(), issue.boundingBox(), page.locator('.tn-issue-cards').boundingBox(),
+      ]);
+      assert.ok(lessonBox && issueBox && textBox && textBox.height >= 60, 'Lesson and a readable news area must be present');
+      assert.ok(lessonBox.y + lessonBox.height <= issueBox.y || issueBox.y + issueBox.height <= lessonBox.y,
+        'An open news issue must not cover the current lesson');
+      await lesson.scrollIntoViewIfNeeded();
+      await mkdir(artifacts, { recursive: true });
+      await page.screenshot({ path: join(artifacts, touch ? 'practice-news-mobile.png' : 'practice-news-desktop.png') });
+      checkedNewsLayout = true;
+    }
     result.tutorialSteps.push(await button.innerText());
-    await button.click();
+    if (touch) await button.tap(); else await button.click();
   }
+  assert.ok(checkedNewsLayout, 'The practice news layout was exercised');
   await expect(lesson.getByRole('link', { name: 'Play', exact: true })).toBeVisible();
   await lesson.getByRole('button', { name: 'Prepare for a threat' }).click();
   const forecast = page.locator('.tn-stage-confirmed');
@@ -455,6 +469,7 @@ try {
     boardHeight: Math.round(wide.height),
   });
   await training(pages[0], room.roomId);
+  await training(pages[1], room.roomId, true);
   async function clickAction(page, button) {
     if (await page.getByRole('button', { name: 'Dismiss news', exact: true }).isVisible()) await page.getByRole('button', { name: 'Dismiss news', exact: true }).click();
     const pendingResponse = page.waitForResponse(

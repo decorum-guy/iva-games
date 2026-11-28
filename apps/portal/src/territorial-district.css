@@ -222,3 +222,16 @@
   .territory-hand-heading { display: none; }
 }
 @media (prefers-reduced-motion: reduce) { .territory-match *, .territory-match *::before, .territory-match *::after { animation: none !important; transition: none !important; } }
+
+/* Keep the current lesson visible while the learner reads an issue. */
+.territory-practice .territorial-news { display: flex; flex-direction: column; min-height: 0; max-height: min(42dvh, 350px); }
+.territory-practice .tn-header { flex: 0 0 auto; }
+.territory-practice .tn-issue { position: static; inset: auto; flex: 1 1 auto; height: auto; min-height: 0; max-height: none; box-shadow: none; }
+@media (max-width: 620px) {
+  .territory-practice { height: auto; min-height: 100dvh; grid-template-rows: auto auto auto auto; }
+  .territory-practice .territory-layout { grid-template-rows: minmax(300px, 40dvh) auto; }
+  .territory-practice .territory-inspector { grid-template-rows: auto auto; overflow: visible; }
+  .territory-practice .territory-panel-scroll { overflow: visible; }
+  .territory-practice .territorial-news { max-height: none; }
+  .territory-practice .tn-issue { flex: none; height: min(42dvh, 350px); }
+}
