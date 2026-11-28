@@ -1,0 +1,42 @@
+{
+  "method": "Direct CUA interaction with real Chromium and rendered screenshots; a partial landing review, not mission acceptance",
+  "sourceBase": "3487a7d981cc158d5c649e86eeedee9107fba4ed",
+  "frontendChanges": ["src/client/Lobby.tsx", "src/client/knock-first.css"],
+  "sourceFileHashes": "build-artifacts-after-browser-2026-11-28.json",
+  "origin": "http://127.0.0.1:5358",
+  "route": "/games/knock-first",
+  "browser": "Chromium on Linux",
+  "verifiedIndependentProfiles": 0,
+  "tabsUsedForGameReview": 1,
+  "authentication": "Anonymous landing; Practice with a bot opened the ordinary platform login form",
+  "completedMissionAcceptanceCycles": 0,
+  "viewportDOM": {"clientWidth": 1348, "clientHeight": 936, "scrollWidth": 1348, "scrollHeight": 1271},
+  "observedControls": [
+    "RU and EN changed visible text and document title",
+    "Archive, Pump and Relay selection states changed",
+    "Normal default, Tense and Calm selection states were observed",
+    "Capacity default 3 and selections 5 and 2 were observed",
+    "Practice with a bot navigated to /login",
+    "Tab moved from RU to EN, back-to-catalogue and main CTA; CTA focus outline was visible"
+  ],
+  "observedDefectsFixedAndRechecked": [
+    "Language switch overlapped the top shift caption; spacing now separates them in RU and EN",
+    "Main CTA arrow glyph was missing; inline SVG renders correctly",
+    "Global paragraph color made the subtitle dim; explicit game foreground is readable in RU and EN",
+    "Capacity label collapsed into three narrow English lines; scoped select width and non-shrinking label display one line"
+  ],
+  "notPerformed": [
+    "Two independent signed-in browser profiles",
+    "Tutorial or any complete mission",
+    "First-person movement, pointer lock or GPU game scene",
+    "Door, wall, Listener, carry, help or reconnect gameplay",
+    "Full, partial or failed evacuation and restart through gameplay",
+    "Touch or short viewport review",
+    "WebGL loss and restoration",
+    "Actual audio listening",
+    "Physical phone or Safari review",
+    "Production launch"
+  ],
+  "environmentRestriction": "Chromium displayed DevTools not allowed on this page / Your organization has blocked the use of DevTools on this page; the message was dismissed and that restriction was not bypassed",
+  "evidence": "Returned CUA accessibility states, read-only viewport DOM measurement and actual screenshots in the work conversation; no screenshot file or video was saved"
+}

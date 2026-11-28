@@ -1,5 +1,5 @@
 import { KNOCK_CONTENT, KNOCK_RULES, KNOCK_WIRE } from './version';
-import { acousticPath, cueForNoise } from './acoustics';
+import { acousticCostLowerBound, acousticPath, cueForNoise } from './acoustics';
 import { approachAngle, batteryFits, batteryHandlePositions, canOccupy, clamp, copy, distance, distanceXZ, lineOfSight, moveCapsule, navigationPath, normalize, pointInLift, snapToFloor, sweepBattery, wrapAngle } from './geometry';
 import { DIFFICULTIES, floorAt, levelForMission, STEP_SECONDS, zoneAt, zoneById } from './level';
 import type { ActionPrompt, Actor, Battery, CommandPayload, CommandReceipt, KnockLevel, KnockSettings, MissionCommand, MissionEvent, MissionParticipant, MissionState, NoiseType, PlayerInput, PlayerView, PublicActor, Vec3 } from './types';
@@ -63,7 +63,7 @@ export function emitNoise(s:MissionState,type:NoiseType,position:Vec3,power:numb
  const level=levelForMission(s.settings);const noise={id:`noise-${s.nextEvent++}`,tick:s.tick,at:s.time,type,zoneId:zoneAt(level,position),position:copy(position),power,echoRadius,actorId};s.noises.push(noise);
  if(echoRadius>0){const clusters=level.echoClusters.filter(c=>distance(c.center,position)<=echoRadius+1e-8).flatMap(c=>{const path=acousticPath(level,s.doors,position,noise.zoneId,c.center,c.zoneId,power,true);if(!path||path.distance>echoRadius)return [];return [{id:c.id,distance:path.distance,arrivalAt:s.time+path.distance/18,expiresAt:s.time+path.distance/18+1.15}];});if(clusters.length){s.echoes.push({id:noise.id,at:s.time,source:copy(position),zoneId:noise.zoneId,radius:echoRadius,clusters});for(const c of clusters){const zone=level.echoClusters.find(k=>k.id===c.id)!.zoneId;if(!s.discoveredZones.includes(zone))s.discoveredZones.push(zone);}}}
  if(type==='listener-step'||type==='chase'||s.phase!=='active'||s.settings.tutorial)return;
- const listener=s.listener,ear=eye(listener.position,1.6);if(power-4*distance(position,ear)<DIFFICULTIES[s.settings.difficulty].hearing-1e-8)return;
+ const listener=s.listener,ear=eye(listener.position,1.6);if(power-4*acousticCostLowerBound(level,position,ear)<DIFFICULTIES[s.settings.difficulty].hearing-1e-8)return;
  const path=acousticPath(level,s.doors,position,noise.zoneId,ear,listener.zoneId,power);if(!path||path.residual<DIFFICULTIES[s.settings.difficulty].hearing)return;
  if(listener.mode==='chase'&&listener.targetActorId){const target=actor(s,listener.targetActorId);if(target&&listenerSees(s,level,target,8))return;}
  if(listener.mode==='investigate'&&path.residual<listener.lastHeardPower+8&&s.time-listener.lastHeardAt<2.5)return;

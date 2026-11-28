@@ -19,3 +19,13 @@
 .kf-action-prompt .kf-carry-feedback{line-height:1.35;max-width:30ch;color:#bed5d4}
 .kf-action-prompt .kf-carry-feedback.obstructed{color:#e0a15c}
 .kf-touch .kf-touch-knock{font-size:10px;line-height:1.15;white-space:normal}
+/* Leave room for the portal's corner language control on the game landing. */
+.kf-landing .kf-topline{padding-right:calc(5vw + 96px)}
+.kf-landing .kf-lead{color:var(--kf-ink);text-shadow:0 2px 18px #061015}
+.kf-expedition-footer>label{flex-shrink:0;white-space:nowrap}
+.kf-expedition-footer>label>select{width:auto;min-width:64px;flex:none}
+@media(max-width:760px){
+  .kf-landing .kf-topline{flex-direction:column;align-items:flex-start;gap:0;padding-right:5vw}
+  .kf-landing .kf-topline>.kf-text-button{padding-right:96px}
+  .kf-landing .kf-topline>span{max-width:none;text-align:left;padding-top:4px}
+}

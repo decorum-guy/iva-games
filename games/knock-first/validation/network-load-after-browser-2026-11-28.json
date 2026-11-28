@@ -1,0 +1,59 @@
+{
+  "method": "Node WebSocket clients and real SQLite, scripted inputs; no browser or human playtest",
+  "expectedRooms": 6,
+  "seats": 30,
+  "scriptedHumanControllers": 12,
+  "explicitBots": 18,
+  "elapsedMs": 20001.846969000002,
+  "inputs": 5172,
+  "snapshots": 3414,
+  "rooms": 6,
+  "samples": 614,
+  "p95TickMs": 5.596634000001359,
+  "maxTickMs": 12.134404000000359,
+  "saveSamples": 84,
+  "p95SaveMs": 0.7466529999999238,
+  "maxSaveMs": 1.585888999999952,
+  "p95SnapshotBytes": 5305,
+  "maxSnapshotBytes": 5431,
+  "lobbySamples": 19,
+  "p95LobbyMs": 37.48247300000003,
+  "maxLobbyMs": 37.48247300000003,
+  "errors": [],
+  "httpErrors": [],
+  "node": "v24.22.3",
+  "platform": "linux",
+  "sourceBase": "3487a7d981cc158d5c649e86eeedee9107fba4ed",
+  "sourceFiles": [
+    {
+      "path": "games/knock-first/src/core/acoustics.ts",
+      "bytes": 12109,
+      "sha256": "e426a5b771d1ae7f4c328ae44cdcdc1dd5f1b533ce5c2860068e27dfd893eb1c"
+    },
+    {
+      "path": "games/knock-first/src/core/mission.ts",
+      "bytes": 54043,
+      "sha256": "ff64c70e65d329f2961131d2f4a924694d12c176b0ad75c070ae05858ed02331"
+    },
+    {
+      "path": "games/knock-first/src/client/Lobby.tsx",
+      "bytes": 17157,
+      "sha256": "b04365d96977135885efb7ef835c8e9d76fa718bba9e7f729ebe8bf15f4bed49"
+    },
+    {
+      "path": "games/knock-first/src/client/knock-first.css",
+      "bytes": 34400,
+      "sha256": "177379a137823898da578911ea17381c37e438172e9d8b5e511f4afbaaa48692"
+    },
+    {
+      "path": "games/knock-first/tests/core-channel.test.ts",
+      "bytes": 9188,
+      "sha256": "b38d3c27bda0412e67448920234ca0e96b193ffe57715c3b8a0115b31646609c"
+    },
+    {
+      "path": "games/knock-first/tests/levels.test.ts",
+      "bytes": 4812,
+      "sha256": "3e38dfa751b4d1ce8d6c551bd94a0ade60d98818eca8ed88b71015c31903ca0b"
+    }
+  ]
+}

@@ -1,7 +1,35 @@
 import { distance, segmentBox, wrapAngle } from './geometry';
 import { floorHeight } from './level';
-import type { DoorState, Floor, KnockLevel, NoiseEvent, SoundCue, Vec3 } from './types';
+import type { DoorState, Floor, KnockLevel, NoiseEvent, Portal, SoundCue, Vec3 } from './types';
 export interface AcousticPath { distance: number; residual: number; virtualSource: Vec3; occluded: boolean; channel: boolean; portals: string[] }
+
+/** Approved Relay duct adjustment; see ../../RULE_ADJUSTMENTS.md. Geometry and
+ * ordinary/door attenuation are unchanged. This applies only to sound channels. */
+export const CHANNEL_LENGTH_FACTOR = 0.1;
+const channelCost = (portal: Portal): number => 4 + CHANNEL_LENGTH_FACTOR * portal.channelLength;
+
+/** An optimistic sound-cost bound, including discounted ducts in either
+ * direction. Ignoring walls and door charges can only reduce cost. Plain
+ * Euclidean distance alone is not a valid lower bound once a duct is cheaper. */
+export function acousticCostLowerBound(level: KnockLevel, from: Vec3, to: Vec3): number {
+ const channels = level.portals.filter(portal => portal.channel);
+ if (!channels.length) return distance(from, to);
+ const points = [from, to, ...channels.flatMap(portal => [portal.aPoint, portal.bPoint])];
+ const costs = points.map((_point, i) => i === 0 ? 0 : Infinity), visited = new Set<number>();
+ while (visited.size < points.length) {
+  let index = -1, cost = Infinity;
+  for (let i = 0; i < points.length; i++) if (!visited.has(i) && costs[i] < cost) { index = i; cost = costs[i]; }
+  if (index < 0 || index === 1) return costs[1];
+  visited.add(index);
+  for (let i = 0; i < points.length; i++) {
+   if (visited.has(i)) continue;
+   let edge = distance(points[index], points[i]);
+   if (index >= 2 && i === ((index - 2) % 2 === 0 ? index + 1 : index - 1)) edge = Math.min(edge, channelCost(channels[Math.floor((index - 2) / 2)]));
+   costs[i] = Math.min(costs[i], cost + edge);
+  }
+ }
+ return costs[1];
+}
 
 interface LocalPath { distance: number; virtualSource: Vec3; occluded: boolean }
 interface ZoneGeometry {
@@ -125,7 +153,7 @@ export function acousticPath(level:KnockLevel,doors:DoorState[],source:Vec3,sour
   if(current.zone===targetZone){const route=localPath(level,current.zone,current.point,target,echoOnly);if(route){const cost=current.cost+route.distance;if(!result||cost<result.distance)result={distance:cost,residual:power-4*cost,virtualSource:route.occluded?route.virtualSource:current.via.length?current.point:source,occluded:current.occluded||route.occluded||current.via.length>0,channel:current.channel,portals:current.via};}}
   for(const p of level.portals){const next=p.a===current.zone?p.b:p.b===current.zone?p.a:null;if(!next)continue;const door=doors.find(d=>d.id===p.id);const closed=p.door&&(!door?.open||door.moving);if(echoOnly&&(closed||p.channel))continue;
    const center={...p.position,y:p.position.y+(echoOnly?0:1.4)};const here=p.channel?(p.a===current.zone?p.aPoint:p.bPoint):center;const there=p.channel?(p.a===current.zone?p.bPoint:p.aPoint):center;
-   const passage=p.channel?4+p.channelLength:echoOnly?0:p.door?(closed?7:1.5):0;
+   const passage=p.channel?channelCost(p):echoOnly?0:p.door?(closed?7:1.5):0;
    if(result&&current.cost+distance(current.point,here)+passage>=result.distance)continue;
    const route=localPath(level,current.zone,current.point,here,echoOnly);if(!route)continue;
    const cost=current.cost+route.distance+passage;const key=`${next}:${p.id}`;if(cost>=(best.get(key)??Infinity))continue;best.set(key,cost);queue.push({key,zone:next,point:there,cost,via:[...current.via,p.id],channel:current.channel||p.channel,occluded:current.occluded||route.occluded||Boolean(closed)||p.channel});
@@ -134,8 +162,7 @@ export function acousticPath(level:KnockLevel,doors:DoorState[],source:Vec3,sour
 }
 export function cueForNoise(level:KnockLevel,doors:DoorState[],noise:NoiseEvent,observer:{position:Vec3;zoneId:string;yaw:number}):SoundCue|null {
  const ear={...observer.position,y:observer.position.y+1.4};
- // Physical paths and authored channels cannot beat straight-line distance.
- if(noise.power-4*distance(noise.position,ear)<8)return null;
+ if(noise.power-4*acousticCostLowerBound(level,noise.position,ear)<8-1e-8)return null;
  const path=acousticPath(level,doors,noise.position,noise.zoneId,ear,observer.zoneId,noise.power);if(!path||path.residual<8)return null;
  const dx=path.virtualSource.x-observer.position.x,dz=path.virtualSource.z-observer.position.z;const bearing=Math.atan2(-dx,-dz);const relative=wrapAngle(bearing-observer.yaw);const direction=Math.abs(relative)<Math.PI/4?'ahead':Math.abs(relative)>3*Math.PI/4?'behind':relative>0?'left':'right';
  const dy=path.virtualSource.y-observer.position.y-1.4;
