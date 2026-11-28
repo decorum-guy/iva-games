@@ -54,10 +54,7 @@ export function counterDraft(offer: TerritoryOffer): TradeDraft {
 export function inspectTradeDraft(view: TerritoryView, draft: TradeDraft) {
   const own = view.you.participantId;
   const target = view.players.find(player => player.participantId === draft.targetId);
-  const targetAllowed = draft.targetId === '*' ? !draft.parentId && view.activeParticipantId === own &&
-    view.players.filter(player => player.participantId !== own && !player.left).length > 1 :
-    !!target && target.participantId !== own && !target.left &&
-    (view.activeParticipantId === own || view.activeParticipantId === target.participantId);
+  const targetAllowed = view.players.some(player => player.participantId !== own && !player.left);
   const parent = draft.parentId ? view.offers.find(offer => offer.id === draft.parentId &&
     offer.authorId === draft.targetId && offer.targetId === own) : undefined;
   const closedParent = draft.parentId ? view.offerHistory?.find(offer => offer.id === draft.parentId) : undefined;

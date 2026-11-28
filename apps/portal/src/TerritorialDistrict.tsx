@@ -229,7 +229,7 @@ function TerritorialPlayers({ view, lang }: { view: TerritoryView; lang: Languag
         <small title={ru ? `Ресурсы: ${player.handCount} · Путь: ${player.longestRoute} · Карты развития: ${player.cardCount}` : `Resources: ${player.handCount} · Route: ${player.longestRoute} · Development cards: ${player.cardCount}`}>{player.isBot || player.left ? ru ? "Бот · " : "Bot · " : ""}{ru ? "Ресурсы" : "Resources"} {player.handCount}
           {" · "}{ru ? "Путь" : "Route"} {player.longestRoute}{` · ${ru ? "Карты" : "Cards"} ${player.cardCount}`}</small>
       </span>
-      <b className="territory-points">{player.participantId === view.you.participantId ? view.you.points : player.points}<small>/{view.goal}</small></b>{tradeLabel(player.participantId) && <span className="territory-player-trade">{tradeLabel(player.participantId)}</span>}
+      <b className="territory-points">{player.participantId === view.you.participantId ? view.you.points : player.points}<small>/{view.goal}</small></b>{view.phase === 'play' && <span className="territory-player-trade">{tradeLabel(player.participantId) || '\u00a0'}</span>}
     </li>)}
   </ul>;
 }
