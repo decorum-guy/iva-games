@@ -32,6 +32,38 @@ function sample(tick = START): PrecisionStallSample {
   };
 }
 
+/** Actual Alice endpoints from Direct10 job141061718269, checkout
+ * a48f8e67ee345e5e9582b1d02b13a5a055a6ccb2: final charged creep before gate4.
+ * Only these endpoints were recorded. Linear interpolation, regular 15Hz
+ * samples, advancing 30Hz acknowledgements and continuous gas below are
+ * explicitly SYNTHETIC unit-test observations, not a browser/physics replay.
+ */
+const ALICE_CREEP = [
+  { tick: 2951, x: 1.330232858657837, z: 30.2901611328125, speed: .09156064004906422, charge: 3.9125000000011356, tilt: 2.73560044127562 },
+  { tick: 2984, x: 1.3557195663452148, z: 30.332609176635742, speed: .09107950457689165, charge: 3.5000000000011298, tilt: 2.7372070091825424 },
+  { tick: 3016, x: 1.377456545829773, z: 30.37484359741211, speed: .09089876358243296, charge: 3.100000000001124, tilt: 2.735082073514283 },
+  { tick: 3048, x: 1.3980834484100342, z: 30.41744041442871, speed: .09085494758650955, charge: 2.7000000000011184, tilt: 2.734770232751776 },
+];
+function interpolatedAliceCreep(tick: number): PrecisionStallSample {
+  if (tick < ALICE_CREEP[0]!.tick || tick > ALICE_CREEP.at(-1)!.tick) throw new Error('Synthetic creep fixture is outside its recorded endpoints');
+  const next = ALICE_CREEP.findIndex(value => value.tick > tick);
+  const right = next < 0 ? ALICE_CREEP.length - 1 : next;
+  const lower = ALICE_CREEP[Math.max(0, right - 1)]!, upper = ALICE_CREEP[right]!;
+  const portion = upper.tick === lower.tick ? 0 : (tick - lower.tick) / (upper.tick - lower.tick);
+  const at = (key: 'x' | 'z' | 'speed' | 'charge' | 'tilt') => lower[key] + (upper[key] - lower[key]) * portion;
+  const snapshotTimeMs = 1795888074593 + (tick - ALICE_CREEP[0]!.tick) * 1000 / 60;
+  return {
+    scope: 'synthetic-direct10-alice/connection2/match/epoch-after-restart/stage1/phase11',
+    track: getTrack('precision', false), nowMs: snapshotTimeMs + 20, snapshotTimeMs,
+    lastAcceptedSeq: 2401 + Math.floor((tick - ALICE_CREEP[0]!.tick) / 2),
+    sentInput: { ...FORWARD }, plannedInput: { ...FORWARD },
+    lane: { tick, gatesPassed: 3, resets: 1, finished: false,
+      car: { position: { x: at('x'), z: at('z') }, speed: at('speed'), charge: at('charge'), tilt: at('tilt') },
+      cargo: [{ status: 'secured', health: 92 }, { status: 'secured', health: 92 }, { status: 'secured', health: 92 }],
+    },
+  };
+}
+
 type Change = (value: PrecisionStallSample) => void;
 function feed(from: number, until: number, previous: PrecisionStallState | null = null, change?: Change) {
   let state = previous;
@@ -55,13 +87,37 @@ describe('external QA Precision upright-stall observation', () => {
     const result = observePrecisionStall(before.state, input);
     expect(result.restore).toBe(true);
     expect(result.evidence).toMatchObject({ startTick: START, tick: START + 92, stalledTicks: 92, gatesPassed: 1, resets: 0, charge: 14.024999999997615 });
+    expect(result.evidence).toMatchObject({ speed: input.lane.car.speed, anchorDisplacement: 0, limits: { speedBelowMps: .20, displacementBelowMeters: .30, minimumTicks: 90 } });
     expect(result.evidence?.gateId).toBe(input.track.orderedGates[1]!.id);
     expect(input).toEqual(original);
     expect(feed(START + 96, START + 296, result.state).triggers).toEqual([]);
   });
 
+  it('includes recorded Alice slow creep in an explicitly synthetic continuous 15Hz window', () => {
+    let state: PrecisionStallState | null = null;
+    const firstTick = ALICE_CREEP[0]!.tick;
+    const anchor = interpolatedAliceCreep(firstTick).lane.car.position;
+    for (let tick = firstTick; tick <= firstTick + 92; tick += 4) {
+      const observation = interpolatedAliceCreep(tick), original = structuredClone(observation);
+      const result = observePrecisionStall(state, observation);
+      expect(result.restore).toBe(tick === firstTick + 92);
+      expect(observation).toEqual(original);
+      expect(observation.lane.car.speed).toBeGreaterThan(.088);
+      expect(observation.lane.car.speed).toBeLessThan(.092);
+      if (result.restore) {
+        const displacement = Math.hypot(observation.lane.car.position.x - anchor.x, observation.lane.car.position.z - anchor.z);
+        // Old .10 m progress resets prevented this 90-tick creep window, even
+        // if only the old .08 m/s speed cutoff had been raised.
+        expect(displacement).toBeGreaterThan(.10); expect(displacement).toBeLessThan(.30);
+        expect(result.evidence).toMatchObject({ startTick: firstTick, stalledTicks: 92, gatesPassed: 3, resets: 1, speed: observation.lane.car.speed, anchorDisplacement: displacement, limits: { speedBelowMps: .20, displacementBelowMeters: .30, minimumTicks: 90 } });
+      }
+      state = result.state;
+    }
+  });
+
   it.each<[string, Change]>([
     ['moving chassis', value => { value.lane.car.speed = 0.4; }],
+    ['speed at the creep limit', value => { value.lane.car.speed = .20; }],
     ['still loading', value => { value.lane = { ...value.lane, cargo: [{ status: 'at-dock', health: 100 }] }; }],
     ['broken cargo', value => { value.lane = { ...value.lane, cargo: [{ status: 'secured', health: 0 }] }; }],
     ['empty battery', value => { value.lane.car.charge = 0; }],
@@ -80,6 +136,25 @@ describe('external QA Precision upright-stall observation', () => {
     ['invalid pose', value => { value.lane.car.position.x = NaN; }],
   ])('does not request recovery for %s', (_name, change) => {
     expect(feed(START, START + 200, null, change).triggers).toEqual([]);
+  });
+
+  it('does not mistake ordinary continuous .4 m/s progress for gate creep', () => {
+    const result = feed(START, START + 200, null, value => {
+      value.lane.car.speed = .4;
+      value.lane.car.position.x += .4 * (value.lane.tick - START) / 60;
+    });
+    expect(result.triggers).toEqual([]);
+    expect(result.state?.startTick).toBeNull();
+  });
+
+  it('restarts the complete 90-tick window after the chassis accelerates above the creep limit', () => {
+    const slow: Change = value => { value.lane.car.speed = .09; };
+    const before = feed(START, START + 60, null, slow);
+    const accelerated = feed(START + 64, START + 64, before.state, value => { value.lane.car.speed = .21; });
+    expect(accelerated.state?.startTick).toBeNull();
+    const slowAgain = feed(START + 68, START + 156, accelerated.state, slow);
+    expect(slowAgain.triggers).toEqual([]);
+    expect(feed(START + 160, START + 160, slowAgain.state, slow).triggers).toHaveLength(1);
   });
 
   it('requires real snapshot ticks and advancing input acknowledgements', () => {
@@ -111,7 +186,9 @@ describe('external QA Precision upright-stall observation', () => {
     ['reconnect or recovered phase scope', value => { value.scope += '/new-epoch'; }],
     ['normal reset counter', value => { value.lane = { ...value.lane, resets: 1 }; }],
     ['new gate', value => { value.lane = { ...value.lane, gatesPassed: 2 }; value.lane.car.position.z = 23.77; }],
-    ['actual position progress', value => { value.lane.car.position.x += 0.11; }],
+    // The anchor must reset at meaningful .30 m progress, not at the old .10 m
+    // threshold that repeatedly discarded Alice's observed slow-creep window.
+    ['actual position progress', value => { value.lane.car.position.x += 0.31; }],
   ])('starts a fresh observation window after %s', (_name, change) => {
     const before = feed(START, START + 88);
     const reset = feed(START + 92, START + 180, before.state, change);

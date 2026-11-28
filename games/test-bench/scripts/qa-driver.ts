@@ -57,18 +57,27 @@ export interface PrecisionStallSample {
 export interface PrecisionStallEvidence {
   startTick: number;
   tick: number;
+  /** Historical name: elapsed insufficient-progress ticks, which can include creep. */
   stalledTicks: number;
   gateId: string;
   gatesPassed: number;
   resets: number;
   position: { x: number; z: number };
   charge: number;
+  speed: number;
+  anchorDisplacement: number;
+  limits: { speedBelowMps: number; displacementBelowMeters: number; minimumTicks: number };
 }
 
+const PRECISION_STALL_LIMITS = { speedBelowMps: .20, displacementBelowMeters: .30, minimumTicks: 90 } as const;
+// The flat-track gate policy targets at least 1.6 m/s. The escape window uses
+// at most one eighth of that speed; .30 m = .20 m/s * 90 ticks / 60 Hz.
+// These are external QA-driver criteria, not gameplay or scoring rules.
 /** Request the ordinary held-R action after a continuously observed upright
- * gate stall. This repairs the QA driver's missing escape behavior; it neither
- * changes the route/prediction nor claims to explain the initial bad approach.
- * Timers use authoritative lane ticks, never wall-clock jumps during recovery.
+ * gate approach with insufficient progress, including slow creep. This repairs
+ * the QA driver's missing escape behavior; it neither changes the route or
+ * prediction nor claims to explain the initial bad approach. Timers use
+ * authoritative lane ticks, never wall-clock jumps during recovery.
  */
 export function observePrecisionStall(previous: PrecisionStallState | null, sample: PrecisionStallSample): { state: PrecisionStallState | null; restore: boolean; evidence?: PrecisionStallEvidence } {
   const { lane, track, scope, lastAcceptedSeq } = sample;
@@ -82,22 +91,22 @@ export function observePrecisionStall(previous: PrecisionStallState | null, samp
   if (distanceToGate <= 0 || distanceToGate > 1.5) return { state: null, restore: false };
 
   let state = previous;
-  const moved = state && Math.hypot(car.position.x - state.anchor.x, car.position.z - state.anchor.z) >= .10;
+  const moved = state && Math.hypot(car.position.x - state.anchor.x, car.position.z - state.anchor.z) >= PRECISION_STALL_LIMITS.displacementBelowMeters;
   if (!state || state.scope !== scope || state.gatesPassed !== lane.gatesPassed || state.resets !== lane.resets || lane.tick < state.lastTick || lastAcceptedSeq < state.lastAcceptedSeq || moved) {
     state = { scope, gatesPassed: lane.gatesPassed, resets: lane.resets, anchor: { x: car.position.x, z: car.position.z }, startTick: null, lastTick: lane.tick, lastAcceptedSeq, triggered: false };
   }
   const advanced = lane.tick > state.lastTick;
   const uninterrupted = lane.tick - state.lastTick <= 18 && (!advanced || lastAcceptedSeq > state.lastAcceptedSeq);
   const driving = sample.sentInput.throttle > .05 && !sample.sentInput.brake && sample.plannedInput.throttle > .05 && !sample.plannedInput.brake;
-  const eligible = uninterrupted && driving && Math.abs(car.speed) < .08;
+  const eligible = uninterrupted && driving && Math.abs(car.speed) < PRECISION_STALL_LIMITS.speedBelowMps;
   // Braking clears accumulation. A triggered latch remains until a real scope,
   // gate, reset or position change so Space+R cannot request R repeatedly.
   const startTick = eligible ? state.startTick ?? lane.tick : null;
   const next = { ...state, startTick, lastTick: lane.tick, lastAcceptedSeq };
-  if (!eligible || next.triggered || startTick === null || lane.tick - startTick < 90) return { state: next, restore: false };
+  if (!eligible || next.triggered || startTick === null || lane.tick - startTick < PRECISION_STALL_LIMITS.minimumTicks) return { state: next, restore: false };
   return {
     state: { ...next, triggered: true }, restore: true,
-    evidence: { startTick, tick: lane.tick, stalledTicks: lane.tick - startTick, gateId: gate.id, gatesPassed: lane.gatesPassed, resets: lane.resets, position: { x: car.position.x, z: car.position.z }, charge: car.charge },
+    evidence: { startTick, tick: lane.tick, stalledTicks: lane.tick - startTick, gateId: gate.id, gatesPassed: lane.gatesPassed, resets: lane.resets, position: { x: car.position.x, z: car.position.z }, charge: car.charge, speed: car.speed, anchorDisplacement: Math.hypot(car.position.x - next.anchor.x, car.position.z - next.anchor.z), limits: { ...PRECISION_STALL_LIMITS } },
   };
 }
 

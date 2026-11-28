@@ -976,6 +976,44 @@ async function survivingLoosePickup(player) {
   return { profile: player.name, renderer: '2d', track: 'climb', mirrored: false, preset: 'gentle', loadPresses, pickupPresses: 1, restored: false, observation: 'Visible minimap, all cargo cards, speed, timer and interaction button only', control: 'Real keyboard W/D/Space/E', loaded: sample(loaded), released: sample(released), eligible: sample(eligible), collected: sample(collected), settled: sample(settled), stabilitySamples, brakingWallMs, simulatedStabilityLowerBoundMs: (Number(collected.timer) - Number(settled.timer) - 1) * 1000 };
 }
 
+async function initialTutorialCrossing(player) {
+  const trace = { profile: player.name, name: 'Initial unloaded tutorial crossing', lesson: 'initial-crossing', status: 'running', controlPolicy: 'Hold W until the visible 13 m goal exposes Continue, as instructed in the lesson', requestedTargetSpeed: null, targetIsHardCap: false, retryPolicy: 'No retry on timeout or error', timingMethod: 'Runner keyboard dispatch/acknowledgement and visible-HUD observations, not DOM event timestamps', observationCount: 0, observations: [], droppedObservations: 0, keyTransitionCount: 0, keyTransitions: [], droppedKeyTransitions: 0 };
+  report.localDriverTraces.push(trace); player.localKeyTrace = trace;
+  let outcome, failure;
+  try {
+    trace.initialHud = await localHud(player);
+    assert.equal(trace.initialHud.lessonTitle, label(player, 'Проедь через рёбра', 'Drive over the ribs'));
+    assert.equal(trace.initialHud.cargo.length, 1); assert.equal(trace.initialHud.cargo[0].status, 'at-dock');
+    assert.equal(trace.initialHud.next, false);
+    await focusLane(player); await keys(player, ['KeyW']);
+    let priorAt = null;
+    outcome = await until(async () => {
+      const hud = await localHud(player), atMs = Date.now();
+      assert.equal(hud.lessonTitle, trace.initialHud.lessonTitle, 'The first crossing must stay in its actual lesson step');
+      assert.ok(['running', 'complete'].includes(hud.attemptStatus));
+      trace.observationCount++;
+      if (trace.observations.length < 1000) trace.observations.push({ atMs, intervalMs: priorAt === null ? null : atMs - priorAt, x: hud.x, z: hud.z, speed: hud.speed, charge: hud.charge, health: hud.health, cargoStatus: hud.cargoStatus, timer: hud.timer, next: hud.next, attemptStatus: hud.attemptStatus, heldKeys: [...player.held], wanted: ['KeyW'], done: hud.next }); else trace.droppedObservations++;
+      priorAt = atMs;
+      return hud.next && hud;
+    }, 'initial tutorial crossing reaches the visible 13 m goal with ordinary W', 30000, 40);
+    assert.ok(Number.isFinite(outcome.z) && outcome.z >= 13, `The first lesson must actually cross 13 m, received ${outcome.z}`);
+    assert.equal(outcome.attemptStatus, 'complete');
+    assert.equal(outcome.cargo.length, 1); assert.equal(outcome.cargo[0].status, 'at-dock');
+    trace.outcomeHud = outcome; trace.status = 'passed';
+  } catch (error) { trace.status = 'failed'; trace.error = error.message; failure = error; }
+  finally {
+    try { await keys(player); } catch (error) { failure ??= error; trace.status = 'failed'; trace.inputReleaseError = error.message; }
+    delete player.localKeyTrace;
+    trace.lastHud = await localHud(player).catch(error => ({ unavailable: error.message }));
+    trace.decisionIntervalsMs = timing(trace.observations.map(value => value.intervalMs).filter(Number.isFinite));
+    const speeds = trace.observations.map(value => value.speed).filter(Number.isFinite);
+    trace.maximumObservedSpeed = speeds.length ? Math.max(...speeds) : null;
+    await emitEvidence('local-driver-trace', compactLocalTrace(trace));
+  }
+  if (failure) throw failure;
+  return { completed: true, goalZ: 13, hud: outcome, control: trace.controlPolicy, retried: false };
+}
+
 async function tutorialComparisonAttempt(player, kind, attempt, fastHealth) {
   const trace = { profile: player.name, name: `${kind === 'fast' ? 'Fast' : 'Slow'} tutorial attempt ${attempt}`, comparison: kind, attempt, status: 'running', controlPolicy: kind === 'fast' ? 'Hold W until the visible comparison stops' : 'Existing visible-HUD speed feedback', requestedTargetSpeed: kind === 'slow' ? .85 : null, targetIsHardCap: false, fastBaselineIntegrity: fastHealth ?? null, timingMethod: 'Runner times of actual keyboard command dispatch/acknowledgement and visible-HUD observations, not DOM event timestamps', observationCount: 0, observations: [], droppedObservations: 0, keyTransitionCount: 0, keyTransitions: [], droppedKeyTransitions: 0 };
   report.localDriverTraces.push(trace); player.localKeyTrace = trace;
@@ -1088,7 +1126,7 @@ async function tutorial(player) {
   await page.getByRole('button', { name: /Проверить/ }).click();
   await expect(page.locator('.tb-race')).toBeVisible();
   const next = () => page.locator('.tb-race-lesson .tb-primary');
-  await localDriveTo(player, 14, 3, hud => hud.next); await keys(player); await next().click();
+  const initialCrossing = await initialTutorialCrossing(player); await next().click();
   await until(async () => (await localHud(player)).z < 1, 'tutorial restarts at the dock lesson');
   await approachLoadingDock(player);
   await keys(player); const load = page.locator('.tb-interact'); await expect(load).toBeEnabled(); await load.focus(); await load.press('Space');
@@ -1107,7 +1145,7 @@ async function tutorial(player) {
   await expect(next()).toBeVisible({ timeout: 5000 }); await keys(player); await next().click();
   await expect(next()).toContainText('В тренировку'); await next().click(); await expect(page.locator('.tb-builder')).toBeVisible();
   report.tutorial = 'completed through UI and real local physics';
-  return { completed: true, steps: 6, fastIntegrity: fast.health, fastCargoStatus: fast.cargoStatus, slowIntegrity: slow.health, fastAttempts: fastComparison.attempts, slowAttempts: slowComparison.attempts, retryPolicy: 'At most one ordinary UI Restart per comparison, only after a verified frozen retry-fast/retry-slow status; identical driving policy on both attempts; no retry on errors or timeouts', milestonePauseMs: 400, baselineMatchesFastHud: true, slowCargoSecured: true, observation: 'Visible minimap, HUD and lesson controls', control: 'Keyboard and UI only' };
+  return { completed: true, steps: 6, initialCrossing, fastIntegrity: fast.health, fastCargoStatus: fast.cargoStatus, slowIntegrity: slow.health, fastAttempts: fastComparison.attempts, slowAttempts: slowComparison.attempts, retryPolicy: 'At most one ordinary UI Restart per comparison, only after a verified frozen retry-fast/retry-slow status; identical driving policy on both attempts; no retry on errors or timeouts', milestonePauseMs: 400, baselineMatchesFastHud: true, slowCargoSecured: true, observation: 'Visible minimap, HUD and lesson controls', control: 'Keyboard and UI only' };
 }
 
 async function createCup(alice, bob) {

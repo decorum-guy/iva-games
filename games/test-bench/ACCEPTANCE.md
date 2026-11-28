@@ -6,7 +6,7 @@
 
 **Полных личных циклов приёмки в браузере: 0. Выпусков игры: 0.**
 
-Последняя полностью прочитанная автоматизация — кандидат 9: оба обычных 2D-кубка завершены, но оба browser jobs FAIL из-за отдельных попыток урока. За всю записанную историю подтверждены **3 завершённых обычных автоматических кубка с ботами; 3 отдельных целевых кубка на нулевую ничью**. Это разные счётчики; автоматизация и ничейный сценарий не заменяют личную приёмку.
+Последняя полностью прочитанная браузерная автоматизация — кандидат 10: direct прошёл урок, но не обычный кубок; RTT прошёл обычный кубок, но не урок. Оба browser jobs FAIL. За всю записанную историю подтверждены **4 завершённых обычных автоматических кубка с ботами; 4 отдельных целевых кубка на нулевую ничью**. Это разные счётчики; автоматизация и ничейный сценарий не заменяют личную приёмку.
 
 Эта запись отделяет исполненный код, исходниковую проверку, автоматическую физическую симуляцию, HTTP/WS-проверку production-сборки, автоматизацию браузера, личное управление в браузере, прослушивание и физические устройства. Успешная сборка или открытый PR не означают принятую игру.
 
@@ -564,3 +564,96 @@ Runner теперь сохраняет каждый fast/slow attempt, исхо�
 Итоговая проверка main перед отправкой нашла ещё документационный [PR53](https://github.com/decorum-guy/iva-games/pull/53), **`7c2be21db5743b15b4a42d708ac959039c6b725e`**. Изменения AGENTS/TOP_LEVEL и полный новый `docs/iva-games/GAME_WORKFLOW.md` прочитаны; вместе с PR template и остальными документами включены обычным merge без конфликтов. Они сохраняют ответственность исполнителя за весь цикл и отдельно требуют обозначать недоступную обязательную проверку как блокер; разрешения на выпуск непринятой игры не дают.
 
 Промежуточный merge с main81597cef сохранён как объект **`37bd36eaef4ce42f082a660d98646aab206a6565`**, дерево **`e31bc6b9af6bdefa2be83fd9d21f0e18990692c1`**, родители candidate9 и81597cef. Он не отправлялся отдельно в branch ref и не запускал CI или выпуск. Следующая опубликованная вершина также включает7c2be21 и эту запись; её фактический checkout и CI должны быть зафиксированы после исполнения. Никакого нового личного цикла или выпуска на этом шаге нет.
+
+## Браузерная автоматизация PR: кандидат 10
+
+Head **`d60256eb602722fc4e41e1ba41c2df47cb66e99c`**, дерево **`588001c7149bef7e2bbf44ba7775a0d48a70ffc1`**. Ветка обновлена один раз с expected previous SHA без force; промежуточный37bd36e отдельно в ref не отправлялся. Fetch подтвердил точные дерево/родителей, ancestry main7c2be21 и чистый local checkout. Оба browser jobs проверили чистый служебный PR merge **`a48f8e67ee345e5e9582b1d02b13a5a055a6ccb2`**, родители main7c2be21 и candidate10, с тем же деревом; metadata GitHub API сверены. Chromium **159.0.8154.6**.
+
+Оба job завершились **FAIL**, но по разным обязательным scopes. Это два незавершённых автоматических прохода, не личные циклы. Накопительные счётчики после них: **4 обычных автоматических кубка, 4 целевых ничейных, 0 личных циклов, 0 выпусков**.
+
+### Direct10: урок PASS, Precision Alice FAIL
+
+[Job141061718269](https://github.com/decorum-guy/iva-games/actions/runs/46171821028/job/141061718269): **95 envelopes →43 records,0 parse errors**. Обязательные scopes:10 PASS,1 FAIL,3 BLOCKED. Оба онлайн-профиля2D. Alice participantId `70df2d86-f33b-438d-8e4c-3d9e2dd6defd`, Bob `0f34b309-1247-4f6c-b39e-b5da5c2671d9`.
+
+| Этап / вариант | Alice | Bob |
+| --- | --- | --- |
+| Fragile, зеркальный | Finish,3/300HP,1799 зачётных ticks,R1 | Finish,3/300HP,1557ticks,R0 |
+| Precision, обычный | Deadline,0 доставлено,4200 зачётных ticks,R1 | Finish,3/279HP,4205 зачётных ticks,R2 |
+| Climb | Не достигнут | Не достигнут |
+
+Alice перед gate3 получила штатный R после93 stalled ticks на tick1875: charge13,45, tilt2,7529°,tiltTicks0. Фактический hold770мс, один POST200,receipt resets1 и независимый публичный snapshot tick1915/resets1; событие restored tick1913. Затем gate3 действительно пройден на tick2158. Это успешное восстановление, но оно **не означает завершённую трассу**.
+
+Последний сохранённый участок Alice перед gate4: ticks2951–3241, z30,2902→30,6855, speed0,08816–0,09156м/с, charge3,9125→0,2875, gates3/reset1, три secured груза по92HP, свежие seq. Машина продвинулась на0,39529м за4,8333simsec. Все записанные скорости выше старого QA cutoff0,08; продвижение0,10м также сбрасывает старое окно. На tick3265 записан depleted, после чего charge0 тоже запрещает новый запрос detector. Это точная граница на сохранённых samples; каждый промежуточный input и внутренний detector state не записаны, более ранняя история не реконструируется. Итоговые0HP — **недоставленный**, а не разрушенный груз. Bob завершил за3605 реальных ticks +600 штрафных, оба его R подтверждены HTTP и публичными counters.
+
+Полный шестишаговый урок прошёл с первой попытки: **fast31HP,slow50HP**, две проверки неподвижности по400мс. Retry count0: новый явный путь повторного урока в этом job не исполнялся. Fast decision intervals median299/max306мс, W hold4491мс послеack; slow median394/p95453/max481мс, максимальная видимая скорость2,0 при цели0,85. Цель скорости по-прежнему не является жёстким лимитом.
+
+Настройки, каталог, две загруженные машины, pause/WebGL context loss/recovery и короткий touch viewport прошли. Fragile R740мс/+5с и Bob disconnect/reload/return прошли. Настоящий Precision restart подтвердил сохранение обоих профилей, countdown5, новые epochs и resume. Один реально выпавший груз подобран; все три secured51/51/44HP держались ≥2simsec. Отдельный tie прошёл три настоящих65-секундных дедлайна, оба place1/zero, нейтральный ввод соблюдён. **Normal fullCups0**; возврат к прежнему завершённому кубку, его evidence и реванш BLOCKED из-за неуспешного обычного кубка.
+
+Uncaught/assets/actions/transport0. Одна console `ERR_CONNECTION_REFUSED` для match получена через71мс после serverStopped и за405мс доserverReady; это receipt-time correlation. Run-wide input→ack p95 Alice36/Bob36,8мс, max69,3/83,7 — не отдельная метрика Precision.
+
+### RTT10: обычный кубок PASS, первый пустой учебный проезд FAIL
+
+[Job141061718270](https://github.com/decorum-guy/iva-games/actions/runs/46171821028/job/141061718270): **98 envelopes →37 records,0 parse errors**. Два независимых2D профиля и два явных бота завершили все12 participant-stage результатов; оба профиля видели одинаковые протоколы.
+
+| Этап / вариант | Alice | Bob |
+| --- | --- | --- |
+| Fragile, зеркальный | Finish,3/300HP,2087 зачётных ticks,R1 | Finish,3/246HP,1704ticks,R0 |
+| Precision, зеркальный | Finish,3/300HP,1778ticks,R0 | Finish,3/300HP,1780ticks,R0 |
+| Climb, обычный | Finish,3/300HP,1163ticks,R0 | Finish,3/300HP,1217ticks,R0 |
+
+Новый Precision detector R не потребовался, дополнительных доказательств его исполнения здесь нет. Намеренный Fragile R740мс дал один POST200/reset1 и +5с. Bob offline/reload/return сохранил match/build при tick254→346 и новой epoch. Реальный restart Precision: ticks415→427→431, оба новых epochs, countdown5, сохранённые сборки и заряд. Запуск реванша PASS, **сам реванш целиком не разыгран**. Normal fullCups1.
+
+**Первый учебный проезд FAIL до погрузки и сравнений.** Урок2/6 «Проедь через рёбра», старый `localDriveTo(target14,speed3)` вышел за30с. HUD после отпускания клавиш: x0,125112,z12,696354,speed0,3,charge26,2,timer210,cargo at-dock,Nextfalse,status running. Поздний failure-screen: z12,585490,speed0,7. Оба наблюдения до13м. Для начального проезда trace ещё не записывался: `localDriverTraces=[]`, `tutorialRetries=[]`. Причина по двум HUD не установлена; fast/slow/retry scopes не достигнуты.
+
+Loopback delay60мс на сторону: Node path median/p95121,8/121,8мс; browser Resource Timing121,4/123,6мс. Input→ack median Alice141,4/Bob141,2мс,p95 обоих158,3. Это локальный путь с серверной/планировочной составляющей, не публичный Internet RTT. Uncaught/assets/actions/transport0; одна session console `ERR_EMPTY_RESPONSE` получена внутри записанного stop→ready окна, без полного причинного request trace.
+
+### Фактический pixel cap и пределы performance-вывода
+
+Все наблюдавшиеся Low3D buffers в обоих jobs соблюли новый лимит: CSS754,297×821,672 → WebGL459×500 =229500pixels,DPR0,609707; CSS1440×818 →636×361 =229596pixels,DPR0,442266. Фактический WebGL buffer совпал с canvas backing dimensions. Это подтверждение применения cap при двух размерах, не оценка качества изображения человеком.
+
+| Сцена | Direct9 p95 | Direct10 p95 | RTT10 p95 |
+| --- | --- | --- | --- |
+| Home3D |186,1мс|301,9мс|165,1мс|
+| Universal practice3D |87,1мс|61,4мс|28,9мс|
+| Gentle practice3D |89,1мс|56,2мс|28,2мс|
+| Slow tutorial3D |Нет парной метрики|60,3мс|Не достигнут|
+
+Home в direct стал медленнее, practice — быстрее. Это **не строгий A/B** и не доказательство универсального ускорения, целевых Mac60FPS/phone30FPS или личной визуальной приёмки. Показатели — интервалы callback кадров в software-rendered CI. Online использовал2D; его0 в поле frameP95 означает отсутствие инструмента, не измеренное нулевое время.
+
+Полные cold transfer estimates у обоих jobs:4 773 709/4 773 703байт,<6MB, с прежней погрешностью заголовков. Build SHA-256 совпали: main **`7054ab173103096825bcb06e1dd4cbea617c997b4fb6839f9d54731f9e2855a3`**, worker **`5cf8fa2433a0cb7cd73ca3ae802852a1624433b03f4c41c620b070f3f2c00035`**, index **`166e0c75a4271de8d87a86dbb8895a6264400275e040756936ff35ca295fee89`**; runner **`80d57e2a538b9a8f25b660a9049abd97536709f233e81690f0d5ad566edcea42`**, helper **`bac3ba2a7d6ac80f7cec7c9dcf91da4291d4dbbae73ab867fb8ebb73291ae1f7`**. Полные completed logs, reconstructed reports, identity и bounded trajectories сохранены под ignored `.qa/test-bench-ci/candidate10-{direct-extended,rtt120}-*`.
+
+### Единственная диагностика первого пустого урока после RTT10
+
+Предварительно объявлены16 свежих headless запусков: settling0/15/60/180 neutral ticks × прежняя HUD-policy target14/speed3 при решениях100/250/500мс и один full-W вариант для каждой истории. Точная учебная машина: Universal с frontterrain,rearroad,economy,large,platform,auxnull; одна капсула остаётся at-dock. Рёбра0,10 и остальная учебная геометрия не менялись. Максимум1800 total ticks, включаяsettling; никаких E/R или pose/velocity/cargo injections.
+
+Full W достиг неизменённого z≥13 во всех4 случаях за168–172 driving ticks (2,80–2,87simsec). Прежняя HUD-policy прошла9/12; три неудачи: settling0/cadence500мс,z12,721154;60/250мс,z12,717104;180/250мс,z12,713818. Во всех100мс случаях цель достигнута. Каждая неудачная машина в последних5simsec получала полный W на300/300ticks, но продвинулась лишь на0,0053–0,0113м; ранее контроллер тормозил при подходе к последнему ребру. Это физически записанное отсутствие прогресса; конкретный contact manifold не измерен.
+
+Проверка4 full-W cases PASS, все3 неудачи прежней политики сохранены, повторов для получения PASS не было. Диагностика поддерживает **узкую QA-only поправку первого упражнения**: удерживать W до обычного Next и z≥13, затем отпустить; исходный30-секундный timeout и отсутствие retry сохранены. Физика, цель, остальные упражнения и правила игры не меняются. Точная причина CI10 остаётся неизвестной без его input history; матрица проверяет новый способ управления, не выдаётся за точный replay или браузерный цикл.
+
+Материалы всех16 per-tick histories и исходный plan — ignored `.qa/test-bench/tutorial-empty-matrix/`; report SHA-256 **`65a31ae265286d6c54b3cd1a1afb6ef74a0b923a67f4fdecd459bc48a4c1be9e`**. Новый runner записывает также начальный урок: initial/outcome/failure HUD, реальные keyboard dispatch/ack, наблюдения и их интервалы. Source syntax/ESLint/diff PASS; успешность в новом браузерном job ещё не подтверждена.
+
+### Остальной завершённый CI10
+
+[Ordinary check141061718350](https://github.com/decorum-guy/iva-games/actions/runs/46171821028/job/141061718350) — **SUCCESS**:108 test files / **1323 tests**,37,83с; deploy Python49,chess-home8,portal18 (21,0с),territorialTradeRetry6,QA helper26,controls11. Новый room-cleanup вошёл в непрофильтрованный portal suite: это browser UI с mocked API. Отдельный настоящий platform HTTP/SQLite тест подтверждает изоляцию участников, restart и восстановление скрытой истории; `platform.test.ts`26 PASS. Эти методы не смешиваются в утверждение о целиком реальном UI→backend hide-flow.
+
+Все сборки, Test Bench production HTTP/WS/restart/assets и прежние portal/game regressions прошли. District compact —6 variants PASS. Territorial —24 rounds,258 commands,revision374,one winner,restarted/trade=true;6мин40,349с. [Overdrive141061718035](https://github.com/decorum-guy/iva-games/actions/runs/46171821028/job/141061718035) —16 PASS/2 SKIPPED,1,5мин. [Colossus141061718346](https://github.com/decorum-guy/iva-games/actions/runs/46171821119/job/141061718346) —138 game units,84 server tests,36 browser PASS/2 SKIPPED,3,9мин.
+
+[Image validation46171821013](https://github.com/decorum-guy/iva-games/actions/runs/46171821013) —SUCCESS: platform141061717718 и chess141061717957 проверили initial/restored health/HTML/JS/CSS/API sessions и соответственно2/3 SQLite. **Publish141062085474 и deploy141062085493 SKIPPED**. Все проверенные jobs использовали checkout a48f8e67/tree588001c7. Общий platform run остаётся **FAIL из-за двух целевых browser jobs**. Финальная проверка refs: main7c2be21, PR44 draft/open/unmerged, head d60256eb. Итог и excerpts сохранены в ignored `.qa/test-bench-ci/candidate10-ci-summary.json`.
+
+Независимый read-only review нового first-crossing helper подтвердил: только реальный W до штатного Next/z≥13; неизменённые30с, без retry, без state injection; проверяются настоящий шаг урока и капсула at-dock; ошибки отпускания клавиш и evidence не подавляются. Runner SHA-256 **`aae9c47a717ce4b0b60b234e08aca0fb266e848d59b2d659197be6d642612d1b`**. Production Scene, TestBench UI и physics имеют прежние hashes кандидата10; эта следующая поправка относится к QA-управлению и диагностике.
+
+### Узкое исправление QA-распознавания медленного упора после Direct10
+
+Source review и сохранённые samples показывают пробел прежней escape policy, а не отказ штатного R или зачёта. Перед gate4 центр Alice так и не пересёк z31; итоговое z30,72425, три secured груза по92HP. В сохранённых десяти заряженных samples скорость выше0,08; окна96–97ticks дали ΔXZ0,13957–0,14423м. Поэтому одного увеличения скоростного порога недостаточно: прежний якорь0,10м тоже мешает длительному накоплению. Это вывод по ограниченному trace, **не восстановленный непрерывный state detector**.91 промежуточный compact sample вытеснен; точное начало контакта неизвестно.
+
+Новый helper использует только QA-пределы **|speed|<0,20м/с, ΔXZ<0,30м в окне90 simulation ticks**. Normal Precision policy требует1,85м/с либо1,6 при большой ошибке направления; при таком медленном ходе она уже планирует полный газ.0,20 — не более12,5% минимальной цели, а0,30м =0,20×90/60. Все прежние условия свежести, advancing ack, scope/gate/reset, дистанции до следующего gate≤1,5м, живого secured груза, заряда, tilt<65°, реального газа без тормоза и latch сохранены. Нормальное движение0,4м/с не подходит. Правила игры, физика, карты, R hold/штраф, deadlines, доставка и подсчёт кубка не менялись.
+
+Trigger evidence теперь сохраняет измеренные speed/anchorDisplacement и применённые limits. Запрос по-прежнему отдельно подтверждается обычными клавишами, HTTP receipt и новым public reset counter; последующий finish проверяется независимо. **Более ранний R не объявляется доказанным спасением Alice**: хвост начинается лишь с3,91 заряда, прежние недостающие samples не реконструируются.
+
+Целевые tests **30/30 PASS**, ESLint/diff PASS. Новый тест использует четыре настоящие точки Alice ticks2951/2984/3016/3048; линейные промежуточные позиции, регулярные15Hz наблюдения/30Hz ack и непрерывный газ **явно синтетические**, не browser/physics replay. Сохранены stationary/moving0,4/braking/stale/ack/scope/reset/latch guards; добавлены граница0,20 и новая полная пауза накопления после ускорения. Guard реального прогресса обновлён с0,11 на0,31м в соответствии с новым измеряемым окном, не с игровым зачётом ворот.
+
+Standalone `tsc --noEmit -p apps/platform/tsconfig.json` получил **FAIL** на двух чужих District `ImportMeta.glob` без деклараций Vite. Это не каноническая `typecheck:platform` из package.json, использующая корневой `tsconfig.platform.json`; исходная ошибка сохранена. Один platform check с явными `--types node,vite/client` и один strict/bundler helper+test check с теми же declarations прошли. Чужие configs/District не менялись. Канонический общий check требует нового CI.
+
+Замороженные SHA-256: QA helper **`0c83f034428e9945564b87cdcbbd32bd054ea1cb5f3f4529e06fc0bc55c00acc`**, targeted tests **`0fb1cc1c13287d44d0796daa9367d6bf99f4d2e0b9aca85ceb52fdb761533732`**. Методы, исходный FAIL и последующие конкретные static PASS сохранены в ignored `.qa/test-bench/candidate11-qa-driver-validation.json`. Дополнительных физических/браузерных прогонов или performance benchmarks в этой поправке не было; будущий полный кубок требует свежего браузерного подтверждения.
+
+Независимый read-only review проверил runner/helper/test на этих exact hashes: блокирующих source-дефектов не обнаружено, все четыре выбранные точки Alice сверены с Direct10 record26/profile0, production rules и строгие finish assertions сохранены. Это не дополнительный test run и не подтверждение будущей непрерывной eligibility или финиша. Новая контрольная точка объединяет обе QA-поправки и журнал завершённого CI10; источник игры остаётся кандидатом10, а сценарии приёмки требуют нового запуска.
