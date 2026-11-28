@@ -2,7 +2,7 @@
 // SQLite; this is runtime/persistence acceptance, not a completed expedition.
 import assert from 'node:assert/strict';
 import { createHash, createPrivateKey, randomBytes, randomUUID, sign } from 'node:crypto';
-import { readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
 import Database from 'better-sqlite3';
 import { WebSocket } from 'ws';
 
@@ -10,7 +10,10 @@ const [phase, revision] = process.argv.slice(2);
 assert.ok(['initial', 'restored'].includes(phase));
 assert.notEqual(process.getuid(), 0);
 const origin = 'https://iva-games.pro', base = 'http://127.0.0.1:4320', protocolVersion = 'iva-realtime@1';
-const key = createPrivateKey(readFileSync('/ci-keys/private.pem'));
+const signerPath = '/tmp/iva-ci-private.pem';
+assert.equal(statSync(signerPath).mode & 0o777, 0o600);
+assert.equal(statSync(signerPath).uid, process.getuid());
+const key = createPrivateKey(readFileSync(signerPath));
 const canonical = value => JSON.stringify(value, (_key, item) => item && typeof item === 'object' && !Array.isArray(item)
   ? Object.fromEntries(Object.keys(item).sort().map(name => [name, item[name]])) : item);
 const signature = (purpose, payload) => sign(null, Buffer.from(`${purpose}\n${payload}`), key).toString('base64url');

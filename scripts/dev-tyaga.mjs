@@ -6,7 +6,7 @@ import { createServer as createHttpServer, request as httpRequest } from 'node:h
 import { createServer as createNetServer } from 'node:net';
 import { spawn, spawnSync } from 'node:child_process';
 import { mkdir, readFile, writeFile, readdir, readlink, stat, open, unlink } from 'node:fs/promises';
-import { join, relative } from 'node:path';
+import { join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { tyagaQaConfig } from './tyaga-qa-config.mjs';
 
@@ -222,12 +222,23 @@ try {
     await run('npm', ['run', 'build:realtime']);
   }
   const signing = await keys();
-  const commit = spawnSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).stdout.trim();
-  const dirty = !!spawnSync('git', ['status', '--porcelain'], { cwd: root, encoding: 'utf8' }).stdout.trim();
+  const runnerCommit = spawnSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).stdout.trim();
+  const runnerDirty = !!spawnSync('git', ['status', '--porcelain'], { cwd: root, encoding: 'utf8' }).stdout.trim();
+  let commit = runnerCommit, dirty = runnerDirty;
   const artifacts = [...await digestFiles(join(root, 'dist-realtime')), ...await digestFiles(join(root, 'dist-platform')), ...await digestFiles(join(root, 'games/tyaga/dist')), ...await digestFiles(join(root, 'apps/portal/dist'))];
   const artifactHash = createHash('sha256').update(JSON.stringify(artifacts)).digest('hex');
+  // A later CI/test-only commit does not rebuild a running acceptance candidate.
+  // Reuse its recorded source revision only after hashing every actual file.
+  if (process.env.TYAGA_QA_BUILD_RECORD) {
+    if (!args.has('--no-build')) throw new Error('A frozen build record requires --no-build');
+    const recordPath = resolve(root, process.env.TYAGA_QA_BUILD_RECORD);
+    if (!relative(root, recordPath).startsWith('.qa/')) throw new Error('Build record must belong to this checkout’s QA directory');
+    const record = JSON.parse(await readFile(recordPath, 'utf8'));
+    if (record.artifactHash !== artifactHash || !/^[a-f0-9]{40}$/.test(record.commit ?? '') || typeof record.dirty !== 'boolean') throw new Error('Frozen build record does not match the actual artifacts');
+    commit = record.commit; dirty = record.dirty;
+  }
   buildId = `${commit.slice(0, 12)}${dirty ? '-dirty' : ''}-${artifactHash.slice(0, 12)}`;
-  await writeFile(join(qa, 'build.json'), JSON.stringify({ commit, dirty, buildId, artifactHash, artifacts }, null, 2), { mode: 0o600 });
+  await writeFile(join(qa, 'build.json'), JSON.stringify({ commit, dirty, buildId, artifactHash, artifacts, runnerCommit, runnerDirty }, null, 2), { mode: 0o600 });
   const common = { NODE_ENV: 'development', TELEGRAM_ENABLED: 'false', TELEGRAM_AUTH_ENABLED: 'false' };
   const allowedOrigins = Object.values(ports).map(port => `http://127.0.0.1:${port}`).join(',');
   realtimeLaunch = { file: 'dist-realtime/main.js', env: { ...common, REALTIME_HOST: '127.0.0.1', REALTIME_PORT: String(ports.realtime),

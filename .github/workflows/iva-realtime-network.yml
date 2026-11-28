@@ -24,6 +24,8 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: '24'
+      - name: Check impairment profiles and evidence classification
+        run: node --test scripts/realtime-network-profile.test.mjs scripts/realtime-network-errors.test.mjs scripts/realtime-load-view.test.mjs
       - name: Build the candidate bytes
         run: docker build --build-arg VCS_REF="$(git rev-parse HEAD)" --file Dockerfile.realtime --tag "$IMAGE_TAG" .
       - name: Check real TCP delay, jitter, loss and reconnect in an isolated namespace

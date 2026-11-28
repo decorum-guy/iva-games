@@ -100,7 +100,7 @@ async function walkByKeyboard(client, command) {
   if (await client.page.locator('dialog[open]').count()) throw new Error('Close the UI panel before walking');
   await client.page.locator('.ty-world canvas').focus();
   const started=Date.now(), trace=[], held=new Set(), tolerance=command.tolerance??.35;
-  let reached=false;
+  let reached=false, failure=null;
   try {
     while(Date.now()-started<Math.min(command.maxMs??12000,30000)) {
       const view=client.view, self=view?.participants.find(p=>p.participantId===view.participantId), actor=view?.entities.find(e=>e.id===self?.entityId);
@@ -118,8 +118,12 @@ async function walkByKeyboard(client, command) {
       trace.push({tick:view.tick,position:actor.position,keys,duration});
       await client.page.waitForTimeout(100);
     }
-  } finally {for(const key of held)await client.page.keyboard.up(key);}
-  await appendFile(resolve(directory,'keyboard-navigation.jsonl'),JSON.stringify({target:{x:command.x,z:command.z},reached,trace})+'\n');
+  } catch(error) { failure=error; }
+  finally {
+    for(const key of held)await client.page.keyboard.up(key);
+    await appendFile(resolve(directory,'keyboard-navigation.jsonl'),JSON.stringify({target:{x:command.x,z:command.z},reached,error:failure?.message??null,trace})+'\n');
+  }
+  if(failure)throw failure;
   console.log(JSON.stringify({keyboardNavigation:true,reached,steps:trace.length,last:trace.at(-1)?.position}));
 }
 async function driveByKeyboard(client, command) {
@@ -127,7 +131,7 @@ async function driveByKeyboard(client, command) {
   if (await client.page.locator('dialog[open]').count()) throw new Error('Close the UI panel before driving');
   await client.page.locator('.ty-world canvas').focus();
   const started=Date.now(), trace=[], held=new Set(), tolerance=Math.max(.5,command.tolerance??1);
-  let reached=false;
+  let reached=false, failure=null;
   const changeKeys=async keys=>{for(const key of held)if(!keys.includes(key)){await client.page.keyboard.up(key);held.delete(key);}for(const key of keys)if(!held.has(key)){await client.page.keyboard.down(key);held.add(key);}};
   try {
     while(Date.now()-started<Math.min(command.maxMs??15000,30000)) {
@@ -144,13 +148,24 @@ async function driveByKeyboard(client, command) {
       await changeKeys(keys);trace.push({tick:view.tick,position:truck.position,rotation:q,speed,error,keys});
       await client.page.waitForTimeout(180);
     }
-  } finally {
-    await changeKeys([]);
-    if(client.view?.participants.find(p=>p.participantId===client.view.participantId)?.controlling==='truck'&&client.snapshot?.phase==='running'){await changeKeys(['Space']);await client.page.waitForTimeout(650);await changeKeys([]);}
-    const parking=client.page.getByRole('button',{name:/^(Стояночный|Parking brake)$/});
-    if(await parking.count()&&await parking.getAttribute('aria-pressed')==='false'&&await parking.isEnabled())await parking.click();
+  } catch(error) { failure=error; }
+  finally {
+    try {
+      await changeKeys([]);
+      const settleUntil=Date.now()+6000;
+      while(Date.now()<settleUntil&&['paused','recovering'].includes(client.snapshot?.phase))await client.page.waitForTimeout(100);
+      if(client.view?.participants.find(p=>p.participantId===client.view.participantId)?.controlling==='truck'&&client.snapshot?.phase==='running'&&client.snapshot.hasControl){
+        await changeKeys(['Space']);await client.page.waitForTimeout(650);await changeKeys([]);
+        const parking=client.page.getByRole('button',{name:/^(Стояночный|Parking brake)$/});
+        if(await parking.count()&&await parking.getAttribute('aria-pressed')==='false'&&await parking.isEnabled())await parking.click();
+      }
+    } catch(error) { failure??=error; }
+    finally {
+      await changeKeys([]);
+      await appendFile(resolve(directory,'keyboard-driving.jsonl'),JSON.stringify({target:{x:command.x,z:command.z},reached,error:failure?.message??null,trace})+'\n');
+    }
   }
-  await appendFile(resolve(directory,'keyboard-driving.jsonl'),JSON.stringify({target:{x:command.x,z:command.z},reached,trace})+'\n');
+  if(failure)throw failure;
   console.log(JSON.stringify({keyboardDriving:true,reached,steps:trace.length,last:trace.at(-1)?.position}));
 }
 async function execute(command) {

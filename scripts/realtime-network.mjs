@@ -8,6 +8,7 @@ import { spawnSync } from 'node:child_process';
 import { WebSocket } from 'ws';
 import { applyLoadChanges } from './realtime-load-view.mjs';
 import { unexpectedNetworkErrors } from './realtime-network-errors.mjs';
+import { netemProfile } from './realtime-network-profile.mjs';
 
 const args = new Map();
 for (let index = 2; index < process.argv.length; index += 2) {
@@ -30,15 +31,10 @@ function command(name, commandArgs) {
   return result.stdout;
 }
 function impairment(profile) {
-  if (!netem) return;
-  const commandArgs = ['qdisc', 'replace', 'dev', 'lo', 'root', 'handle', '1:', 'netem'];
-  if (profile.rttMs || profile.jitterMs) {
-    commandArgs.push('delay', `${profile.rttMs / 2}ms`);
-    if (profile.jitterMs) commandArgs.push(`${profile.jitterMs / 2}ms`, 'distribution', 'normal');
-  }
-  if (profile.lossPercent) commandArgs.push('loss', `${profile.lossPercent}%`);
-  if (commandArgs.at(-1) === 'netem') commandArgs.push('delay', '0ms');
+  if (!netem) return null;
+  const { args: commandArgs, applied } = netemProfile(profile);
   command('tc', commandArgs); ownedQdisc = true;
+  return applied;
 }
 const clearImpairment = () => { if (ownedQdisc) { command('tc', ['qdisc', 'del', 'dev', 'lo', 'root', 'handle', '1:']); ownedQdisc = false; } };
 async function waitUntil(predicate, timeoutMs = 20_000, message = 'Expected protocol state') {
@@ -166,8 +162,8 @@ try {
   connected.forEach(client=>client.stop());await sleep(100);
   const profiles=netem?[0,80,160,300].flatMap(rttMs=>[0,30].flatMap(jitterMs=>[0,1,5].map(lossPercent=>({rttMs,jitterMs,lossPercent})))):[{rttMs:0,jitterMs:0,lossPercent:0}];
   for (const profile of profiles) {
-    impairment(profile);connected=await pair();const before=connected.map(client=>client.frames);await sleep(8000);
-    const sample={...profile,measuredSeconds:8,clients:connected.map((client,index)=>({frames:client.frames-before[index],closed:client.closed,errors:client.errors,errorCount:client.errorCount,
+    const applied=impairment(profile);connected=await pair();const before=connected.map(client=>client.frames);await sleep(8000);
+    const sample={...profile,applied,measuredSeconds:8,clients:connected.map((client,index)=>({frames:client.frames-before[index],closed:client.closed,errors:client.errors,errorCount:client.errorCount,
       heartbeatRtt:{count:client.rtts.length,p50Ms:quantile(client.rtts,.5),p99Ms:quantile(client.rtts,.99)}})),
       qdisc:netem?JSON.parse(command('tc',['-j','-s','qdisc','show','dev','lo'])):null};
     assert.ok(sample.clients.every(client=>client.frames>1),'Both clients must receive state under the requested impairment');
@@ -180,7 +176,7 @@ try {
   }
   if(netem)for(const seconds of [1,5,15]) {
     connected=await pair();const previous=connected[0].snapshot,started=performance.now();
-    impairment({rttMs:0,jitterMs:0,lossPercent:100});await sleep(seconds*1000);const qdisc=JSON.parse(command('tc',['-j','-s','qdisc','show','dev','lo']));
+    const applied=impairment({rttMs:0,jitterMs:0,lossPercent:100});await sleep(seconds*1000);const qdisc=JSON.parse(command('tc',['-j','-s','qdisc','show','dev','lo']));
     clearImpairment();const actualBlackholeSeconds=(performance.now()-started)/1000;
     const interruptedClients=connected.map(client=>({closed:client.closed,errors:[...client.errors],errorCount:client.errorCount}));
     for(const client of interruptedClients){assert.equal(client.errorCount,client.errors.length,'Error evidence overflow');assert.deepEqual(unexpectedNetworkErrors(client.errors,100),[],'Unexpected error during TCP blackhole');}
@@ -194,7 +190,7 @@ try {
     }
     await first.ready();const second=await new Client(participants[1]).ready();connected=[first,second];for(const client of connected)assertRetained(client,expected);
     const retry=await first.action(actionId,payload);assert.equal(retry.committedJournalSeq,receipt.committedJournalSeq);
-    const sample={requestedSeconds:seconds,actualBlackholeSeconds,recoveryElapsedSeconds:(performance.now()-started)/1000-actualBlackholeSeconds,previousWorldTick:previous.worldTick,firstReturn,qdisc,interruptedClients,
+    const sample={requestedSeconds:seconds,actualBlackholeSeconds,applied,recoveryElapsedSeconds:(performance.now()-started)/1000-actualBlackholeSeconds,previousWorldTick:previous.worldTick,firstReturn,qdisc,interruptedClients,
       sameMatch:true,singleItemRetained:true,receiptRetained:true};outages.push(sample);console.log(JSON.stringify({event:'network-outage',...sample}));
     connected.forEach(client=>client.stop());await sleep(100);
   }
@@ -202,7 +198,8 @@ try {
   assert.equal(health.activeMatches,1);assert.equal(health.failedMatches,0);
   report={passed:true,mode,netemExecuted:netem,matrixComplete:netem&&cases.length===24&&outages.length===3,manifest:prepared.status.manifest,
     matchId:prepared.matchId,ordinaryCrateApproach:true,unpackedPhysicalItems:1,crateMassDecreaseKg:6,applicationAckLossDeduplicated:true,cases,outages,
-    limitations:['Protocol clients, not browser/mobile/rendered acceptance.','Netem loss affects real TCP packets; RTT and jitter are requested settings, observed heartbeat RTT is reported separately.','This does not complete a map or measure hour-long capacity.']};
+    limitations:['Protocol clients, not browser/mobile/rendered acceptance.','Netem loss affects real TCP packets; RTT and jitter are requested settings, observed heartbeat RTT is reported separately.',
+      'Zero nominal RTT with nonzero jitter applies a reported 0.001 ms one-way base: tc rejects a normal distribution at exactly zero latency.','This does not complete a map or measure hour-long capacity.']};
 } catch(error) { report={passed:false,mode,netemExecuted:netem,matrixComplete:false,error:error.message,manifest:prepared?.status.manifest,cases,outages}; }
 finally {
   for(const client of clients)client.stop();
