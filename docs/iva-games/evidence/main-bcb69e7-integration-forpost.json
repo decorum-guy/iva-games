@@ -1,0 +1,97 @@
+{
+  "schema": "iva-forpost-main-integration-1",
+  "sourceAudit": {
+    "format": "iva-main-bcb69e7-preservation-audit-v1",
+    "source": "Direct exact Git fetch, immutable commit diffs and source inspection; no browser or runtime execution.",
+    "base": "fc91c1c68f4b81d9a2ab4ad64274d11aaa0a3d4e",
+    "currentCandidate": "48178562e0feef9b7ac5987d1c588b0dc12da6ec",
+    "incomingMain": "bcb69e7f5d474e63d67862b87652dd325b640481",
+    "incomingTree": "2ec69e1e82d6b1bf60936ba01447bd08497a4845",
+    "auditRef": "refs/qa/rules-core/main-bcb69e7",
+    "changedPaths": [
+      "AGENTS.md",
+      "docs/iva-games/BUILD_STATUS.md",
+      "docs/iva-games/DISTRICT_BROWSER_RETRY_SYNC_2026_11_28.md",
+      "docs/iva-games/KNOCK_FIRST_3D_REWORK_2026_11_28.md",
+      "docs/iva-games/README.md",
+      "scripts/district-territorial-browser.mjs"
+    ],
+    "overlappingPaths": [
+      "AGENTS.md",
+      "scripts/district-territorial-browser.mjs"
+    ],
+    "criticalPathDelta": {
+      "games/forpost": [],
+      "apps/realtime-server": [],
+      "packages/realtime-kit": [],
+      "apps/platform": [],
+      "apps/portal": [],
+      "packages/game-registry": [],
+      ".github/workflows": [],
+      "package.json": [],
+      "package-lock.json": [],
+      "Dockerfile.realtime": []
+    },
+    "newAgentsSection": "Knock First art/functional assignments only; retain alongside existing Forpost/Tyaga full-cycle directions. No Forpost rule/runtime change.",
+    "script": {
+      "path": "scripts/district-territorial-browser.mjs",
+      "baselineSha256": "42f462f3131a3550897755674946d55aff473eeedfdeb08464675987e2128efe",
+      "acceptedMainSha256": "0bd32e5f18849011b95b9f6ac9111030a78795b11cf9e36b6d6a6d94b2f6f845",
+      "mergedCandidateSha256": "e57fed4b9ab025cf71fcc51fff616ba1de5a48b0fa5cd752e5c59f424019e369",
+      "preservesAcceptedMain": [
+        "single author click, UI-owned retry",
+        "DISTRICT_FORCE_AUTHOR_STALE=1 first-command expectedRevision-1 real transport fault injection",
+        "all response action IDs equal",
+        "sanitized action/status/forcedStale retry summary",
+        "response listener and exact owned route cleanup"
+      ],
+      "preservesBranch": [
+        "accept/cancel expected action type",
+        "original offer-group membership",
+        "nonempty same action ID",
+        "safe integer and increasing retry revision",
+        "same recipient and decision payload; group cancellation may move only to another original group member",
+        "maximum five attempts, only explicit409 STALE_REVISION retries",
+        "final200 required",
+        "byte-identical ordinary action retry tail and author offerIds callsites"
+      ],
+      "testsExecuted": false,
+      "syntaxCheckExecuted": false
+    },
+    "trackedEdits": false,
+    "mergePerformed": false,
+    "commitsOrPushes": false,
+    "newDeploymentClaim": false,
+    "limits": [
+      "Compatibility candidate is source-reviewed only and must be checked after root performs the normal merge.",
+      "Existing local checks remain tied to4817856; this audit does not relabel them as merged-head checks.",
+      "Incoming main changes no Forpost, shared runtime, platform adapter, catalog or build inputs in the inspected delta."
+    ],
+    "artifactSha256": {
+      "from-4817856.patch": "6a08e0390fd6a33fcb647035fa43502c7c2f84151a1ae2e7277d428e8a90f367",
+      "from-bcb69e7.patch": "3f18541584ebf52d93d9327fdcf46ff8df5072217d4ecd4586de96cf477d2805",
+      "AGENTS-addition.md": "13770b5277be30be9bfda0e1e81387829a61875f428967926491788a76c52f7f"
+    }
+  },
+  "rootIntegration": {
+    "mergeCommit": "44fe1e7f0626ed628200ad38e7a2354b221dca84",
+    "tree": "efb1cf972fbc0f4a7de0a8a3cb2b15ff8f9a3982",
+    "method": "Normal no-ff merge; one District helper conflict resolved with the reviewed compatible copy.",
+    "syntaxCommand": [
+      "node",
+      "--check",
+      "scripts/district-territorial-browser.mjs"
+    ],
+    "syntaxExitCode": 0,
+    "lintCommand": [
+      "npx",
+      "eslint",
+      "scripts/district-territorial-browser.mjs"
+    ],
+    "lintExitCode": 0,
+    "forpostSourceFingerprintUnchanged": true,
+    "forpostCoreFingerprintUnchanged": true,
+    "incomingDocumentsPreserved": true,
+    "nativeCombinedBrowserValidation": "pending"
+  }
+}

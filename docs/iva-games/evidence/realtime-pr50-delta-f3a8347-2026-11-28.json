@@ -1,0 +1,333 @@
+{
+  "schema": "iva-realtime-pr50-delta-audit-2",
+  "method": "Exact commit fetch into own namespaced refs; read-only Git tree/blob/diff and targeted source inspection plus GitHub PR metadata. No execution acceptance.",
+  "githubMetadata": {
+    "number": 50,
+    "url": "https://github.com/decorum-guy/iva-games/pull/50",
+    "state": "open",
+    "draft": true,
+    "merged": false,
+    "headSha": "f3a8347a11241ffdea677ff5ec391f227907cb29",
+    "baseSha": "7c2be21db5743b15b4a42d708ac959039c6b725e",
+    "updatedAt": "2026-11-28T19:08:04Z"
+  },
+  "fetchedRefs": {
+    "pullRequest": "refs/qa/rules-core/pr50-f3a8347",
+    "main": "refs/qa/rules-core/main-fc91c1c"
+  },
+  "baseline": {
+    "commit": "848c626481a8ada589fb7e3d742af1f47d028e73",
+    "tree": "c1aed62a254744803655048cff4e41d6c369ddd9",
+    "parents": [
+      "b7ab9ed4265b819299d082e21a6a3957ba1d07de",
+      "7c2be21db5743b15b4a42d708ac959039c6b725e"
+    ]
+  },
+  "head": {
+    "commit": "f3a8347a11241ffdea677ff5ec391f227907cb29",
+    "tree": "a26cca311ff918630aa55c1189be45a3b792d179",
+    "parents": [
+      "848c626481a8ada589fb7e3d742af1f47d028e73"
+    ]
+  },
+  "pullRequestDelta": {
+    "newCommits": 1,
+    "changedPathCount": 10,
+    "changedPaths": [
+      "M\tapps/realtime-server/README.md",
+      "M\tapps/realtime-server/qa/CAPACITY_REVIEW.md",
+      "M\tdeploy/iva-games/REALTIME_BOOTSTRAP.md",
+      "M\tgames/tyaga/ACCEPTANCE.md",
+      "M\tgames/tyaga/PHYSICS_QA.md",
+      "M\tgames/tyaga/STATUS.md",
+      "M\tgames/tyaga/qa/UI_ELEMENTS.json",
+      "M\tgames/tyaga/src/core/config.ts",
+      "M\tgames/tyaga/src/server-world/world.ts",
+      "A\tgames/tyaga/tests/bot-scheduling.test.ts"
+    ],
+    "sharedProductionDelta": [],
+    "productionSourceBlobs": [
+      {
+        "path": "games/tyaga/src/core/config.ts",
+        "before": "35850e1704c69ca5075695a2340eb0c4ed5e2961",
+        "after": "22ad1a5c89ea85a6838086cbd8bad3e589d52383"
+      },
+      {
+        "path": "games/tyaga/src/server-world/world.ts",
+        "before": "fd826ea9cf4109bb06b1a755c42f65a7a0c4909e",
+        "after": "d9cbba086e0012bdcda0b846920dcb6e1378475b"
+      }
+    ],
+    "sourceBehavior": "Bot decisions use fixed seatIndex%6 phases, each still every six 60 Hz steps. First phase uses neutral input; cached bot input is deleted on controller kind/generation change.",
+    "addedTestSource": "games/tyaga/tests/bot-scheduling.test.ts contains cadence, exact restored continuation and neutral controller-transition scenarios; not executed by this audit.",
+    "effectiveTyagaVersions": {
+      "before": {
+        "RULES_VERSION": "tyaga@0.1",
+        "CONTENT_VERSION": "tyaga-expedition@4",
+        "BOT_VERSION": "tyaga-bots@2",
+        "physicsBuildHash": "rapier3d-0.21.0:17cfa80eebd8de0291b948496dbffba724b98b489687f8272ca236a7bbf1dd4b:tyaga-solver-12-4-rope64-v9"
+      },
+      "after": {
+        "RULES_VERSION": "tyaga@0.1",
+        "CONTENT_VERSION": "tyaga-expedition@4",
+        "BOT_VERSION": "tyaga-bots@3",
+        "physicsBuildHash": "rapier3d-0.21.0:17cfa80eebd8de0291b948496dbffba724b98b489687f8272ca236a7bbf1dd4b:tyaga-solver-12-4-rope64-v10"
+      }
+    },
+    "versionConsequence": "Unchanged adapter reads BOT_VERSION and PHYSICS_BUILD_HASH, so the effective game manifest changes. TyagaWorld.restore still rejects a different physicsBuildHash. Future integration must preserve exact retained old workers/readers rather than pass old v9 snapshots directly to v10.",
+    "documentationDelta": "Six Markdown reports/bootstrap notes and one UI registry update. Reported CI/netem/capacity/browser outcomes belong to their named Tyaga revisions and were not independently rerun or credited to Forpost here.",
+    "fixturesOnly": false
+  },
+  "unchangedCriticalContractScopes": [
+    {
+      "scope": "packages/realtime-kit",
+      "beforeObject": "6380f62288cfc5a0bf4611b99da53203d0ed1ecc",
+      "afterObject": "6380f62288cfc5a0bf4611b99da53203d0ed1ecc",
+      "objectType": "tree",
+      "unchanged": true
+    },
+    {
+      "scope": "packages/session-kit",
+      "beforeObject": "d4ee70a3f305579d7f4ff4b7aea688df54802f89",
+      "afterObject": "d4ee70a3f305579d7f4ff4b7aea688df54802f89",
+      "objectType": "tree",
+      "unchanged": true
+    },
+    {
+      "scope": "packages/game-registry",
+      "beforeObject": "4258b5002323dc6de712fd1277939dcd69fdb1ad",
+      "afterObject": "4258b5002323dc6de712fd1277939dcd69fdb1ad",
+      "objectType": "tree",
+      "unchanged": true
+    },
+    {
+      "scope": "apps/realtime-server/src/crypto.ts",
+      "beforeObject": "1bc3ca071e2e78379eb1ff033763b19d69c01d1c",
+      "afterObject": "1bc3ca071e2e78379eb1ff033763b19d69c01d1c",
+      "objectType": "blob",
+      "unchanged": true
+    },
+    {
+      "scope": "apps/realtime-server/src/storage.ts",
+      "beforeObject": "bddb3937fd7b6217b6de4f12dfc4f8c1ab66822f",
+      "afterObject": "bddb3937fd7b6217b6de4f12dfc4f8c1ab66822f",
+      "objectType": "blob",
+      "unchanged": true
+    },
+    {
+      "scope": "apps/realtime-server/src/adapter.ts",
+      "beforeObject": "e47ff0416f688667d081a08065f9b425f40ad217",
+      "afterObject": "e47ff0416f688667d081a08065f9b425f40ad217",
+      "objectType": "blob",
+      "unchanged": true
+    },
+    {
+      "scope": "apps/realtime-server/src/artifacts.ts",
+      "beforeObject": "ead37af71af72bf96d36d0187f7fc6a7f47dab37",
+      "afterObject": "ead37af71af72bf96d36d0187f7fc6a7f47dab37",
+      "objectType": "blob",
+      "unchanged": true
+    },
+    {
+      "scope": "apps/realtime-server/src/client-content.ts",
+      "beforeObject": "c38db3a5901cc297a9157cd186d525f07186fd5e",
+      "afterObject": "c38db3a5901cc297a9157cd186d525f07186fd5e",
+      "objectType": "blob",
+      "unchanged": true
+    },
+    {
+      "scope": "apps/realtime-server/src/main.ts",
+      "beforeObject": "dce4306df96bc7d2c33fae74bf6af09007fd8bf1",
+      "afterObject": "dce4306df96bc7d2c33fae74bf6af09007fd8bf1",
+      "objectType": "blob",
+      "unchanged": true
+    },
+    {
+      "scope": "apps/realtime-server/src/simulation-worker.ts",
+      "beforeObject": "ef2680881fb75f31379d4d6d505a89b0764160f0",
+      "afterObject": "ef2680881fb75f31379d4d6d505a89b0764160f0",
+      "objectType": "blob",
+      "unchanged": true
+    },
+    {
+      "scope": "apps/platform/src/main.ts",
+      "beforeObject": "357ac2a44f2986533ff6cdb24e66d02ef4298175",
+      "afterObject": "357ac2a44f2986533ff6cdb24e66d02ef4298175",
+      "objectType": "blob",
+      "unchanged": true
+    },
+    {
+      "scope": "Dockerfile.realtime",
+      "beforeObject": "b0535b8827054b3f644c216a96b30a3fc2fc8341",
+      "afterObject": "b0535b8827054b3f644c216a96b30a3fc2fc8341",
+      "objectType": "blob",
+      "unchanged": true
+    },
+    {
+      "scope": "deploy/iva-games/activation.py",
+      "beforeObject": "ff71c4211ed72673fdeb0eb75734b530531dc2d4",
+      "afterObject": "ff71c4211ed72673fdeb0eb75734b530531dc2d4",
+      "objectType": "blob",
+      "unchanged": true
+    },
+    {
+      "scope": "deploy/iva-games/verify-realtime-image.sh",
+      "beforeObject": "bef0375afd94df9cd247a52b00c88c9fae52955c",
+      "afterObject": "bef0375afd94df9cd247a52b00c88c9fae52955c",
+      "objectType": "blob",
+      "unchanged": true
+    }
+  ],
+  "main": {
+    "baseline": {
+      "commit": "7c2be21db5743b15b4a42d708ac959039c6b725e",
+      "tree": "2042a7f9ea1365219ed5aceb3177bc988dda9289",
+      "parents": [
+        "81597cefd83ba278bbaa41c782b1e6aa7f9d0999",
+        "a148aff7aaccef9820504755e24d849c35980484"
+      ]
+    },
+    "head": {
+      "commit": "fc91c1c68f4b81d9a2ab4ad64274d11aaa0a3d4e",
+      "tree": "347ab6ef3ebb19362efa926f3924913a68837755",
+      "parents": [
+        "7c2be21db5743b15b4a42d708ac959039c6b725e",
+        "8f01450ba10435432be0e82b3494b9e19e1bd434"
+      ]
+    },
+    "changedPathCount": 43,
+    "changedPaths": [
+      "M\tAGENTS.md",
+      "A\tapps/portal/chess-home/tests/entry.spec.ts",
+      "M\tapps/portal/chess-home/tests/home.spec.ts",
+      "M\tapps/portal/src/TerritorialActions.tsx",
+      "A\tapps/portal/src/TradeStatusIcon.tsx",
+      "M\tapps/portal/src/territorial-actions.css",
+      "M\tapps/portal/src/territorial-table-polish.css",
+      "M\tdocs/iva-games/BUILD_STATUS.md",
+      "A\tdocs/iva-games/CHESS_ENTRY_FLOW.md",
+      "A\tdocs/iva-games/CHESS_MENUS_VALIDATION_2026_11_28.md",
+      "A\tdocs/iva-games/GAME_BRANCH_AUDIT_2026_11_28.md",
+      "M\tdocs/iva-games/GAME_WORKFLOW.md",
+      "M\tdocs/iva-games/README.md",
+      "M\tgames/chess/colossus/src/ui/ColossusApp.tsx",
+      "M\tgames/chess/colossus/src/ui/Setup.tsx",
+      "M\tgames/chess/colossus/src/ui/experience.css",
+      "M\tgames/chess/colossus/tests/e2e/audit-regressions.spec.ts",
+      "M\tgames/chess/colossus/tests/e2e/colossus.spec.ts",
+      "M\tgames/chess/colossus/tests/e2e/colossus3d.spec.ts",
+      "M\tgames/chess/colossus/tests/e2e/helpers.ts",
+      "M\tgames/chess/colossus/tests/e2e/menu.spec.ts",
+      "M\tgames/chess/overdrive/playwright.config.ts",
+      "M\tgames/chess/overdrive/src/ui/OverdriveApp.tsx",
+      "M\tgames/chess/overdrive/src/ui/overdrive.css",
+      "M\tgames/chess/overdrive/tests/e2e/overdrive.spec.ts",
+      "M\tgames/chess/overdrive/tests/e2e/tutorial.spec.ts",
+      "M\tgames/chess/overdrive/tests/unit/overdriveUi.test.ts",
+      "M\tgames/chess/remorse/src/i18n/catalog.ts",
+      "M\tgames/chess/remorse/src/ui/App.tsx",
+      "M\tgames/chess/remorse/src/ui/Dialogs.tsx",
+      "M\tgames/chess/remorse/src/ui/styles.css",
+      "M\tgames/chess/remorse/tests/e2e/bot-pacing.spec.ts",
+      "M\tgames/chess/remorse/tests/e2e/game.spec.ts",
+      "M\tgames/chess/remorse/tests/e2e/online.spec.ts",
+      "M\tgames/chess/remorse/tests/e2e/playability.spec.ts",
+      "M\tgames/chess/remorse/tests/e2e/promotions.spec.ts",
+      "M\tgames/chess/remorse/tests/e2e/recovery.spec.ts",
+      "M\tgames/chess/remorse/tests/e2e/royal.spec.ts",
+      "M\tgames/chess/remorse/tests/e2e/scene.spec.ts",
+      "M\tgames/chess/remorse/tests/e2e/tutorial.spec.ts",
+      "M\tprompts/GAME_EXECUTOR.md",
+      "M\tprompts/TOP_LEVEL_CHAT.md",
+      "M\tscripts/district-trade-browser.mjs"
+    ],
+    "sharedScopesChecked": [
+      "apps/realtime-server/src",
+      "apps/platform/src",
+      "packages/realtime-kit",
+      "packages/session-kit",
+      "packages/game-registry",
+      "Dockerfile.realtime",
+      "deploy/iva-games/activation.py",
+      "deploy/iva-games/verify-realtime-image.sh"
+    ],
+    "sharedContractDelta": [],
+    "runtimeProductionPaths": [],
+    "instructionDelta": "AGENTS/GAME_WORKFLOW/GAME_EXECUTOR/TOP_LEVEL_CHAT add the chess entry-menu contract; that added scope is chess variants. The other accepted changes are chess entry UI/tests, District trade UI/tests and project reports.",
+    "newAcceptedRealtimeLayer": false,
+    "isAncestorOfPrHead": false,
+    "mergeBaseWithPrHead": "7c2be21db5743b15b4a42d708ac959039c6b725e"
+  },
+  "catalogSnapshots": {
+    "main": {
+      "revision": "fc91c1c68f4b81d9a2ab4ad64274d11aaa0a3d4e",
+      "blob": "ce49038726cd96704e89ec0822774669f130dfe2",
+      "gameIds": [
+        "remorse",
+        "overdrive",
+        "colossus",
+        "district",
+        "harbor",
+        "platform-lab"
+      ]
+    },
+    "pullRequest": {
+      "revision": "f3a8347a11241ffdea677ff5ec391f227907cb29",
+      "blob": "b08089346f503ec74baa999dc5ce0603d39bccbd",
+      "gameIds": [
+        "remorse",
+        "overdrive",
+        "colossus",
+        "district",
+        "tyaga",
+        "harbor",
+        "platform-lab"
+      ]
+    },
+    "forpostAtAuditStart": {
+      "revision": "938fe61bc078a6c2655f414ab92444a75c340add",
+      "blob": "e2f100cb849badafc5bfac9cc7b63ed9d0734a5e",
+      "gameIds": [
+        "forpost",
+        "remorse",
+        "overdrive",
+        "colossus",
+        "district",
+        "harbor",
+        "platform-lab"
+      ]
+    }
+  },
+  "adapterRegistration": {
+    "pullRequest": "simulation-worker still constructs createTyagaAdapter; main/client archive and platform registration remain Tyaga-specific; no Forpost registration added by this delta.",
+    "forpostAtAuditStart": "Forpost simulation worker and platform createForpostRegistration remain present; its catalog has Forpost and the six base entries.",
+    "acceptedMain": "Neither Tyaga nor Forpost catalog entry, and no realtime production source, exists at the inspected main."
+  },
+  "conclusions": {
+    "mainRequiresRealtimeAdaptation": false,
+    "newPrDeltaRequiresForpostCodeChangeNow": false,
+    "existingSharedContractIncompatibilitiesResolved": false,
+    "remainingScopes": [
+      "wire grammar and versions",
+      "ticket/bridge signatures and claims",
+      "platform admission/validation API",
+      "SQLite schemas and table semantics",
+      "runtime/client archive readers and routes",
+      "both game registrations and catalog schemas"
+    ],
+    "futureIntegration": "If a shared implementation is accepted later, reconcile these contracts deliberately while retaining both adapters/catalog entries and exact archived versions. This audit does not merge or replace either implementation.",
+    "rootDocumentationUpdate": "Move latest delta-audit identity from848c626 to f3a8347, retain848 as historical evidence, and note bot3/physicsv10 effective manifest values plus the absence of shared contract changes.",
+    "acceptance": "No newly accepted realtime layer or game release established by this audit."
+  },
+  "actions": {
+    "sourceEdits": false,
+    "mergeOrCherryPick": false,
+    "branchCheckout": false,
+    "testsRun": false,
+    "buildsRun": false,
+    "browserRun": false,
+    "githubMessagesSent": false,
+    "commits": false,
+    "pushes": false
+  }
+}

@@ -470,33 +470,71 @@ try {
   });
   await training(pages[0], room.roomId);
   await training(pages[1], room.roomId, true);
-  async function clickAction(page, button, uiRetries = false) {
+  async function clickAction(page, button, uiRetry = null) {
     if (await page.getByRole('button', { name: 'Dismiss news', exact: true }).isVisible()) await page.getByRole('button', { name: 'Dismiss news', exact: true }).click();
-    const responses = [];
-    const isAction = r => r.url().endsWith(path+'/actions') && r.request().method()==='POST';
-    const recordResponse = r => { if (isAction(r)) responses.push(r); };
-    page.on('response', recordResponse);
-    let injected = false;
-    const forceStale = async route => {
-      const command = route.request().postDataJSON();
-      if (!injected) {
-        injected = true;
-        assert.ok(command.expectedRevision > 0);
-        // Explicit diagnostic: the real server rejects an outdated command;
-        // game state and the UI's retry command remain untouched.
-        await route.continue({ postData: JSON.stringify({ ...command, expectedRevision: command.expectedRevision - 1 }) });
-      } else await route.continue();
-    };
-    const injectStale = uiRetries && process.env.DISTRICT_FORCE_AUTHOR_STALE === '1';
-    if (injectStale) await page.route(origin+'/api/platform/v1'+path+'/actions', forceStale);
-    try {
+    if (uiRetry) {
+      // Author group decisions own their stale retry in the UI. Observe the
+      // same intent after one click; a successful retry removes its button.
+      assert.ok(['accept', 'cancel'].includes(uiRetry.type));
+      const responses = [];
+      const isAction = response => response.url().endsWith(path + '/actions') && response.request().method() === 'POST';
+      const recordResponse = response => { if (isAction(response)) responses.push(response); };
+      let injected = false, routed = false;
+      const forceStale = async route => {
+        const command = route.request().postDataJSON();
+        if (!injected) {
+          injected = true;
+          assert.ok(command.expectedRevision > 0);
+          // Explicit diagnostic retained from accepted main: only the first
+          // command revision changes; the real server and UI perform the retry.
+          await route.continue({ postData: JSON.stringify({ ...command, expectedRevision: command.expectedRevision - 1 }) });
+        } else await route.continue();
+      };
+      const injectStale = process.env.DISTRICT_FORCE_AUTHOR_STALE === '1';
+      page.on('response', recordResponse);
+      try {
+        if (injectStale) { await page.route(origin + '/api/platform/v1' + path + '/actions', forceStale); routed = true; }
+        let original, previousRevision, attempts = 0;
+        let validation = Promise.resolve(false);
+        const pendingResponse = page.waitForResponse(response => {
+          if (!isAction(response)) return false;
+          validation = validation.then(async () => {
+            const command = response.request().postDataJSON();
+            assert.equal(command.payload.type, uiRetry.type);
+            assert.ok(typeof command.actionId === 'string' && command.actionId.length > 0);
+            assert.ok(Number.isSafeInteger(command.expectedRevision));
+            assert.ok(uiRetry.offerIds.includes(command.payload.offerId), 'Author decision stays within its original offer group');
+            if (original) {
+              assert.equal(command.actionId, original.actionId, 'UI retry preserves the clicked action identity');
+              assert.ok(command.expectedRevision > previousRevision, 'A stale retry uses a newer revision');
+              const payload = uiRetry.type === 'cancel' ? { ...command.payload, offerId: original.payload.offerId } : command.payload;
+              assert.deepEqual(payload, original.payload, 'UI retry preserves the decision, chosen recipient and phase');
+            } else original = command;
+            previousRevision = command.expectedRevision;
+            const data = await response.json();
+            assert.ok(++attempts <= 5, 'Author decision has at most five POST attempts');
+            if (response.status() === 200) return true;
+            assert.equal(response.status(), 409, JSON.stringify(data));
+            assert.equal(data.error?.code, 'STALE_REVISION', JSON.stringify(data));
+            assert.ok(attempts < 5, 'Author decision exhausted its stale retry limit');
+            return false;
+          });
+          return validation;
+        });
+        const [, response] = await Promise.all([button.click(), pendingResponse]);
+        assert.equal(new Set(responses.map(item => item.request().postDataJSON().actionId)).size, 1, 'One author click retains one action ID through UI retries');
+        if (injectStale) assert.ok(injected && responses.some(item => item.status() === 409), 'The forced outdated command reached the real server');
+        (result.authorDecisionRetries ??= []).push({ action: response.request().postDataJSON().payload.type,
+          statuses: responses.map(item => item.status()), forcedStale: injectStale, oneActionId: true });
+        result.uiActions.push(uiRetry.type);
+        return;
+      } finally {
+        page.off('response', recordResponse);
+        if (routed) await page.unroute(origin + '/api/platform/v1' + path + '/actions', forceStale);
+      }
+    }
     for(let attempt=0;attempt<3;attempt++) {
-      const pendingResponse=page.waitForResponse(async r => {
-        if (!isAction(r)) return false;
-        // Author decisions already refresh/retry inside the production UI.
-        // A second test click can race that retry and target a removed quote.
-        return !(uiRetries && r.status()===409 && (await r.json()).error?.code==='STALE_REVISION');
-      });
+      const pendingResponse=page.waitForResponse(r=>r.url().endsWith(path+'/actions')&&r.request().method()==='POST');
       await button.click(); const response=await pendingResponse;
       const data=await response.json();
       if(response.status()===409&&data.error?.code==='STALE_REVISION'&&attempt<2) {
@@ -504,17 +542,7 @@ try {
         continue;
       }
       assert.equal(response.status(),200,JSON.stringify(data));
-      if (uiRetries) {
-        assert.equal(new Set(responses.map(r=>r.request().postDataJSON().actionId)).size,1,'One author click retains one action ID through UI retries');
-        if (injectStale) assert.ok(injected && responses.some(r=>r.status()===409),'The forced outdated command reached the real server');
-        (result.authorDecisionRetries ??= []).push({ action: response.request().postDataJSON().payload.type,
-          statuses: responses.map(r=>r.status()), forcedStale: injectStale, oneActionId: true });
-      }
       result.uiActions.push(response.request().postDataJSON().payload.type); return;
-    }
-    } finally {
-      page.off('response',recordResponse);
-      if (injectStale) await page.unroute(origin+'/api/platform/v1'+path+'/actions',forceStale);
     }
   }
   let done;
@@ -605,7 +633,10 @@ try {
           for (const [i,p] of pages.entries()) assert.deepEqual(await geometry(p), beforeGeometry[i], 'Offer appearance/consent keeps board and page geometry '+JSON.stringify({before:beforeHeaders[i],after:await headerLayout(p)}));
           await mkdir(artifacts, {recursive:true});
           for (const [i,p] of pages.entries()) await p.screenshot({path:join(artifacts,i ? 'trade-mobile.png' : 'trade-desktop.png')});
-          await clickAction(page, page.getByRole('button', {name: new RegExp('^Trade with '+other.players.find(p=>p.participantId===other.you.participantId).displayName)}), true);
+          await clickAction(page, page.getByRole('button', {name: new RegExp('^Trade with '+other.players.find(p=>p.participantId===other.you.participantId).displayName)}), {
+            type: 'accept',
+            offerIds: consentView.offers.filter(offer => offer.authorId === view.you.participantId && offer.targetId === other.you.participantId && offer.agreedAt !== undefined).map(offer => offer.id),
+          });
           await expect(page.locator('.ta-offer[data-offer-status=agreed]')).toHaveCount(0);
           for (const [i,p] of pages.entries()) assert.deepEqual(await geometry(p), beforeGeometry[i], 'Offer removal keeps board and page geometry');
           // The common author cross remains actionable after consent, without a transfer.
@@ -622,7 +653,10 @@ try {
           const cancellation=cancelBaseline.offers.find(offer=>offer.authorId===view.you.participantId&&offer.targetId===other.you.participantId);
           await clickAction(otherPage,otherPage.locator(`[data-offer-id="${cancellation.id}"]`).getByRole('button',{name:'Accept',exact:true}));
           await expect(page.locator(`[data-offer-id="${cancellation.id}"][data-offer-status=agreed]`)).toBeVisible();
-          await clickAction(page,page.getByRole('button',{name:'Withdraw offer for everyone',exact:true}), true);
+          await clickAction(page,page.getByRole('button',{name:'Withdraw offer for everyone',exact:true}), {
+            type: 'cancel',
+            offerIds: cancelBaseline.offers.filter(offer => offer.groupId === cancellation.groupId).map(offer => offer.id),
+          });
           const cancelled=await current(client);
           assert.deepEqual(cancelled.you.hand,cancelBaseline.you.hand,'The author cross never transfers consented resources');
           assert.equal(cancelled.offers.some(offer=>offer.groupId===cancellation.groupId),false);

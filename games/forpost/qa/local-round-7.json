@@ -1,0 +1,299 @@
+{
+  "source": "Actual commands in the isolated clone; no browser or publication claim.",
+  "gitCommit": "48178562e0feef9b7ac5987d1c588b0dc12da6ec",
+  "sourceTree": "6f0c9056ab6ed6d8e2ee9656136e787bcba9479b",
+  "dirtyAtStart": false,
+  "checks": [
+    {
+      "name": "boundaries",
+      "command": [
+        "npm",
+        "run",
+        "check:boundaries"
+      ],
+      "exitCode": 0,
+      "elapsedSeconds": 2.4276290880006854,
+      "logSha256": "06abb3f17ff586276a2878f48febe44df2bca66e002f7b883ba01b43e614808d"
+    },
+    {
+      "name": "types",
+      "command": [
+        "npm",
+        "run",
+        "typecheck"
+      ],
+      "exitCode": 0,
+      "elapsedSeconds": 26.07139190199814,
+      "logSha256": "5153c3973a2a9ec8df58fb4d11bde54e7348200279b1a0cdd6527546a9e5db56"
+    },
+    {
+      "name": "lint",
+      "command": [
+        "npm",
+        "run",
+        "lint"
+      ],
+      "exitCode": 0,
+      "elapsedSeconds": 17.396654064999893,
+      "logSha256": "7736aba01cede4f9af1726e887ccb0162ff4d1bed9599a594ffd0b67cebcfe4b"
+    },
+    {
+      "name": "unit-serial",
+      "command": [
+        "npm",
+        "test",
+        "--",
+        "--maxWorkers=1"
+      ],
+      "exitCode": 0,
+      "elapsedSeconds": 94.69126892900385,
+      "logSha256": "6923778ab12d23a48fc6d4af17eb7fd033000f01983d6e7e68a9df683ce4f24d"
+    },
+    {
+      "name": "e2e-discovery",
+      "command": [
+        "npx",
+        "playwright",
+        "test",
+        "--config",
+        "games/forpost/playwright.config.ts",
+        "--list"
+      ],
+      "exitCode": 0,
+      "elapsedSeconds": 1.6563054619982722,
+      "logSha256": "6c3d39a6d080b2ca3fd8329a09aea1aac7e1a43857ad67d4543376c048c7b9d9"
+    },
+    {
+      "name": "build-all",
+      "command": [
+        "npm",
+        "run",
+        "build:all"
+      ],
+      "exitCode": 0,
+      "elapsedSeconds": 51.3775845199998,
+      "logSha256": "b95d6f3741e41da36a0412a304f51dc7360a8e5a9ff4e8fd456a30b5f6e0ed95"
+    },
+    {
+      "name": "network",
+      "command": [
+        "node",
+        "apps/realtime-server/scripts/network-smoke.mjs"
+      ],
+      "exitCode": 0,
+      "elapsedSeconds": 57.31215784200322,
+      "logSha256": "9ff724dd1f772fbc9d765526215083b1bc9cd5151c0a11cb48767c2402340a2e"
+    }
+  ],
+  "sourceTrace": {
+    "format": "iva-forpost-source-2",
+    "gitCommit": "48178562e0feef9b7ac5987d1c588b0dc12da6ec",
+    "dirty": false,
+    "sourceSha256": "1a385fd98bffdff8628172e4f9579d1eaf3359ab1b574d917d333c6370b6af6c",
+    "sourceFileCount": 252,
+    "coreSha256": "805ab712cd7e723d0ca1754c0d9edf4c0ea9156bfc5f568d2f34f4fee12d754c",
+    "coreFileCount": 18,
+    "method": "SHA-256 of sorted relative paths then exact bytes; independent per-file SHA-256 and strict complete inventory"
+  },
+  "summary": {
+    "unitPassed": 1462,
+    "unitSkipped": 1,
+    "unitFiles": 121,
+    "unitWorkers": 1,
+    "e2eDiscoveryOnly": true,
+    "networkPassed": 14
+  },
+  "network": {
+    "passed": 14,
+    "checks": [
+      "current build and content-addressed client serve identical accepted bytes",
+      "personal acknowledged delta stream and requested full resynchronization",
+      "real practice admission and filtered full",
+      "one-use ticket denied before state",
+      "another guest cannot resume",
+      "HttpOnly guest identity renews for thirty days without a script bearer or identity rotation",
+      "atomic one-controller transfer",
+      "new input sequence after takeover and stale movement neutralization",
+      "durable ACK repeat and payload conflict",
+      "pause, process restart, same match and committed receipt",
+      "real purchase, deliberately unreceived ACK, SIGKILL and one restored order/charge/receipt",
+      "abrupt process death, expired lease and durable receipt recovery",
+      "new artifact starts new rooms while existing rooms retain exact simulation code",
+      "owner can end saved practice"
+    ],
+    "artifactId": "sha256:edd02c41df7fabeac4f9762e065fa75beef34b9604c4f44cd57858e0e2af4417",
+    "contentId": "sha256:74b205a11cc43ba56125a8393e83d0ccec6bf30896f069dc7e6658b2518373cb",
+    "kind": "automated HTTP/WebSocket, not browser or capacity acceptance",
+    "selectedHealth": {
+      "storageFailures": 0,
+      "roomFailureReasons": {
+        "CHECKPOINT_UNAVAILABLE": 0,
+        "CHECKPOINT_WAL_LIMIT": 0,
+        "LEASE_LOST": 0,
+        "STATE_CHECKSUM": 0,
+        "WORKER_DEADLINE": 0,
+        "WORKER_UNAVAILABLE": 0,
+        "LEASE_HEARTBEAT_EXPIRED": 0,
+        "UNKNOWN_RUNTIME_FAILURE": 0
+      },
+      "roomFailureStages": {
+        "persist": 0,
+        "disconnect": 0,
+        "scheduler": 0,
+        "snapshotLease": 0
+      },
+      "maxCommitMs": 50.63600199999928,
+      "maxStepMs": 67.53389500000048
+    }
+  },
+  "priorPreflight": {
+    "gitCommit": "fdf6f0243690fc5add5e2d25893ececf41d5ccb4",
+    "summary": {
+      "unitPassed": 1459,
+      "unitFiles": 121,
+      "unitSkipped": 1,
+      "unitWorkers": 1,
+      "nodeHarness": 26,
+      "infrastructure": 85,
+      "networkPassed": 14
+    },
+    "ordinaryCheckAttempts": [
+      {
+        "source": "Actual commands in the isolated clone; no browser or publication claim.",
+        "gitCommit": "fdf6f0243690fc5add5e2d25893ececf41d5ccb4",
+        "sourceTree": "eeb6d58881dc7bd45bb054836ba3467e1ca70f31",
+        "dirtyAtStart": false,
+        "checks": [
+          {
+            "name": "check",
+            "command": [
+              "npm",
+              "run",
+              "check"
+            ],
+            "exitCode": 1,
+            "elapsedSeconds": 75.45574691300135,
+            "logSha256": "662be4a117ad47de5a3b70f4a154a2f01d9115e0ad326d3bfc87fae60dc14f55"
+          }
+        ]
+      },
+      {
+        "source": "Actual commands in the isolated clone; no browser or publication claim.",
+        "gitCommit": "fdf6f0243690fc5add5e2d25893ececf41d5ccb4",
+        "sourceTree": "eeb6d58881dc7bd45bb054836ba3467e1ca70f31",
+        "dirtyAtStart": false,
+        "checks": [
+          {
+            "name": "check",
+            "command": [
+              "npm",
+              "run",
+              "check"
+            ],
+            "exitCode": 1,
+            "elapsedSeconds": 81.98285080900678,
+            "logSha256": "61e1c4c788d27dda176411d894106484658f9f7c22ab833c2d828dfad4462f60"
+          }
+        ]
+      }
+    ],
+    "originalTimeoutReplay": {
+      "command": [
+        "npx",
+        "vitest",
+        "run",
+        "--config",
+        "games/chess/remorse/vitest.config.ts",
+        "games/chess/remorse/src/scene/kingFracture.test.ts",
+        "--maxWorkers=1"
+      ],
+      "gitCommit": "fdf6f0243690fc5add5e2d25893ececf41d5ccb4",
+      "exitCode": 0,
+      "elapsedSeconds": 7.1521104909988935,
+      "logSha256": "0127a6dcd2fce74e49065778edebc7d87ff64a5b23d3b9105baee78ab66241eb",
+      "testSourceMatchesMain": true,
+      "testTimeoutUnchanged": true
+    }
+  },
+  "caughtAndCorrectedTypeFailure": {
+    "source": "Actual commands in the isolated clone; no browser or publication claim.",
+    "gitCommit": "f573f7b1d3028bf6931c7ff8f2fa4b58337a5d31",
+    "sourceTree": "def66a049bf3ca43eb374cf178ad9f5b5afd69f5",
+    "dirtyAtStart": false,
+    "checks": [
+      {
+        "name": "boundaries",
+        "command": [
+          "npm",
+          "run",
+          "check:boundaries"
+        ],
+        "exitCode": 0,
+        "elapsedSeconds": 2.4167753610017826,
+        "logSha256": "06abb3f17ff586276a2878f48febe44df2bca66e002f7b883ba01b43e614808d"
+      },
+      {
+        "name": "types",
+        "command": [
+          "npm",
+          "run",
+          "typecheck"
+        ],
+        "exitCode": 2,
+        "elapsedSeconds": 27.092524052000954,
+        "logSha256": "46b6949d47a977cead3a6c406dd3434f78d163c309ff4e918b60c5e2bf501b3c"
+      }
+    ],
+    "cause": "Four TS18048 diagnostics in the new E2E mutable-view callbacks; stable own participant ID is captured in commit4817856. Production code and assertions unchanged by this typing correction."
+  },
+  "ownedDeliveryRegression": {
+    "evidence": "own-delivery-regression-r7.json",
+    "before": {
+      "passed": 44,
+      "failed": 5
+    },
+    "after": {
+      "passed": 49,
+      "failed": 0
+    },
+    "scope": "Controlled core commands and exact source review, not browser play."
+  },
+  "boundaries": [
+    "Local command results belong to clean4817856. The subsequent44fe1e7 merge changes only the recorded main documents and combined District QA helper; exact Forpost source/core fingerprints agree.",
+    "The full unit suite used one worker with unchanged assertions and per-test timeout. Two ordinary parallel check attempts on preceding FDF had timed out in the untouched main kingFracture white test; isolated original-file replay passed. Those failures remain recorded.",
+    "The real HTTP/WS smoke is functional recovery evidence, not a browser passage or capacity profile.",
+    "Fresh main integration and exact native CI must be recorded separately; no CI result, Docker image, final match, physical device or public release is claimed here."
+  ],
+  "subsequentMainIntegration": {
+    "mergeCommit": "44fe1e7f0626ed628200ad38e7a2354b221dca84",
+    "tree": "efb1cf972fbc0f4a7de0a8a3cb2b15ff8f9a3982",
+    "method": "Normal no-ff merge; one District helper conflict resolved with the reviewed compatible copy.",
+    "syntaxCommand": [
+      "node",
+      "--check",
+      "scripts/district-territorial-browser.mjs"
+    ],
+    "syntaxExitCode": 0,
+    "lintCommand": [
+      "npx",
+      "eslint",
+      "scripts/district-territorial-browser.mjs"
+    ],
+    "lintExitCode": 0,
+    "forpostSourceFingerprintUnchanged": true,
+    "forpostCoreFingerprintUnchanged": true,
+    "incomingDocumentsPreserved": true,
+    "nativeCombinedBrowserValidation": "pending",
+    "incomingMain": "bcb69e7f5d474e63d67862b87652dd325b640481",
+    "sourceTrace": {
+      "format": "iva-forpost-source-2",
+      "gitCommit": "44fe1e7f0626ed628200ad38e7a2354b221dca84",
+      "dirty": false,
+      "sourceSha256": "1a385fd98bffdff8628172e4f9579d1eaf3359ab1b574d917d333c6370b6af6c",
+      "sourceFileCount": 252,
+      "coreSha256": "805ab712cd7e723d0ca1754c0d9edf4c0ea9156bfc5f568d2f34f4fee12d754c",
+      "coreFileCount": 18,
+      "method": "SHA-256 of sorted relative paths then exact bytes; independent per-file SHA-256 and strict complete inventory"
+    }
+  }
+}

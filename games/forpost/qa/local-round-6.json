@@ -1,0 +1,159 @@
+{
+  "source": "Actual commands in the isolated clone; no browser or publication claim.",
+  "gitCommit": "a3312fc841f7523707a5b3a010e4acc818ea769f",
+  "sourceTree": "d8cd98b9093700dd39f55f07edfde1fe91af2a8c",
+  "dirtyAtStart": false,
+  "checks": [
+    {
+      "name": "boundaries",
+      "command": [
+        "npm",
+        "run",
+        "check:boundaries"
+      ],
+      "exitCode": 0,
+      "elapsedSeconds": 2.1814486870025576,
+      "logSha256": "6874fd9c107ab90990aa15a529a98fb45d670461c10abcc0570393a18d3fe8b0"
+    },
+    {
+      "name": "build-all",
+      "command": [
+        "npm",
+        "run",
+        "build:all"
+      ],
+      "exitCode": 0,
+      "elapsedSeconds": 48.19101189800131,
+      "logSha256": "5b7cba36af55096653ba233457f534e447af682f6838e0c6d6ddfc53218b3d27"
+    },
+    {
+      "name": "network",
+      "command": [
+        "node",
+        "apps/realtime-server/scripts/network-smoke.mjs"
+      ],
+      "exitCode": 0,
+      "elapsedSeconds": 56.878213092000806,
+      "logSha256": "f8f70f9789f0a87ac4b93777a9078cc623554ee8b725d959c84d10d3c5bcde23"
+    }
+  ],
+  "network": {
+    "passed": 14,
+    "checks": [
+      "current build and content-addressed client serve identical accepted bytes",
+      "personal acknowledged delta stream and requested full resynchronization",
+      "real practice admission and filtered full",
+      "one-use ticket denied before state",
+      "another guest cannot resume",
+      "HttpOnly guest identity renews for thirty days without a script bearer or identity rotation",
+      "atomic one-controller transfer",
+      "new input sequence after takeover and stale movement neutralization",
+      "durable ACK repeat and payload conflict",
+      "pause, process restart, same match and committed receipt",
+      "real purchase, deliberately unreceived ACK, SIGKILL and one restored order/charge/receipt",
+      "abrupt process death, expired lease and durable receipt recovery",
+      "new artifact starts new rooms while existing rooms retain exact simulation code",
+      "owner can end saved practice"
+    ],
+    "artifactId": "sha256:98a6727de9c2a9a6b63664cffa8b96842dd3fdc7ed6d78338f9b4f6e7cb62561",
+    "contentId": "sha256:f16229c8035d95b69e034f69cb6ecb9d3d80dcf378f85d25987fd4f673546dd4",
+    "capacityFixture": {
+      "schema": "iva-realtime-capacity-1",
+      "gameId": "forpost",
+      "artifactId": "test-fixture",
+      "source": "test-fixture",
+      "evidence": "Two simultaneously retained versions for a functional HTTP/WS probe. These sizing inputs are synthetic, not measured capacity.",
+      "maxRooms": 2,
+      "maxBodies": 112,
+      "maxBots": 12,
+      "maxConnections": 24,
+      "stepP99Ms": 8,
+      "roomMemoryBytes": 134217728
+    },
+    "lastHealth": {
+      "ticks": 933,
+      "maxStepMs": 42.3384389999992,
+      "maxCommitMs": 162.157984999998,
+      "storageFailures": 0,
+      "resyncs": 1,
+      "admissionFailures": 0,
+      "stepWorkSamples": 933,
+      "stepWorkCpuTotalMs": 387.8620000000001,
+      "maxCommitBatchSize": 1,
+      "journalPendingAgeMs": 0,
+      "journalAgeP99Ms": 60.4,
+      "snapshotAgeMs": 0,
+      "snapshotAgeP99Ms": 80,
+      "resyncReasons": {
+        "requested": 1,
+        "staleEpoch": 0,
+        "backpressure": 0
+      },
+      "stepP99Ms": 19.7,
+      "commitP99Ms": 41,
+      "eventLoopDelayP99Ms": 15.638527,
+      "stepWorkP99Ms": 9.4,
+      "stepWorkCpuP99Ms": 8.1,
+      "processCpuMs": 7322.381,
+      "processElapsedMs": 36049.547171000006,
+      "writer": {
+        "batches": 938,
+        "maxTransactionMs": 159.59525199999916,
+        "maxWorldBytes": 18777,
+        "maxRecordBytes": 23436,
+        "maxJournalBytes": 427,
+        "transactionP99Ms": 15.1,
+        "bodyP99Ms": 3.8,
+        "finalizeP99Ms": 10.4,
+        "walAutoCheckpoint": 0,
+        "synchronous": 2,
+        "queueP99Ms": 4.7,
+        "checkpoint": {
+          "observedAt": 1795892968453,
+          "sqliteVersion": "3.54.1",
+          "pageSize": 4096,
+          "walBytes": 2369032,
+          "logFrames": 465,
+          "checkpointedFrames": 260,
+          "busy": 0,
+          "runs": 33,
+          "maxMs": 14.864937999998801,
+          "p99Ms": 14.9,
+          "failures": 0
+        }
+      },
+      "byGame": {
+        "forpost": {
+          "stepP99Ms": 19.7,
+          "stepWorkP99Ms": 9.4,
+          "stepWorkCpuP99Ms": 8.1,
+          "commitP99Ms": 41,
+          "journalPendingAgeMs": 0,
+          "journalAgeP99Ms": 60.4,
+          "snapshotAgeMs": 0,
+          "snapshotAgeP99Ms": 80
+        }
+      },
+      "rssBytes": 192507904,
+      "heapUsedBytes": 16775712,
+      "queuedBytesMax": 0
+    },
+    "kind": "automated HTTP/WebSocket, not browser or capacity acceptance"
+  },
+  "sourceTrace": {
+    "format": "iva-forpost-source-2",
+    "gitCommit": "a3312fc841f7523707a5b3a010e4acc818ea769f",
+    "dirty": false,
+    "sourceSha256": "8654dcb1855edd76e8d70a9a3bfda9eb41b9ef4cf5c99b14e7c4304f02e5680c",
+    "sourceFileCount": 252,
+    "coreSha256": "14d49d29954d0f7f427feea026beb23113699ff8ecb36ec4480f61f339a61e68",
+    "coreFileCount": 18,
+    "method": "SHA-256 of sorted relative paths then exact bytes; independent per-file SHA-256 and strict complete inventory",
+    "providedTraceVerified": false
+  },
+  "boundaries": [
+    "Actual same-command HTTP/WebSocket/SQLite rig, not a browser passage.",
+    "The runtime/client identity belongs to this local clean commit. The forthcoming CI merge will have its own build and client identity.",
+    "No Docker, public release, production capacity or physical-device acceptance is claimed."
+  ]
+}

@@ -1,0 +1,79 @@
+{
+  "schema": "iva-realtime-pr50-delta-audit-1",
+  "method": "read-only fetch to a distinct QA ref, git parent/tree/diff/blob verification and targeted source reading; no execution acceptance",
+  "pullRequest": 50,
+  "pullRequestStateSource": "root GitHub metadata read",
+  "draft": true,
+  "accepted": false,
+  "fetchedRef": "refs/remotes/qa/pr50-audit-848c626",
+  "baseline": "b7ab9ed4265b819299d082e21a6a3957ba1d07de",
+  "baselineTree": "14c2e7b9b4992c096fd5d6530aec683294ec8b08",
+  "head": "848c626481a8ada589fb7e3d742af1f47d028e73",
+  "tree": "c1aed62a254744803655048cff4e41d6c369ddd9",
+  "parents": [
+    "b7ab9ed4265b819299d082e21a6a3957ba1d07de",
+    "7c2be21db5743b15b4a42d708ac959039c6b725e"
+  ],
+  "localForpostHeadAtAudit": "df581a24808ac6823083f9f735375c94803d1cb7",
+  "newHistoryCommits": 15,
+  "changedPathCount": 99,
+  "changedSharedRuntimeSourcePaths": [
+    "apps/realtime-server/src/engine.ts",
+    "apps/realtime-server/src/server.ts",
+    "apps/realtime-server/src/worker-host.ts"
+  ],
+  "selectedSourceBlobs": [
+    {
+      "path": "apps/realtime-server/src/engine.ts",
+      "before": "d8fed88e64f12ee32dbfd7e308f465524f4d3a6b",
+      "after": "970d33367d0c425a41f16fc84e06f96f679c4240"
+    },
+    {
+      "path": "apps/realtime-server/src/server.ts",
+      "before": "35e12963a3925731594d7932dd737eed31fa62b2",
+      "after": "18dfdf8a94d2defc3d1a3859ccaafa14c1471fed"
+    },
+    {
+      "path": "apps/realtime-server/src/worker-host.ts",
+      "before": "6d32baa58edf4917cdde7e02cd259fd9d32e313e",
+      "after": "a10f64965070204b9673a11460cef217fbfa1c3e"
+    },
+    {
+      "path": "games/tyaga/src/client/connection.ts",
+      "before": "5c1aa101b4bcfa9d861c355af6ad08289436a16a",
+      "after": "bfbca1869fed3695d3a5c2f6890a8410e3572084"
+    }
+  ],
+  "unchangedContractScopes": [
+    "packages/realtime-kit",
+    "packages/session-kit",
+    "packages/game-registry",
+    "apps/realtime-server/src/crypto.ts",
+    "apps/realtime-server/src/storage.ts",
+    "apps/realtime-server/src/adapter.ts",
+    "apps/realtime-server/src/artifacts.ts",
+    "apps/realtime-server/src/client-content.ts",
+    "apps/realtime-server/src/main.ts",
+    "apps/realtime-server/src/simulation-worker.ts",
+    "apps/platform/src/main.ts",
+    "Dockerfile.realtime",
+    "deploy/iva-games/activation.py",
+    "deploy/iva-games/verify-realtime-image.sh"
+  ],
+  "platformDeltaPaths": [
+    "apps/platform/src/database.ts",
+    "apps/platform/src/http.ts",
+    "apps/platform/src/service.ts"
+  ],
+  "platformDeltaInterpretation": "Read source changes are the accepted main terminal-room history clear/restore feature, already preserved in Forpost.",
+  "productionDelta": "Additive overload health/journal and rate-kind diagnostics; Tyaga ACK/baseline/controller-scope lifecycle. Existing wire grammar, signatures, storage schema, archive formats and adapter interface remain unchanged.",
+  "fixturesOnly": false,
+  "fundamentalCompatibilityGapsRemain": true,
+  "reportedTyagaEvidence": "Its checked-in documents report four browser rounds with zero completed deliveries, pending R05 replay, partial netem and unaccepted capacity. Those reports were not independently executed or credited to Forpost here.",
+  "testsRun": false,
+  "buildsRun": false,
+  "browserRun": false,
+  "productionActions": false,
+  "mergeOrCherryPick": false,
+  "documentationSha256": "5eabbea2ae0ff74f1c8035892d753fc18d85ebf1c56ecaf328fec28bb4861a54"
+}

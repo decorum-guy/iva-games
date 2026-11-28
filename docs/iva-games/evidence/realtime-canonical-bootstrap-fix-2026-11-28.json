@@ -1,0 +1,131 @@
+{
+  "schema": "iva-realtime-canonical-bootstrap-fix-1",
+  "sourceCommit": "df581a24808ac6823083f9f735375c94803d1cb7",
+  "sourceDirty": true,
+  "sourceSha256": "d81ecd4e4444579ac45ab667988c37b4ddf2b6c84b63ca688c35c28412f9cd00",
+  "method": "sorted relative paths then exact file bytes",
+  "files": [
+    {
+      "path": "deploy/iva-games/prepare-realtime-image.py",
+      "sha256": "226fa3baa327b4b56667741effdb3ab53329885d2434436311338fdfb0971c27"
+    },
+    {
+      "path": "deploy/iva-games/test_realtime_retention.py",
+      "sha256": "143e49dc59314f9ee93dffc986f2ca4d8903ab74ee878c82c604c5063f73442f"
+    },
+    {
+      "path": "docs/iva-games/REALTIME_RETENTION.md",
+      "sha256": "9b0e1d85d744987c33247bfc836a8f744cbe6fa01f6d0ed3c720922cb1cf261a"
+    }
+  ],
+  "failedCiBuild": "9ebeb9e75054876409d81e615743254a1ba976ac",
+  "failedCiTree": "7b3bfe3688c52a5da1833e18a288fe7cd75d6db5",
+  "failedCiPrHead": "defb53049ffc594a42c01eb61cdc0a8667f4d756",
+  "failedJobs": [
+    141073353167,
+    141073352875
+  ],
+  "failureStage": "legacy full-body fingerprint before Docker build; image tests and hour workload skipped",
+  "failedCiResponseBodyAvailable": false,
+  "independentObservedHtmlComparison": {
+    "old": {
+      "bytes": 598,
+      "sha256": "b0af43f9cda37d8dc17f8613df907719e4f6b537fa92830c9410066df7e7e9b5"
+    },
+    "new": {
+      "bytes": 598,
+      "sha256": "3054b8f086c2457bf9b5be8a5af65a302e846b3effd23040fa19391fa3bfbc10"
+    },
+    "delta": [
+      {
+        "sample": "r4",
+        "kind": "js",
+        "hashToken": "gq6eTcFQ",
+        "byteStart": 438,
+        "byteEndExclusive": 446
+      },
+      {
+        "sample": "r4",
+        "kind": "css",
+        "hashToken": "BhwHI1bQ",
+        "byteStart": 520,
+        "byteEndExclusive": 528
+      },
+      {
+        "sample": "r5",
+        "kind": "js",
+        "hashToken": "CdXmSpou",
+        "byteStart": 438,
+        "byteEndExclusive": 446
+      },
+      {
+        "sample": "r5",
+        "kind": "css",
+        "hashToken": "DBb4t3H1",
+        "byteStart": 520,
+        "byteEndExclusive": 528
+      }
+    ],
+    "otherBytesIdentical": true,
+    "canonicalTemplateSha256": "b0b243d662c02857c7b822311be4e3c0a6264acc916f6c8488eb6b0a573c0e10",
+    "canonicalMarker": "00000000",
+    "sourceFilesChanged": false
+  },
+  "actualPublicCollectorRead": {
+    "kind": "actual unauthenticated collector fetch_inventory; response metadata observed without changing returned bytes or validation",
+    "dockerExecuted": false,
+    "bootstrapBuildInputGenerated": false,
+    "hostPreflightRequired": true,
+    "success": true,
+    "legacyPortalVerified": true,
+    "inventoryAvailable": false,
+    "canonicalTemplateSha256": "b0b243d662c02857c7b822311be4e3c0a6264acc916f6c8488eb6b0a573c0e10",
+    "seconds": 20.25,
+    "responses": [
+      {
+        "url": "https://iva-games.pro/api/realtime/v1/compatibility",
+        "media": "text/html",
+        "bytes": 598,
+        "sha256": "3054b8f086c2457bf9b5be8a5af65a302e846b3effd23040fa19391fa3bfbc10"
+      },
+      {
+        "url": "https://iva-games.pro/",
+        "media": "text/html",
+        "bytes": 598,
+        "sha256": "3054b8f086c2457bf9b5be8a5af65a302e846b3effd23040fa19391fa3bfbc10"
+      },
+      {
+        "url": "https://iva-games.pro/api/realtime/v1/health",
+        "media": "text/html",
+        "bytes": 598,
+        "sha256": "3054b8f086c2457bf9b5be8a5af65a302e846b3effd23040fa19391fa3bfbc10"
+      },
+      {
+        "url": "https://iva-games.pro/health/live",
+        "media": "application/json",
+        "bytes": 36,
+        "sha256": "66db26c425adb97330fb573c8e832dfe3958a73dc70cbf7f826f81f037b605ef"
+      },
+      {
+        "url": "https://iva-games.pro/api/platform/v1/games",
+        "media": "application/json",
+        "bytes": 1187,
+        "sha256": "ca92c5974b67ce22d625ae78cf7a30b056bec09106fb4e3ef8d80777ce3dba1f"
+      }
+    ]
+  },
+  "focusedPythonTests": {
+    "passed": 20,
+    "failed": 0,
+    "seconds": 0.032
+  },
+  "pythonVersion": "3.12.14",
+  "pythonAstSyntaxFilesPassed": 2,
+  "syntheticInputs": "Additional allowed-token and rejection variants are explicit unit fixtures, not observed releases.",
+  "bootstrapMeaning": "Recognized public legacy portal routing only, not absence of physical saved data. Actual host-volume preflight remains mandatory.",
+  "dockerExecuted": false,
+  "hostPreflightExecuted": false,
+  "loadWorkloadExecuted": false,
+  "deploymentPerformed": false,
+  "historicalR4EvidenceUnchanged": true
+}

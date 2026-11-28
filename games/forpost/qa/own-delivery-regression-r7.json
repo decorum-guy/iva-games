@@ -1,0 +1,130 @@
+{
+  "schema": "iva-forpost-owned-delivery-regression-1",
+  "basis": "Actual source review and controlled test executions; no browser passage or match win claimed.",
+  "baselineCommit": "fdf6f0243690fc5add5e2d25893ececf41d5ccb4",
+  "candidate": {
+    "format": "iva-forpost-delivery-candidate-v1",
+    "baseHead": "fdf6f0243690fc5add5e2d25893ececf41d5ccb4",
+    "files": [
+      {
+        "path": "games/forpost/src/core/operations.ts",
+        "baseSha256": "8f497fa0d986de45a5cc1d41c1cd12e0ce7f071c118aff9dad665f26f198b205",
+        "candidateSha256": "407fcb18e09f653b105ad46c40f2bbb1bc804344f9088f36f7f0d00ad02014b9",
+        "changed": true
+      },
+      {
+        "path": "games/forpost/tests/core-rules.test.ts",
+        "baseSha256": "4051e36959a8d834d5b14bde0fd9300ed8975dde823a78c03cf8202dbf40e4f9",
+        "candidateSha256": "f5e197c6af6c294d61e318d17e09b643206697acb102a45c28fdeb989353da0a",
+        "changed": true
+      },
+      {
+        "path": "games/forpost/src/core/tutorial.ts",
+        "baseSha256": "ee28146ab8a77fc8d4745d6c7970f98d37817af96af1bd2e463560f392c4dac0",
+        "candidateSha256": "ea5b7a93c2bea24b8d93124334e7f2c37a5cc95328045d681f2cabdcad113528",
+        "changed": true
+      },
+      {
+        "path": "games/forpost/tests/core-tutorial.test.ts",
+        "baseSha256": "3bdc26681431352ab74565c98556401bcdce7ccc5ba402768fcd4bbd31aae49e",
+        "candidateSha256": "2b5bdb1b395d878ff2cc9fdd47c588b69bb6231fc648c08d4b1846260f352a65",
+        "changed": true
+      },
+      {
+        "path": "games/forpost/src/client/tutorial-copy.ts",
+        "baseSha256": "f0f98374ac4296c5a41fc733c3b4bfa623b029b925aa155a4341946a6c605d40",
+        "candidateSha256": "09ccda77467fee534f1eebabff3cb33a1af863f5d76f5cf27ab5c150fb7fadce",
+        "changed": true
+      },
+      {
+        "path": "games/forpost/e2e/interaction.spec.ts",
+        "baseSha256": "b0c41e21a284c41ceec77cce1f5b2f6242054498ae230b1a359aeea4fc89307e",
+        "candidateSha256": "aac38e5620804a72c60bf4a9380f6d3a9b0146e3fa4fb57aad6af1ce4c4a0940",
+        "changed": true
+      },
+      {
+        "path": "games/forpost/e2e/forpost.spec.ts",
+        "baseSha256": "41c3f50403b07202abb3a7a3c3cd7341a1914f3ef8286c3a46310a78eb1ec916",
+        "candidateSha256": "f9f6968c8d7d2114ac35a092b2f9101bb6ea956a2ee283ffc7450900df8b8043",
+        "changed": true
+      },
+      {
+        "path": "games/forpost/src/client/App.tsx",
+        "baseSha256": "90fa57c049cdf06a3990463e193e3d0732d6d91c506375af675e2149ff7524b4",
+        "candidateSha256": "484bc272e7d9bb230566310e3e30460ea3232e7fe7f1d1ad4f150373ecffdf24",
+        "changed": true
+      },
+      {
+        "path": "games/forpost/src/client/styles.css",
+        "baseSha256": "90b0c67663b609528c2d744ee93a937787f8b278766f61afc321d39c70afd2fa",
+        "candidateSha256": "651eda60c0a1702d7b5122142ef71903f02a7026c1af2df72b231933abcdc230",
+        "changed": true
+      }
+    ],
+    "trackedSourcesModified": true,
+    "testsExecuted": "Root executed the frozen tests before and after application; browser checks remain pending.",
+    "patchSha256": "26273a49337793528ef29ce08e48369b8465663fbbc239d3660f241cf727191f",
+    "syntaxCheck": "8 TypeScript/TSX files transpiled without syntactic diagnostics; semantic typecheck and product tests not run by this agent."
+  },
+  "before": {
+    "gitCommit": "fdf6f0243690fc5add5e2d25893ececf41d5ccb4",
+    "method": "Candidate tests only against unchanged production sources; exact baseline test bytes restored afterwards.",
+    "command": [
+      "npx",
+      "vitest",
+      "run",
+      "--config",
+      "games/forpost/vitest.config.ts",
+      "games/forpost/tests/core-rules.test.ts",
+      "games/forpost/tests/core-tutorial.test.ts",
+      "--maxWorkers=1"
+    ],
+    "exitCode": 1,
+    "elapsedSeconds": 4.035187982997741,
+    "logSha256": "23a03949b897110d46c1657e42ff5fc769f5e2af369a92594289a8ed4f323e11",
+    "candidateTestHashes": {
+      "games/forpost/tests/core-rules.test.ts": "f5e197c6af6c294d61e318d17e09b643206697acb102a45c28fdeb989353da0a",
+      "games/forpost/tests/core-tutorial.test.ts": "2b5bdb1b395d878ff2cc9fdd47c588b69bb6231fc648c08d4b1846260f352a65"
+    },
+    "baselineRestored": true
+  },
+  "after": {
+    "method": "Same frozen candidate tests against applied candidate sources.",
+    "command": [
+      "npx",
+      "vitest",
+      "run",
+      "--config",
+      "games/forpost/vitest.config.ts",
+      "games/forpost/tests/core-rules.test.ts",
+      "games/forpost/tests/core-tutorial.test.ts",
+      "--maxWorkers=1"
+    ],
+    "exitCode": 0,
+    "elapsedSeconds": 3.70801357000164,
+    "logSha256": "bc63af90fc64cdbf4ea89fd86313172cae9d802f88568c280a4945d497eded7d",
+    "candidatePatchSha256": "26273a49337793528ef29ce08e48369b8465663fbbc239d3660f241cf727191f"
+  },
+  "beforeCounts": {
+    "passed": 44,
+    "failed": 5,
+    "total": 49
+  },
+  "afterCounts": {
+    "passed": 49,
+    "failed": 0,
+    "total": 49
+  },
+  "findings": [
+    "Personal delivery credit could include protected/nonparticipating own nonbuilders when an eligible teammate delivered; the same eligible list now drives presence and credit.",
+    "The old full map UI test could pass with zero own deliveries; R5 FP02/2D actually did so.",
+    "The squad tutorial keeps its specified switchback/persistent order and now additionally requires a real independent drone delivery for broader E13 acceptance.",
+    "The final tutorial requires actual fighter-autopilot delivery and a finished operation; an unsuccessful ending shows retry guidance."
+  ],
+  "boundaries": [
+    "Completed saved lessons keep their completed status; unfinished saves use additive serialized flags.",
+    "Normal opponent, team size, game rules, combat parameters and match timing were not changed to force a UI outcome.",
+    "The prepared live 1v1 UI strategy must still be exercised on all maps and renderers; local core tests do not establish its success.",
+    "Existing privacy/result gates remain and exact identities are used in test memory, not printed in final map logs."
+  ]
+}
