@@ -1,4 +1,5 @@
 import { createPosition } from './state'
+import { ENERGY_V2_RULES_VERSION } from './types'
 import type { Action, GameState, PieceInput, PositionInput } from './types'
 
 /** Independent teaching positions; no tutorial-specific rule changes or energy subsidies in live games. */
@@ -10,7 +11,7 @@ export interface TeachingFixture {
 }
 const piece = (id: string, side: PieceInput['side'], type: PieceInput['type'], square: string): PieceInput => ({ id, side, type, square })
 function position(pieces: PieceInput[], extra: Omit<PositionInput, 'pieces'> = {}): GameState {
-  return createPosition({ pieces: [
+  return createPosition({ rulesVersion: ENERGY_V2_RULES_VERSION, pieces: [
     ...(!pieces.some(p => p.type === 'king' && p.side === 'white') ? [piece('wk', 'white', 'king', 'a1')] : []),
     ...(!pieces.some(p => p.type === 'king' && p.side === 'black') ? [piece('bk', 'black', 'king', 'h8')] : []), ...pieces,
   ], ...extra })

@@ -1,5 +1,5 @@
 import { expect, test, type BrowserContext, type Page } from '@playwright/test'
-import { ABILITY_PRACTICE, QUICK_LESSONS } from '../../src/tutorial/quickTeaching'
+import { ABILITY_PRACTICE, BASIC_LESSON_COUNT, QUICK_LESSONS, abilityExercise } from '../../src/tutorial/quickTeaching'
 import { ABILITIES, type Action, type GameState } from '../../src/core'
 import { abilityName, pieceName, type Language } from '../../src/ui/i18n'
 
@@ -30,17 +30,21 @@ async function openTutorial(page: Page, lang: Language) {
   await page.getByRole('button', { name: lang === 'ru' ? 'Обучение' : 'Tutorial', exact: true }).click()
   await expect(tutorial(page)).toHaveAttribute('data-step', 'pawn')
 }
-async function play(page: Page, state: GameState, action: Action, lang: Language) {
+async function play(page: Page, state: GameState, action: Action, lang: Language, blocked = false, practice = false) {
   await expect(tutorial(page)).toHaveAttribute('data-status', 'ready')
-  if (action.mode !== 'normal') {
+  if (action.mode !== 'normal' && !practice) {
     const mode = action.mode === 'activate' ? (lang === 'ru' ? 'Форсаж' : 'Overdrive')
       : action.mode === 'form' ? (lang === 'ru' ? 'Приём' : 'Ability') : (lang === 'ru' ? 'Импульс' : 'Impulse')
     await page.locator('.od-power-switch').getByRole('button', { name: new RegExp(`^${mode}`) }).click()
   }
   const target = action.to ?? state.pieces.find(piece => piece.id === action.targetId)!.square
-  await expect(square(page, target)).toHaveAttribute('data-target', 'true')
+  await expect(square(page, target)).toHaveAttribute('data-target', blocked ? 'false' : 'true')
+  if (blocked) await expect(tutorial(page)).toHaveAttribute('data-attempt', 'true')
   await clickSquare(page, target)
-  await expect(tutorial(page)).toHaveAttribute('data-status', 'showing')
+}
+async function advance(page: Page, lang: Language) {
+  await expect(tutorial(page)).toHaveAttribute('data-status', 'review')
+  await page.getByRole('button', { name: lang === 'ru' ? 'Дальше' : 'Next', exact: true }).click()
 }
 async function visibleBoardAndControls(page: Page) {
   for (const cell of ['a1', 'h1', 'a8', 'h8']) {
@@ -56,7 +60,7 @@ async function visibleBoardAndControls(page: Page) {
 }
 
 for (const lang of ['ru', 'en'] as const) {
-  test(`${lang}: ten real actions, energy and own-turn timer; ordinary save survives`, async ({ page, context }, info) => {
+  test(`${lang}: all moves, battery check, edge Ram, chain and own-turn timer; ordinary save survives`, async ({ page, context }, info) => {
     await preferences(context, lang)
     const before = await normalGame(page, lang)
     await openTutorial(page, lang)
@@ -68,21 +72,32 @@ for (const lang of ['ru', 'en'] as const) {
         await expect(page.locator('.od-capacitors')).toHaveAccessibleName(/6/)
         await info.attach(`tutorial-${lang}-form`, { body: await page.screenshot(), contentType: 'image/png' })
       }
-      await play(page, step.state, step.expected, lang)
-      if (step.id === 'rook') await expect(page.locator('.od-capacitors')).toHaveAccessibleName(/2/)
-      if (step.id === 'impulse' || step.id === 'activate') await expect(page.locator('.od-capacitors')).toHaveAccessibleName(/0/)
-      if (index >= 7) {
-        const remaining = String(9 - index)
-        await expect(page.locator('.od-quick-timer')).toHaveAttribute('data-remaining', remaining)
-        if (step.reply) {
-          await expect(tutorial(page)).toHaveAttribute('data-status', 'opponent')
-          await expect(page.locator('.od-quick-timer')).toHaveAttribute('data-remaining', remaining)
-        }
+      if (step.id === 'battery-check') await expect(square(page, 'e1')).toHaveAttribute('data-check', 'true')
+      await play(page, step.state, step.expected, lang, step.blockedAttempt)
+      const final = index === QUICK_LESSONS.length - 1
+      await expect(tutorial(page)).toHaveAttribute('data-status', final ? 'complete' : 'review')
+      if (step.id === 'rook') await expect(page.locator('.od-capacitors')).toHaveAccessibleName(/: 2 /)
+      if (step.id === 'impulse' || step.id === 'activate') await expect(page.locator('.od-capacitors')).toHaveAccessibleName(/: 0 /)
+      if (step.id === 'battery-check') {
+        await expect(square(page, 'e1')).toHaveAttribute('data-check', 'false')
+        await expect(page.locator('.od-capacitors')).toHaveAccessibleName(/: 3 /)
       }
+      if (step.id === 'ram-edge') {
+        await expect(square(page, 'h4')).toHaveAccessibleName(/Пешка|Pawn/)
+        await expect(page.locator('.od-capacitors')).toHaveAccessibleName(/: 3 /)
+      }
+      if (step.id === 'ram-chain') {
+        await expect(square(page, 'c5')).toHaveAccessibleName(/Ладья|Rook/)
+        await expect(square(page, 'c6')).toHaveAccessibleName(/Пешка|Pawn/)
+        await expect(square(page, 'c7')).toHaveAccessibleName(/Конь|Knight/)
+      }
+      const remaining = { activate: '2', free: '1', expire: '0' }[step.id as 'activate' | 'free' | 'expire']
+      if (remaining) await expect(page.locator('.od-quick-timer')).toHaveAttribute('data-remaining', remaining)
       expect(await localSave(page)).toBe(before)
+      if (!final) await advance(page, lang)
     }
     await expect(tutorial(page)).toHaveAttribute('data-status', 'complete')
-    await expect(page.locator('.od-quick-pieces button')).toHaveCount(6)
+    await expect(page.getByRole('button', { name: lang === 'ru' ? 'Приёмы всех фигур' : 'All piece abilities', exact: true })).toBeVisible()
     await info.attach(`tutorial-${lang}-complete`, { body: await page.screenshot(), contentType: 'image/png' })
     await page.getByRole('button', { name: lang === 'ru' ? 'Вернуться к игре' : 'Return to game', exact: true }).click()
     await expect(app(page)).toHaveAttribute('data-mode', 'local')
@@ -94,27 +109,28 @@ for (const lang of ['ru', 'en'] as const) {
   })
 }
 
-test('skip chess basics, optional six abilities and replay stay separate from a saved game', async ({ page, context }) => {
+test('skip chess basics, six abilities in all three power modes and replay preserve the saved game', async ({ page, context }) => {
   await preferences(context)
   const before = await normalGame(page, 'en')
   await openTutorial(page, 'en')
   await page.getByRole('button', { name: /I know chess/ }).click()
   await expect(tutorial(page)).toHaveAttribute('data-step', 'impulse')
-  for (const step of QUICK_LESSONS.slice(6)) {
-    await expect(tutorial(page)).toHaveAttribute('data-step', step.id)
-    await play(page, step.state, step.expected, 'en')
-  }
-  await expect(tutorial(page)).toHaveAttribute('data-status', 'complete')
-  for (const fixture of ABILITY_PRACTICE) {
+  expect(QUICK_LESSONS[BASIC_LESSON_COUNT].id).toBe('impulse')
+  await page.getByRole('button', { name: 'All piece abilities', exact: true }).click()
+  for (const [index, fixture] of ABILITY_PRACTICE.entries()) {
     const piece = fixture.state.pieces.find(item => item.id === fixture.expected.pieceId)!
     await page.getByRole('button', { name: `${pieceName(piece.type, 'en')} · ${abilityName(ABILITIES[piece.type], 'en')}`, exact: true }).click()
     await expect(tutorial(page)).toHaveAttribute('data-track', 'abilities')
-    await play(page, fixture.state, fixture.expected, 'en')
-    await expect(tutorial(page)).toHaveAttribute('data-status', 'complete')
-    await expect(tutorial(page).getByRole('heading', { level: 1 })).toContainText('— complete')
-    expect(await localSave(page)).toBe(before)
+    for (const [mode, label] of [['impulse', 'Impulse 3'], ['activate', 'Overdrive 6'], ['form', 'In form 0']] as const) {
+      await page.getByRole('button', { name: label, exact: true }).click()
+      const step = abilityExercise(index, mode)
+      await play(page, step.state, step.expected, 'en', false, true)
+      await expect(tutorial(page)).toHaveAttribute('data-status', 'complete')
+      if (mode !== 'impulse') await expect(page.locator('.od-quick-timer')).toHaveAttribute('data-remaining', mode === 'form' ? '1' : '2')
+      expect(await localSave(page)).toBe(before)
+    }
   }
-  await page.getByRole('button', { name: 'Restart', exact: true }).click()
+  await page.getByRole('button', { name: 'Restart course', exact: true }).click()
   await expect(tutorial(page)).toHaveAttribute('data-step', 'pawn')
   await page.keyboard.press('Escape')
   await expect(app(page)).toHaveAttribute('data-turn', '1')
@@ -130,7 +146,7 @@ test('move-book entry and reloading an unfinished lesson preserve the normal sav
     await page.getByRole('button', { name: 'Move book', exact: true }).click()
     await page.getByRole('button', { name: 'Try on the board', exact: true }).click()
   } else {
-    await page.getByRole('button', { name: 'Menu', exact: true }).click()
+    await page.getByRole('button', { name: 'New game', exact: true }).click()
     await page.getByRole('button', { name: /Learn on the board/ }).click()
   }
   await play(page, QUICK_LESSONS[0].state, QUICK_LESSONS[0].expected, 'en')
@@ -152,7 +168,8 @@ test('opening the trainer cancels the hidden local bot until returning', async (
   const before = await localSave(page)
   expect(JSON.parse(before!).actions).toHaveLength(1)
   await play(page, QUICK_LESSONS[0].state, QUICK_LESSONS[0].expected, 'en')
-  await expect(tutorial(page)).toHaveAttribute('data-step', 'knight')
+  await advance(page, 'en')
+  await expect(tutorial(page)).toHaveAttribute('data-step', 'pawn-capture')
   expect(await localSave(page)).toBe(before)
   await page.getByRole('button', { name: /Back to game/ }).click()
   await expect(app(page)).toHaveAttribute('data-turn', '2', { timeout: 15_000 })
@@ -175,7 +192,7 @@ test('online tutorial consumes a queued reply and returns the latest room withou
   await page.clock.install({ time: new Date('2026-11-27T12:00:00Z') })
   try {
     const before = await normalGame(page, 'en')
-    await page.getByRole('button', { name: 'Menu', exact: true }).click()
+    await page.getByRole('button', { name: 'New game', exact: true }).click()
     await page.getByRole('button', { name: /Play online/ }).click()
     await page.getByLabel('Your name', { exact: true }).fill('Tutor host')
     await page.getByRole('button', { name: 'Create room', exact: true }).click()
@@ -216,7 +233,8 @@ test('online tutorial consumes a queued reply and returns the latest room withou
     await square(guest, 'g8').click(); await square(guest, 'f6').click()
     await expect.poll(() => revision).toBe(4)
     await play(page, QUICK_LESSONS[0].state, QUICK_LESSONS[0].expected, 'en')
-    await expect(tutorial(page)).toHaveAttribute('data-step', 'knight')
+    await advance(page, 'en')
+    await expect(tutorial(page)).toHaveAttribute('data-step', 'pawn-capture')
     expect(sent).toBe(commandsBeforeLesson)
     expect(await localSave(page)).toBe(before)
     expect(page.url()).toBe(roomUrl)

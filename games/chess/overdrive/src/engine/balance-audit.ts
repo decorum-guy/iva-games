@@ -63,7 +63,7 @@ export function runAuditGame(options: AuditOptions, progress?: (ply: number) => 
     firstEnergy: both<number | null>(() => null), firstImpulse: both<number | null>(() => null), firstActivation: both<number | null>(() => null),
     firstActivationMaterialLead: both<number | null>(() => null),
     abilities: {} as Record<string, number>, modes: {} as Record<string, number>, depth: {} as Record<string, number>, stopReasons: {} as Record<string, number>,
-    nodes: 0, searchMs: 0, searchMoves: 0,
+    nodes: 0, searchMs: 0, searchMoves: 0, ramPushSizes: {} as Record<string, number>,
   }
   for (let ply = 0; ply < options.maxPly && !state.outcome; ply++) {
     const side = state.side
@@ -124,7 +124,10 @@ export function runAuditGame(options: AuditOptions, progress?: (ply: number) => 
       }
     }
     for (const event of resolved.events) {
-      if (event.type === 'ability') increment(stats.abilities, event.ability)
+      if (event.type === 'ability') {
+        increment(stats.abilities, event.ability)
+        if (event.ability === 'ram') increment(stats.ramPushSizes, String(resolved.events.filter(e => e.type === 'move' && e.forced).length))
+      }
       if (event.type === 'promotion' && event.forced) stats.forcedPromotions[event.side]++
     }
     commands.push(command)

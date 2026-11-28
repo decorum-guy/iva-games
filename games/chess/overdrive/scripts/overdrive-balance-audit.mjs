@@ -38,8 +38,8 @@ if (!isMainThread) {
   execFileSync(process.execPath, [resolve(repository, 'node_modules/vite/bin/vite.js'), 'build', '--ssr', 'src/engine/balance-audit.ts', '--outDir', `${output}/engine`, '--emptyOutDir'], { cwd: fileURLToPath(new URL('../', import.meta.url)), stdio: 'inherit' })
   const sourceCommit = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: repository, encoding: 'utf8' }).trim()
   const engineSha256 = createHash('sha256').update(readFileSync(`${output}/engine/balance-audit.js`)).digest('hex')
-  const versions = args.get('--version') ? [String(args.get('--version'))] : ['overdrive-v1', 'overdrive-v2']
-  if (versions.some(v => !['overdrive-v1', 'overdrive-v2'].includes(v))) throw new Error('Invalid version')
+  const versions = String(args.get('--version') ?? 'overdrive-v1,overdrive-v2').split(',')
+  if (versions.some(v => !['overdrive-v1', 'overdrive-v2', 'overdrive-v3'].includes(v))) throw new Error('Invalid version')
   const jobs = []
   for (let opening = 0; opening < openings; opening++) for (let sample = 0; sample < seeds; sample++) for (const swap of [false, true]) for (const rulesVersion of versions) {
     const seed = 26112601 + opening * 1000 + sample * 2

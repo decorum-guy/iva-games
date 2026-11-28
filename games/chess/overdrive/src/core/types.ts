@@ -1,7 +1,8 @@
 /** Complete, public state for the deterministic OVERDRIVE ruleset. */
-export const RULES_VERSION = 'overdrive-v2' as const
+export const RULES_VERSION = 'overdrive-v3' as const
+export const ENERGY_V2_RULES_VERSION = 'overdrive-v2' as const
 export const LEGACY_RULES_VERSION = 'overdrive-v1' as const
-export type RulesVersion = typeof RULES_VERSION | typeof LEGACY_RULES_VERSION
+export type RulesVersion = typeof RULES_VERSION | typeof ENERGY_V2_RULES_VERSION | typeof LEGACY_RULES_VERSION
 export const energyBankSize = (version: RulesVersion): number => version === LEGACY_RULES_VERSION ? 5 : 3
 export const SIDES = ['white', 'black'] as const
 export const PIECE_TYPES = ['pawn', 'knight', 'bishop', 'rook', 'queen', 'king'] as const

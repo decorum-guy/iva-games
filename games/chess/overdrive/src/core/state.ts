@@ -1,4 +1,4 @@
-import { PIECE_TYPES, RULES_VERSION, LEGACY_RULES_VERSION, energyBankSize, SIDES, RuleError } from './types'
+import { PIECE_TYPES, RULES_VERSION, ENERGY_V2_RULES_VERSION, LEGACY_RULES_VERSION, energyBankSize, SIDES, RuleError } from './types'
 import type { GameState, Piece, PieceType, PositionInput, Side } from './types'
 import { adjacent, homeRank, opposite, pawnStartRank, rank, squareAt, validSquare } from './geometry'
 import { positionKey } from './rules'
@@ -40,7 +40,8 @@ const ownKeys = (value: Record<string, unknown>, keys: readonly string[]) => Obj
 /** Structural/invariant validation for persisted JSON. Does not claim reachability from the opening. */
 export function validateState(value: unknown): value is GameState {
   if (!record(value) || !ownKeys(value, ['rulesVersion', 'pieces', 'side', 'turnSerial', 'energy', 'forms', 'rewardedCheckLayouts', 'enPassant', 'quietPly', 'repetition', 'outcome'])) return false
-  if ((value.rulesVersion !== RULES_VERSION && value.rulesVersion !== LEGACY_RULES_VERSION) || !side(value.side) || !integer(value.turnSerial) || !integer(value.quietPly)) return false
+  if (value.rulesVersion !== RULES_VERSION && value.rulesVersion !== ENERGY_V2_RULES_VERSION && value.rulesVersion !== LEGACY_RULES_VERSION) return false
+  if (!side(value.side) || !integer(value.turnSerial) || !integer(value.quietPly)) return false
   if (!Array.isArray(value.pieces) || value.pieces.length < 2 || value.pieces.length > 32) return false
   const ids = new Set<string>(), squares = new Set<string>(), kings = { white: 0, black: 0 }
   for (const p of value.pieces) {
