@@ -24,6 +24,14 @@ try {
   }
   const image = encode({ width: 128, height: 96, data: pixels }, 80).data;
   await page.getByLabel('Загрузить фото').setInputFiles({ name: 'synthetic.jpg', mimeType: 'image/jpeg', buffer: image });
+  const crop = page.getByRole('group', { name: /Положение фото/ });
+  await expect(crop).toBeVisible();
+  await page.getByLabel('Масштаб').fill('1.5');
+  const before = await crop.locator('img').getAttribute('style');
+  await crop.focus();
+  await page.keyboard.press('ArrowRight');
+  assert.notEqual(await crop.locator('img').getAttribute('style'), before);
+  await page.getByRole('button', { name: 'Применить', exact: true }).click();
   await expect(page.locator('.profile-identity .avatar-photo')).toHaveAttribute('src', /^data:image\/jpeg;base64,/);
   const saved = page.waitForResponse(response => response.url().endsWith('/api/platform/v1/profile') && response.request().method() === 'POST');
   await page.getByRole('button', { name: 'Сохранить профиль' }).click();

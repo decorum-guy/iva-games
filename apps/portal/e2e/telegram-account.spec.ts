@@ -74,6 +74,14 @@ test('chooses a character and uploads, previews and saves a profile photo', asyn
   await page.getByRole('button', { name: 'Аватар: Лис' }).click();
   await expect(page.locator('.profile-identity .avatar-art')).toBeVisible();
   await page.getByLabel('Загрузить фото').setInputFiles({ name: 'profile.jpg', mimeType: 'image/jpeg', buffer: image });
+  await expect(page.getByText('Кадрирование', { exact: true })).toBeVisible();
+  const crop = page.getByRole('group', { name: /Положение фото/ });
+  await page.getByLabel('Масштаб').fill('2');
+  const beforeMove = await crop.locator('img').getAttribute('style');
+  await crop.focus();
+  await page.keyboard.press('ArrowRight');
+  expect(await crop.locator('img').getAttribute('style')).not.toBe(beforeMove);
+  await page.getByRole('button', { name: 'Применить', exact: true }).click();
   await expect(page.locator('.profile-identity img')).toHaveAttribute('src', /^data:image\/jpeg;base64,/);
   await page.getByRole('button', { name: 'Сохранить профиль' }).click();
   await expect.poll(() => uploaded.length).toBeGreaterThan(0);
