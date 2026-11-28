@@ -15,7 +15,7 @@ const machine = { node: process.version, platform: os.platform(), arch: os.arch(
 let complete = false, stopping = false;
 process.once('SIGTERM', () => { stopping = true; }); process.once('SIGINT', () => { stopping = true; });
 function snapshotReport() { return { kind: 'real wall-clock HTTP/WebSocket simulation load; no browser/FPS claim', complete, targetSeconds: seconds, elapsedSeconds: (Date.now() - start) / 1000,
-  roomCount, teamSize: 3, botLevel: 'strong', artifactId: healthAtStart.artifactId, contentId: healthAtStart.contentId, machine, failures, results,
+  roomCount, teamSize: 3, botLevel: 'strong', artifactId: healthAtStart.artifactId, contentId: healthAtStart.contentId, sourceTrace: rig.sourceTrace, machine, failures, results,
   slots: slots.map(slot => ({ mapId: slot.mapId, matchId: slot.matchId, starts: slot.starts, snapshots: slot.snapshots, deltas: slot.deltas, lastTick: slot.lastTick, phase: slot.phase,
     peakProjectedEntities: slot.peakProjectedEntities, temporaryBotObserved: slot.temporaryBotObserved })), samples }; }
 async function begin(slot, number) {

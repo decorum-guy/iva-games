@@ -25,7 +25,7 @@ describe('Unanswered trade proposals preserve hidden recipient hands', () => {
     const canPay=offered(true),cannotPay=offered(false);
     const authorCanPay=viewTerritory(canPay,'author',1_200);
     const authorCannotPay=viewTerritory(cannotPay,'author',1_200);
-    expect(authorCanPay.offers).toHaveLength(1);
+    expect(authorCanPay.offers).toHaveLength(2);
     expect(authorCanPay).toEqual(authorCannotPay);
     expect(authorCannotPay.offers[0]).not.toHaveProperty('unavailableReason');
     expect(JSON.stringify(authorCannotPay)).not.toContain('target-resources');
@@ -45,6 +45,10 @@ describe('Unanswered trade proposals preserve hidden recipient hands', () => {
 
   it('sends neither the quote nor its closure history to an uninvolved participant', () => {
     const state=offered(false);
+    // Persisted pre-broadcast quote: old rooms keep their private addressed offer.
+    state.offers = state.offers.filter(offer => offer.targetId === 'target');
+    state.history = state.history?.filter(entry => entry.targetId !== 'observer');
+    delete state.offers[0].groupId;
     const observer=viewTerritory(state,'observer',1_200);
     expect(observer.offers).toEqual([]);
     expect(observer.history?.some(item=>item.kind==='offer')).toBe(false);

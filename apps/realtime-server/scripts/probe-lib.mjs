@@ -1,8 +1,9 @@
 /** Isolated real-process QA helpers. No production credentials or accounts. */
 import assert from 'node:assert/strict';
-import { spawn } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { once } from 'node:events';
-import { mkdir, mkdtemp, rename, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, readdir, rename, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:net';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -12,16 +13,35 @@ export const sleep = ms => new Promise(r => setTimeout(r, ms));
 export const isSnapshot = message => message.type === 'full' || message.type === 'delta';
 export async function freePort() { const server = createServer(); server.listen(0, '127.0.0.1'); await once(server, 'listening'); const port = server.address().port; await new Promise(r => server.close(r)); return port; }
 export async function writeReport(path, report) { const temporary = path + '.tmp'; await writeFile(temporary, JSON.stringify(report, null, 2) + '\n'); await rename(temporary, path); }
+async function sourceIdentity() {
+  const collect = async directory => {
+    const files = [];
+    for (const entry of await readdir(resolve(root, directory), { withFileTypes: true })) {
+      const name = directory + '/' + entry.name;
+      if (entry.isDirectory()) files.push(...await collect(name));
+      else if (entry.isFile()) files.push(name);
+    }
+    return files;
+  };
+  const core = (await collect('games/forpost/src/core')).sort(), files = [...core,
+    ...await collect('games/forpost/src/client'), ...await collect('apps/realtime-server/src'), ...await collect('packages/realtime-kit/src'),
+    'games/forpost/vite.config.ts', 'apps/realtime-server/vite.config.ts', 'package-lock.json'].sort();
+  const digest = async paths => { const hash = createHash('sha256'); for (const path of paths) { hash.update(path); hash.update(await readFile(resolve(root, path))); } return hash.digest('hex'); };
+  return { gitCommit: execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim(),
+    dirty: execFileSync('git', ['status', '--porcelain'], { cwd: root, encoding: 'utf8' }).trim().length > 0,
+    sourceSha256: await digest(files), sourceFileCount: files.length, coreSha256: await digest(core), coreFileCount: core.length,
+    method: 'SHA-256 of sorted relative source paths followed by exact file bytes; compiled runtime/client separately pinned by health hashes' };
+}
 export async function startRig({ prefix, port, publicOrigin, maxRooms = 4 } = {}) {
   await mkdir(resolve(root, '.qa'), { recursive: true }); const directory = await mkdtemp(resolve(root, '.qa/' + prefix + '-'));
   port ??= await freePort(); const endpoint = `http://127.0.0.1:${port}`, origin = publicOrigin ?? endpoint;
-  let logs = '', cookie = '';
+  let logs = '', cookie = ''; const sourceTrace = await sourceIdentity();
   const processHandle = spawn(process.execPath, [resolve(root, 'dist-realtime/main.js')], { cwd: root, stdio: ['ignore', 'pipe', 'pipe'],
     env: { ...process.env, REALTIME_PORT: String(port), REALTIME_HOST: '127.0.0.1', REALTIME_PUBLIC_ORIGIN: origin, REALTIME_MAX_ROOMS: String(maxRooms),
       REALTIME_DATABASE_PATH: resolve(directory, 'realtime.sqlite'), REALTIME_PRACTICE_KEY_PATH: resolve(directory, 'practice.pem'),
-      REALTIME_TRUSTED_KEYS_PATH: '', REALTIME_STATIC_DIRECTORY: resolve(root, 'games/forpost/dist'), IVA_BUILD_SHA: 'isolated-' + prefix } });
+      REALTIME_TRUSTED_KEYS_PATH: '', REALTIME_STATIC_DIRECTORY: resolve(root, 'games/forpost/dist'), IVA_BUILD_SHA: process.env.IVA_BUILD_SHA ?? sourceTrace.gitCommit } });
   for (const stream of [processHandle.stdout, processHandle.stderr]) stream.on('data', data => { logs = (logs + data.toString()).slice(-8000); });
-  const rig = { directory, endpoint, origin, processHandle,
+  const rig = { directory, endpoint, origin, processHandle, sourceTrace,
     async health() { const response = await fetch(endpoint + '/health/ready'); return await response.json(); },
     async post(path, body = {}) {
       const response = await fetch(origin + path, { method: 'POST', headers: { Origin: origin, 'Content-Type': 'application/json', Cookie: cookie }, body: JSON.stringify(body) });

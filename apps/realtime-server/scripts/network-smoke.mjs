@@ -7,6 +7,7 @@ import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { once } from 'node:events';
 import WebSocket from 'ws';
+import Database from 'better-sqlite3';
 const root = fileURLToPath(new URL('../../../', import.meta.url));
 await mkdir(resolve(root, '.qa'), { recursive: true });
 const directory = await mkdtemp(resolve(root, '.qa/realtime-network-'));
@@ -41,7 +42,7 @@ async function stop() {
 async function post(path, value = {}, useCookie = true) {
   const response = await fetch(origin + path, { method: 'POST', headers: { 'Content-Type': 'application/json', Origin: origin, ...(useCookie && cookie ? { Cookie: cookie } : {}) }, body: JSON.stringify(value) });
   if (useCookie && response.headers.get('set-cookie')) cookie = response.headers.get('set-cookie').split(';')[0];
-  return { status: response.status, body: await response.json() };
+  return { status: response.status, body: await response.json(), setCookie: response.headers.get('set-cookie') };
 }
 async function socket(ticket) {
   const ws = new WebSocket(origin.replace('http:', 'ws:') + '/ws/realtime/v1', 'iva-realtime-v1', { origin });
@@ -85,6 +86,8 @@ try {
   await start();
   const startRoom = await post('/api/realtime/v1/practice', { mapId: 'FP01', teamSize: 1, displayName: 'QA', botLevel: 'novice', mode: 'training', seed: 9123 });
   assert.equal(startRoom.status, 201); const firstTicket = startRoom.body.ticket, matchId = startRoom.body.matchId;
+  assert.ok(startRoom.setCookie?.includes('HttpOnly') && startRoom.setCookie.includes('SameSite=Strict') && startRoom.setCookie.includes('Max-Age=2592000'));
+  const firstOwnerCookie = cookie;
   assert.match(startRoom.body.route, /^\/realtime-assets\/[0-9a-f]{64}\/$/);
   const originalHtml = await (await fetch(origin + startRoom.body.route)).text();
   assert.equal(originalHtml, await (await fetch(origin + '/play/forpost/')).text());
@@ -104,6 +107,8 @@ try {
   assert.equal(replay.messages.some(snapshot), false); replay.close(); passed.push('one-use ticket denied before state');
   const unauthorized = await post(`/api/realtime/v1/practice/${matchId}/ticket`, {}, false); assert.equal(unauthorized.status, 404); passed.push('another guest cannot resume');
   const secondTicket = await post(`/api/realtime/v1/practice/${matchId}/ticket`), second = await admitted(secondTicket.body.ticket);
+  assert.ok(secondTicket.setCookie?.includes('Max-Age=2592000')); assert.ok(cookie === firstOwnerCookie, 'ticket renewal preserves opaque ownership');
+  passed.push('HttpOnly guest identity renews for thirty days without a script bearer or identity rotation');
   assert.equal(second.hello.controlling, false); second.send('claimControl');
   const control = await second.wait(m => m.type === 'controlChanged' && m.controlling); second.hello.controllerGeneration = control.controllerGeneration;
   await first.wait(m => m.type === 'controlChanged' && !m.controlling);
@@ -119,7 +124,7 @@ try {
   const neutral = await second.wait(m => snapshot(m) && m.worldTick >= moved.worldTick + 12);
   const stoppedFighter = neutral.view.units.find(u => u.id === initialFighter.id);
   assert.ok(Math.abs(stoppedFighter.x - movedFighter.x) < 0.05, 'stale movement neutralizes without a key-up packet');
-  passed.push('new input sequence after takeover and 250ms neutralization');
+  passed.push('new input sequence after takeover and stale movement neutralization');
   const actionId = 'forpost-smoke-mode-1'; second.send('action', { actionId, payload: { type: 'mode', mode: 'tactics' } });
   const ack = await second.wait(m => m.type === 'actionAck' && m.actionId === actionId); assert.equal(ack.result.ok, true);
   second.send('action', { actionId, payload: { type: 'mode', mode: 'tactics' } });
@@ -129,20 +134,64 @@ try {
   const before = await second.wait(m => snapshot(m) && m.worldTick > 10);
   first.close(); second.close();
   await sleep(11_000);
+  const observedDatabase = new Database(resolve(directory, 'realtime.sqlite'), { readonly: true });
+  try {
+    const readPause = () => JSON.parse(observedDatabase.prepare('SELECT record_json FROM rt_matches WHERE match_id=?').get(matchId).record_json);
+    const paused = readPause(); assert.equal(paused.phase, 'paused');
+    await sleep(400); assert.equal(readPause().tick, paused.tick, 'empty durable pause does not advance game time');
+  } finally { observedDatabase.close(); }
   const health = await (await fetch(origin + '/health/ready')).json(); assert.equal(health.ok, true); assert.equal(health.metrics.storageFailures, 0);
   await stop(); await start();
   const restoredTicket = await post(`/api/realtime/v1/practice/${matchId}/ticket`); assert.equal(restoredTicket.status, 200);
   const restored = await admitted(restoredTicket.body.ticket), full = await restored.wait(m => m.type === 'full');
   assert.ok(restored.hello.epoch > first.hello.epoch); assert.ok(full.worldTick >= before.worldTick); assert.equal(full.view.matchId, matchId);
+  assert.equal(full.lastConsumedInputSeq, -1, 'a new generation cannot acknowledge the previous input stream');
   restored.send('action', { actionId, payload: { type: 'mode', mode: 'tactics' } });
   const restoredAck = await restored.wait(m => m.type === 'actionAck' && m.actionId === actionId); assert.equal(restoredAck.replayed, true);
   passed.push('pause, process restart, same match and committed receipt');
+  const purchaseOptions = view => Object.entries(view.buildOptions).flatMap(([padId, entries]) => entries.filter(entry => entry.ok).map(entry => ({ padId, ...entry }))).sort((a, b) => a.cost - b.cost);
+  let purchaseView = full.view;
+  if (!purchaseOptions(purchaseView).length) {
+    // The temporary bot may legitimately have spent the wallet during absence.
+    // Cancel its unstarted own order through the actual gameplay API first.
+    const queued = purchaseView.buildOrders.find(order => order.ownerId === purchaseView.you && !order.buildingId);
+    if (queued) {
+      const cancelId = 'forpost-smoke-prepare-purchase'; restored.send('action', { actionId: cancelId, payload: { type: 'cancelBuild', orderId: queued.id } });
+      assert.equal((await restored.wait(message => message.type === 'actionAck' && message.actionId === cancelId)).result.ok, true);
+    }
+    purchaseView = (await restored.wait(message => snapshot(message) && purchaseOptions(message.view).length > 0, 35_000)).view;
+  }
+  const option = purchaseOptions(purchaseView)[0];
+  assert.ok(option, 'a real legal purchase exists before the lost-ACK crash');
+  const purchaseId = 'forpost-smoke-purchase-lost-ack', purchasePayload = { type: 'build', padId: option.padId, kind: option.kind };
+  const spentBeforePurchase = purchaseView.participants.find(person => person.id === purchaseView.you).statistics.spent;
+  // Stop receiving bytes before the request. The writer remains real SQLite;
+  // observe its receipt, then destroy the socket without delivering that ACK.
+  restored.ws._socket.pause(); restored.send('action', { actionId: purchaseId, payload: purchasePayload });
+  let purchaseReceipt;
+  const purchaseDatabase = new Database(resolve(directory, 'realtime.sqlite'), { readonly: true });
+  try {
+    const deadline = Date.now() + 8000;
+    while (Date.now() < deadline && !purchaseReceipt) {
+      const row = purchaseDatabase.prepare('SELECT record_json FROM rt_actions WHERE match_id=? AND action_id=?').get(matchId, purchaseId);
+      if (row) purchaseReceipt = JSON.parse(row.record_json); else await sleep(20);
+    }
+  } finally { purchaseDatabase.close(); }
+  assert.equal(purchaseReceipt?.result.ok, true, 'purchase has a durable receipt before process death');
+  assert.equal(restored.messages.some(message => message.type === 'actionAck' && message.actionId === purchaseId), false, 'purchase ACK was not received');
   const previousEpoch = restored.hello.epoch;
-  for (const client of clients) client.close(); clients = [];
+  for (const client of clients) { clearInterval(client.beat); client.ws.terminate(); } clients = [];
   const killed = once(processHandle, 'exit'); processHandle.kill('SIGKILL'); await killed; processHandle = null;
   await start();
   const crashTicket = await post(`/api/realtime/v1/practice/${matchId}/ticket`); assert.equal(crashTicket.status, 200);
   const crashClient = await admitted(crashTicket.body.ticket); assert.ok(crashClient.hello.epoch > previousEpoch);
+  const crashFull = await crashClient.wait(message => message.type === 'full');
+  assert.equal(crashFull.view.buildOrders.filter(order => order.id === purchaseReceipt.result.entityId).length, 1);
+  assert.equal(crashFull.view.participants.find(person => person.id === crashFull.view.you).statistics.spent, spentBeforePurchase + option.cost);
+  crashClient.send('action', { actionId: purchaseId, payload: purchasePayload });
+  const purchaseReplay = await crashClient.wait(message => message.type === 'actionAck' && message.actionId === purchaseId);
+  assert.equal(purchaseReplay.replayed, true); assert.deepEqual(purchaseReplay.result, purchaseReceipt.result);
+  passed.push('real purchase, deliberately unreceived ACK, SIGKILL and one restored order/charge/receipt');
   crashClient.send('action', { actionId, payload: { type: 'mode', mode: 'tactics' } });
   assert.equal((await crashClient.wait(m => m.type === 'actionAck' && m.actionId === actionId)).replayed, true);
   passed.push('abrupt process death, expired lease and durable receipt recovery');

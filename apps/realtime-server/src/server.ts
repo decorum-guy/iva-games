@@ -159,7 +159,10 @@ export function createRealtimeServer(options: RealtimeOptions) {
         if (method !== 'POST' || request.headers.origin !== origin) throw new Error('ORIGIN_NOT_ALLOWED');
         if (!request.headers['content-type']?.startsWith('application/json')) throw new Error('INVALID_MESSAGE');
         let token = cookie(request, cookieName);
-        if (!token) { token = randomBytes(32).toString('base64url'); response.setHeader('Set-Cookie', `${cookieName}=${token}; Path=/; HttpOnly; SameSite=Strict; Max-Age=86400${secure ? '; Secure' : ''}`); }
+        if (!token) token = randomBytes(32).toString('base64url');
+        // Guest identity outlives a room's 24-hour resume window and is renewed
+        // on successful owned HTTP operations; no bearer is exposed to script.
+        const renewOwnership = () => response.setHeader('Set-Cookie', `${cookieName}=${token}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${30 * 24 * 60 * 60}${secure ? '; Secure' : ''}`);
         const ownerHash = hash(token), raw = await body(request), input: unknown = JSON.parse(raw || '{}');
         if (path === '/api/realtime/v1/practice') {
           const address = request.socket.remoteAddress ?? 'local'; const bucket = anonymousRate.get(address) ?? { at: Date.now(), count: 0 };
@@ -173,15 +176,15 @@ export function createRealtimeServer(options: RealtimeOptions) {
             config: { mapId: settings.mapId, teamSize: settings.teamSize, mode: settings.mode, seed: settings.seed ?? randomBytes(4).readUInt32LE(),
               participants: roster.map(p => ({ id: p.participantId, name: p.displayName, team: p.team, controller: p.controller, botLevel: settings.botLevel,
                 weapon: settings.weapon, tool: settings.tool })) } });
-          send(response, 201, await practiceTicket(match, ownerHash)); return;
+          const ticket = await practiceTicket(match, ownerHash); renewOwnership(); send(response, 201, ticket); return;
         }
         const ticketMatch = path.match(/^\/api\/realtime\/v1\/practice\/([\w-]+)\/ticket$/);
         if (ticketMatch) {
           const match = runtime.get(ticketMatch[1]); if (!match) throw new Error('MATCH_UNAVAILABLE');
-          send(response, 200, await practiceTicket(match, ownerHash)); return;
+          const ticket = await practiceTicket(match, ownerHash); renewOwnership(); send(response, 200, ticket); return;
         }
         const abandonMatch = path.match(/^\/api\/realtime\/v1\/practice\/([\w-]+)\/abandon$/);
-        if (abandonMatch) { await runtime.abandon(abandonMatch[1], ownerHash); send(response, 200, { ok: true }); return; }
+        if (abandonMatch) { await runtime.abandon(abandonMatch[1], ownerHash); renewOwnership(); send(response, 200, { ok: true }); return; }
         throw new Error('MATCH_UNAVAILABLE');
       }
       if (!['GET', 'HEAD'].includes(method)) throw new Error('MATCH_UNAVAILABLE');

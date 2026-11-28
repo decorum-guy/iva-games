@@ -28,7 +28,8 @@ export async function roomTicket(roomId: string): Promise<JoinInfo> {
   if (!session.user) throw new Error('AUTH_REQUIRED')
   return requestJson(`/api/platform/v1/rooms/${encodeURIComponent(roomId)}/realtime-ticket`, {}, { 'X-CSRF-Token': session.csrfToken, 'Idempotency-Key': crypto.randomUUID() })
 }
-interface Pending { action: Action; resolve: (value: ActionResult) => void; reject: (error: Error) => void; timer: ReturnType<typeof setTimeout> }
+interface Pending { action: Action; resolve: (value: ActionResult) => void; reject: (error: Error) => void; timer: ReturnType<typeof setTimeout> | null }
+const TERMINAL_RENEW_ERRORS = new Set(['AUTH_REQUIRED', 'UNAUTHENTICATED', 'SESSION_REQUIRED', 'SIGN_IN_AGAIN', 'FORBIDDEN', 'ORIGIN_NOT_ALLOWED', 'EXPIRED', 'NOT_FOUND', 'MATCH_NOT_FOUND', 'MATCH_UNAVAILABLE', 'MATCH_CLOSED', 'HTTP_401', 'HTTP_403', 'HTTP_404'])
 
 export class OnlineSession implements SessionClient {
   private socket: WebSocket | null = null
@@ -38,6 +39,7 @@ export class OnlineSession implements SessionClient {
   private sequence = 0
   private closed = false
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null
+  private renewing = false
   private heartbeat: ReturnType<typeof setInterval> | null = null
   private pending = new Map<string, Pending>()
   private connected = false
@@ -53,11 +55,46 @@ export class OnlineSession implements SessionClient {
   private send(value: unknown): void { if (this.socket?.readyState === WebSocket.OPEN) this.socket.send(JSON.stringify(value)) }
   private envelope(type: string): Record<string, unknown> { return { type, protocolVersion: 1, matchId: this.info.matchId, epoch: this.epoch, controllerGeneration: this.generation } }
   private readPhase(value: unknown): void {
+    const previous = this.hostPhase
     if (typeof value === 'string') this.hostPhase = value
     if (this.hostPhase !== 'running') { this.inputHistory = []; this.predicted = null }
+    if (this.hostPhase === 'paused' || this.hostPhase === 'recovering') this.pausePending()
+    else if (this.hostPhase === 'running' && (previous === 'paused' || previous === 'recovering') && this.connected) this.replayPending()
   }
   private reportStatus(code?: string): void {
     this.onStatus(this.hostPhase === 'paused' || this.hostPhase === 'recovering' ? 'paused' : this.controlling ? 'connected' : 'spectating', code)
+  }
+  private pausePending(): void { for (const pending of this.pending.values()) { if (pending.timer) clearTimeout(pending.timer); pending.timer = null } }
+  private rejectPending(error: Error): void { this.pausePending(); for (const pending of this.pending.values()) pending.reject(error); this.pending.clear() }
+  private sendPending(actionId: string, pending: Pending): void {
+    if (pending.timer) clearTimeout(pending.timer)
+    pending.timer = setTimeout(() => { this.pending.delete(actionId); pending.reject(new Error('NETWORK')) }, 20000)
+    this.send({ ...this.envelope('action'), actionId, payload: pending.action })
+  }
+  private replayPending(): void {
+    // The host looks up committed receipts before its phase guard. Replaying the same
+    // ID/payload can recover a lost ACK even after the match has finished.
+    if (this.controlling) for (const [actionId, pending] of this.pending) this.sendPending(actionId, pending)
+  }
+  private scheduleReconnect(code?: string): void {
+    if (this.closed || this.reconnectTimer || this.renewing) return
+    this.onStatus('reconnecting', code); this.retries++
+    this.reconnectTimer = setTimeout(() => {
+      this.reconnectTimer = null
+      if (this.closed) return
+      this.renewing = true
+      void this.renew().then(info => {
+        this.renewing = false
+        if (this.closed) return
+        this.info = info; this.connect()
+      }).catch((error: unknown) => {
+        this.renewing = false
+        if (this.closed) return
+        const failure = error instanceof Error ? error : new Error('NETWORK')
+        if (TERMINAL_RENEW_ERRORS.has(failure.message)) { this.rejectPending(failure); this.onStatus('error', failure.message) }
+        else this.scheduleReconnect(failure.message)
+      })
+    }, Math.min(500 * this.retries, 5000))
   }
   private connect(): void {
     if (this.closed) return
@@ -65,8 +102,9 @@ export class OnlineSession implements SessionClient {
     this.onStatus(this.retries ? 'reconnecting' : 'connecting')
     const url = new URL(this.info.websocketPath, location.href); url.protocol = location.protocol === 'https:' ? 'wss:' : 'ws:'
     const socket = new WebSocket(url, 'iva-realtime-v1'); this.socket = socket
-    socket.onopen = () => this.send({ type: 'authenticate', ticket: this.info.ticket })
+    socket.onopen = () => { if (!this.closed && this.socket === socket) this.send({ type: 'authenticate', ticket: this.info.ticket }) }
     socket.onmessage = event => {
+      if (this.closed || this.socket !== socket) return
       let message: Record<string, unknown>
       try { message = JSON.parse(String(event.data)) as Record<string, unknown> } catch { return }
       if (message.type === 'hello') {
@@ -75,7 +113,7 @@ export class OnlineSession implements SessionClient {
         this.readPhase(message.phase); this.reportStatus()
         if (this.heartbeat) clearInterval(this.heartbeat)
         this.heartbeat = setInterval(() => this.send({ ...this.envelope('heartbeat') }), 1000)
-        if (this.controlling && this.hostPhase === 'running') for (const [actionId, pending] of this.pending) this.send({ ...this.envelope('action'), actionId, payload: pending.action })
+        this.replayPending()
       }
       if (message.type === 'full') {
         const nextEpoch = Number(message.epoch)
@@ -93,23 +131,22 @@ export class OnlineSession implements SessionClient {
       }
       if (message.type === 'actionAck') {
         const id = String(message.actionId); const pending = this.pending.get(id)
-        if (pending) { clearTimeout(pending.timer); this.pending.delete(id); pending.resolve(message.result as ActionResult) }
+        if (pending) { if (pending.timer) clearTimeout(pending.timer); this.pending.delete(id); pending.resolve(message.result as ActionResult) }
       }
-      if (message.type === 'controlChanged') { this.generation = Number(message.controllerGeneration); this.sequence = 0; this.inputHistory = []; this.predicted = null; this.controlling = message.controlling === true; this.reportStatus() }
+      if (message.type === 'controlChanged') { this.generation = Number(message.controllerGeneration); this.sequence = 0; this.inputHistory = []; this.predicted = null; this.controlling = message.controlling === true; this.reportStatus(); this.pausePending(); this.replayPending() }
       if (message.type === 'error') {
         const code = String(message.code ?? 'NETWORK')
-        if (code === 'MATCH_PAUSED') this.readPhase('paused')
+        if (code === 'MATCH_PAUSED' && this.hostPhase !== 'finished' && this.hostPhase !== 'abandoned') this.readPhase('paused')
         if (this.connected) this.reportStatus(code); else this.onStatus('error', code)
       }
       if (message.type === 'phaseChanged') { this.readPhase(message.phase); this.reportStatus() }
     }
     socket.onclose = () => {
-      this.connected = false; this.controlling = false; this.inputHistory = []; this.predicted = null; if (this.heartbeat) clearInterval(this.heartbeat)
-      if (this.closed) return
-      this.onStatus('reconnecting'); this.retries++
-      this.reconnectTimer = setTimeout(() => { void this.renew().then(info => { this.info = info; this.connect() }).catch((error: Error) => { this.onStatus('error', error.message) }) }, Math.min(500 * this.retries, 5000))
+      if (this.closed || this.socket !== socket) return
+      this.socket = null; this.connected = false; this.controlling = false; this.inputHistory = []; this.predicted = null; if (this.heartbeat) clearInterval(this.heartbeat)
+      this.heartbeat = null; this.pausePending(); this.scheduleReconnect()
     }
-    socket.onerror = () => this.onStatus('reconnecting')
+    socket.onerror = () => { if (!this.closed && this.socket === socket) this.onStatus('reconnecting') }
   }
   private remember(sequence: number, view: WorldView): void {
     this.baselines.set(sequence, view); while (this.baselines.size > 32) this.baselines.delete(this.baselines.keys().next().value!)
@@ -132,8 +169,8 @@ export class OnlineSession implements SessionClient {
     if (this.hostPhase !== 'running') return Promise.reject(new Error(this.hostPhase === 'finished' ? 'MATCH_FINISHED' : 'MATCH_PAUSED'))
     const actionId = crypto.randomUUID()
     return new Promise((resolve, reject) => {
-      const timer = setTimeout(() => { this.pending.delete(actionId); reject(new Error('NETWORK')) }, 20000)
-      this.pending.set(actionId, { action: value, resolve, reject, timer }); this.send({ ...this.envelope('action'), actionId, payload: value })
+      const pending: Pending = { action: structuredClone(value), resolve, reject, timer: null }
+      this.pending.set(actionId, pending); this.sendPending(actionId, pending)
     })
   }
   claim(): void { this.send({ ...this.envelope('claimControl') }) }
@@ -141,7 +178,8 @@ export class OnlineSession implements SessionClient {
   getPrediction(): PredictedFighter | null { return this.predicted }
   close(): void {
     this.input({ moveX: 0, moveZ: 0, aimX: 1, aimZ: 0, fireHeld: false, firePressSeq: 0 })
-    this.closed = true; if (this.reconnectTimer) clearTimeout(this.reconnectTimer); if (this.heartbeat) clearInterval(this.heartbeat)
-    this.socket?.close(); for (const pending of this.pending.values()) { clearTimeout(pending.timer); pending.reject(new Error('NETWORK')) }; this.pending.clear()
+    this.closed = true; this.connected = false; this.controlling = false
+    if (this.reconnectTimer) clearTimeout(this.reconnectTimer); if (this.heartbeat) clearInterval(this.heartbeat)
+    this.reconnectTimer = null; this.heartbeat = null; this.socket?.close(); this.rejectPending(new Error('NETWORK'))
   }
 }

@@ -95,13 +95,14 @@ try {
     const renewed = await rig.post(`/api/realtime/v1/practice/${admission.matchId}/ticket`); client = await connectClient(rig, renewed.ticket);
     const snapshot = await client.wait(isSnapshot); assert.equal(snapshot.view.matchId, admission.matchId);
     assert.equal(client.hello.epoch, previousEpoch); assert.ok(client.hello.controllerGeneration > previousGeneration);
+    assert.equal(snapshot.lastConsumedInputSeq, -1, 'new controller generation must not acknowledge the old generation input');
     client.send('input', { inputSeq: 1, payload: { moveX: 0, moveZ: 0, aimX: 1, aimZ: 0, fireHeld: false, firePressSeq: 0 } });
     await client.wait(message => isSnapshot(message) && message.lastConsumedInputSeq === 1);
-    disconnects.push({ blockedSeconds: seconds, recoveryMs: performance.now() - started - seconds * 1000, sameMatch: true, freshInputSequence: true });
+    disconnects.push({ blockedSeconds: seconds, recoveryMs: performance.now() - started - seconds * 1000, sameMatch: true, freshInputSequence: true, previousInputAckCleared: true });
   }
   checks.push('one/five/eight/fifteen-second actual TCP disconnections, new tickets, same match and fresh control sequences');
   const health = await rig.health(); assert.equal(health.metrics.storageFailures, 0); complete = true;
-  await writeReport(reportPath, { complete, kind: 'real ordered TCP delay/jitter relay; no browser or physical WAN claim', artifactId: health.artifactId, contentId: health.contentId,
+  await writeReport(reportPath, { complete, kind: 'real ordered TCP delay/jitter relay; no browser or physical WAN claim', artifactId: health.artifactId, contentId: health.contentId, sourceTrace: rig.sourceTrace,
     jitterDefinition: 'per direction uniform delay offset ± configuredJitter/2, clamped at zero and kept in TCP byte order',
     packetLossPercent: { cases: [1, 2, 5], status: 'unverified', reason: 'CAP_NET_ADMIN is false; dropping application bytes would corrupt TCP/WebSocket framing and is not IP packet loss' }, cases, disconnects, checks, health });
   console.log(JSON.stringify({ complete, reportPath, cases, disconnects, checks, metrics: health.metrics }, null, 2));

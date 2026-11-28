@@ -33,7 +33,7 @@ export function planBots(w: World): void {
   for (const p of w.participants) {
     if (w.tutorial?.frozenParticipants.includes(p.id)) continue
     if (!(p.controller === 'bot' || p.temporaryBot) || w.tick < Math.ceil(p.nextPlanTick)) continue
-    const profile = BOT_PROFILES[p.temporaryBot ? 'normal' : p.botLevel]
+    const level = p.temporaryBot ? 'normal' : p.botLevel, profile = BOT_PROFILES[level]
     p.nextPlanTick += profile.planPeriod
     if (p.nextPlanTick < w.tick) p.nextPlanTick = w.tick + profile.planPeriod
     p.mode = 'tactics'
@@ -70,9 +70,9 @@ export function planBots(w: World): void {
     if (!has('turret') && p.credits >= 190) { build(w, p, view, 'turret'); continue }
     if (p.credits >= 150 && p.powerUsed >= p.power - 1 && !has('generator')) { build(w, p, view, 'generator'); continue }
     if (!has('post') && p.credits >= 210) { build(w, p, view, 'post'); continue }
-    if (p.botLevel === 'strong' && !has('battery') && p.credits >= 240) build(w, p, view, 'battery')
+    if (level === 'strong' && !has('battery') && p.credits >= 240) build(w, p, view, 'battery')
     const ownTeam = w.teams[p.team]
-    if (p.seat === 1 && p.botLevel !== 'novice' && w.tick - ownTeam.humanRouteTick >= 450 && w.tick - ownTeam.routeChangedTick >= 450 && view.transports.every(t => t.team !== p.team)) {
+    if (p.seat === 1 && level !== 'novice' && w.tick - ownTeam.humanRouteTick >= 450 && w.tick - ownTeam.routeChangedTick >= 450 && view.transports.every(t => t.team !== p.team)) {
       const northThreat = view.units.filter(u => u.team !== p.team && u.z < map.height / 2).length
       const southThreat = view.units.filter(u => u.team !== p.team && u.z >= map.height / 2).length
       if (northThreat !== southThreat) applyAction(w, p.id, { type: 'route', route: northThreat < southThreat ? 'N' : 'S' })

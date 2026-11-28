@@ -23,6 +23,7 @@ export interface Peer {
 interface PendingAction { participantId: string; actionId: string; payload: Record<string, unknown>; payloadHash: string; peers: Set<Peer> }
 interface Room {
   stored: StoredMatch; worker: WorkerRpc; views: Record<string, WorldView>; peers: Map<string, Peer>;
+  published: { match: StoredMatch; views: Record<string, WorldView> }; failed: boolean;
   inputs: Record<string, Input>; actions: PendingAction[]; pending: Map<string, PendingAction>;
   chain: Promise<void>; busy: boolean; nextTickAt: number; lastPersistAt: number;
 }
@@ -92,7 +93,15 @@ export class RealtimeRuntime {
   }
   private room(stored: StoredMatch, worker: WorkerRpc, result: SimulationResult): Room {
     return { stored, worker, views: result.views, peers: new Map(), inputs: {}, actions: [], pending: new Map(),
+      published: this.publication(stored, result.views), failed: false,
       chain: Promise.resolve(), busy: false, nextTickAt: performance.now(), lastPersistAt: Date.now() };
+  }
+  private publication(match: StoredMatch, views: Record<string, WorldView>) {
+    // World strings and worker-produced views are immutable between steps. Copy
+    // mutable metadata so heartbeat/controller writes cannot alter a publication.
+    return { match: { ...match, controls: Object.fromEntries(Object.entries(match.controls).map(([id, control]) => [id, { ...control }])),
+      roster: match.roster.map(participant => ({ ...participant })), manifest: { ...match.manifest },
+      outcome: structuredClone(match.outcome), pendingOutcome: structuredClone(match.pendingOutcome) }, views };
   }
   private locked<T>(room: Room, operation: () => Promise<T>): Promise<T> {
     const task = room.chain.then(operation);
@@ -106,7 +115,7 @@ export class RealtimeRuntime {
     if (old) { if (old.fingerprint !== fingerprint) throw new Error('START_CONFLICT'); return old; }
     const pending = this.creating.get(input.startId);
     if (pending) { const value = await pending; if (value.fingerprint !== fingerprint) throw new Error('START_CONFLICT'); return value; }
-    if (this.draining || [...this.rooms.values()].filter(r => !['finished', 'abandoned'].includes(r.stored.phase)).length + this.creating.size >= this.options.maxRooms) throw new Error('SERVER_BUSY');
+    if (this.draining || this.samples.storageFailures || [...this.rooms.values()].filter(r => !['finished', 'abandoned'].includes(r.stored.phase)).length + this.creating.size >= this.options.maxRooms) throw new Error('SERVER_BUSY');
     const task = (async () => {
       const now = Date.now(), matchId = randomUUID(); const worker = this.worker();
       const result = await worker.call<SimulationResult>('create', { ...input.config, matchId, idSalt: randomBytes(32).toString('hex') });
@@ -127,16 +136,21 @@ export class RealtimeRuntime {
     this.creating.set(input.startId, task);
     try { return await task; } finally { this.creating.delete(input.startId); }
   }
-  get(matchId: string): StoredMatch | null { return this.rooms.get(matchId)?.stored ?? null; }
+  get(matchId: string): StoredMatch | null { return this.rooms.get(matchId)?.published.match ?? null; }
   private async persist(room: Room, journal: unknown, receipts: Receipt[] = [], result?: { resultId: string; outcome: unknown }): Promise<void> {
+    if (room.failed) throw new Error('RECOVERY_REQUIRED');
     room.stored.journalSeq++;
+    const publication = this.publication(room.stored, room.views);
     const start = performance.now();
-    await this.store.call('commit', { match: room.stored, leaseOwner: this.leaseOwner, journal, receipts, result });
+    try { await this.store.call('commit', { match: publication.match, leaseOwner: this.leaseOwner, journal, receipts, result }); }
+    catch (error) { this.failRoom(room); throw error; }
+    room.published = publication;
     const elapsed = performance.now() - start; this.commitTiming.record(elapsed);
     this.samples.maxCommitMs = Math.max(this.samples.maxCommitMs, elapsed); room.lastPersistAt = Date.now();
   }
   async connect(peer: Peer): Promise<void> {
     await this.ready; if (this.draining) throw new Error('SERVER_BUSY'); const room = this.rooms.get(peer.claims.matchId);
+    if (room?.failed) throw new Error('SERVER_UNAVAILABLE');
     if (!room || (room.stored.kind === 'practice' ? peer.claims.issuer !== 'iva-realtime-practice' : peer.claims.issuer !== 'iva-platform') || room.stored.rosterHash !== peer.claims.rosterHash || room.stored.roomId !== peer.claims.roomId ||
       room.stored.rulesVersion !== peer.claims.rulesVersion || room.stored.contentVersion !== peer.claims.contentVersion ||
       !room.stored.roster.some(p => p.participantId === peer.claims.participantId && p.playerId === peer.claims.playerId && p.controller === 'human') ||
@@ -144,9 +158,11 @@ export class RealtimeRuntime {
     if (!await this.store.call<boolean>('checkAdmission', peer.claims.admissionId, peer.claims.playerId)) throw new Error('AUTH_REQUIRED');
     await this.store.call('consumeTicket', peer.claims.ticketId, peer.claims.expiresAt);
     await this.locked(room, async () => {
+      if (this.draining || this.closed) throw new Error('SERVER_BUSY');
+      if (room.failed) throw new Error('SERVER_UNAVAILABLE');
       room.peers.set(peer.id, peer); const control = room.stored.controls[peer.claims.participantId];
       room.stored.lastHumanAt = Date.now(); room.stored.expiresAt = Date.now() + LIMITS.resumeForMs;
-      if (!control.connectionId) { control.generation++; control.connectionId = peer.id; control.lastActivity = Date.now(); control.lastInputAt = 0; control.inputSeq = -1; control.temporaryBot = false; }
+      if (!control.connectionId) { control.generation++; control.connectionId = peer.id; control.lastActivity = Date.now(); control.lastInputAt = 0; control.inputSeq = -1; control.consumed = -1; control.temporaryBot = false; }
       if (['paused', 'ready', 'recovering'].includes(room.stored.phase)) {
         room.stored.phase = 'running'; room.stored.pausedAt = null; room.stored.countdownUntil = Date.now() + 3000;
         room.nextTickAt = performance.now();
@@ -164,19 +180,23 @@ export class RealtimeRuntime {
     const room = this.rooms.get(peer.claims.matchId); if (!room) return;
     room.peers.delete(peer.id);
     void this.locked(room, async () => {
+      if (room.failed) return;
       const control = room.stored.controls[peer.claims.participantId];
       if (control.connectionId === peer.id) { control.connectionId = null; delete room.inputs[peer.claims.participantId]; await this.persist(room, { type: 'disconnect', participantId: peer.claims.participantId }); }
     }).catch(() => this.failRoom(room));
   }
   private envelope(room: Room, peer: Peer) {
-    return { protocolVersion: 1, matchId: room.stored.matchId, epoch: room.stored.epoch,
-      controllerGeneration: room.stored.controls[peer.claims.participantId].generation };
+    const match = room.published.match;
+    return { protocolVersion: 1, matchId: match.matchId, epoch: match.epoch,
+      controllerGeneration: match.controls[peer.claims.participantId].generation };
   }
   private full(room: Room, peer: Peer): void { this.snapshot(room, peer, true); }
   private snapshot(room: Room, peer: Peer, forceFull = false): void {
+    if (room.failed) return;
     // A suspended former owner may not send stale authority after its lease expires.
     if (Date.now() - room.lastPersistAt > 14_500) { this.failRoom(room); return; }
-    if (room.stored.pendingOutcome && Date.now() < room.stored.countdownUntil) return;
+    const { match, views } = room.published;
+    if (match.pendingOutcome && Date.now() < match.countdownUntil) return;
     let stream = this.projections.get(peer);
     if (!stream) { stream = new ProjectionStream<WorldView>(); this.projections.set(peer, stream); }
     const bytes = peer.queuedBytes();
@@ -187,14 +207,15 @@ export class RealtimeRuntime {
       return;
     }
     peer.blockedSince = 0;
-    const view = room.views[peer.claims.participantId]; if (!view) return;
-    peer.send({ ...stream.snapshot(view, room.stored.epoch, forceFull), ...this.envelope(room, peer), worldTick: room.stored.tick,
-      rulesVersion: room.stored.rulesVersion, contentVersion: room.stored.contentVersion,
-      committedJournalSeq: room.stored.journalSeq, lastConsumedInputSeq: room.stored.controls[peer.claims.participantId].consumed,
-      phase: room.stored.phase, countdownUntil: room.stored.countdownUntil, resumeUntil: room.stored.expiresAt });
+    const view = views[peer.claims.participantId]; if (!view) return;
+    peer.send({ ...stream.snapshot(view, match.epoch, forceFull), ...this.envelope(room, peer), worldTick: match.tick,
+      rulesVersion: match.rulesVersion, contentVersion: match.contentVersion,
+      committedJournalSeq: match.journalSeq, lastConsumedInputSeq: match.controls[peer.claims.participantId].consumed,
+      phase: match.phase, countdownUntil: match.countdownUntil, resumeUntil: match.expiresAt });
   }
   async message(peer: Peer, message: Exclude<ClientMessage, {type: 'authenticate'}>): Promise<void> {
     const room = this.rooms.get(peer.claims.matchId); if (!room || message.matchId !== room.stored.matchId) throw new Error('MATCH_UNAVAILABLE');
+    if (room.failed) throw new Error('SERVER_UNAVAILABLE');
     peer.lastSeen = Date.now();
     if (message.epoch !== room.stored.epoch) { this.full(room, peer); throw new Error('STALE_EPOCH'); }
     if (message.type === 'resync') { this.samples.resyncs++; this.full(room, peer); return; }
@@ -204,6 +225,7 @@ export class RealtimeRuntime {
       return;
     }
     await this.locked(room, async () => {
+      if (room.failed) throw new Error('SERVER_UNAVAILABLE');
       const control = room.stored.controls[peer.claims.participantId];
       if (message.controllerGeneration !== control.generation) throw new Error('STALE_CONTROLLER');
       if (message.type === 'claimControl') {
@@ -244,7 +266,7 @@ export class RealtimeRuntime {
     if (this.draining) return;
     const now = performance.now();
     for (const room of this.rooms.values()) {
-      if (room.busy || now < room.nextTickAt) continue;
+      if (room.failed || room.busy || now < room.nextTickAt) continue;
       room.busy = true;
       void this.locked(room, async () => {
         let steps = 0;
@@ -261,7 +283,9 @@ export class RealtimeRuntime {
   private async tick(room: Room): Promise<void> {
     const now = Date.now();
     const present = [...room.peers.values()].filter(peer => now - peer.lastSeen < 10_000);
-    if (present.length) { room.stored.lastHumanAt = now; room.stored.expiresAt = now + LIMITS.resumeForMs; }
+    const lastSignal = Math.max(room.stored.lastHumanAt, ...[...room.peers.values()].map(peer => peer.lastSeen));
+    room.stored.lastHumanAt = lastSignal;
+    if (present.length) room.stored.expiresAt = lastSignal + LIMITS.resumeForMs;
     if (room.stored.phase === 'running' && !present.length && now - room.stored.lastHumanAt >= LIMITS.pauseAfterMs) {
       room.stored.phase = 'paused'; room.stored.pausedAt = now; await this.persist(room, { type: 'emptyPause' });
     }
@@ -326,15 +350,18 @@ export class RealtimeRuntime {
     if (room.stored.tick % 2 === 0 || receipts.length || room.stored.phase !== 'running') for (const peer of room.peers.values()) this.snapshot(room, peer);
   }
   private failRoom(room: Room): void {
+    if (room.failed) return;
+    room.failed = true;
     this.samples.storageFailures++; room.stored.phase = 'failed-recoverable'; room.nextTickAt = Number.POSITIVE_INFINITY;
     for (const peer of room.peers.values()) peer.close(1011, 'RECOVERY_REQUIRED');
   }
   view(matchId: string, playerId: string): unknown {
-    const room = this.rooms.get(matchId); const participant = room?.stored.roster.find(p => p.playerId === playerId);
-    if (!room || !participant) throw new Error('MATCH_UNAVAILABLE');
-    return { kind: 'realtime', gameId: 'forpost', matchId, route: this.route(room.stored), phase: room.stored.phase,
-      participantId: participant.participantId, finished: room.stored.phase === 'finished', outcome: room.stored.outcome,
-      resumeUntil: room.stored.expiresAt, rulesVersion: room.stored.rulesVersion, contentVersion: room.stored.contentVersion };
+    const room = this.rooms.get(matchId); const match = room?.published.match;
+    const participant = match?.roster.find(p => p.playerId === playerId);
+    if (!room || !match || !participant) throw new Error('MATCH_UNAVAILABLE');
+    return { kind: 'realtime', gameId: 'forpost', matchId, route: this.route(match), phase: room.failed ? 'failed-recoverable' : match.phase,
+      participantId: participant.participantId, finished: match.phase === 'finished', outcome: match.outcome,
+      resumeUntil: match.expiresAt, rulesVersion: match.rulesVersion, contentVersion: match.contentVersion };
   }
   route(match: StoredMatch): string { return /^sha256:[0-9a-f]{64}$/.test(match.manifest.client) ? '/realtime-assets/' + match.manifest.client.slice(7) + '/' : '/play/forpost/'; }
   health() { return { ok: !this.draining && this.samples.storageFailures === 0, service: 'iva-realtime', protocolVersion: 1, artifactId: this.options.artifactId, contentId: this.options.contentId, buildRevision: this.options.buildRevision ?? 'unknown',
@@ -351,6 +378,7 @@ export class RealtimeRuntime {
     }
     if (room.stored.kind !== 'practice' || room.stored.ownerHash !== ownerHash) throw new Error('MATCH_UNAVAILABLE');
     await this.locked(room, async () => {
+      if (room.failed) throw new Error('SERVER_UNAVAILABLE');
       if (room.stored.phase !== 'finished') { room.stored.phase = 'abandoned'; room.stored.outcome = null; room.stored.pendingOutcome = null; }
       room.stored.expiresAt = Date.now();
       await this.persist(room, { type: 'practiceAbandoned' });
@@ -361,14 +389,19 @@ export class RealtimeRuntime {
   async drain(): Promise<void> {
     this.draining = true;
     await Promise.allSettled([...this.creating.values()]);
-    for (const room of this.rooms.values()) await this.locked(room, async () => {
-      if (!['finished', 'abandoned'].includes(room.stored.phase)) { room.stored.phase = 'paused'; room.stored.pausedAt ??= Date.now(); }
-      await this.persist(room, { type: 'drain' });
-      for (const peer of room.peers.values()) peer.send({ type: 'phaseChanged', ...this.envelope(room, peer), phase: 'paused', reason: 'SERVER_UPDATING' });
-    });
+    const failures: unknown[] = [];
+    for (const room of this.rooms.values()) {
+      try { await this.locked(room, async () => {
+        if (room.failed) throw new Error('RECOVERY_REQUIRED');
+        if (!['finished', 'abandoned'].includes(room.stored.phase)) { room.stored.phase = 'paused'; room.stored.pausedAt ??= Date.now(); }
+        await this.persist(room, { type: 'drain' });
+        for (const peer of room.peers.values()) peer.send({ type: 'phaseChanged', ...this.envelope(room, peer), phase: 'paused', reason: 'SERVER_UPDATING' });
+      }); } catch (error) { failures.push(error); }
+    }
+    if (failures.length) throw new AggregateError(failures, 'RECOVERY_REQUIRED');
   }
   async resume(): Promise<void> {
-    if (this.closed) throw new Error('SERVER_UNAVAILABLE');
+    if (this.closed || this.samples.storageFailures) throw new Error('SERVER_UNAVAILABLE');
     for (const room of this.rooms.values()) await this.locked(room, async () => {
       if (room.stored.phase === 'paused' && room.peers.size) {
         room.stored.phase = 'running'; room.stored.countdownUntil = Date.now() + 3000; room.nextTickAt = performance.now();
@@ -379,9 +412,13 @@ export class RealtimeRuntime {
   }
   async close(): Promise<void> {
     if (this.closed) return;
-    await this.drain(); this.closed = true; this.loopDelay.disable(); if (this.timer) clearInterval(this.timer);
+    const failures: unknown[] = [];
+    try { await this.drain(); } catch (error) { failures.push(error); }
+    this.closed = true; this.loopDelay.disable(); if (this.timer) clearInterval(this.timer);
     for (const room of this.rooms.values()) for (const peer of room.peers.values()) peer.close(1012, 'SERVER_UPDATING');
-    await this.store.call('release', this.leaseOwner); await this.store.call('close');
+    try { await this.store.call('release', this.leaseOwner); } catch (error) { failures.push(error); }
+    try { await this.store.call('close'); } catch (error) { failures.push(error); }
     await Promise.all([...[...this.workers.values()].flat().map(worker => worker.stop()), this.store.stop()]);
+    if (failures.length) throw new AggregateError(failures, 'RECOVERY_REQUIRED');
   }
 }

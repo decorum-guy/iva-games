@@ -16,9 +16,9 @@
 |---|---|
 | Runtime image | `ghcr.io/decorum-guy/iva-games-realtime@sha256:…`, Node, отдельные simulation workers и SQLite writer |
 | Внутренняя сеть | Только Compose service `realtime:4331`; наружу порт не публикуется |
-| Данные | Отдельный external volume, `realtime.sqlite` с WAL, ключ гостевого обучения, maintenance token и проверяемые архивы исполняемого кода в `artifacts/` |
+| Данные | Отдельный external volume, `realtime.sqlite` с WAL, ключ гостевого обучения, maintenance token, проверяемые архивы исполняемого кода в `artifacts/` и клиентских ресурсов в `content/` |
 | Account bridge | Платформа подписывает Ed25519; realtime хранит только разрешённые публичные ключи платформы |
-| Публичные пути | `/play/forpost/`, `/api/realtime/v1/*`, `/ws/realtime/v1`, зарезервированный `/realtime-assets/*` |
+| Публичные пути | `/play/forpost/`, `/api/realtime/v1/*`, `/ws/realtime/v1`, закреплённые клиентские файлы `/realtime-assets/<content-hash>/*` |
 | Закрытые пути | `/internal/realtime/*` и `/maintenance/realtime/*` возвращают 404 через Caddy |
 | Проверка живости | `/api/realtime/v1/health`, service `iva-realtime`; `artifactId` и `buildRevision` дают фактическую идентичность запущенного кода |
 | Выпуск | Три проверенных digest, selective update, совместный backup platform/realtime после durable drain, обычный `DEPLOYED <sha>` |

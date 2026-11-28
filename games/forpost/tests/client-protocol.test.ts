@@ -24,9 +24,9 @@ const input = { moveX: 1, moveZ: 0, aimX: 1, aimZ: 0, fireHeld: false, firePress
 let session: OnlineSession | undefined
 beforeEach(() => { vi.useFakeTimers(); Wire.instances = []; vi.stubGlobal('WebSocket', Wire); vi.stubGlobal('location', { href: 'http://forpost.test/play/forpost/', protocol: 'http:' }) })
 afterEach(() => { session?.close(); session = undefined; vi.unstubAllGlobals(); vi.useRealTimers() })
-function connect() {
+function connect(renew: () => Promise<JoinInfo> = async () => ({ ...info, ticket: 'renewed-test-ticket' })) {
   const views: WorldView[] = [], statuses: ConnectionState[] = []
-  session = new OnlineSession(info, async () => ({ ...info, ticket: 'renewed-test-ticket' }), view => views.push(view), status => statuses.push(status))
+  session = new OnlineSession(info, renew, view => views.push(view), status => statuses.push(status))
   const socket = Wire.instances[0], view = viewForPlayer(createTutorialWorld(0), 'learner')
   socket.hello(); socket.receive({ type: 'full', epoch: 1, snapshotSeq: 1, phase: 'running', view })
   return { socket, view, views, statuses }
@@ -134,7 +134,109 @@ describe('client realtime protocol', () => {
     socket.receive({ type: 'full', epoch: 1, snapshotSeq: 2, phase: 'finished', view: { ...view, phase: 'finished' } })
     expect(socket.sent.at(-1)).toMatchObject({ type: 'ackSnapshot', snapshotSeq: 2 })
     const count = socket.sent.length; session!.input(input); expect(socket.sent).toHaveLength(count)
+    socket.receive({ type: 'error', code: 'MATCH_PAUSED' })
     await expect(session!.action({ type: 'reload' })).rejects.toThrow('MATCH_FINISHED')
     expect(socket.sent).toHaveLength(count)
+  })
+  it('keeps renewing through transient outages and reconnects after the service recovers', async () => {
+    const renew = vi.fn<() => Promise<JoinInfo>>()
+      .mockRejectedValueOnce(new Error('NETWORK'))
+      .mockRejectedValueOnce(new Error('GAME_UNAVAILABLE'))
+      .mockResolvedValue({ ...info, ticket: 'recovered-ticket' })
+    const { socket, statuses } = connect(renew)
+    socket.close()
+    const statusCount = statuses.length; socket.hello(); expect(statuses).toHaveLength(statusCount)
+    await vi.advanceTimersByTimeAsync(500); expect(renew).toHaveBeenCalledTimes(1)
+    await vi.advanceTimersByTimeAsync(1000); expect(renew).toHaveBeenCalledTimes(2)
+    expect(statuses.at(-1)).toBe('reconnecting'); expect(Wire.instances).toHaveLength(1)
+    await vi.advanceTimersByTimeAsync(1500); expect(renew).toHaveBeenCalledTimes(3)
+    const recovered = Wire.instances.at(-1)!
+    recovered.hello(true, 2)
+    expect(recovered.sent[0]).toEqual({ type: 'authenticate', ticket: 'recovered-ticket' })
+    expect(statuses.at(-1)).toBe('connected')
+  })
+  it('caps the retry interval during a prolonged outage instead of giving up or hot-looping', async () => {
+    const renew = vi.fn<() => Promise<JoinInfo>>().mockRejectedValue(new Error('SERVER_BUSY'))
+    const { socket, statuses } = connect(renew)
+    socket.close(); await vi.advanceTimersByTimeAsync(60000)
+    expect(renew.mock.calls.length).toBeGreaterThanOrEqual(12)
+    expect(renew.mock.calls.length).toBeLessThanOrEqual(20)
+    expect(statuses.at(-1)).toBe('reconnecting'); expect(Wire.instances).toHaveLength(1)
+  })
+  it('stops renewal and exposes a terminal authentication failure', async () => {
+    const renew = vi.fn<() => Promise<JoinInfo>>().mockRejectedValue(new Error('AUTH_REQUIRED'))
+    const { socket, statuses } = connect(renew)
+    const pending = session!.action({ type: 'mode', mode: 'tactics' })
+    const rejected = expect(pending).rejects.toThrow('AUTH_REQUIRED')
+    socket.close(); await vi.advanceTimersByTimeAsync(60000)
+    await rejected
+    expect(renew).toHaveBeenCalledTimes(1); expect(statuses.at(-1)).toBe('error')
+    expect(Wire.instances).toHaveLength(1)
+  })
+  it('cancels a scheduled renewal when the user closes the session', async () => {
+    const renew = vi.fn<() => Promise<JoinInfo>>().mockResolvedValue(info)
+    const { socket, statuses } = connect(renew)
+    socket.close(); session!.close(); const count = statuses.length
+    await vi.advanceTimersByTimeAsync(60000)
+    expect(renew).not.toHaveBeenCalled(); expect(statuses).toHaveLength(count)
+    expect(Wire.instances).toHaveLength(1)
+  })
+  it.each(['resolve', 'reject'] as const)('ignores a late renewal %s and old socket packets after disposal', async outcome => {
+    let resolveRenew!: (info: JoinInfo) => void, rejectRenew!: (error: Error) => void
+    const renew = vi.fn(() => new Promise<JoinInfo>((resolve, reject) => { resolveRenew = resolve; rejectRenew = reject }))
+    const { socket, statuses, views, view } = connect(renew)
+    socket.close(); await vi.advanceTimersByTimeAsync(500); expect(renew).toHaveBeenCalledTimes(1)
+    session!.close(); const statusCount = statuses.length, viewCount = views.length
+    if (outcome === 'resolve') resolveRenew({ ...info, ticket: 'late-ticket' }); else rejectRenew(new Error('NETWORK'))
+    socket.receive({ type: 'full', epoch: 1, snapshotSeq: 2, phase: 'running', view: { ...view, tick: 999 } })
+    socket.onerror?.(); await vi.advanceTimersByTimeAsync(60000)
+    expect(statuses).toHaveLength(statusCount); expect(views).toHaveLength(viewCount)
+    expect(Wire.instances).toHaveLength(1); expect(renew).toHaveBeenCalledTimes(1)
+  })
+  it('recovers a committed action receipt after a long outage and finished-match reconnect with the original payload', async () => {
+    let resolveRenew!: (info: JoinInfo) => void
+    const { socket } = connect(() => new Promise(resolve => { resolveRenew = resolve }))
+    const payload = { type: 'build' as const, padId: 'L-03', kind: 'relay' as 'relay' | 'generator' }
+    const pending = session!.action(payload), first = socket.sent.at(-1)!
+    let settled = false; void pending.then(() => { settled = true }, () => { settled = true })
+    payload.kind = 'generator'
+    socket.close(); await vi.advanceTimersByTimeAsync(30000)
+    expect(settled).toBe(false)
+    resolveRenew({ ...info, ticket: 'finished-match-ticket' }); await vi.advanceTimersByTimeAsync(0)
+    const recovered = Wire.instances.at(-1)!
+    recovered.hello(true, 2, 'finished')
+    const replay = recovered.sent.filter(message => message.type === 'action')
+    expect(replay).toHaveLength(1)
+    expect(replay[0]).toMatchObject({ actionId: first.actionId, payload: { type: 'build', padId: 'L-03', kind: 'relay' }, controllerGeneration: 2 })
+    await expect(session!.action({ type: 'reload' })).rejects.toThrow('MATCH_FINISHED')
+    recovered.receive({ type: 'actionAck', actionId: first.actionId, replayed: true, result: { ok: true, code: 'ok', entityId: 'committed-order' } })
+    await expect(pending).resolves.toMatchObject({ ok: true, entityId: 'committed-order' })
+    await vi.advanceTimersByTimeAsync(30000)
+    expect(recovered.sent.filter(message => message.type === 'action')).toHaveLength(1)
+  })
+  it('waits for control before replaying a pending receipt from a spectator reconnect', async () => {
+    const { socket } = connect()
+    const pending = session!.action({ type: 'mode', mode: 'tactics' }), first = socket.sent.at(-1)!
+    socket.close(); await vi.advanceTimersByTimeAsync(500)
+    const recovered = Wire.instances.at(-1)!
+    recovered.hello(false, 2, 'finished')
+    expect(recovered.sent.filter(message => message.type === 'action')).toHaveLength(0)
+    recovered.receive({ type: 'controlChanged', controllerGeneration: 3, controlling: true })
+    expect(recovered.sent.filter(message => message.type === 'action')).toEqual([expect.objectContaining({ actionId: first.actionId, payload: first.payload, controllerGeneration: 3 })])
+    recovered.receive({ type: 'actionAck', actionId: first.actionId, replayed: true, result: { ok: true, code: 'ok' } })
+    await expect(pending).resolves.toEqual({ ok: true, code: 'ok' })
+  })
+  it('keeps an uncertain action through a host pause without a socket break and reuses its ID on resume', async () => {
+    const { socket } = connect()
+    const pending = session!.action({ type: 'mode', mode: 'tactics' }), first = socket.sent.at(-1)!
+    let settled = false; void pending.then(() => { settled = true }, () => { settled = true })
+    socket.receive({ type: 'phaseChanged', phase: 'paused' })
+    await vi.advanceTimersByTimeAsync(30000)
+    expect(settled).toBe(false); expect(socket.sent.filter(message => message.type === 'action')).toHaveLength(1)
+    socket.receive({ type: 'phaseChanged', phase: 'running' })
+    const actions = socket.sent.filter(message => message.type === 'action')
+    expect(actions).toHaveLength(2); expect(actions[1]).toEqual(first)
+    socket.receive({ type: 'actionAck', actionId: first.actionId, replayed: true, result: { ok: true, code: 'ok' } })
+    await expect(pending).resolves.toEqual({ ok: true, code: 'ok' })
   })
 })

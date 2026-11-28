@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { applyAction, advanceWorld, buildEligibility, BUILDINGS, createWorld, deserializeWorld, getMap, MAPS, neutralInput, recomputePower, serializeWorld, setController, stepWorld, transportProgress, validateMap, viewForPlayer, WEAPONS } from '../src/core/index'
 import { resolveDamage, removeBuilding } from '../src/core/economy'
 import { chooseTarget } from '../src/core/combat'
+import { planBots } from '../src/core/bots'
 import { evaluateOperation, concludeOperation, unloadTransports } from '../src/core/operations'
 import { createUnit, fighter } from '../src/core/state'
 import { entityVisible, updateMemories } from '../src/core/visibility'
@@ -58,6 +59,35 @@ describe('Forpost authoritative geometry and versioned state', () => {
   it('changes temporary controller without replacing the human owner (F13)', () => {
     const w = world(); setController(w, 'A1', 'bot'); expect(w.participants[0].controller).toBe('human'); expect(w.participants[0].temporaryBot).toBe(true)
     setController(w, 'A1', 'human'); expect(w.participants[0].temporaryBot).toBe(false); expect(w.participants[0].input.fireHeld).toBe(false)
+  })
+  it('uses the normal takeover policy for battery purchases without changing a permanent strong bot', () => {
+    for (const temporary of [false, true]) {
+      const w = battle(), p = w.participants[0]; w.phase = 'overtime'; p.botLevel = 'strong'; p.credits = 240
+      if (temporary) setController(w, p.id, 'bot'); else p.controller = 'bot'
+      building(w, p.id, 'relay', 'L-01'); building(w, p.id, 'turret', 'L-03'); building(w, p.id, 'post', 'L-02')
+      const dock = building(w, p.id, 'dock', 'L-15'); for (const station of w.stations) station.owner = p.team
+      recomputePower(w)
+      // A legitimately disconnected dock and controlled stations leave room and power for a battery.
+      expect(dock.powered).toBe(false); expect(p.powerUsed).toBeLessThan(p.power - 1)
+      expect(Object.values(viewForPlayer(w, p.id).buildOptions).some(options => options.some(o => o.kind === 'battery' && o.ok))).toBe(true)
+      planBots(w)
+      expect(w.buildOrders.filter(o => o.ownerId === p.id && o.kind === 'battery')).toHaveLength(temporary ? 0 : 1)
+      expect(p.credits).toBe(temporary ? 240 : 60); expect(p.botLevel).toBe('strong')
+      expect(p.controller).toBe(temporary ? 'human' : 'bot')
+    }
+  })
+  it('uses the normal takeover policy for a visible route threat without changing a permanent novice bot', () => {
+    for (const temporary of [false, true]) {
+      const w = battle(), p = w.participants[0], own = fighter(w, p.id)!, enemy = fighter(w, 'B1')!
+      p.botLevel = 'novice'; p.credits = 0; own.x = 12; own.z = 18; enemy.x = 16; enemy.z = 18
+      if (temporary) setController(w, p.id, 'bot'); else p.controller = 'bot'
+      w.teams.A.manualRoute = 'N'; w.teams.A.routeChangedTick = 0; w.teams.A.humanRouteTick = 0
+      expect(viewForPlayer(w, p.id).units.some(u => u.id === enemy.id)).toBe(true)
+      planBots(w)
+      expect(w.teams.A.manualRoute).toBe(temporary ? 'S' : 'N')
+      expect(w.teams.A.routeAuthorId).toBe(temporary ? p.id : null); expect(p.botLevel).toBe('novice')
+      expect(p.controller).toBe(temporary ? 'human' : 'bot')
+    }
   })
 })
 
