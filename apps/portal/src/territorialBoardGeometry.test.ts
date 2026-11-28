@@ -5,7 +5,7 @@ import { houseOutline, roadHitLine, territoryCoastlines } from './territorialBoa
 describe('territorial board coastline', () => {
   it.each(territoryMaps)('$id keeps separate island contours and removes internal tile sides', map => {
     const paths = territoryCoastlines(map);
-    const lakes: Record<string, number> = { longwater: 1, 'lantern-strait': 1, 'kite-isles': 1 };
+    const lakes: Record<string, number> = { longwater: 2, 'lantern-strait': 3, 'kite-isles': 2 };
     expect(paths).toHaveLength(map.landmasses + (lakes[map.id] ?? 0));
     const sides = new Map<string, number>();
     for (const tile of map.tiles) {

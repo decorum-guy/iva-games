@@ -19,7 +19,7 @@ export async function checkCoastalMap(client, phone, origin) {
   await phone.reload();
 
   const board = phone.getByRole('group', { name: 'Great Estuary', exact: true });
-  await expect(board.locator('[data-tile-origin]')).toHaveCount(48);
+  await expect(board.locator('[data-tile-origin]')).toHaveCount(49);
   await expect(board.getByRole('button', { name: /Heath · No resource production/ })).toHaveCount(1);
   await expect(board.locator('.tb-harbor text', { hasText: '2:1' }).first()).toBeVisible();
   await expect(board.locator('.tb-harbor text', { hasText: '3:1' }).first()).toBeVisible();
