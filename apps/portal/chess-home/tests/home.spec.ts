@@ -66,8 +66,8 @@ test('opens a root-origin saved game at the new path and keeps subsequent moves'
   await page.getByRole('article').filter({ has: page.getByRole('heading', { name: 'Remorse', exact: true }) }).getByRole('link', { name: 'Играть' }).click();
   const board = page.getByTestId('playfield');
   await expect(board).toHaveAttribute('data-busy', 'false');
-  const id = await board.getAttribute('data-game-id');
-  expect(id).toBe(record.id);
+  await expect(board).toHaveAttribute('data-game-id', record.id);
+  const id = record.id;
   await page.locator('[data-square="e2"]').click();
   await page.locator('[data-square="e4"]').click();
   await expect(board).toHaveAttribute('data-turn', '1');

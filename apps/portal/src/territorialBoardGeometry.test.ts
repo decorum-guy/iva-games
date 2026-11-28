@@ -1,11 +1,20 @@
 import { describe, expect, it } from 'vitest';
 import { territoryMaps } from '../../../games/district/src/territorial/maps';
-import { houseOutline, roadHitLine, territoryCoastlines } from './territorialBoardGeometry';
+import { coastalHeathForms, houseOutline, roadHitLine, territoryCoastlines } from './territorialBoardGeometry';
 
 describe('territorial board coastline', () => {
+  it('keeps coastal heath illustrations distinct and stable across snapshot ordering', () => {
+    const expected: Record<string, number[]> = { longwater: [1], 'lantern-strait': [2, 3], 'kite-isles': [3, 1] };
+    for (const map of territoryMaps) {
+      const forms = coastalHeathForms(map);
+      expect([...forms.values()]).toEqual(expected[map.id] ?? []);
+      expect(coastalHeathForms({ ...map, tiles: [...map.tiles].reverse() })).toEqual(forms);
+    }
+  });
   it.each(territoryMaps)('$id keeps separate island contours and removes internal tile sides', map => {
     const paths = territoryCoastlines(map);
-    expect(paths).toHaveLength(map.landmasses);
+    const lakes: Record<string, number> = { longwater: 2, 'lantern-strait': 3, 'kite-isles': 2 };
+    expect(paths).toHaveLength(map.landmasses + (lakes[map.id] ?? 0));
     const sides = new Map<string, number>();
     for (const tile of map.tiles) {
       tile.nodeIds.forEach((a, index) => {

@@ -1,0 +1,185 @@
+{
+  "schemaVersion": 3,
+  "profile": "district@0.4",
+  "id": "kite-isles",
+  "version": "1",
+  "name": {
+    "ru": "Берег коршунов",
+    "en": "Kite Coast"
+  },
+  "supportedPlayers": [2, 3, 4],
+  "landmasses": 1,
+  "sectors": [
+    {
+      "id": "pines",
+      "name": {
+        "ru": "Северные сосны",
+        "en": "Northern Pines"
+      },
+      "tiles": [
+        [2, 0, "ore", 4, []],
+        [3, 0, "grain", 3, ["floodplain"]],
+        [1, 1, "ore", 3, []],
+        [2, 1, "ore", 8, ["floodplain"]],
+        [3, 1, "wool", 10, []]
+      ]
+    },
+    {
+      "id": "chalk",
+      "name": {
+        "ru": "Меловой берег",
+        "en": "Chalk Coast"
+      },
+      "tiles": [
+        [6, 0, "wood", 5, ["woodland"]],
+        [7, 0, "brick", 12, []],
+        [5, 1, "ore", 9, ["floodplain"]],
+        [6, 1, "wool", 6, []],
+        [7, 1, "wood", 3, ["woodland"]],
+        [8, 1, "brick", 6, ["floodplain"]],
+        [7, 2, "wool", 4, ["floodplain"]]
+      ]
+    },
+    {
+      "id": "gull",
+      "name": {
+        "ru": "Чаячья бухта",
+        "en": "Gull Cove"
+      },
+      "tiles": [
+        [4, 1, "ore", 9, []],
+        [3, 2, "brick", 8, []],
+        [4, 2, "wool", 11, ["floodplain"]],
+        [2, 3, "grain", 11, []],
+        [3, 3, "grain", 5, ["floodplain"]],
+        [2, 4, "grain", 11, ["floodplain"]],
+        [3, 4, "wood", 11, ["woodland"]]
+      ]
+    },
+    {
+      "id": "nest",
+      "name": {
+        "ru": "Гнездовье",
+        "en": "The Rookery"
+      },
+      "tiles": [
+        [0, 2, "brick", 5, []],
+        [1, 2, null, null, ["floodplain"]],
+        [0, 3, "wool", 9, ["floodplain"]],
+        [1, 3, "grain", 6, []],
+        [-1, 4, "wool", 4, ["floodplain"]],
+        [0, 4, "wood", 2, ["woodland"]]
+      ]
+    },
+    {
+      "id": "spire",
+      "name": {
+        "ru": "Шпиль",
+        "en": "The Spire"
+      },
+      "tiles": [
+        [5, 2, "brick", 12, []],
+        [6, 2, "wool", 2, []],
+        [5, 3, "ore", 5, []],
+        [6, 3, "grain", 8, ["floodplain"]],
+        [4, 4, "grain", 6, []],
+        [5, 4, "ore", 2, ["floodplain"]]
+      ]
+    },
+    {
+      "id": "haven",
+      "name": {
+        "ru": "Зелёная гавань",
+        "en": "Green Haven"
+      },
+      "tiles": [
+        [7, 3, "wood", 9, ["woodland"]],
+        [8, 3, "grain", 11, []],
+        [9, 3, "wood", 4, ["woodland"]],
+        [7, 4, "ore", 5, []],
+        [8, 4, "brick", 8, ["floodplain"]]
+      ]
+    },
+    {
+      "id": "copper",
+      "name": {
+        "ru": "Медные холмы",
+        "en": "Copper Hills"
+      },
+      "tiles": [
+        [1, 4, "wood", 9, ["woodland"]],
+        [-1, 5, "wood", 8, ["woodland"]],
+        [0, 5, "brick", 4, []],
+        [1, 5, "wool", 4, ["floodplain"]],
+        [-1, 6, "ore", 10, []],
+        [0, 6, "wood", 10, ["woodland"]]
+      ]
+    },
+    {
+      "id": "scree",
+      "name": {
+        "ru": "Каменная осыпь",
+        "en": "The Scree"
+      },
+      "tiles": [
+        [6, 4, null, null, []],
+        [4, 5, "brick", 3, ["floodplain"]],
+        [5, 5, "wool", 6, []],
+        [6, 5, "brick", 10, []],
+        [4, 6, "grain", 10, []],
+        [5, 6, "wood", 3, ["woodland"]],
+        [6, 6, "brick", 12, ["floodplain"]]
+      ]
+    }
+  ],
+  "ferries": [
+    {
+      "a": [1, 2, 1],
+      "b": [2, 3, 5],
+      "eventSectorId": "pines"
+    }
+  ],
+  "ports": [
+    {
+      "at": [2, 3, 0],
+      "resource": null
+    },
+    {
+      "at": [4, 4, 0],
+      "resource": "grain"
+    },
+    {
+      "at": [9, 3, 1],
+      "resource": "wood"
+    },
+    {
+      "at": [-1, 6, 3],
+      "resource": null
+    },
+    {
+      "at": [6, 6, 3],
+      "resource": "brick"
+    },
+    {
+      "at": [7, 0, 0],
+      "resource": "ore"
+    },
+    {
+      "at": [0, 2, 5],
+      "resource": null
+    },
+    {
+      "at": [3, 0, 0],
+      "resource": "wool"
+    },
+    {
+      "at": [4, 6, 4],
+      "resource": null
+    },
+    {
+      "at": [7, 2, 1],
+      "resource": "wood"
+    }
+  ],
+  "projection": "regular-hex"
+}

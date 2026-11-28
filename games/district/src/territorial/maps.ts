@@ -42,6 +42,7 @@ export interface TerritoryMap {
   name: LocalName;
   supportedPlayers: number[];
   landmasses: number;
+  projection?: 'regular-hex';
   nodes: TerritoryNode[];
   edges: TerritoryEdge[];
   tiles: TerritoryTile[];
@@ -146,6 +147,7 @@ function componentCount(nodes: TerritoryNode[], edges: TerritoryEdge[]) {
 /** Compile and validate authored geography before adding it to a room. */
 export function validateTerritoryMap(input: unknown): TerritoryMap {
   const data = object(input);
+  need(data.projection === undefined || data.projection === 'regular-hex', 'unsupported map projection');
   need(data.schemaVersion === 3 && data.profile === 'district@0.4', 'unsupported schema/profile');
   const id = identifier(data.id);
   need(typeof data.version === 'string' && /^[1-9][0-9]{0,5}$/.test(data.version), 'invalid version');
@@ -262,15 +264,18 @@ export function validateTerritoryMap(input: unknown): TerritoryMap {
   }
   need(openSites >= 8, 'insufficient separated opening plots for four seats');
   const minX = Math.min(...nodes.map(node => node.x)), minY = Math.min(...nodes.map(node => node.y));
+  const regular = data.projection === 'regular-hex';
+  const xScale = regular ? 21 * Math.sqrt(3) : 44;
+  const yScale = regular ? 21 : 20;
   for (const item of [...nodes, ...tiles]) {
-    item.x = (item.x - minX) * 44 + 36;
-    item.y = (item.y - minY) * 20 + 36;
+    item.x = (item.x - minX) * xScale + 36;
+    item.y = (item.y - minY) * yScale + 36;
   }
   const sectors = [...sectorDefinitions].map(([sectorId, label]) => ({
     id: sectorId, name: label, polygon: outline(tiles.filter(tile => tileSector.get(tile.id) === sectorId), nodeById),
   }));
   return { schemaVersion: 3, profile: 'district@0.4', id, version: data.version, name: name(data.name), supportedPlayers: [2, 3, 4],
-    landmasses: data.landmasses, nodes, edges, tiles, sectors, ports,
+    ...(regular ? { projection: 'regular-hex' as const } : {}), landmasses: data.landmasses, nodes, edges, tiles, sectors, ports,
     width: Math.max(...nodes.map(node => node.x)) + 36, height: Math.max(...nodes.map(node => node.y)) + 36 };
 }
 

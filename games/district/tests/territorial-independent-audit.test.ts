@@ -129,7 +129,10 @@ describe('Independent PR26 transactional and provenance audit', () => {
       });
       const after = applyTerritory(s, 'a', { type: 'roll' }, 1);
       const roll = viewTerritory(after, 'c', 1).latestRoll!;
+      const heathIds = new Set(map.tiles.filter(tile => tile.resource === null).map(tile => tile.id));
+      expect(roll.triggeredTileIds!.every(id => !heathIds.has(id))).toBe(true);
       for (const source of roll.sources!) {
+        expect(heathIds.has(source.tileId)).toBe(false);
         const tile = map.tiles.find(tile => tile.id === source.tileId)!;
         expect(source.amount).toBeGreaterThan(0);
         expect(tile.number).toBe(number); expect(tile.resource).toBe(source.resource);

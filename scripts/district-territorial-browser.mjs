@@ -1,6 +1,7 @@
 /** Exercise two real browsers against the built District server with isolated accounts. */
 import assert from 'node:assert/strict';
 import { chromium, expect } from '@playwright/test';
+import { checkCoastalMap } from './district-coastal-smoke.mjs';
 import { spawn, execFileSync } from 'node:child_process';
 import { createServer } from 'node:net';
 import { cp, mkdir, mkdtemp, readdir, readFile, rm, stat } from 'node:fs/promises';
@@ -559,6 +560,7 @@ try {
     await pages[index].reload();
     await expect(pages[index].locator('.territory-outcome')).toBeVisible();
   }
+  await checkCoastalMap(bob, pages[1], origin);
   await newsFixtures(clients, pages, guest);
   assert.deepEqual(errors, []);
   assert.ok(result.restarted && result.trade);

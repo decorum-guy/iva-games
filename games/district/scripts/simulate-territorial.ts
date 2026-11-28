@@ -4,6 +4,7 @@ import { resolve } from 'node:path';
 import { createHash } from 'node:crypto';
 import type { BotDifficulty, Participant } from '@iva-games/session-kit';
 import { chooseTerritoryBot } from '../src/territorial/bot';
+import { auditFourSeatOpenings } from './audit/four-seat-openings';
 import { chooseTerritoryBot as previousPolicy } from './audit/previous-territory-policy';
 import { applyTerritory, createTerritory, currentId, fallbackTerritory, points, viewTerritory } from '../src/territorial/core';
 import { territoryMaps } from '../src/territorial/maps';
@@ -156,7 +157,9 @@ function simulate(map: TerritoryMap, seats: number, preset: NewsPreset, sample: 
 }
 const maps = territoryMaps.filter(map => !mapFilter || map.id === mapFilter);
 if (!maps.length) throw new Error('Unknown map ' + mapFilter);
-if(audit) {
+if (process.argv.includes('--four-seat-openings')) {
+  for (const map of maps) console.log(JSON.stringify(auditFourSeatOpenings(map)));
+} else if(audit) {
   for(const map of maps) {
     const compare = (policy: typeof chooseTerritoryBot) => {
       const games=Array.from({length:samples},(_,sample)=>simulate(map,3,'medium',sample,policy));

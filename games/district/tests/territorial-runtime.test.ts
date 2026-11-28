@@ -14,6 +14,13 @@ import type { DistrictView } from '../src/types';
 import { PlatformService } from '../../../apps/platform/src/service';
 import { MemoryMailbox } from '../../../apps/platform/src/mail';
 
+import { territorySettings } from '../src/territorial/runtime';
+
+it('pins the chosen geography when a new room omits its map version', () => {
+  expect(territorySettings({ mapId: 'longwater' })).toEqual({ mapId: 'longwater', mapVersion: '1', newsPreset: 'medium' });
+  expect(() => territorySettings({ mapId: 'longwater', mapVersion: '2' })).toThrow();
+});
+
 const cleanups: (() => void)[] = [];
 afterEach(() => { while (cleanups.length) cleanups.pop()!(); });
 
