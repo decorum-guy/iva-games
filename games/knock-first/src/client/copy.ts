@@ -74,13 +74,13 @@ export const PROMPTS: Record<string, [string, string]> = {
 };
 export const TUTORIAL_COPY: [string, string, string, string][] = [
   ['Проверьте связь', 'Check your senses', 'Включите звук или выберите подписи. Оба способа покажут направление.', 'Enable audio or choose captions. Both show you the direction.'],
-  ['Пройдите тихо', 'Walk quietly', 'Удерживайте C и пройдите несколько шагов. На сенсоре включите «Тихо».', 'Hold C and take a few steps. On touch, enable Quiet.'],
-  ['Стукните по трубе', 'Strike the pipe', 'Подойдите к полосатой трубе и нажмите Q. Контур покажет путь.', 'Approach the striped pipe and press Q. The outline reveals a path.'],
-  ['Откройте дверь', 'Open the door', 'Найдите дверь по эху. Подойдите и нажмите E.', 'Find the door in the echo. Approach it and press E.'],
-  ['Выберите путь', 'Choose a path', 'Осмотритесь и пройдите через проём. Поворачивайте мышью или правой областью экрана.', 'Look around and walk through. Turn with the mouse or the right side of the screen.'],
-  ['Возьмите батарею вдвоём', 'Carry together', 'Подойдите к рукояти, нажмите E и дайте метку «Возьми ручку».', 'Approach a handle, press E, then mark Take the handle.'],
+  ['Пройдите тихо', 'Walk quietly', 'Удерживайте C и пройдите несколько шагов.', 'Hold C and take a few steps.'],
+  ['Стукните по трубе', 'Strike the pipe', 'Наведите на круг пластины и нажмите Q.', 'Aim at the circle on the plate and press Q.'],
+  ['Откройте дверь', 'Open the door', 'Подойдите к двери и нажмите E.', 'Approach the door and press E.'],
+  ['Пройдите дальше', 'Go through', 'Пройдите через открытую дверь.', 'Walk through the open door.'],
+  ['Возьмите батарею вдвоём', 'Carry together', 'E — взять рукоять. G → «Возьми ручку».', 'E — take a handle. G → Take the handle.'],
   ['Отпустите рукоять', 'Release your handle', 'Нажмите E ещё раз. Напарник продолжит держать батарею.', 'Press E again. Your partner keeps holding the battery.'],
   ['Помогите напарнику', 'Help your partner', 'Подойдите к сбитому боту и удерживайте E две секунды.', 'Approach the downed bot and hold E for two seconds.'],
-  ['Обычная поверхность', 'An ordinary surface', 'Обычная стена даёт короткое эхо. Труба открывает больше, но её слышно дальше.', 'A wall gives a short echo. A pipe reveals more, but carries farther.'],
+  ['Постучите по стене', 'Knock on a wall', 'Подойдите к стене, наведите на неё и нажмите Q.', 'Approach a wall, aim at it and press Q.'],
   ['Снова резонатор', 'The resonator again', 'Подойдите к трубе и нажмите Q. Сравните дальность и силу с обычным стуком.', 'Approach the pipe and press Q. Compare its reach and strength with a plain knock.'],
 ];
