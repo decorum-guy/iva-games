@@ -14,5 +14,11 @@ export default defineConfig({
     },
   },
   preview: { port: 5175, strictPort: true },
-  build: { outDir: "dist", emptyOutDir: true },
+  build: {
+    outDir: "dist",
+    emptyOutDir: true,
+    // Keep fonts on the same origin so the portal's font-src 'self' applies.
+    // Undefined preserves Vite's default inlining for every other asset.
+    assetsInlineLimit: (filePath) => /\.(?:woff2?|ttf|otf|eot)$/i.test(filePath) ? false : undefined,
+  },
 });

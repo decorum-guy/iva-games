@@ -10,12 +10,13 @@ import bpy
 import hashlib
 import json
 import math
+import os
 import random
 from pathlib import Path
 from mathutils import Matrix, Vector
 
 ROOT = Path(__file__).resolve().parents[2]
-OUT = ROOT / 'public/assets/tyaga/models'
+OUT = Path(os.environ.get('TYAGA_ART_OUT', str(ROOT / 'public/assets/tyaga/models')))
 OUT.mkdir(parents=True, exist_ok=True)
 TAU = 2 * math.pi
 MANIFEST = []
@@ -279,7 +280,7 @@ def truck():
     return root
 
 
-def winch_parts(root, scale=1):
+def winch_parts(root, scale=1, drum_socket=True):
     s = scale
     box(root, 'winch-base', (0, -.12 * s, 0), (.62 * s, .12 * s, .56 * s), 'steel', .03)
     for z in [-.24 * s, .24 * s]:
@@ -294,14 +295,34 @@ def winch_parts(root, scale=1):
     lever = group('winch-handle', root, (0, .06 * s, .46 * s))
     line(lever, 'crank', (0, 0, 0), (.19 * s, .17 * s, 0), .025 * s, 'steel')
     cyl(lever, 'rubber-grip', (.19 * s, .17 * s, .05 * s), .04 * s, .12 * s, 'rubber', 'z')
-    socket(root, 'socket-drum', (.18 * s, .05 * s, 0), 'winch')
+    if drum_socket:
+        socket(root, 'socket-drum', (.18 * s, .05 * s, 0), 'winch')
     socket(root, 'handle-crank', (.19 * s, .23 * s, .51 * s), 'control')
 
 
 def winch():
     root = group('tyaga-winch')
-    winch_parts(root)
-    handle(root, 'handle-carry', (-.2, .22, 0), (.2, .22, 0), (0, .13, 0))
+    winch_parts(root, drum_socket=False)
+    # Retain the existing finished case, drum and crank transform. Replacing a
+    # handle must not silently rescale the load-bearing body or the animation.
+    root['fixedNormalizationScaleXYZ'] = [1, .8774636387825012, 1.152941107749939]
+    root['fixedNormalizationTranslationXYZ'] = [0, -.11705657094717026, -.1671764850616455]
+    hardware = group('portable-winch-hardware', root)
+    hardware['canonicalGeometry'] = True
+    hardware['canonicalPosition'] = [0, 0, 0]
+    hardware['interactionHardware'] = True
+    # Rear-mounted carrying bow leaves the forward cable path unobstructed.
+    for z in [-.18, .18]:
+        line(hardware, 'carry-upright', (-.25, -.17, z), (-.25, .25, z), .018, 'steel', 8)
+        line(hardware, 'carry-shoulder', (-.25, .25, z), (0, .30, z), .018, 'steel', 8)
+    line(hardware, 'carry-crossbar', (0, .30, -.18), (0, .30, .18), .018, 'rubber', 10)
+    socket(hardware, 'handle-carry', (0, .30, 0), 'handle')
+    # The open guide is centred on the actual authoritative cable endpoint.
+    ring(hardware, 'cable-outlet-guide', (.35, .10, 0), .070, .012, 'ochre', 'x', 8)
+    for z in [-.07, .07]:
+        line(hardware, 'outlet-brace', (.25, -.17, z * 1.8), (.35, .06, z), .012, 'steel', 8)
+    line(hardware, 'visible-drum-lead', (.135, .005, 0), (.35, .10, 0), .028, 'rope-light', 8)
+    socket(hardware, 'socket-drum', (.35, .10, 0), 'winch')
     base_eye = group('base-eye', root)
     base_eye['canonicalPosition'] = [0, -.155, 0]
     eye(base_eye, 'socket-base', (0, 0, 0), 'x', .08)
@@ -598,14 +619,21 @@ def platform(lift=False):
             box(root, 'pontoon-lock-housing', (x, -.15 if lift else -.05, z), (.35, .12 if lift else .10, .36), 'orange', .035)
             socket(root, 'socket-platform-' + str(x) + '-' + str(z), (x, -.20 if lift else -.10, z))
     if lift:
-        for x, tag in [(-4.1, 'back'), (4.1, 'front')]:
-            barrier = group('barrier-' + tag, root, (x, .20, -1.7))
-            line(barrier, 'barrier-arm', (0, .45, 0), (0, .45, 3.4), .06, 'ochre')
-            for z in [.45, 1.25, 2.05, 2.85]:
-                line(barrier, 'barrier-band', (0, .45, z), (0, .45, z + .15), .063, 'steel')
+        # Operable near/far barriers are separate authoritative entities. A
+        # second fixed copy here would remain closed when the real one opens.
         for z in [-1.7, 1.7]:
             eye(root, 'socket-lift-cable-' + str(z), (0, .14, z), 'x', .10)
-        socket(root, 'control-lift', (3.6, 1.0, 1.9), 'control')
+        controls = group('lift-interaction-hardware', root)
+        controls['interactionHardware'] = True
+        line(controls, 'console-bracket', (-3.2, .95, 2.04), (-3.5, .76, 1.6), .022, 'steel', 10)
+        box(controls, 'console-case', (-3.5, .765, 1.6), (.24, .05, .18), 'orange', .018)
+        ring(controls, 'console-handwheel', (-3.5, .80, 1.6), .05, .012, 'steel', 'y', 10)
+        line(controls, 'console-wheel-spoke', (-3.55, .80, 1.6), (-3.45, .80, 1.6), .009, 'alloy', 6)
+        socket(controls, 'control-lift', (-3.5, .80, 1.6), 'control')
+        for x, tag in [(-3.8, 'rear'), (3.8, 'front')]:
+            box(controls, 'lashing-eye-base', (x, .119, 0), (.20, .038, .20), 'steel', .012)
+            ring(controls, 'lashing-eye-' + tag, (x, .15, 0), .065, .015, 'ochre', 'y', 12)
+            socket(controls, 'socket-ring-' + tag, (x, .15, 0))
     else:
         box(root, 'drive-clamp-receiver', (-4.15, -.05, 2.0), (.10, .10, .18), 'orange', .018)
         cyl(root, 'drive-clamp-seat', (-4.18, -.05, 2.0), .045, .04, 'steel', 'x')
@@ -683,6 +711,61 @@ def lift_gear():
     for z in [-.32, .32]:
         cyl(pulley, 'drum-flange', (0, 0, z), .32, .05, 'ochre', 'z', 20)
     socket(root, 'socket-gear-drive', (.44, .15, 0), 'drive')
+    return root
+
+
+def lift_control():
+    """Fixed lower control; origin is the existing authoritative control point."""
+    root = group('tyaga-lift-control')
+    box(root, 'control-base', (0, -.77, -.16), (.32, .06, .28), 'steel', .012)
+    box(root, 'control-post', (0, -.46, -.12), (.06, .56, .06), 'steel-light', .009)
+    # The road is on local -Z. Keep the head's operating face toward that road;
+    # its small offset neck remains inside the existing .4m head collider.
+    box(root, 'control-neck', (0, -.16, -.01), (.06, .06, .28), 'steel-light', .008)
+    box(root, 'control-cabinet', (0, 0, .10), (.32, .34, .16), 'orange', .025)
+    box(root, 'control-front', (0, 0, .016), (.27, .28, .012), 'steel', .008)
+    for x in [-.105, .105]:
+        cyl(root, 'base-bolt', (x, -.735, -.16), .017, .012, 'alloy', 'y', 6)
+    hardware = group('lower-control-hardware', root)
+    hardware['interactionHardware'] = True
+    cyl(hardware, 'wheel-spindle', (0, 0, .006), .016, .042, 'alloy', 'z', 10)
+    ring(hardware, 'control-wheel', (0, 0, 0), .055, .012, 'ochre', 'z', 12)
+    line(hardware, 'control-wheel-spoke', (-.055, 0, 0), (.055, 0, 0), .010, 'steel', 6)
+    for x, mat in [(-.09, 'red'), (.09, 'teal')]:
+        cyl(hardware, 'direction-button', (x, -.10, .002), .022, .025, mat, 'z', 10)
+    emblem(hardware, (0, .108, .007), .42)
+    socket(hardware, 'control', (0, 0, 0), 'control')
+    return root
+
+
+def lift_transmission():
+    """Fixed upper drive receiver; origin is the existing drive mount point."""
+    root = group('tyaga-lift-transmission')
+    # This post sits at the right edge of the 1.2m service walk. Its physical
+    # base leaves 1.02m clear on the left, beside the unchanged terminal head.
+    box(root, 'transmission-base', (.50, -1.22, -.12), (.16, .06, .28), 'steel', .012)
+    box(root, 'transmission-post', (.50, -.665, -.12), (.08, 1.05, .08), 'steel-light', .010)
+    box(root, 'transmission-support-arm', (.315, -.17, -.12), (.45, .06, .08), 'steel-light', .010)
+    box(root, 'gearcase-back', (.14, 0, 0), (.12, .36, .36), 'orange', .028)
+    cyl(root, 'gear-bearing', (.075, 0, 0), .115, .06, 'steel', 'z', 20)
+    drum = group('lift-drum', root, (.075, 0, 0))
+    cyl(drum, 'drive-gear', (0, 0, 0), .10, .075, 'ochre', 'z', 16)
+    for a in [TAU * i / 8 for i in range(8)]:
+        line(drum, 'gear-spoke', (0, 0, .041), (.085 * math.cos(a), .085 * math.sin(a), .041), .012, 'steel', 6)
+    for z in [-.19, .19]:
+        ring(root, 'receiver-bearing', (0, 0, z), .045, .009, 'alloy', 'z', 12)
+        line(root, 'receiver-cheek', (.13, .09, z), (0, .02, z), .018, 'steel', 8)
+    for x in [.455, .545]:
+        cyl(root, 'foundation-bolt', (x, -1.185, -.12), .017, .012, 'alloy', 'y', 6)
+    hardware = group('upper-control-hardware', root)
+    hardware['interactionHardware'] = True
+    line(hardware, 'control-drive-shaft', (.14, -.17, -.12), (.14, -.4, -.12), .015, 'alloy', 8)
+    line(hardware, 'manual-shaft', (.14, -.4, -.12), (0, -.4, 0), .015, 'alloy', 8)
+    ring(hardware, 'upper-control-wheel', (0, -.4, 0), .075, .012, 'ochre', 'z', 12)
+    for a in [0, TAU / 3, 2 * TAU / 3]:
+        line(hardware, 'upper-control-spoke', (0, -.4, 0), (.075 * math.cos(a), -.4 + .075 * math.sin(a), 0), .01, 'steel', 6)
+    socket(root, 'drive', (0, 0, 0), 'drive')
+    socket(hardware, 'control', (0, -.4, 0), 'control')
     return root
 
 
@@ -912,8 +995,13 @@ def export_asset(asset_id, builder, dimensions, mass=None, origin='center', coll
         center = (low + high) / 2
         target = Vector((dimensions[0], dimensions[2], dimensions[1]))
         factor = Vector(tuple(target[i] / (high[i] - low[i]) for i in range(3)))
-        root.scale = factor
-        root.location = Vector(tuple(-center[i] * factor[i] for i in range(3)))
+        if root.get('fixedNormalizationScaleXYZ') is not None:
+            x, y, z = root['fixedNormalizationScaleXYZ']
+            root.scale = (x, z, y)
+            root.location = p(root['fixedNormalizationTranslationXYZ'])
+        else:
+            root.scale = factor
+            root.location = Vector(tuple(-center[i] * factor[i] for i in range(3)))
         bpy.context.view_layer.update()
     # Functional attachment coordinates are authored in the final body frame.
     # Keep their visible eye and socket together after bounds normalization.
@@ -981,6 +1069,27 @@ def export_asset(asset_id, builder, dimensions, mass=None, origin='center', coll
             'interactionHardware': {'node': 'deck-interaction-hardware', 'role': 'carrying grips and small fastener heads; not a load-bearing surface',
                 'socketCenters': [[0, .10, -1.50], [0, .10, 1.50]]},
             'physicsSource': 'games/tyaga/src/server-world/compound.ts:deckParts'}
+    if asset_id == 'anchor':
+        # Collision sections are extracted from this model's final normalized
+        # vertices. They retain the eye/handle/flange openings; an enclosing box
+        # would create an invisible obstacle beside the actual attachment eye.
+        anchor_contract = json.loads((ROOT / 'art/source/anchor-collider.json').read_text())
+        collider = anchor_contract['collider']
+    if asset_id in {'lift-control', 'lift-transmission'}:
+        if asset_id == 'lift-control':
+            base = ([0, -.77, -.16], [.16, .03, .14])
+            post = ([0, -.46, -.12], [.03, .28, .03])
+        else:
+            base = ([.50, -1.22, -.12], [.08, .03, .14])
+            post = ([.50, -.665, -.12], [.04, .525, .04])
+        collider = {'shape': 'compound', 'fixed': True, 'parts': [
+            {'id': 'head', 'shape': 'box', 'center': [0, 0, 0], 'halfExtents': [.2, .2, .2], 'existing': True},
+            {'id': 'base', 'shape': 'box', 'center': base[0], 'halfExtents': base[1]},
+            {'id': 'post', 'shape': 'box', 'center': post[0], 'halfExtents': post[1]}],
+            'physicsSource': 'games/tyaga/src/server-world/lift-control-geometry.ts',
+            'physicsIntegration': 'source physics checked; UI acceptance pending'}
+        if asset_id == 'lift-transmission':
+            collider['parts'].append({'id': 'support-arm', 'shape': 'box', 'center': [.315, -.17, -.12], 'halfExtents': [.225, .03, .04]})
     entry = dict(assetId=asset_id, runtimePath='/assets/tyaga/models/' + filename,
         source='games/tyaga/art/source/generate_models.py', author='Iva Games / original procedural production',
         license='project-original', version='tyaga-art@1', origin=origin, units='metres',
@@ -989,6 +1098,24 @@ def export_asset(asset_id, builder, dimensions, mass=None, origin='center', coll
         sockets=sockets, animatedNodes=nodes, triangles=triangles,
         bytes=path.stat().st_size, sha256=hashlib.sha256(path.read_bytes()).hexdigest(),
         validation={'export': 'verified', 'gameplayVisual': 'pending', 'collisionAlignment': 'pending'})
+    if asset_id == 'anchor':
+        entry['runtimeSockets'] = anchor_contract['runtimeSockets']
+    if asset_id in {'lift-control', 'lift-transmission'}:
+        entry['validation']['collisionAlignment'] = 'source physics checked; UI acceptance pending'
+    if asset_id in {'winch', 'lift', 'lift-control', 'lift-transmission'}:
+        entry['version'] = 'tyaga-art@2'
+        all_points = [obj.matrix_world @ vertex.co for obj in root.children_recursive if obj.type == 'MESH' for vertex in obj.data.vertices]
+        xyz = [(v.x, v.z, -v.y) for v in all_points]
+        entry['visualBounds'] = {'min': [min(v[k] for v in xyz) for k in range(3)], 'max': [max(v[k] for v in xyz) for k in range(3)]}
+        entry['interactionHardware'] = {'role': 'small handles, sockets and control details; not an additional load-bearing surface',
+            'separateFromBodyBounds': True}
+        aliases = {
+            'winch': {'drum': 'socket-drum', 'handle-0': 'handle-carry', 'base': 'socket-base'},
+            'lift': {'control': 'control-lift', 'ring-front': 'socket-ring-front', 'ring-rear': 'socket-ring-rear'},
+            'lift-control': {'control': 'control'},
+            'lift-transmission': {'drive': 'drive', 'control': 'control'},
+        }[asset_id]
+        entry['runtimeSockets'] = {key: {'node': node, 'local': sockets[node]} for key, node in aliases.items()}
     MANIFEST.append(entry)
     print('TYAGA_ASSET ' + json.dumps({k: entry[k] for k in ['assetId', 'triangles', 'bytes']}), flush=True)
 
@@ -1036,6 +1163,8 @@ ASSETS = [
     ('lift', lambda: platform(True), [8.4, .2, 4.2], 520),
     ('lift-frame', lift_frame, [10.6, 11.8, 6.2], None, 'ground'),
     ('lift-gear', lift_gear, [.9, .8, .7], None), ('ramp', ramp, [3, .18, 3.4], None),
+    ('lift-control', lift_control, [.4, .4, .4], None, 'socket'),
+    ('lift-transmission', lift_transmission, [.4, .4, .4], None, 'socket'),
     ('block', concrete_block, [3.6, 1.2, 2.8], 280),
     ('rock-a', lambda: rock(1), [3, 1.5, 2], None, 'ground'),
     ('rock-b', lambda: rock(2), [2.2, 1.5, 2], None, 'ground'),

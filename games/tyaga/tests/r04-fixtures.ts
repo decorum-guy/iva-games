@@ -11,10 +11,12 @@ export function steps(w: TyagaWorld, count: number, tool = 0) {
   for (let i = 0; i < count; i++) w.step({ alice: { ...NEUTRAL_INPUT, tool } });
 }
 
-/** Initial test placement reproduces the public R04/025 transforms. These are
- * isolated regressions, not ordinary map or browser completion. After setup,
- * installation, attachment and winding use the same player actions/inputs. */
-export async function observedWinchFixture(facingLoad = false) {
+/** R04-origin geometry with the anchor front initially turned toward the winch.
+ * The literal old rearward orientation crossed the real shoulder once its
+ * authored eye/compound were used; it is retained as an explicit negative via
+ * anchorFacesWinch=false. These are isolated regressions, not browser/route
+ * completion. After setup, installation/attachment/winding use player inputs. */
+export async function observedWinchFixture(facingLoad = false, anchorFacesWinch = true) {
   const w = await TyagaWorld.create({ matchId: 'R04-tools', mapId: 'tutorial', participants });
   const positions = {
     'training-anchor': V(23.816770553588867, .42496904730796814, 14.367894172668457),
@@ -25,7 +27,9 @@ export async function observedWinchFixture(facingLoad = false) {
     const body = w.body(id); body.setTranslation(position, true); body.setLinvel(V(), true); body.setAngvel(V(), true);
   }
   w.body('training-light').setRotation({ x: .9968453049659729, y: 4.948357279488391e-9, z: .07936977595090866, w: 4.70188972201413e-8 }, true);
-  w.body('training-anchor').setRotation({ x: -1.9600307155087648e-7, y: .0015770148020237684, z: -5.545921766270112e-8, w: .9999988079071045 }, true);
+  w.body('training-anchor').setRotation(anchorFacesWinch
+    ? yawQuat(Math.atan2(22.397144317626953 - positions['training-anchor'].x, 13.996566772460938 - positions['training-anchor'].z))
+    : { x: -1.9600307155087648e-7, y: .0015770148020237684, z: -5.545921766270112e-8, w: .9999988079071045 }, true);
   const winch = w.state.inventory['winch-1']; winch.state = 'world'; winch.bodyId = winch.id;
   w.addBody({ id: winch.id, kind: 'winch', position: V(22.397144317626953, .27491527795791626, 13.996566772460938), rotation: facingLoad ? yawQuat(-Math.atan2(26.95044491 - 13.99656677, 11.47188617 - 22.39714432)) : { x: -2.9185447392165997e-9, y: -.120490163564682, z: 2.361352358093427e-8, w: .9927145838737488 } });
   const strap = w.state.inventory['strap-11']; strap.state = 'world'; strap.bodyId = strap.id;

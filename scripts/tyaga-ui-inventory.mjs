@@ -23,7 +23,7 @@ async function filesBelow(folder) {
   }
   return result.sort();
 }
-const scanned = [...await filesBelow(client), 'games/tyaga/src/core/types.ts', 'games/tyaga/src/core/config.ts', 'games/tyaga/src/maps/index.ts', 'games/tyaga/src/tutorial/index.ts', 'games/tyaga/src/server-world/actions.ts', 'games/tyaga/UI_COVERAGE.md', 'packages/game-registry/games.json'].sort();
+const scanned = [...await filesBelow(client), 'games/tyaga/src/core/types.ts', 'games/tyaga/src/core/config.ts', 'games/tyaga/src/maps/index.ts', 'games/tyaga/src/tutorial/index.ts', 'games/tyaga/src/server-world/actions.ts', 'games/tyaga/src/server-world/world.ts', 'games/tyaga/UI_COVERAGE.md', 'packages/game-registry/games.json'].sort();
 const sources = new Map(), fingerprints = [];
 for (const file of scanned) {
   const bytes = await fs.readFile(path.join(root, file));
@@ -198,6 +198,17 @@ const interactionSource = sources.get('games/tyaga/src/server-world/actions.ts')
 visit(interactionSource, node => { if (ts.isCallExpression(node) && text(node.expression) === 'push' && owner(node) === 'interactionsFor' && node.arguments.length >= 4) suppliers.push({ id: identify('server-action', node, text(node.arguments[0])), runtimeIdExpression: text(node.arguments[0]), label: { ru: literal(node.arguments[1]), en: literal(node.arguments[2]) }, action: text(node.arguments[3]), actionTypes: actionRefs(node.arguments[3]), targetId: text(node.arguments[4]), availability: text(node.arguments[5]) || "'OK' plus push() reach/operation/control/hands gates", socket: text(node.arguments[6]), ...context(node), source: location(node) }); });
 const body = definitions.get('BODY')[0].node.initializer, bodyNames = {};
 for (const prop of body.properties) if (ts.isPropertyAssignment(prop) && ts.isCallExpression(prop.initializer)) bodyNames[text(prop.name).replaceAll("'", '')] = { ru: literal(prop.initializer.arguments[4]), en: literal(prop.initializer.arguments[5]) };
+const runtimeEntityNameSuppliers = [];
+visit(sources.get('games/tyaga/src/server-world/world.ts'), node => {
+  if (!ts.isVariableDeclaration(node) || text(node.name) !== 'name' || !node.initializer || !text(node.initializer).includes('BODY[e.kind].name')) return;
+  const alternatives = [];
+  visit(node.initializer, value => {
+    if (!ts.isObjectLiteralExpression(value)) return;
+    const properties = new Map(value.properties.filter(ts.isPropertyAssignment).map(property => [text(property.name), property.initializer]));
+    if (properties.has('ru') && properties.has('en')) alternatives.push({ ru: literal(properties.get('ru')), en: literal(properties.get('en')), ...context(value), source: location(value) });
+  });
+  runtimeEntityNameSuppliers.push({ expression: text(node.initializer), alternatives, fallbackDictionary: 'bodyNames', source: location(node), acceptance: 'NOT_TESTED_BY_SOURCE_INVENTORY' });
+});
 const mapInventory = {};
 visit(sources.get('games/tyaga/src/maps/index.ts'), node => { if (ts.isReturnStatement(node) && node.expression && ts.isObjectLiteralExpression(node.expression)) { const props = new Map(node.expression.properties.filter(ts.isPropertyAssignment).map(p => [text(p.name), p.initializer])); if (props.has('tools') && props.has('cargo')) mapInventory[owner(node)] = { cargo: literal(props.get('cargo')), initialTools: literal(props.get('tools')), source: location(node) }; } });
 const keyboard = [];
@@ -220,7 +231,7 @@ const data = {
   analysisLimits: ['Label expressions preserve source text and RU/EN alternatives; they are not a browser-computed accessible-name audit.', 'Conditions are lexical ancestor branches, not a proof that a state is reachable. Read the source owner for preceding early returns and indirect guards.', 'Handler action types are direct AST literals and resolved local declarations; dynamic actions flow through component props and serverInteractionTemplates.', 'The template census includes display-only call sites of an otherwise interactive component, such as the minimap, and explicitly marks those call sites.'],
   requiredRuntimeStates: ['ordinary', 'hover where applicable', 'keyboard focus', 'pressed/held', 'selected/checked/expanded', 'disabled with reason', 'waiting', 'success', 'error', 'repeat/cancel', 'keyboard', 'touch', 'small viewport', 'orientation change', 'focus loss', 'input release'],
   sourceFiles: fingerprints,
-  domains: { playerLimits: { min: game.minPlayers, max: game.maxPlayers, seatIndices: Array.from({ length: game.maxPlayers }, (_, i) => i), source: 'packages/game-registry/games.json#tyaga' }, mapCopy, mapInventory, botTasks: tasks, targetGroups: valueOf('groupLabels'), bodyNames, labelBindings, actionTypes: actionNames, serverInteractionTemplates: suppliers },
+  domains: { playerLimits: { min: game.minPlayers, max: game.maxPlayers, seatIndices: Array.from({ length: game.maxPlayers }, (_, i) => i), source: 'packages/game-registry/games.json#tyaga' }, mapCopy, mapInventory, botTasks: tasks, targetGroups: valueOf('groupLabels'), bodyNames, runtimeEntityNameSuppliers, labelBindings, actionTypes: actionNames, serverInteractionTemplates: suppliers },
   summary: { nativeTemplates: controls.length, byTag: Object.fromEntries([...new Set([...intrinsic, ...controls.map(c => c.tag)])].sort().map(tag => [tag, controls.filter(c => c.tag === tag).length])), componentCallSites: instances.length, sourceMountPaths: expanded.length, labelActivationAreas: labelActivators.length, optionTemplates: controls.reduce((n, c) => n + (c.choices?.length ?? 0), 0), constructedCanvases: canvases.length, interactiveCanvases: canvases.filter(c => c.interactive).length, imperativeEntries: imperative.length, keyboardBranches: keyboard.length, serverInteractionTemplates: suppliers.length, coverageGroups: coverageGroups.length },
   controls, componentInstances: instances, sourceMountedControls: expanded, labelActivationAreas: labelActivators, imperativeCanvases: canvases, imperativeControls: imperative, keyboardBranches: keyboard, cssStateRules: stateRules, coverageGroups,
 };

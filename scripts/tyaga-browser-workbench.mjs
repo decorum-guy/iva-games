@@ -249,6 +249,34 @@ async function execute(command) {
     case 'state': {
       const visibleText=(await page.locator('body').innerText()).slice(0,14000),view=client.view; console.log(JSON.stringify({client:active,url:page.url(),text:visibleText, errors:client.errors,wire:view?{phase:view.phase,tick:view.tick,epoch:client.snapshot.epoch,hasControl:client.snapshot.hasControl,participants:view.participants,truck:view.truck,checkpoint:view.checkpoint,tutorial:view.tutorial,interactions:view.interactions,objects:view.entities.filter(e=>e.kind==='truck'||e.kind==='character'||e.required).map(e=>({id:e.id,position:e.position,integrity:e.integrity,velocity:e.velocity})),events:view.events.slice(-8)}:null})); break;
     }
+    case 'await-view': {
+      // Observe only the public snapshots already received by this browser.
+      // This cannot send actions, alter the world, or assign a passing state.
+      const conditions=command.conditions;
+      if(!Array.isArray(conditions)||conditions.length<1||conditions.length>12)throw new Error('One to twelve public-view conditions required');
+      for(const condition of conditions){
+        if(!['view','snapshot'].includes(condition.source??'view')||!Array.isArray(condition.path)||condition.path.length<1||condition.path.length>8||condition.path.some(key=>!(typeof key==='string'||Number.isSafeInteger(key))||['__proto__','constructor','prototype'].includes(key))||!['equals','atLeast','atMost'].includes(condition.operator??'equals'))throw new Error('Invalid public-view condition');
+      }
+      const started=Date.now(),timeout=Math.max(100,Math.min(command.timeoutMs??5000,15000));
+      let observations,passed;
+      do{
+        observations=conditions.map(condition=>{
+          const source=(condition.source??'view')==='view'?client.view:client.snapshot;
+          const observed=condition.path.reduce((value,key)=>value?.[key],source);
+          const operator=condition.operator??'equals',expected=condition.value;
+          const ok=operator==='equals'?Object.is(observed,expected):typeof observed==='number'&&typeof expected==='number'&&(operator==='atLeast'?observed>=expected:observed<=expected);
+          return{source:condition.source??'view',path:condition.path,operator,expected,observed:observed??null,missing:observed===undefined,passed:ok};
+        });
+        passed=observations.every(observation=>observation.passed);
+        if(passed||Date.now()-started>=timeout)break;
+        await page.waitForTimeout(100);
+      }while(!passed&&Date.now()-started<timeout);
+      const result={name:command.name??null,client:active,startedAt:started,finishedAt:Date.now(),passed,observations,snapshot:client.snapshot?{matchId:client.snapshot.matchId,epoch:client.snapshot.epoch,generation:client.snapshot.controllerGeneration,seq:client.snapshot.snapshotSeq,tick:client.view?.tick,phase:client.snapshot.phase}:null,kind:'Read-only public snapshot observation; not gameplay or browser acceptance by itself'};
+      await appendFile(resolve(directory,'view-observations.jsonl'),JSON.stringify({...result,view:client.view})+'\n');
+      console.log(JSON.stringify({viewObservation:result}));
+      if(!passed)throw new Error('Public view did not meet the stated conditions within the bounded wait');
+      break;
+    }
     case 'inspect': console.log(JSON.stringify(await page.locator('button,input,select,a').evaluateAll(elements=>elements.map(e=>{const b=e.getBoundingClientRect();return{text:e.textContent?.trim().slice(0,80),aria:e.getAttribute('aria-label'),type:e.tagName,disabled:e.disabled,selected:e.getAttribute('aria-pressed'),x:b.x,y:b.y,width:b.width,height:b.height,visible:b.width>0&&b.height>0}})))); break;
     case 'audit-ui': {
       const report=await page.locator('button,input,select,a,[tabindex]').evaluateAll(elements=>elements.map(e=>{

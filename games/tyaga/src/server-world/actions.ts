@@ -6,6 +6,7 @@ import type { OperationRecord } from './state';
 import type { TyagaWorld } from './world';
 import { socketsFor } from './objects';
 import { rememberTutorialWinchRelease } from '../tutorial';
+import { ANCHOR_COLLIDER_PARTS } from './anchor-geometry';
 
 export const MESSAGES:Record<string,{ru:string;en:string}>={
   OK:{ru:'Готово',en:'Done'},STARTED:{ru:'Выполняется',en:'In progress'},NOT_FOUND:{ru:'Предмет уже недоступен',en:'The item is no longer available'},
@@ -59,10 +60,24 @@ function clearAt(w:TyagaWorld,position:Vec3,size:Vec3,rotation=Q(),excludeId?:st
 }
 function heldBy(w:TyagaWorld,id:string):string[]{return Object.values(w.state.characters).filter(c=>c.holding?.itemId===id).map(c=>c.participant.participantId);}
 function packedVolume(kind:ItemKind):number{if(kind==='deck')return 1.5*1.5*.4;const s=BODY[kind].size;return s.x*s.y*s.z;}
+function anchorEyeSeatClear(w:TyagaWorld,id:string,collider:RAPIER.Collider,entry:number,reverseRay:RAPIER.Ray,d:number,atStart:boolean):boolean{
+  const index=w.state.entities[id].colliders.indexOf(collider.handle);
+  if(!ANCHOR_COLLIDER_PARTS[index]?.id.startsWith('eye-'))return false;
+  const reverseEntry=collider.castRay(reverseRay,d,true);if(reverseEntry<0)return false;
+  const farEnd=d-reverseEntry;
+  // Only the hollow eye may seat a connector locally. Reversing the segment
+  // must give the same result; its entire solid interval must be terminal.
+  // The shoulder, shaft, handle and flanges remain real obstacles even nearby.
+  return atStart?Math.max(entry,farEnd)<=.25:Math.min(entry,farEnd)>=d-.25;
+}
 function strapPathClear(w:TyagaWorld,fromId:string,from:SocketView,toId:string,to:SocketView,itemId:string,actorId:string):boolean{
-  const d=distance(from.world,to.world),ray=new RAPIER.Ray(from.world,norm(sub(to.world,from.world)));let clear=true;
+  const d=distance(from.world,to.world),ray=new RAPIER.Ray(from.world,norm(sub(to.world,from.world))),reverseRay=new RAPIER.Ray(to.world,norm(sub(from.world,to.world)));let clear=true;
   w.physics.intersectionsWithRay(ray,d,true,hit=>{
     const id=w.state.colliderBodies[hit.collider.handle];
+    if((id===fromId||id===toId)&&w.state.entities[id]?.kind==='anchor'){
+      if(anchorEyeSeatClear(w,id,hit.collider,hit.timeOfImpact,reverseRay,d,id===fromId))return true;
+      clear=false;return false;
+    }
     // Eyelets are slightly inset in the source meshes. Permit only their
     // short terminal entry, never a path through an entire endpoint body.
     if(id===fromId&&hit.timeOfImpact<.025){const exit=hit.collider.castRay(ray,d,false),eyeClearance=w.state.entities[id]?.kind==='winch'?.65:.25;if(exit>=0&&exit<=eyeClearance)return true;}
@@ -72,9 +87,13 @@ function strapPathClear(w:TyagaWorld,fromId:string,from:SocketView,toId:string,t
   return clear;
 }
 function ropePathClear(w:TyagaWorld,fromId:string,from:SocketView,toId:string,to:SocketView):boolean{
-  const d=distance(from.world,to.world),ray=new RAPIER.Ray(from.world,norm(sub(to.world,from.world)));let clear=true;
+  const d=distance(from.world,to.world),ray=new RAPIER.Ray(from.world,norm(sub(to.world,from.world))),reverseRay=new RAPIER.Ray(to.world,norm(sub(from.world,to.world)));let clear=true;
   w.physics.intersectionsWithRay(ray,d,true,hit=>{
     const id=w.state.colliderBodies[hit.collider.handle];
+    if(id===toId&&w.state.entities[id]?.kind==='anchor'){
+      if(anchorEyeSeatClear(w,id,hit.collider,hit.timeOfImpact,reverseRay,d,false))return true;
+      clear=false;return false;
+    }
     // A drum outlet may be slightly inset, but the newly laid cable must
     // leave that local outlet, not cross any other part of its own housing.
     if(id===fromId&&hit.timeOfImpact<.025){const exit=hit.collider.castRay(ray,d,false);if(exit>=0&&exit<=.08)return true;}

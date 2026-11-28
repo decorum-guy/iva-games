@@ -69,7 +69,8 @@ try {
   staticTransfer = options.snapshotTransfer === STATIC_VIEW_TRANSFER;
   const adapter = await createTyagaAdapter();
   adapter.runtimeArtifactId = `${adapter.runtimeArtifactId}:${options.artifactFingerprint}`;
-  engine = new RealtimeEngine({ storage, adapters: [adapter], maxMatches: options.maxMatches, ownedArtifactIds: [adapter.runtimeArtifactId], cloneViews: false });
+  engine = new RealtimeEngine({ storage, adapters: [adapter], maxMatches: options.maxMatches, ownedArtifactIds: [adapter.runtimeArtifactId], cloneViews: false,
+    onMatchFailure: observation => console.error(JSON.stringify(observation)) });
   await engine.initialize();
   setInterval(() => {
     if (ticking) return;

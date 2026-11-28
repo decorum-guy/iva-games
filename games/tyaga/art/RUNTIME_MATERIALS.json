@@ -7,15 +7,15 @@
       "purpose": "Static physical surface appearance: soil",
       "author": "Iva Games project-original procedural source",
       "source": "games/tyaga/src/client/terrain-materials.ts",
-      "sourceSha256": "d163001e69ba72c44150b6fcd5db44241a48eeaf6cb5853c5c9818f3faccdb92",
+      "sourceSha256": "037650304f6c93c124a66fbab7c6f4df3d8691c4ea9a547eb06e3883fe0552ee",
       "license": "project-original; no third-party texture imported",
       "runtime": "Generated in memory by the bundled Tyaga client; no external image request",
-      "version": "tyaga-terrain@1",
+      "version": "tyaga-terrain@2",
       "dimensions": [
         256,
         256
       ],
-      "colorSha256": "087ece16df0edebd6106e3898e978139d3a866b4cf19eb2a77a757cc5a6e359b",
+      "colorSha256": "f4043f56fec023ba3247aa9d9a99309cc8b07bece6abe64055d6246891e40acb",
       "detailSha256": "65d121645cf2491fca488d33f15c31dc675a17b4d7c459a27313f187319bd1fd",
       "collider": "Existing authoritative Surface; no new or displaced vertex",
       "animations": [],
@@ -23,22 +23,22 @@
         "low": "albedo + roughness + material edge treatment",
         "high": "same plus small bump detail"
       },
-      "acceptance": "source validated; in-game R05 visual and performance acceptance pending"
+      "acceptance": "actual source pixel bytes verified; next-build in-game visual and performance acceptance pending"
     },
     {
       "assetId": "terrain-stone",
       "purpose": "Static physical surface appearance: stone",
       "author": "Iva Games project-original procedural source",
       "source": "games/tyaga/src/client/terrain-materials.ts",
-      "sourceSha256": "d163001e69ba72c44150b6fcd5db44241a48eeaf6cb5853c5c9818f3faccdb92",
+      "sourceSha256": "037650304f6c93c124a66fbab7c6f4df3d8691c4ea9a547eb06e3883fe0552ee",
       "license": "project-original; no third-party texture imported",
       "runtime": "Generated in memory by the bundled Tyaga client; no external image request",
-      "version": "tyaga-terrain@1",
+      "version": "tyaga-terrain@2",
       "dimensions": [
         256,
         256
       ],
-      "colorSha256": "d3d91fe8eb766accc674589c59fe2b8050049f8be5ca43cbe219b7a6398e8b66",
+      "colorSha256": "99a1291b0292d008ef70eb3239849fcccd3d05f4a93740bbc4e39595f27256cc",
       "detailSha256": "7c6fe7581d50e7e255a21a0841b181a5c4297e6aa42990c2e9b156131d7f3e11",
       "collider": "Existing authoritative Surface; no new or displaced vertex",
       "animations": [],
@@ -46,22 +46,22 @@
         "low": "albedo + roughness + material edge treatment",
         "high": "same plus small bump detail"
       },
-      "acceptance": "source validated; in-game R05 visual and performance acceptance pending"
+      "acceptance": "actual source pixel bytes verified; next-build in-game visual and performance acceptance pending"
     },
     {
       "assetId": "terrain-wet-stone",
       "purpose": "Static physical surface appearance: wet-stone",
       "author": "Iva Games project-original procedural source",
       "source": "games/tyaga/src/client/terrain-materials.ts",
-      "sourceSha256": "d163001e69ba72c44150b6fcd5db44241a48eeaf6cb5853c5c9818f3faccdb92",
+      "sourceSha256": "037650304f6c93c124a66fbab7c6f4df3d8691c4ea9a547eb06e3883fe0552ee",
       "license": "project-original; no third-party texture imported",
       "runtime": "Generated in memory by the bundled Tyaga client; no external image request",
-      "version": "tyaga-terrain@1",
+      "version": "tyaga-terrain@2",
       "dimensions": [
         256,
         256
       ],
-      "colorSha256": "0a4b5ec81fc2d8e5c9cfc0ea2d7259eaa346625e726c9f5639ea81c7c4369cd1",
+      "colorSha256": "f6f79ca39b0c72b9b47ee95c154a474f6947a92899eae09718b3b93a35815a6a",
       "detailSha256": "00cd3419307a607f7d32f457757e0e4f7141c6a64e42d81cc4a4c9a808d28d74",
       "collider": "Existing authoritative Surface; no new or displaced vertex",
       "animations": [],
@@ -69,22 +69,22 @@
         "low": "albedo + roughness + material edge treatment",
         "high": "same plus small bump detail"
       },
-      "acceptance": "source validated; in-game R05 visual and performance acceptance pending"
+      "acceptance": "actual source pixel bytes verified; next-build in-game visual and performance acceptance pending"
     },
     {
       "assetId": "terrain-mud",
       "purpose": "Static physical surface appearance: mud",
       "author": "Iva Games project-original procedural source",
       "source": "games/tyaga/src/client/terrain-materials.ts",
-      "sourceSha256": "d163001e69ba72c44150b6fcd5db44241a48eeaf6cb5853c5c9818f3faccdb92",
+      "sourceSha256": "037650304f6c93c124a66fbab7c6f4df3d8691c4ea9a547eb06e3883fe0552ee",
       "license": "project-original; no third-party texture imported",
       "runtime": "Generated in memory by the bundled Tyaga client; no external image request",
-      "version": "tyaga-terrain@1",
+      "version": "tyaga-terrain@2",
       "dimensions": [
         256,
         256
       ],
-      "colorSha256": "f78d984eb096615d9e29afac9bc1c02b35a87a887868449e6354b10dcca6a38b",
+      "colorSha256": "e4ed49704855b8cc7ad09b3c2fa6b3bb799805ac84b87f7a600bb67ad83f1665",
       "detailSha256": "59a4567aa5c8eb5aa6a2d287ec8f01eb26a9374791bd7a26cc061b715ce3e76b",
       "collider": "Existing authoritative Surface; no new or displaced vertex",
       "animations": [],
@@ -92,17 +92,17 @@
         "low": "albedo + roughness + material edge treatment",
         "high": "same plus small bump detail"
       },
-      "acceptance": "source validated; in-game R05 visual and performance acceptance pending"
+      "acceptance": "actual source pixel bytes verified; next-build in-game visual and performance acceptance pending"
     },
     {
       "assetId": "terrain-wood",
       "purpose": "Static physical surface appearance: wood",
       "author": "Iva Games project-original procedural source",
       "source": "games/tyaga/src/client/terrain-materials.ts",
-      "sourceSha256": "d163001e69ba72c44150b6fcd5db44241a48eeaf6cb5853c5c9818f3faccdb92",
+      "sourceSha256": "037650304f6c93c124a66fbab7c6f4df3d8691c4ea9a547eb06e3883fe0552ee",
       "license": "project-original; no third-party texture imported",
       "runtime": "Generated in memory by the bundled Tyaga client; no external image request",
-      "version": "tyaga-terrain@1",
+      "version": "tyaga-terrain@2",
       "dimensions": [
         256,
         256
@@ -115,17 +115,17 @@
         "low": "albedo + roughness + material edge treatment",
         "high": "same plus small bump detail"
       },
-      "acceptance": "source validated; in-game R05 visual and performance acceptance pending"
+      "acceptance": "actual source pixel bytes verified; next-build in-game visual and performance acceptance pending"
     },
     {
       "assetId": "terrain-steel",
       "purpose": "Static physical surface appearance: steel",
       "author": "Iva Games project-original procedural source",
       "source": "games/tyaga/src/client/terrain-materials.ts",
-      "sourceSha256": "d163001e69ba72c44150b6fcd5db44241a48eeaf6cb5853c5c9818f3faccdb92",
+      "sourceSha256": "037650304f6c93c124a66fbab7c6f4df3d8691c4ea9a547eb06e3883fe0552ee",
       "license": "project-original; no third-party texture imported",
       "runtime": "Generated in memory by the bundled Tyaga client; no external image request",
-      "version": "tyaga-terrain@1",
+      "version": "tyaga-terrain@2",
       "dimensions": [
         256,
         256
@@ -138,22 +138,22 @@
         "low": "albedo + roughness + material edge treatment",
         "high": "same plus small bump detail"
       },
-      "acceptance": "source validated; in-game R05 visual and performance acceptance pending"
+      "acceptance": "actual source pixel bytes verified; next-build in-game visual and performance acceptance pending"
     },
     {
       "assetId": "terrain-ice",
       "purpose": "Static physical surface appearance: ice",
       "author": "Iva Games project-original procedural source",
       "source": "games/tyaga/src/client/terrain-materials.ts",
-      "sourceSha256": "d163001e69ba72c44150b6fcd5db44241a48eeaf6cb5853c5c9818f3faccdb92",
+      "sourceSha256": "037650304f6c93c124a66fbab7c6f4df3d8691c4ea9a547eb06e3883fe0552ee",
       "license": "project-original; no third-party texture imported",
       "runtime": "Generated in memory by the bundled Tyaga client; no external image request",
-      "version": "tyaga-terrain@1",
+      "version": "tyaga-terrain@2",
       "dimensions": [
         256,
         256
       ],
-      "colorSha256": "5b96abf4d92547dfd38aa4f5ba9df4f41ff90029ac2bef62056f0a5b038deb32",
+      "colorSha256": "52135581d36ef07d3ec7c137a5646353dac0120dff5275ae90e82019570b2c05",
       "detailSha256": "059aabc9b5da04f148631f7235b5f869aaaff8f579c1749453dab57e2eea3c22",
       "collider": "Existing authoritative Surface; no new or displaced vertex",
       "animations": [],
@@ -161,22 +161,22 @@
         "low": "albedo + roughness + material edge treatment",
         "high": "same plus small bump detail"
       },
-      "acceptance": "source validated; in-game R05 visual and performance acceptance pending"
+      "acceptance": "actual source pixel bytes verified; next-build in-game visual and performance acceptance pending"
     },
     {
       "assetId": "terrain-rock",
       "purpose": "Static physical surface appearance: rock",
       "author": "Iva Games project-original procedural source",
       "source": "games/tyaga/src/client/terrain-materials.ts",
-      "sourceSha256": "d163001e69ba72c44150b6fcd5db44241a48eeaf6cb5853c5c9818f3faccdb92",
+      "sourceSha256": "037650304f6c93c124a66fbab7c6f4df3d8691c4ea9a547eb06e3883fe0552ee",
       "license": "project-original; no third-party texture imported",
       "runtime": "Generated in memory by the bundled Tyaga client; no external image request",
-      "version": "tyaga-terrain@1",
+      "version": "tyaga-terrain@2",
       "dimensions": [
         256,
         256
       ],
-      "colorSha256": "e6bd5dce150f2b06fb5b4ab8be6752d3c1b639e14d49886d733e1a2cc1131af7",
+      "colorSha256": "9425f60cf8cfd0b4b67926d6ccb34a7e14e8969ef119effdb5507f4b7ff89db1",
       "detailSha256": "8f21175c8fe0ab5cd52794f1abe27dc89de1ba6cd9fa95e522575658368ed688",
       "collider": "Existing authoritative Surface; no new or displaced vertex",
       "animations": [],
@@ -184,7 +184,7 @@
         "low": "albedo + roughness + material edge treatment",
         "high": "same plus small bump detail"
       },
-      "acceptance": "source validated; in-game R05 visual and performance acceptance pending"
+      "acceptance": "actual source pixel bytes verified; next-build in-game visual and performance acceptance pending"
     },
     {
       "assetId": "contact-shadow",
@@ -221,6 +221,16 @@
       0,
       18
     ],
-    "webglRendererRun": false
+    "webglRendererRun": false,
+    "textureReproduction": {
+      "script": "scripts/tyaga-runtime-materials.mjs",
+      "method": "Execute transpiled terrainPixels from the actual TS source twice; hash raw RGBA Uint8Array bytes. No renderer/DOM/simulation.",
+      "sourceSha256": "037650304f6c93c124a66fbab7c6f4df3d8691c4ea9a547eb06e3883fe0552ee",
+      "version": "tyaga-terrain@2",
+      "pairs": 8,
+      "bytesPerChannel": 262144,
+      "deterministic": true,
+      "inGameAcceptance": "pending for this source revision"
+    }
   }
 }

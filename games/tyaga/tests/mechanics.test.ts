@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { evidence } from './evidence';
 import { TyagaWorld } from '../src/server-world/world';
 import { NEUTRAL_INPUT } from '../src/core/config';
-import { V, add, distance, length, localPoint, quatAxis, quatMul, rotate, sub } from '../src/core/math';
+import { V, add, distance, length, localPoint, quatAxis, quatMul, rotate, sub, yawQuat } from '../src/core/math';
 import RAPIER from '@dimforge/rapier3d-compat';
 import { kineticState } from './r04-fixtures';
 const participants=[{participantId:'alice',displayName:'Alice',seatIndex:0,bot:false},{participantId:'bob',displayName:'Bob',seatIndex:1,bot:false}];
@@ -171,7 +171,9 @@ it('P07 a cable sags over a real obstacle and reels without moving through its v
 it('a portable winch can be secured to an installed ground anchor through normal attachment',async()=>{
  const w=await fixture();try{
   const winch=w.state.inventory['winch-1'];winch.state='world';winch.bodyId=winch.id;w.addBody({id:winch.id,kind:'winch',position:V(7,.3,6)});w.updateMasses();
-  w.body('training-anchor').setTranslation(V(7,.44,7),true);w.body('person:alice').setTranslation(V(6.1,.9,6.5),true);step(w,30);
+  // Initial positive fixture: the actual front eye faces the winch. A rearward
+  // strap through the real shoulder is covered by the R05 negative regression.
+  w.body('training-anchor').setTranslation(V(7,.44,7),true);w.body('training-anchor').setRotation(yawQuat(Math.PI),true);w.body('person:alice').setTranslation(V(6.1,.9,6.5),true);step(w,30);
   expect(w.action('alice',{type:'anchor',itemId:'training-anchor'}).result.ok).toBe(true);step(w,185);
   const old=Object.values(w.state.links).find(l=>l.kind==='strap'&&l.fromId==='equipment-crate')!;w.detachLink(old.id);w.body(old.itemId!).setTranslation(V(6,.2,7.2),true);step(w,15);
   const result=w.action('alice',{type:'attach',kind:'strap',fromId:winch.id,fromSocket:'base',toId:'training-anchor',toSocket:'ring',itemId:old.itemId!});

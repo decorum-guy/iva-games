@@ -20,7 +20,7 @@ async function open(page: Page) {
     }
   })
   await page.goto('/remorse/')
-  await page.getByTestId('mode-hotseat').waitFor()
+  await page.getByTestId('mode-ai').waitFor()
 }
 
 async function holdWrite(page: Page, name: 'matches' | 'learning') {
@@ -222,6 +222,7 @@ test('a late open closes, and a failed acknowledgement of the recovered practice
   await expect(page.getByTestId('mode-learn')).toBeDisabled()
   await page.getByTestId('mode-ai').click()
   await page.getByTestId('setup-practice').click()
+  await page.locator('.setup-more > summary').click();
   await page.getByTestId('setup-white').click()
   await page.getByTestId('setup-level').selectOption('1')
   await page.getByTestId('setup-start').click()

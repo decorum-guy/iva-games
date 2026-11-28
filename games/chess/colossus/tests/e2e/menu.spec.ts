@@ -36,7 +36,7 @@ async function difficultyHasRoom(page: Page) {
       label: rect('label[for="colossus-difficulty"]'),
       select: rect('#colossus-difficulty'),
       helper: rect('#colossus-difficulty-description'),
-      extras: rect('.setup-extras'),
+      extras: rect('.setup-more'),
     };
   });
   expect(bounds.select.top - bounds.label.bottom, 'Label stays above the field').toBeGreaterThanOrEqual(4);
@@ -78,7 +78,7 @@ test('menu preserves native pointer focus, accessible keyboard focus and clear m
   await difficultyHasRoom(page);
 
   await page.keyboard.press('Tab');
-  await expect(page.locator('.boss-cards-option input')).toBeFocused();
+  await expect(page.locator('.setup-more>summary')).toBeFocused();
   await expect(setup).toHaveAttribute('data-focus-modality', 'keyboard');
   await page.keyboard.press('Shift+Tab');
   await expect(difficulty).toBeFocused();
@@ -96,10 +96,11 @@ test('menu preserves native pointer focus, accessible keyboard focus and clear m
   expect(await controlPaint(chosenBoss), 'Selected boss has a distinct border/background treatment')
     .not.toEqual(await controlPaint(opponents.first()));
 
+  await activate(page.locator('.setup-more>summary'));
   const modes = page.locator('.mode-tabs');
   const start = page.getByTestId('start-game');
   for (const [mode, action] of [
-    ['Hunt', 'Begin hunt'], ['Campaign', 'Begin campaign'],
+    ['Hunt', 'Start game'], ['Campaign', 'Begin campaign'],
     ['Two commanders', 'Play together'], ['Practice', 'Open practice'],
   ]) {
     const selected = modes.getByRole('button', { name: mode, exact: true });

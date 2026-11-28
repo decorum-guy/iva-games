@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import type { MapId, MaterialId, Surface } from '../core/types';
 
 /** Original Tyaga material source. No downloaded image or runtime CDN input. */
-export const TERRAIN_ART_VERSION = 'tyaga-terrain@1';
+export const TERRAIN_ART_VERSION = 'tyaga-terrain@2';
 export type TerrainKind = MaterialId | 'rock';
 type TerrainTexture = { color: THREE.DataTexture; detail: THREE.DataTexture };
 type Disposable = THREE.Material | THREE.Texture;
@@ -64,16 +64,17 @@ export function terrainPixels(kind: TerrainKind, size = SIZE) {
   const cracks = kind === 'stone' || kind === 'wet-stone' || kind === 'rock' || kind === 'ice' ? mineralCracks(seed) : null;
   for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
     const u = x / size, v = y / size, coarse = cloud(u, v), fine = grain(u, v), small = fleck(u, v), dust = hash(x, y, seed);
-    let shade = 1 + (coarse - .5) * .23 + (fine - .5) * .13 + (dust - .5) * .045;
+    // Keep broad mineral variation; small grains stay quiet behind carried tools.
+    let shade = 1 + (coarse - .5) * .23 + (fine - .5) * .045 + (dust - .5) * .012;
     let relief = .8 + fine * .12 + small * .07;
     if (kind === 'soil' || kind === 'mud') {
-      const pebbles = smooth(.72, .89, small), soilGrain = (dust - .5) * .09;
-      shade += pebbles * .18 + soilGrain;
+      const pebbles = smooth(.72, .89, small), soilGrain = (dust - .5) * .018;
+      shade += pebbles * .045 + soilGrain;
       if (kind === 'mud') { const damp = smooth(.42, .77, coarse); shade -= damp * .16; relief -= damp * .22; }
       relief += pebbles * .08;
     } else if (kind === 'stone' || kind === 'wet-stone' || kind === 'rock') {
       const fracture = cracks!(u, v);
-      shade -= fracture * .17; shade += smooth(.76, .94, small) * .17; relief -= fracture * .14;
+      shade -= fracture * .17; shade += smooth(.76, .94, small) * .045; relief -= fracture * .14;
       if (kind === 'rock') {
         const strata = Math.sin(TAU * (v * 3 + coarse * .18 + .035 * Math.sin(u * TAU * 2)));
         shade += strata * .06; relief += strata * .025;

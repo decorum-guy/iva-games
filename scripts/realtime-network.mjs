@@ -7,7 +7,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { WebSocket } from 'ws';
 import { applyLoadChanges } from './realtime-load-view.mjs';
-import { unexpectedNetworkErrors } from './realtime-network-errors.mjs';
+import { captureUnpackSnapshot, classifyUnpackEvidence, recordUnpackSnapshot, summarizeUnpackEvidence, unexpectedNetworkErrors } from './realtime-network-errors.mjs';
 import { netemProfile } from './realtime-network-profile.mjs';
 
 const args = new Map();
@@ -23,7 +23,7 @@ const canonical = value => JSON.stringify(value, (_key, item) => item && typeof 
 const signature = (purpose, value) => sign(null, Buffer.from(`${purpose}\n${value}`), key).toString('base64url');
 const sleep = milliseconds => new Promise(resolve => setTimeout(resolve, milliseconds));
 const clients = new Set(), cases = [], outages = [];
-let ownedQdisc = false, prepared = null, activeCase = { stage: 'initial-connection' };
+let ownedQdisc = false, prepared = null, activeCase = { stage: 'initial-connection' }, initialUnpack = null;
 const emptyInput = { moveX: 0, moveZ: 0, run: false, throttle: 0, steer: 0, brake: false, tool: 0 };
 function command(name, commandArgs) {
   const result = spawnSync(name, commandArgs, { encoding: 'utf8', timeout: 10_000, maxBuffer: 1024 * 1024 });
@@ -58,6 +58,7 @@ class Client {
     this.resyncAt = 0; this.dropAckFor = null; this.ignoredAck = null; this.stopping = false; this.lastStateAt = performance.now();
     this.ackTimer = null; this.pendingAck = null; this.lastAcknowledged = null; this.serverBaseline = null;
     this.awaitingFull = false; this.claimAttempts = []; this.claimCount = 0; this.lastClaimAt = -Infinity;
+    this.lastSentInput = null; this.trackedUnpack = null;
     const now = Date.now(), claims = { issuer: 'iva-platform', audience: 'iva-realtime', keyId: 'network-test', ticketId: randomBytes(24).toString('base64url'),
       playerId: participant.playerId, participantId: participant.participantId, matchId: prepared.matchId, roomId: prepared.input.roomId, rosterHash: prepared.status.rosterHash,
       gameId: 'tyaga', rulesVersion: prepared.status.manifest.rulesVersion, contentVersion: prepared.status.manifest.contentVersion, protocolVersion: 'iva-realtime@1',
@@ -78,6 +79,9 @@ class Client {
         if (frame.type === 'controlChanged') { this.awaitingFull = true; this.resetAcknowledgements(); this.resync(); }
         if (frame.type === 'heartbeat' && this.pings.has(frame.nonce)) { this.rtts.push(performance.now() - this.pings.get(frame.nonce)); this.pings.delete(frame.nonce); }
         if (frame.type === 'actionAck') {
+          if (this.trackedUnpack?.actionId === frame.actionId && !this.trackedUnpack.firstAcknowledgement) {
+            this.trackedUnpack.firstAcknowledgement = { observedAtMs: performance.now(), frame: structuredClone(frame) };
+          }
           if (this.dropAckFor === frame.actionId) { this.dropAckFor = null; this.ignoredAck = frame; }
           else this.receipts.set(frame.actionId, frame);
         }
@@ -93,6 +97,7 @@ class Client {
         this.snapshot = frame; this.lastStateAt = performance.now(); this.baselines.set(frame.snapshotSeq, frame.view);
         this.inputSeq = Math.max(this.inputSeq, frame.lastConsumedInputSeq);
         this.acknowledge(frame);
+        if (this.trackedUnpack) recordUnpackSnapshot(this.trackedUnpack, this.unpackSnapshot(this.trackedUnpack.itemId, this.trackedUnpack.payload.position));
       } catch (error) { this.errorCount += 1; if (this.errors.length < 50) this.errors.push({ code: 'PROJECTION_FAILED', detail: error.message }); }
     });
     this.inputTimer = setInterval(() => { if (this.snapshot?.hasControl && this.snapshot.phase === 'running') this.send({ type: 'input', inputSeq: ++this.inputSeq, payload: this.input }); }, 1000 / 30);
@@ -104,7 +109,14 @@ class Client {
   }
   send(message) {
     if (this.socket.readyState !== WebSocket.OPEN || (!this.snapshot && !this.hello) || (this.awaitingFull && message.type !== 'resync')) return false;
-    this.socket.send(JSON.stringify({ ...scope(this), ...message })); return true;
+    this.socket.send(JSON.stringify({ ...scope(this), ...message }));
+    if (message.type === 'input') this.lastSentInput = { inputSeq: message.inputSeq, payload: structuredClone(message.payload),
+      sentAtMs: performance.now(), observedSnapshotSeq: this.snapshot?.snapshotSeq, observedWorldTick: this.snapshot?.worldTick };
+    return true;
+  }
+  unpackSnapshot(itemId, position) {
+    return captureUnpackSnapshot({ snapshot: this.snapshot, participantId: this.participant.participantId, itemId, position,
+      input: this.input, inputSeq: this.inputSeq, lastSentInput: this.lastSentInput, observedAtMs: performance.now() });
   }
   resetAcknowledgements() {
     clearTimeout(this.ackTimer); this.ackTimer = null; this.pendingAck = null;
@@ -198,18 +210,40 @@ try {
   const created = await bridge('/internal/realtime/v1/matches',{gameId:'tyaga',input});
   prepared = {...created,input,status:await bridge(`/internal/realtime/v1/matches/${created.matchId}/status`,{},'GET')};
   let connected = await pair(), actor = connected[0]; const initialMass = itemState(actor).crateMass;
+  initialUnpack = { participantId: actor.participant.participantId, itemId: 'repair-1', targetId: 'equipment-crate', initialMass,
+    approachStart: actor.unpackSnapshot('repair-1'), firstSend: null, firstAcknowledgement: null, firstOperation: null, terminalEvent: null,
+    baselineEventId: 0, observations: [], events: [], observedSnapshots: 0, omittedSnapshots: 0, omittedEvents: 0 };
   const walkingDeadline = performance.now()+20_000;
   while (!actor.snapshot.view.interactions.some(option=>option.id==='unpack-repair'&&option.enabled) && performance.now()<walkingDeadline) {
     const view=actor.snapshot.view,person=view.entities.find(entity=>entity.participantId===actor.participant.participantId),crate=view.entities.find(entity=>entity.id==='equipment-crate');
     actor.input={...emptyInput,...(person.position.x>crate.position.x+.1?{moveX:-1}:{moveZ:-1})}; await sleep(80);
   }
-  actor.input={...emptyInput}; await sleep(100);
+  actor.input={...emptyInput}; initialUnpack.neutralRequested = actor.unpackSnapshot('repair-1'); await sleep(100);
   assert.ok(actor.snapshot.view.interactions.some(option=>option.id==='unpack-repair'&&option.enabled),'Ordinary input must reach the crate');
   const person=actor.snapshot.view.entities.find(entity=>entity.participantId===actor.participant.participantId);
   const actionId=randomUUID(),payload={type:'unpack',itemId:'repair-1',position:{x:person.position.x,y:person.position.y,z:person.position.z+1.2}};
-  actor.dropAckFor=actionId; actor.send({type:'action',actionId,payload});
-  await waitUntil(()=>itemState(actor).item==='world'&&actor.ignoredAck,10_000,'Real unpack operation did not finish');
+  initialUnpack.actionId = actionId; initialUnpack.payload = structuredClone(payload); initialUnpack.before = actor.unpackSnapshot('repair-1', payload.position);
+  initialUnpack.baselineEventId = Math.max(0, ...initialUnpack.before.events.map(event => event.id));
+  actor.trackedUnpack = initialUnpack; actor.dropAckFor=actionId;
+  initialUnpack.firstSend = actor.send({type:'action',actionId,payload});
+  recordUnpackSnapshot(initialUnpack, initialUnpack.before);
+  try {
+    await waitUntil(() => {
+      initialUnpack.classification = classifyUnpackEvidence(initialUnpack);
+      if (initialUnpack.classification.terminal && initialUnpack.classification.code !== 'COMPLETE') throw new Error(initialUnpack.classification.message);
+      return initialUnpack.classification.code === 'COMPLETE';
+    }, 10_000, 'INITIAL_UNPACK_DEADLINE');
+  } catch (error) {
+    if (error.message === 'INITIAL_UNPACK_DEADLINE') {
+      initialUnpack.classification = classifyUnpackEvidence(initialUnpack, true);
+      throw new Error(initialUnpack.classification.message);
+    }
+    throw error;
+  } finally {
+    initialUnpack.after = actor.unpackSnapshot('repair-1', payload.position); actor.trackedUnpack = null;
+  }
   const receipt=await actor.action(actionId,payload),expected=itemState(actor);
+  initialUnpack.duplicateAcknowledgement = structuredClone(receipt);
   assert.equal(receipt.result.ok,true); assert.equal(receipt.committedJournalSeq,actor.ignoredAck.committedJournalSeq);
   assert.equal(expected.count,1);assert.equal(expected.item,'world');assert.ok(Math.abs(expected.crateMass-(initialMass-6))<.001);
   connected.forEach(client=>client.stop());await sleep(100);
@@ -252,15 +286,15 @@ try {
   }
   health=await bridge('/health/realtime/ready',{},'GET').catch(async()=>await(await fetch(origin+'/health/realtime/ready')).json());
   assert.equal(health.activeMatches,1);assert.equal(health.failedMatches,0);
-  report={passed:true,mode,netemExecuted:netem,matrixComplete:netem&&cases.length===24&&outages.length===3,manifest:prepared.status.manifest,
+  report={passed:true,mode,netemExecuted:netem,matrixComplete:netem&&cases.length===24&&outages.length===3,manifest:prepared.status.manifest,initialUnpack,
     matchId:prepared.matchId,ordinaryCrateApproach:true,unpackedPhysicalItems:1,crateMassDecreaseKg:6,applicationAckLossDeduplicated:true,cases,outages,
     limitations:['Protocol clients, not browser/mobile/rendered acceptance.','Netem loss affects real TCP packets; RTT and jitter are requested settings, observed heartbeat RTT is reported separately.',
       'Zero nominal RTT with nonzero jitter applies a reported 0.001 ms one-way base: tc rejects a normal distribution at exactly zero latency.','This does not complete a map or measure hour-long capacity.']};
 } catch(error) { report={passed:false,mode,netemExecuted:netem,matrixComplete:false,error:error.message,activeCase,
-  failedClients:[...clients].map(client=>client.diagnostic()),manifest:prepared?.status.manifest,cases,outages}; }
+  failedClients:[...clients].map(client=>client.diagnostic()),manifest:prepared?.status.manifest,initialUnpack,cases,outages}; }
 finally {
   for(const client of clients)client.stop();
   try{clearImpairment();}catch(error){report.passed=false;report.cleanupError=error.message;}
   writeFileSync(output,JSON.stringify(report,null,2));
 }
-console.log(JSON.stringify({event:'network-summary',...report}));process.exitCode=report.passed?0:1;
+console.log(JSON.stringify({event:'network-summary',...report,initialUnpack:summarizeUnpackEvidence(report.initialUnpack),diagnosticReportPath:output}));process.exitCode=report.passed?0:1;

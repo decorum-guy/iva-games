@@ -10,8 +10,12 @@ import { performAction, finishOperation, interactionsFor, zoneConditions } from 
 import { chooseBotAction } from '../bots';
 import { advanceTutorial, tutorialView } from '../tutorial';
 import { bridgeMountParts, deckParts } from './compound';
+import { createSnapshotEncoder } from './snapshot-encoding';
+import { anchorParts } from './anchor-geometry';
+import { liftControlParts } from './lift-control-geometry';
 
-export const PHYSICS_BUILD_HASH = 'rapier3d-0.21.0:17cfa80eebd8de0291b948496dbffba724b98b489687f8272ca236a7bbf1dd4b:tyaga-solver-12-4-rope64-v10';
+export const PHYSICS_BUILD_HASH = 'rapier3d-0.21.0:17cfa80eebd8de0291b948496dbffba724b98b489687f8272ca236a7bbf1dd4b:tyaga-solver-12-4-rope64-v11';
+const encodeSnapshot = createSnapshotEncoder<GameState>(PHYSICS_BUILD_HASH);
 let initialization: Promise<void> | undefined;
 export function initializePhysics(): Promise<void> { return initialization ??= RAPIER.init().then(()=>{if(RAPIER.version()!=='0.21.0')throw new Error(`INCOMPATIBLE_RAPIER_RUNTIME:${RAPIER.version()}`);}); }
 export class TyagaWorld {
@@ -59,7 +63,7 @@ export class TyagaWorld {
     for(const record of Object.values(value.state.entities))if(record.active&&!physics.getRigidBody(record.handle))throw new Error('CORRUPT_BODY_MAP');
     physics.propagateModifiedBodyPositionsToColliders();return world;
   }
-  serialize(): string {return JSON.stringify({schema:1,physicsBuildHash:PHYSICS_BUILD_HASH,physics:Buffer.from(this.physics.takeSnapshot()).toString('base64'),state:this.state} satisfies SavedWorld);}
+  serialize(): string {return encodeSnapshot(this.physics.takeSnapshot(),this.state);}
   dispose(): void {this.queue.free();this.physics.free();}
   body(id: string): RigidBody {const e=this.state.entities[id];if(!e?.active)throw new Error('UNKNOWN_BODY');const b=this.physics.getRigidBody(e.handle);if(!b)throw new Error('MISSING_BODY');return b;}
   maybeBody(id: string): RigidBody|null {const e=this.state.entities[id];return e?.active?this.physics.getRigidBody(e.handle):null;}
@@ -85,8 +89,13 @@ export class TyagaWorld {
       for(const x of main==='mast'?[-1.6,1.6]:[-1.9,.5])makeCollider(RAPIER.ColliderDesc.cuboid(.15,high/2,.9).setTranslation(x,.35+high/2,0),0);
     }else if(options.kind==='ring'&&options.customModel==='bridge-mount'){
       for(const descriptor of bridgeMountParts())makeCollider(descriptor,0);
+    }else if(options.kind==='ring'&&(options.customModel==='lift-control'||options.customModel==='lift-transmission')){
+      for(const descriptor of liftControlParts(options.customModel))makeCollider(descriptor,0);
     }else if(options.kind==='deck'&&!options.folded){
       const parts=deckParts(),volume=parts.reduce((sum,part)=>sum+part.volume,0);
+      for(const part of parts)makeCollider(part.descriptor,mass*part.volume/volume);
+    }else if(options.kind==='anchor'){
+      const parts=anchorParts(),volume=parts.reduce((sum,part)=>sum+part.volume,0);
       for(const part of parts)makeCollider(part.descriptor,mass*part.volume/volume);
     }else if(options.kind==='jack'){
       makeCollider(RAPIER.ColliderDesc.cuboid(.25,.12,.18).setTranslation(0,-.24,0),mass*.7);
@@ -108,7 +117,14 @@ export class TyagaWorld {
     const e:EntityRecord={id:options.id,kind:options.kind,handle:body.handle,colliders,size:{...size},baseMass:mass,sockets:socketsFor(options.kind,size),required:options.required??false,active:true,fixed:options.fixed??false,submergedSeconds:0,lastSafe:{...options.position},...(options.integrity!==undefined?{integrity:options.integrity}:{}),...(options.folded?{folded:true}:{}),...(options.customModel?{customModel:options.customModel}:{})};
     this.state.entities[options.id]=e;return e;
   }
-  removeBody(id:string):void{const e=this.state.entities[id];if(!e?.active)return;for(const h of e.colliders){delete this.state.colliderBodies[h];delete this.state.colliderMaterials[h];}const b=this.physics.getRigidBody(e.handle);if(b)this.physics.removeRigidBody(b);e.active=false;}
+  removeBody(id:string):void{
+    const e=this.state.entities[id];if(!e?.active)return;
+    // A consumed strap or repair unit can still be held. Release every grip
+    // before removing its body so the next character step has no stale target.
+    for(const [participantId,c]of Object.entries(this.state.characters))if(c.holding?.itemId===id){c.holding=null;this.emit('released',id,participantId);}
+    for(const h of e.colliders){delete this.state.colliderBodies[h];delete this.state.colliderMaterials[h];}
+    const b=this.physics.getRigidBody(e.handle);if(b)this.physics.removeRigidBody(b);e.active=false;
+  }
   unfoldDeckGeometry(id:string):void{
     const e=this.state.entities[id],body=this.body(id),mass=body.mass();
     for(const handle of e.colliders){this.physics.removeCollider(this.physics.getCollider(handle),true);delete this.state.colliderBodies[handle];delete this.state.colliderMaterials[handle];}
@@ -145,8 +161,8 @@ export class TyagaWorld {
       const guide=this.physics.createImpulseJoint(data,fixed,platform,true);guide.setContactsEnabled(true);
       this.state.machinery.lift={driveId:null,targetHeight:10.1,operator:null,guideJoint:guide.handle,cableBroken:false,catchHeight:null,barriers:{'lift-barrier-near':false,'lift-barrier-far':false},driveJoint:null,overloadSeconds:0};
       for(const id of ['lift-barrier-near','lift-barrier-far']){const b=this.body(id);const local=localPoint(platform.translation(),platform.rotation(),b.translation());const j=this.physics.createImpulseJoint(RAPIER.JointData.fixed(local,Q(),V(),Q()),platform,b,true);j.setContactsEnabled(false);this.physics.getCollider(this.state.entities[id].colliders[0]).setCollisionGroups(0x00010000);}
-      this.addBody({id:'lift-transmission',kind:'ring',position:V(222,17.25,69.3),fixed:true});this.state.entities['lift-transmission'].sockets=[{id:'drive',local:V(),role:'drive'},{id:'control',local:V(0,-.4,0),role:'control'}];
-      this.addBody({id:'lift-lower-control',kind:'ring',position:V(216,10.8,74),fixed:true});this.state.entities['lift-lower-control'].sockets=[{id:'control',local:V(),role:'control'}];
+      this.addBody({id:'lift-transmission',kind:'ring',position:V(222,17.25,69.3),fixed:true,customModel:'lift-transmission'});this.state.entities['lift-transmission'].sockets=[{id:'drive',local:V(),role:'drive'},{id:'control',local:V(0,-.4,0),role:'control'}];
+      this.addBody({id:'lift-lower-control',kind:'ring',position:V(216,10.8,74),fixed:true,customModel:'lift-control'});this.state.entities['lift-lower-control'].sockets=[{id:'control',local:V(),role:'control'}];
     }
   }
   socket(id:string,socketId:string):SocketView|null{
@@ -795,7 +811,8 @@ export class TyagaWorld {
     const jack=this.state.machinery.jacks[e.id];if(jack)mechanism.piston=jack.height;
     const ferry=this.state.machinery.ferry;if(ferry?.driveId===e.id){mechanism.propellerAngle=ferry.propellerAngle;mechanism.steer=(ferry.operator?this.inputs[ferry.operator]?.steer??0:0)*Math.PI/6;}
     if(e.id==='lift-transmission')mechanism.drumAngle=(this.body('lift-platform').translation().y-10.1)/.16;
-    return{id:e.id,kind:e.kind,model:e.customModel??BODY[e.kind].model,name:BODY[e.kind].name,position:{...b.translation()},rotation:character&&!character.controlling?yawQuat(character.heading):{...b.rotation()},size:{...e.size},velocity:{...b.linvel()},angularVelocity:{...b.angvel()},mass:b.mass(),...(Object.keys(mechanism).length?{mechanism}:{}),...(e.integrity!==undefined?{integrity:e.integrity}:{}),required:e.required,active:e.active,sockets:e.sockets.map(s=>this.socket(e.id,s.id)!),...(character?{participantId:character.participant.participantId,seatIndex:character.participant.seatIndex,appearance:character.participant.appearance??{head:(character.participant.seatIndex%2)as 0|1,backpack:(Math.floor(character.participant.seatIndex/2)%2)as 0|1},animation}:{}),state:e.kind==='barrier'?(this.state.machinery.lift?.barriers[e.id]?'closed':'open'):e.folded?'folded':e.anchored?'anchored':e.integrity===0?'destroyed':'normal'};
+    const name=e.customModel==='lift-control'?{ru:'Нижний пульт подъёмника',en:'Lower lift controls'}:e.customModel==='lift-transmission'?{ru:'Приводная стойка подъёмника',en:'Lift drive mounting stand'}:BODY[e.kind].name;
+    return{id:e.id,kind:e.kind,model:e.customModel??BODY[e.kind].model,name,position:{...b.translation()},rotation:character&&!character.controlling?yawQuat(character.heading):{...b.rotation()},size:{...e.size},velocity:{...b.linvel()},angularVelocity:{...b.angvel()},mass:b.mass(),...(Object.keys(mechanism).length?{mechanism}:{}),...(e.integrity!==undefined?{integrity:e.integrity}:{}),required:e.required,active:e.active,sockets:e.sockets.map(s=>this.socket(e.id,s.id)!),...(character?{participantId:character.participant.participantId,seatIndex:character.participant.seatIndex,appearance:character.participant.appearance??{head:(character.participant.seatIndex%2)as 0|1,backpack:(Math.floor(character.participant.seatIndex/2)%2)as 0|1},animation}:{}),state:e.kind==='barrier'?(this.state.machinery.lift?.barriers[e.id]?'closed':'open'):e.folded?'folded':e.anchored?'anchored':e.integrity===0?'destroyed':'normal'};
   }
   view(participantId:string):TyagaView{
     if(!this.state.characters[participantId])throw new Error('NOT_A_PARTICIPANT');

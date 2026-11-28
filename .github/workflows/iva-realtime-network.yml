@@ -30,3 +30,14 @@ jobs:
         run: docker build --build-arg VCS_REF="$(git rev-parse HEAD)" --file Dockerfile.realtime --tag "$IMAGE_TAG" .
       - name: Check real TCP delay, jitter, loss and reconnect in an isolated namespace
         run: bash deploy/iva-games/verify-realtime-network.sh
+      - name: Preserve the credential-free network report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: realtime-network-${{ github.run_id }}-${{ github.run_attempt }}
+          # Explicit file allowlist: never upload the signing-key directory,
+          # runtime database, container filesystem, or a broad temp wildcard.
+          path: ${{ runner.temp }}/iva-realtime-network-artifacts/realtime-network.json
+          if-no-files-found: warn
+          retention-days: 7
+          include-hidden-files: false

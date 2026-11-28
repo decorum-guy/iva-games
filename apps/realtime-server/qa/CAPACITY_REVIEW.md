@@ -1,14 +1,16 @@
 # Capacity evidence and remaining acceptance
 
-Status: **capacity not accepted**. Two one-room 60-second probes ran on frozen
-commit `848c626481a8ada589fb7e3d742af1f47d028e73`: six humans passed the short
-gates; one human plus five bots failed step p99. No hour or retained heavy-scene
-run was started. The delay's cause is not established by these measurements.
-Further measurements await a new compiled freeze and must not overlap browser
-or other physics workloads.
+Status: **capacity not accepted**. Two pairs of one-room 60-second probes ran
+on frozen commits `848c626481a8ada589fb7e3d742af1f47d028e73` and
+`f3a8347a11241ffdea677ff5ec391f227907cb29`. In both pairs, six humans passed the
+short gates; one human plus five bots failed step p99. No hour or retained
+heavy-scene run was started. A subsequent single CPU diagnostic identified a
+large serialization cost, without establishing the cause of those p99 failures.
+The byte-compatible serialization correction passed targeted checks but awaits
+a new compiled freeze and measurement without browser/profiler workload.
 
 This review uses the recorded [five historical calibrations](load-calibrations.json),
-the two local R05 reports identified below, runtime/harness source and read-only
+the local R05 reports and diagnostic identified below, runtime/harness source and read-only
 resource inspection. It is not a VPS
 measurement. The requirements remain [REALTIME_PLATFORM §13 and §16](../../../docs/game-design/REALTIME_PLATFORM.md):
 step p99 strictly below half the fixed step interval, commit p99 at most 50 ms,
@@ -98,6 +100,76 @@ matching runtime/client hashes. Its [three-image workflow](https://github.com/de
 also passed. Those independent results do not resolve the local bots-p99
 failure or substitute for the unexecuted hour/heavy repeat. See the
 [runtime README](../README.md#recorded-ci-evidence) for exact image/log evidence.
+
+## Second preflight and scoped serialization correction
+
+Commit `f3a8347a11241ffdea677ff5ec391f227907cb29` used frozen build
+`f3a8347a1124-b000f0e55429`, aggregate SHA-256
+`b000f0e55429c39cf54e1ee4a010c782401e332c4eaaa2d675d60f8116bf6a4b`.
+All 325 files and complete file sets matched before running. The actual runtime
+was `tyaga-runtime@1:d421c2aec4e299cb171ca303ca1df74263851ee50046b5e810fe1b0dbe4fad8c`;
+client hash remained `65bc616c33132399fd7a52f4d34d670e1c272775b1a3d3e78558a52a0ee3bc47`.
+Health/start identified solver `v10`, bots `@3`, content `@4`, 60 Hz physics and
+20 Hz snapshots. Runtime threads used CPUs 0–1, generator 2–8, the same 1 GiB
+reference, and no concurrent local renderer/physics test. Both new directories
+preserve the first preflight's evidence.
+
+| Profile | Measured seconds / steps | Whole-window step p99 upper, ms | Commit p99 upper, ms | Peak RSS, MiB | Maximum process CPU / two-CPU budget | Short result |
+| --- | --- | ---: | ---: | ---: | ---: | --- |
+| Six human clients | 60.012 / 3600 | 8 | 20 | 617.836 | 45.216% | PASS |
+| One human, five bots | 60.015 / 3601 | 10 | 20 | 584.633 | 32.021% | FAIL: step p99 |
+
+The bots' p99 bucket is **(9, 10] ms**, above the strict 8.333333 ms requirement.
+Separate last-2,048-step p99 values were 9.676266/10.408713 ms (humans/bots);
+process maxima were 63.786115/84.934381 ms. These different windows are retained,
+not substituted for the complete-window criterion. Both runs had no overload,
+protocol/rate-limit or queue-overflow errors and child runtimes drained with
+exit 0. Sent snapshots averaged 19.405/19.600 Hz over the sampled final roughly
+55 seconds. Evidence: `.qa/realtime-load/r05-preflight-02-summary.json` and
+`r05-preflight-02-n1-{humans,bots}-60` beneath `.qa/realtime-load/`. Heavy
+preparation was not built; heavy/hour counts stayed zero after the failure.
+
+One separately authorized **diagnostic** profiled the exact `f3a8347` archived
+simulation worker: runtime CPUs 4–5, generator 6–7, 50 seconds plus warmup, with
+a browser and another runtime active elsewhere on the shared executor.
+Inspector sampled 35.119 seconds (28,670 samples). Of non-idle sample-weighted
+time, synchronous persistence stacks occupied 59.78%, game `physicsStep` 23.16%,
+bot public views 5.41%, bot decisions 1.76% and GC 2.84%. `groundPath` occupied
+10.859 ms across the profile. `TyagaWorld.serialize` had 6,404.585 ms inclusive
+and 5,087.300 ms self; SHA hashing had 1,525.475 ms inclusive. Inclusive values
+overlap. GC observer events totalled 318.914 ms, maximum 25.058 ms, without an
+exact correspondence to prior slow steps. Sample-weighted elapsed time is not
+independently measured CPU time or per-step attribution. The step timer ends
+before serialization/writer await, so this cost cannot simply be subtracted
+from step p99; allocation/GC pressure is a hypothesis, not an established cause.
+
+The final saved world contained 793,503 bytes, including 730,336 bytes of
+physics base64 and 63,002 bytes of state. A private read-only proof preserved
+exact bytes and stored SHA-256 for two snapshots and the initial checkpoint.
+A short encoding-plus-SHA diagnostic on CPUs 4–5, 288 iterations per variant
+in rotated order, measured 5.370 ms for the old encoder, 3.407 ms for framing
+and 2.782 ms for framing plus a Buffer view. SHA cost includes deferred string
+flattening; Rapier capture was outside this micro-diagnostic. Its 48.2% change
+is not a simulation or p99 improvement, and the host browser remained active.
+
+The approved source correction changes only `TyagaWorld.serialize` and a small
+encoder helper: preserve JSON field order and escaped hash, insert the safe
+Buffer-produced base64 directly, and avoid an extra copy of the fresh binary
+snapshot. Game-state JSON, full physics content, SHA-256, envelope/schema,
+writer barrier, persistence frequency and solver remain unchanged. Physics
+`v10`, bots `@3` and serializer `tyaga-world@1` stay unchanged; a future compiled
+worker obtains its own actual runtime digest.
+
+Fourteen targeted tests passed on CPUs 4–5: all byte values/padding/nonzero
+offsets; escaped Unicode/control characters/property order; real Rapier
+legacy-byte restoration/replay; bot-controller restoration; and the runtime's
+unpack receipt, crate mass and SQLite recovery. Game TypeScript and targeted
+ESLint passed. Game source hash:
+`bec106223d39317f92ee1c139ddf2f999f451d3900736e0a50eb77145312c970`.
+No shared build or further capacity probe followed this correction. Raw profile,
+GC and private proof: `.qa/realtime-load/r05-preflight-02-bots-cpuprofile/`.
+Targeted log: `.qa/tyaga/serialization-optimization-01-tests.log`. Both prior
+capacity failures remain unchanged; compiled remeasurement is still required.
 
 ## Resource reference and limits of the local gate
 
@@ -200,8 +272,11 @@ with `--map valley` or `--map quarry` when checking which scene is limiting.
 After both normal and heavy short probes pass, run the one-hour probe on the
 final accepted candidate using the profile selected from the measured short
 results. The following is the six-human command; use `--profile bots` and a
-new output directory if bots are the limiting profile. If neither dominates,
-record separate hour runs instead of claiming an unmeasured combined bound.
+new output directory if bots are the limiting profile. Record the reason for
+that selection and the coverage limits while retaining both short reports.
+Section 16 requires one hour at the declared capacity and a heavy repeat;
+it does not automatically require every Cartesian combination of profile/map
+to run for an hour. Any extra duration must resolve a concrete remaining risk.
 
 ```bash
 taskset -c 2-8 node scripts/realtime-load.mjs --server-cpus 0,1 --seconds 3600 --rooms 1 --profile humans --scene normal --map ridge --memory-mib 1024 --output .qa/realtime-load/next-n1-humans-hour
@@ -218,8 +293,13 @@ taskset -c 2-8 node scripts/realtime-load.mjs --server-cpus 0,1 --seconds 60 --r
 taskset -c 2-8 node scripts/realtime-load.mjs --server-cpus 0,1 --seconds 60 --rooms 1 --profile humans --scene lift --memory-mib 1024 --output .qa/realtime-load/next-n1-lift-60
 ```
 
-Only a stable, correctly loaded short scene proceeds to its hour repeat. Both
-different mechanisms remain in scope; one room cannot contain both maps.
+Only stable, correctly loaded short scenes allow selection of the heavy hour.
+Both mechanisms retain their separate short checks; one room cannot contain
+both maps. Choose the more demanding measured scene for the heavy repeat,
+document the measurements and coverage limits, and run only the corresponding
+command below. The initial plan is one normal hour plus one heavy hour, not
+both alternatives by default. No heavy choice is established by the current
+failed normal preflight.
 
 ```bash
 taskset -c 2-8 node scripts/realtime-load.mjs --server-cpus 0,1 --seconds 3600 --rooms 1 --profile humans --scene ferry --memory-mib 1024 --output .qa/realtime-load/next-n1-ferry-hour

@@ -172,6 +172,26 @@ and the next sequential commands. Affinity does not reserve host CPU or measure
 the production VPS. Another frozen candidate must pass its short probes before
 the full hour and maximum-scene repetition.
 
+The second frozen preflight, commit
+`f3a8347a11241ffdea677ff5ec391f227907cb29`, retained those budgets after spreading
+the five bots' unchanged 10 Hz decisions across fixed seat phases. Six humans
+again passed the 60-second whole-window gate (step p99 upper 8 ms). One human
+plus five bots still failed (bucket **(9, 10] ms**); commit p99 was 20 ms for
+both. No heavy or hour run followed. A separate diagnostic profile on exact
+`f3a8347` bytes used CPUs 4–5 while a browser remained active elsewhere on the
+same host, with Inspector overhead. It is not an acceptance rerun.
+
+That profile identified synchronous snapshot encoding/hash work as the largest
+non-idle sampled stack, without proving the cause of any earlier slow step.
+The current source changes only `TyagaWorld.serialize`: it frames the existing
+schema-1 JSON around Buffer-produced base64 and uses a view of the fresh binary
+snapshot. It preserves exact bytes/hash, full physics content and persistence
+cadence; physics/bot/serializer versions stay unchanged. Fourteen focused
+encoding, real-world replay, bot-controller and durable-receipt tests passed.
+This performance change awaits a new compiled measurement; it does not accept
+the failed preflight or change a capacity limit. Exact evidence and limitations
+are in [the capacity review](qa/CAPACITY_REVIEW.md).
+
 The QA-only `qa/heavy-seed.ts` and `scripts/vite.realtime-heavy.config.ts`
 prepare one-room `--scene ferry` or `--scene lift` fixtures for the same compiled
 worker. `--scene paired` explicitly requires two rooms. Normal loaded masses,

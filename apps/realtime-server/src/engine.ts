@@ -28,6 +28,11 @@ interface OverloadObservation {
   schedulerGapMs: number; accumulatedLagMs: number; stepIntervalMs: number; maxCatchUpSteps: number;
   lastStepMs: number; lastBatchStepMs: number; lastBatchSteps: number; lastSerializeMs: number; lastCommitMs: number;
 }
+export interface MatchFailureObservation {
+  event: 'realtime-match-frozen'; stage: 'persist' | 'tick'; code: string;
+  matchId: string; gameId: string; runtimeArtifactId: string;
+  worldTick: number; lastCommittedJournalSeq: number;
+}
 export interface EngineOptions {
   storage: StorageClient; adapters: GameAdapter[]; ownerId?: string;
   maxMatches?: number; wallNow?: () => number; monoNow?: () => number;
@@ -36,6 +41,9 @@ export interface EngineOptions {
   /** Worker postMessage immediately clones the returned view before any next
    * queued mutation. Direct in-process adapters retain defensive cloning. */
   cloneViews?: boolean;
+  /** Server diagnostics only: never include action payloads, identities,
+   * tickets, arbitrary exception text or snapshots in the observation. */
+  onMatchFailure?: (observation: MatchFailureObservation) => void;
 }
 interface ReplayStep { inputs: Record<string, unknown>; context: StepContext }
 export class RealtimeEngine {
@@ -53,6 +61,7 @@ export class RealtimeEngine {
   private ready = false;
   private readonly ownedArtifactIds?: Set<string>;
   private readonly cloneViews: boolean;
+  private readonly onMatchFailure?: EngineOptions['onMatchFailure'];
   private readonly timings = new Map<string, GameTimings>();
   private readonly lastOverloads = new Map<string, OverloadObservation>();
   readonly metrics = { steps: 0, commits: 0, maxStepMs: 0, maxCommitMs: 0, failures: 0, overloadPauses: 0, overloadRecurrences: 0, startedAt: Date.now() };
@@ -62,6 +71,7 @@ export class RealtimeEngine {
     this.wall = options.wallNow ?? Date.now; this.mono = options.monoNow ?? (() => performance.now());
     this.ownedArtifactIds = options.ownedArtifactIds ? new Set(options.ownedArtifactIds) : undefined;
     this.cloneViews = options.cloneViews !== false;
+    this.onMatchFailure = options.onMatchFailure;
     for (const adapter of options.adapters) this.timings.set(adapter.gameId, new GameTimings());
   }
   private adapter(gameId: string, rulesVersion: string, contentVersion: string): GameAdapter {
@@ -88,6 +98,17 @@ export class RealtimeEngine {
   private syncControllers(match: ActiveMatch): void {
     match.stored.meta.controllers = this.listControls(match).map(({ participantId, kind, controllerGeneration }) => ({ participantId, kind, controllerGeneration }));
     match.adapter.controllersChanged?.(match.world, this.listControls(match));
+  }
+  private freeze(match: ActiveMatch, error: unknown, stage: MatchFailureObservation['stage']): void {
+    if (match.frozen) return;
+    match.frozen = true; this.metrics.failures += 1;
+    const candidate = error instanceof RealtimeError ? error.code : error instanceof Error ? error.message : '';
+    const code = /^[A-Z][A-Z0-9_]{0,79}$/.test(candidate) ? candidate : 'INTERNAL_ERROR';
+    try {
+      this.onMatchFailure?.({ event: 'realtime-match-frozen', stage, code,
+        matchId: match.stored.matchId, gameId: match.adapter.gameId, runtimeArtifactId: match.adapter.runtimeArtifactId,
+        worldTick: match.stored.meta.worldTick, lastCommittedJournalSeq: match.stored.meta.journalSeq });
+    } catch { /* A diagnostic sink cannot alter the authoritative freeze. */ }
   }
   async initialize(): Promise<void> {
     for (const stored of await this.storage.call('all')) {
@@ -237,7 +258,7 @@ export class RealtimeEngine {
       match.committedAt = completed; match.dirtySince = null;
       this.metrics.commits += 1; this.metrics.maxCommitMs = Math.max(this.metrics.maxCommitMs, duration);
     } catch (error) {
-      match.frozen = true; this.metrics.failures += 1;
+      this.freeze(match, error, 'persist');
       throw error;
     }
   }
@@ -474,7 +495,7 @@ export class RealtimeEngine {
           if (humans.length) await this.finish(match, outcome);
           else { meta.pendingOutcome = outcome; meta.phase = 'paused'; meta.pauseReason = 'empty'; meta.returnUntil = wall + RETURN_WINDOW_MS; await this.persist(match, 'pending-outcome', {}, true); }
         }
-      } catch { match.frozen = true; this.metrics.failures += 1; }
+      } catch (error) { this.freeze(match, error, 'tick'); }
     }
   }
   private async finish(match: ActiveMatch, value: unknown): Promise<void> {

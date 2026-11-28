@@ -76,10 +76,11 @@ def transforms(doc):
 
 def models():
     manifest=json.loads((ASSETS/'models/manifest.json').read_text())
-    expected={'truck','character','generator-large','mast','pump-large','generator','optics','pump','deck','beam','winch','anchor','strap','jack','repair','drive','crate','pontoon','ferry-deck','lift','block','ramp','ring','bridge-mount','barrier'}
+    expected={'truck','character','generator-large','mast','pump-large','generator','optics','pump','deck','beam','winch','anchor','strap','jack','repair','drive','crate','pontoon','ferry-deck','lift','lift-control','lift-transmission','block','ramp','ring','bridge-mount','barrier'}
     found={a['assetId'] for a in manifest['assets']}
     check(expected<=found,f'Missing runtime models: {sorted(expected-found)}')
     check(len(found)==len(manifest['assets']),'Duplicate model assetId')
+    check(len(found)==44,'Expected the reviewed 44-model production set')
     result=[]
     for asset in manifest['assets']:
         name=asset['assetId'];path=ASSETS/'models'/(name+'.glb')
@@ -135,10 +136,96 @@ def models():
         if points:
             xyz=np.concatenate(points);low=xyz.min(axis=0);high=xyz.max(axis=0)
             size=high-low;center=(high+low)/2
-            if name in {'winch','anchor','strap','jack','repair','drive','ring','crate','hook','beam','deck-folded','generator-large','generator','optics','pump-large','pump','mast'}:
+            if name in {'anchor','strap','jack','repair','drive','ring','crate','hook','beam','deck-folded','generator-large','generator','optics','pump-large','pump','mast'}:
                 check(np.max(np.abs(size-np.array(asset['dimensionsXYZ'])))<.001,f'{name}: dimensions differ from physics')
                 check(np.max(np.abs(center))<.001,f'{name}: origin is not bounds-centre')
             extra={}
+            if name in {'winch','lift','lift-control','lift-transmission'}:
+                expected_sockets={
+                    'winch':{'drum':[.35,.1,0],'handle-0':[0,.3,0],'base':[0,-.155,0]},
+                    'lift':{'control':[-3.5,.8,1.6],'ring-front':[3.8,.15,0],'ring-rear':[-3.8,.15,0]},
+                    'lift-control':{'control':[0,0,0]},
+                    'lift-transmission':{'drive':[0,0,0],'control':[0,-.4,0]},
+                }[name]
+                check(asset.get('version')=='tyaga-art@2',f'{name}: reviewed port revision missing')
+                check(asset.get('interactionHardware',{}).get('separateFromBodyBounds'),f'{name}: small interaction hardware must be explicit')
+                visual=asset.get('visualBounds',{})
+                check(np.max(np.abs(low-np.array(visual.get('min',[0,0,0]))))<1e-5 and np.max(np.abs(high-np.array(visual.get('max',[0,0,0]))))<1e-5,f'{name}: full visual envelope differs')
+                actual_nodes={node.get('name'):world[i][:3,3] for i,node in enumerate(doc['nodes'])}
+                socket_errors={}
+                for alias,position in expected_sockets.items():
+                    spec=asset.get('runtimeSockets',{}).get(alias,{})
+                    check(spec.get('node') in actual_nodes,f'{name}: missing visible runtime socket {alias}')
+                    check(np.linalg.norm(np.array(spec.get('local',[999,999,999]))-position)<1e-6,f'{name}: runtime socket metadata differs {alias}')
+                    if spec.get('node') in actual_nodes:
+                        error=float(np.linalg.norm(actual_nodes[spec['node']]-position));socket_errors[alias]=error
+                        check(error<1e-6,f'{name}: visible runtime socket differs {alias}')
+                extra={'runtimeSocketDeviationMeters':socket_errors,'interactionHardwareExcludedFromBodyBounds':True,
+                    'physicsAndGameplayAcceptance':'pending; asset validation is static only'}
+                if name=='winch':
+                    check(asset['dimensionsXYZ']==[.62,.55,.98] and asset['massKg']==35,'winch: body dimensions/mass changed')
+                    check(asset['collider']=={'shape':'box','halfExtents':[.31,.275,.49]},'winch: body collider changed')
+                    body=np.concatenate(structure);half=np.array([.31,.275,.49])
+                    check(np.all(body.min(0)>=-half-1e-6) and np.all(body.max(0)<=half+1e-6),'winch: structural case leaves its existing body envelope')
+                    root_index=next((i for i,node in enumerate(doc['nodes'])if node.get('name')=='tyaga-winch'),None)
+                    check(root_index is not None,'winch: root node missing')
+                    if root_index is not None:
+                        expected_transform=np.diag([1,.8774636387825012,1.152941107749939,1.])
+                        expected_transform[:3,3]=[0,-.11705657094717026,-.1671764850616455]
+                        check(np.max(np.abs(world[root_index]-expected_transform))<1e-6,'winch: original case/drum normalization changed')
+                    check({'drum','winch-handle','handle-carry','socket-drum'}<=names,'winch: mechanism/carry nodes missing')
+                if name=='lift':
+                    check(not any(n and n.startswith('barrier-')for n in names),'lift: embedded duplicate barrier geometry remains')
+                    check(asset['dimensionsXYZ']==[8.4,.2,4.2],'lift: platform body dimensions changed')
+                if name in {'lift-control','lift-transmission'}:
+                    base,post=(([0,-.77,-.16],[.16,.03,.14]),([0,-.46,-.12],[.03,.28,.03])) if name=='lift-control' else (([.5,-1.22,-.12],[.08,.03,.14]),([.5,-.665,-.12],[.04,.525,.04]))
+                    parts=[{'id':'head','shape':'box','center':[0,0,0],'halfExtents':[.2,.2,.2],'existing':True},
+                        {'id':'base','shape':'box','center':base[0],'halfExtents':base[1]},
+                        {'id':'post','shape':'box','center':post[0],'halfExtents':post[1]}]
+                    if name=='lift-transmission':parts.append({'id':'support-arm','shape':'box','center':[.315,-.17,-.12],'halfExtents':[.225,.03,.04]})
+                    check(asset['origin']=='socket' and asset['dimensionsXYZ']==[.4,.4,.4],f'{name}: canonical head/origin changed')
+                    check(asset['collider'].get('fixed') is True and asset['collider'].get('parts')==parts,f'{name}: reviewed fixed collider descriptors differ')
+                    floor=-.8 if name=='lift-control' else -1.25
+                    check(abs(low[1]-floor)<1e-6,f'{name}: visible base no longer touches the floor datum')
+                    extra.update({'fixedColliderParts':len(parts),'baseFloorLocalY':floor,'bodyOrigin':'existing runtime socket; head extent .4m',
+                        'physicsAndGameplayAcceptance':asset['validation']['collisionAlignment'],
+                        'physicsResultBasis':'isolated runtime regression record; this asset validator only checks bytes/geometry'})
+            if name=='anchor':
+                contract=json.loads((ROOT/'art/source/anchor-collider.json').read_text())
+                check(asset['collider']==contract['collider'],'anchor: collider metadata differs from authored section contract')
+                check(asset.get('runtimeSockets')==contract['runtimeSockets'],'anchor: runtime socket aliases differ')
+                check(asset['massKg']==contract['massKg']==12,'anchor: mass must remain 12 kg')
+                check(asset['dimensionsXYZ']==contract['dimensionsXYZ']==[.42,.85,.26],'anchor: nominal bounds changed')
+                parts=contract['collider']['parts']
+                groups={prefix:sum(p['id'].split('-')[0]==prefix for p in parts) for prefix in ['shaft','shoulder','handle','flange','eye']}
+                check(groups=={'shaft':1,'shoulder':1,'handle':9,'flange':42,'eye':16},'anchor: convex section partition differs')
+                check(all(p['shape']=='convexHull' and p['volumeM3']>0 for p in parts),'anchor: invalid convex section')
+                check(abs(sum(p['massFraction'] for p in parts)-1)<1e-10,'anchor: collider masses do not sum to 12 kg')
+                total_volume=sum(p['volumeM3'] for p in parts)
+                check(all(abs(p['massFraction']-p['volumeM3']/total_volume)<1e-10 for p in parts),'anchor: mass fractions differ from section volumes')
+                hull=np.concatenate([np.array(p['vertices']).reshape((-1,3)) for p in parts])
+                distances=np.linalg.norm(xyz[:,None,:]-hull[None,:,:],axis=2)
+                mismatch=max(float(distances.min(axis=0).max()),float(distances.min(axis=1).max()))
+                check(mismatch<1e-5,'anchor: compound vertices do not match the actual normalized mesh')
+                actual_nodes={node.get('name'):world[i][:3,3] for i,node in enumerate(doc['nodes'])}
+                for alias,value in contract['runtimeSockets'].items():
+                    check(value['node'] in actual_nodes,f'anchor: missing runtime alias node {alias}')
+                    if value['node'] in actual_nodes:
+                        check(np.linalg.norm(actual_nodes[value['node']]-value['local'])<1e-6,f'anchor: runtime alias {alias} does not follow visible hardware')
+                # Every eye wedge remains on one side of a plane outside the
+                # central opening. Convex hulls therefore cannot fill the hole.
+                eye_center=np.array(contract['runtimeSockets']['ring']['local'])
+                scale=np.array([.9716156125068665,.966518759727478,.8493196368217468])
+                clearance=[]
+                for part in parts:
+                    if not part['id'].startswith('eye-'): continue
+                    points=(np.array(part['vertices']).reshape((-1,3))-eye_center)/scale
+                    radial=points[:,:2].mean(axis=0);radial/=np.linalg.norm(radial)
+                    clearance.append(float(np.min(points[:,:2]@radial)))
+                check(min(clearance)>.058*math.cos(math.pi/16)-1e-6,'anchor: convex eye section fills the central opening')
+                extra={'compoundParts':len(parts),'compoundVertexDeviationMeters':mismatch,
+                    'runtimeSocketAliases':contract['runtimeSockets'],'massKg':12,
+                    'physicsAndGameplayAcceptance':'pending; asset validation is static only'}
             if name=='deck':
                 body=np.concatenate(structure);struct_low=body.min(axis=0);struct_high=body.max(axis=0)
                 check(np.max(np.abs(struct_high-struct_low-np.array(asset['dimensionsXYZ'])))<.001,'deck: structural dimensions differ')

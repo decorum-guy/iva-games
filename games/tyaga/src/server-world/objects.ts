@@ -1,5 +1,6 @@
 import type { EntityKind, SocketView, Vec3 } from '../core/types';
 import { V } from '../core/math';
+import { ANCHOR_SOCKET_LOCALS } from './anchor-geometry';
 export type LocalSocket = Omit<SocketView,'world'>;
 const s=(id:string,local:Vec3,role:SocketView['role']):LocalSocket=>({id,local,role});
 export function socketsFor(kind:EntityKind,size:Vec3):LocalSocket[]{
@@ -22,7 +23,7 @@ export function socketsFor(kind:EntityKind,size:Vec3):LocalSocket[]{
   if(kind==='lift')return [s('control',V(-3.5,.8,1.6),'control'),s('ring-front',V(3.8,.15,0),'ring'),s('ring-rear',V(-3.8,.15,0),'ring')];
   if(kind==='winch')return [s('drum',V(size.x/2+.04,.1,0),'control'),s('base',V(0,-size.y/2+.12,0),'ring'),s('handle-0',V(0,.3,0),'handle')];
   if(kind==='jack')return [s('control',V(0,.15,.28),'control'),s('head',V(0,.3,0),'ring'),s('handle-0',V(0,.2,0),'handle')];
-  if(kind==='anchor')return [s('ring',V(0,.35,0),'ring'),s('handle-0',V(0,.3,0),'handle')];
+  if(kind==='anchor')return [s('ring',{...ANCHOR_SOCKET_LOCALS.ring},'ring'),s('handle-0',{...ANCHOR_SOCKET_LOCALS['handle-0']},'handle')];
   if(kind==='drive')return [s('handle-0',V(-.05,.6,0),'handle'),s('drive',V(.55,.55,0),'drive'),s('ring',V(0,.3,0),'ring')];
   if(kind==='barrier')return [s('control',V(0,.3,1.5),'control')];
   const large=['generator-large','mast','pump-large'].includes(kind);

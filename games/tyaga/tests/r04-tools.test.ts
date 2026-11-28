@@ -8,7 +8,7 @@ import { evidence } from './evidence';
 import { attachBase, cableAction, kineticState, observedWinchFixture, participants, steps } from './r04-fixtures';
 
 describe('R04 ordinary UI mechanism defects (observed-geometry fixtures)', () => {
-  it.each([false, true])('accepts the same clear winch base strap in either endpoint order: reverse=%s', async reverse => {
+  it.each([false, true])('accepts the corrected R04 anchor front in either endpoint order: reverse=%s', async reverse => {
     const w = await observedWinchFixture();
     try {
       const result = attachBase(w, reverse);

@@ -36,8 +36,15 @@ export async function openEnglish(page: Page, view: '2d' | '3d' = '2d') {
   await expect(page.locator('.setup-screen')).toBeVisible();
   await expect(page.locator('.language-switch')).toHaveText('RU');
 }
+export async function chooseMode(page: Page, name: string) {
+  const more = page.locator('.setup-more');
+  if (await more.getAttribute('open') === null) await activate(more.locator('summary'));
+  await activate(page.locator('.mode-tabs').getByRole('button', { name, exact: true }));
+}
 export async function beginHunt(page: Page, view: '2d' | '3d' = '2d') {
   await activate(page.getByTestId('start-game'));
+  const replace = page.getByRole('dialog', { name: 'Start a new game?', exact: true });
+  if (await replace.isVisible()) await activate(replace.getByRole('button', { name: 'Start new game', exact: true }));
   await expect(page.getByTestId('board-' + view)).toBeVisible();
 }
 export async function move(page: Page, from: string, to: string) {
@@ -85,7 +92,7 @@ export async function menu(page: Page) {
   await expect(page.locator('.setup-screen')).toBeVisible();
 }
 export async function continueLocal(page: Page, mode: 'Hunt' | 'Practice' = 'Hunt') {
-  await activate(page.locator('.mode-tabs').getByRole('button', { name: mode, exact: true }));
+  await chooseMode(page, mode);
   await activate(page.locator('.start-actions').getByRole('button', { name: 'Continue', exact: true }));
   await expect(board(page)).toBeVisible();
 }

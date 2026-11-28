@@ -1,5 +1,13 @@
 # Iva Games — latest project direction
 
+## Knock First — owner rejected 3D, 28 November 2026
+
+The owner rejected the actual Terra screenshot of Knock First and explicitly assigned GPT-6.1 Terra to functional browser acceptance and **GPT-6 Astra (not 6.2)** to a substantial 3D/models/materials/lighting/animation rework. Read [the concrete art and integration contract](docs/iva-games/KNOCK_FIRST_3D_REWORK_2026_11_28.md). These are explicitly coordinated parallel assignments, not a second game implementation. Use isolated branches/worktrees and agree on renderer/input files before overlapping edits. Old asset counts, CPU rig checks and pre-rework functional observations do not accept the new visuals. Preserve rules, privacy, collisions, sound, saves and the current main release; Knock First is not accepted or released by these assignments alone.
+
+## Chess menus — shared player journey, 28 November 2026
+
+Follow [the chess entry contract](docs/iva-games/CHESS_ENTRY_FLOW.md) for all current and future chess variants: New game / Continue, Tutorial, With a friend, Settings. Preserve each game's visual identity. Put rare options behind an explicit disclosure, protect unfinished saves, and verify desktop/mobile RU/EN entry and recovery before release. Do not add another first-screen section for each new feature.
+
 ## Обязательное правило для новых игр
 
 **Одна игра, один ИИ-исполнитель, полный цикл до сайта.** Если владелец поручил сделать игру, прочитай [порядок полного цикла](docs/iva-games/GAME_WORKFLOW.md) и доведи её сам: правила, код, ассеты, интерфейс, звук, тесты, полная браузерная приёмка, исправления, рабочая ветка и PR, разрешённый штатный выпуск, проверка на iva-games.pro. Не отдавай владельцу или следующему чату незакрытые обычные этапы. PR и зелёный CI не равны готовой игре. Недостающий доступ или непройденная обязательная проверка — блокер, а не основание объявлять выпуск.

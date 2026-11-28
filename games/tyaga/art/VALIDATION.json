@@ -14,7 +14,29 @@
         0.0,
         -0.0,
         0.0
-      ]
+      ],
+      "compoundParts": 69,
+      "compoundVertexDeviationMeters": 7.844572368440001e-11,
+      "runtimeSocketAliases": {
+        "ring": {
+          "node": "socket-anchor",
+          "local": [
+            0.0,
+            0.20323717545187492,
+            0.0934251658720826
+          ]
+        },
+        "handle-0": {
+          "node": "handle-anchor",
+          "local": [
+            0.0,
+            0.33854981679206375,
+            0.0
+          ]
+        }
+      },
+      "massKg": 12,
+      "physicsAndGameplayAcceptance": "pending; asset validation is static only"
     },
     {
       "assetId": "strap",
@@ -528,8 +550,8 @@
     },
     {
       "assetId": "lift",
-      "triangles": 4380,
-      "bytes": 279556,
+      "triangles": 4808,
+      "bytes": 299712,
       "visualBoundsXYZ": [
         8.4,
         1.198,
@@ -539,22 +561,36 @@
         0.0,
         0.389,
         0.0
-      ]
+      ],
+      "runtimeSocketDeviationMeters": {
+        "control": 2.665600739919886e-08,
+        "ring-front": 4.8054800741922146e-08,
+        "ring-rear": 4.8054800741922146e-08
+      },
+      "interactionHardwareExcludedFromBodyBounds": true,
+      "physicsAndGameplayAcceptance": "pending; asset validation is static only"
     },
     {
       "assetId": "winch",
-      "triangles": 1732,
-      "bytes": 69192,
+      "triangles": 1916,
+      "bytes": 81020,
       "visualBoundsXYZ": [
-        0.62,
-        0.55,
+        0.6713,
+        0.593,
         0.98
       ],
       "visualCentreXYZ": [
-        0.0,
-        0.0,
+        0.0257,
+        0.0215,
         -0.0
-      ]
+      ],
+      "runtimeSocketDeviationMeters": {
+        "drum": 3.130666123817904e-08,
+        "handle-0": 5.64181593458423e-08,
+        "base": 6.5024099742355806e-09
+      },
+      "interactionHardwareExcludedFromBodyBounds": true,
+      "physicsAndGameplayAcceptance": "pending; asset validation is static only"
     },
     {
       "assetId": "pontoon",
@@ -640,6 +676,55 @@
       "clearSlotRays": 196,
       "slotRaySamples": 196,
       "interactionHardwareExcludedFromStructuralBounds": true
+    },
+    {
+      "assetId": "lift-control",
+      "triangles": 932,
+      "bytes": 61500,
+      "visualBoundsXYZ": [
+        0.32,
+        0.97,
+        0.48
+      ],
+      "visualCentreXYZ": [
+        -0.0,
+        -0.315,
+        -0.06
+      ],
+      "runtimeSocketDeviationMeters": {
+        "control": 0.0
+      },
+      "interactionHardwareExcludedFromBodyBounds": true,
+      "physicsAndGameplayAcceptance": "source physics checked; UI acceptance pending",
+      "fixedColliderParts": 3,
+      "baseFloorLocalY": -0.8,
+      "bodyOrigin": "existing runtime socket; head extent .4m",
+      "physicsResultBasis": "isolated runtime regression record; this asset validator only checks bytes/geometry"
+    },
+    {
+      "assetId": "lift-transmission",
+      "triangles": 1372,
+      "bytes": 71688,
+      "visualBoundsXYZ": [
+        0.667,
+        1.43,
+        0.468
+      ],
+      "visualCentreXYZ": [
+        0.2465,
+        -0.535,
+        -0.026
+      ],
+      "runtimeSocketDeviationMeters": {
+        "drive": 0.0,
+        "control": 5.960464455334602e-09
+      },
+      "interactionHardwareExcludedFromBodyBounds": true,
+      "physicsAndGameplayAcceptance": "source physics checked; UI acceptance pending",
+      "fixedColliderParts": 4,
+      "baseFloorLocalY": -1.25,
+      "bodyOrigin": "existing runtime socket; head extent .4m",
+      "physicsResultBasis": "isolated runtime regression record; this asset validator only checks bytes/geometry"
     }
   ],
   "audio": [

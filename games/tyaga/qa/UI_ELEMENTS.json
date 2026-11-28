@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "generator": {
     "script": "scripts/tyaga-ui-inventory.mjs",
-    "sha256": "5a7374f2063b4ae00551fdc49bf5083c8765093e917972daf8048a8d2bb93ffe",
+    "sha256": "6970b51fef89ea3e2b74062527ac5a6c7be6ce26794aafc4c9198f3f5a8e65c8",
     "command": "node scripts/tyaga-ui-inventory.mjs",
     "checkCommand": "node scripts/tyaga-ui-inventory.mjs --check"
   },
@@ -63,15 +63,15 @@
     },
     {
       "file": "games/tyaga/src/client/Game.tsx",
-      "bytes": 45678,
-      "sha256": "a1262af493d737b9e97ab7eacfb2e1562827b02121304377d60ffd8a9bb61f31",
-      "gitBlobSha1": "6b6db548c59d9e4304ba325f1415b900c51844b0"
+      "bytes": 45751,
+      "sha256": "152037849a0a0463e3230027a8d64b397a8eebcd3683fb5cc73f2c3f0f1f0ba8",
+      "gitBlobSha1": "25dc7a3e318294b2d642108c6cf40606789b7700"
     },
     {
       "file": "games/tyaga/src/client/Lobby.tsx",
-      "bytes": 12059,
-      "sha256": "eda5df8ba085f98eab1376fd33a75676a65124b047e2270e985627aae0c23dd3",
-      "gitBlobSha1": "9614407513db0c883130a41c03c8e488b04cb404"
+      "bytes": 12749,
+      "sha256": "fa414393ba7188bf2a5eaf94195cc85312056afb6cdafbcf07d075e3a4998ab4",
+      "gitBlobSha1": "15d5b2aa15d392586b6e1f18faf46f4a0ab84771"
     },
     {
       "file": "games/tyaga/src/client/action-ui.tsx",
@@ -142,14 +142,14 @@
     {
       "file": "games/tyaga/src/client/styles.css",
       "bytes": 55159,
-      "sha256": "42c4d185a33501f47561d79516a19d2f46d40d1e978eb96b74516abf5ac80144",
-      "gitBlobSha1": "01f9f9713090484518d54618433e6506496802bb"
+      "sha256": "dceebb88eccaed8c2ee7911e21e01816df68bebd3f8ac4746abb73959926fd97",
+      "gitBlobSha1": "642f0bcf7786e298863f3c417ea697227ce64c1f"
     },
     {
       "file": "games/tyaga/src/client/terrain-materials.ts",
-      "bytes": 12266,
-      "sha256": "d163001e69ba72c44150b6fcd5db44241a48eeaf6cb5853c5c9818f3faccdb92",
-      "gitBlobSha1": "88cbf524cd6cdaaa62af64561ad45535e8c4707a"
+      "bytes": 12353,
+      "sha256": "037650304f6c93c124a66fbab7c6f4df3d8691c4ea9a547eb06e3883fe0552ee",
+      "gitBlobSha1": "ed269f15cf8fdcefedf0cc57e91e16579b305c12"
     },
     {
       "file": "games/tyaga/src/client/ui.tsx",
@@ -183,9 +183,15 @@
     },
     {
       "file": "games/tyaga/src/server-world/actions.ts",
-      "bytes": 53281,
-      "sha256": "39a2363d80d22711eec158074c93d710bc34413021698b369b237108ba588720",
-      "gitBlobSha1": "e8bb686aad4e6a7d68931977b977917cdc834376"
+      "bytes": 54599,
+      "sha256": "10dbb10833dec6119f86ffd13485d7891890ab3a648f2a4f1490fb18bc0b05d9",
+      "gitBlobSha1": "9bc745446c0f04d852e3d833cf6c3c9843585f52"
+    },
+    {
+      "file": "games/tyaga/src/server-world/world.ts",
+      "bytes": 84246,
+      "sha256": "bf1a879e0391d9523be3d77baaa2d88691b798c0fa32dc5034e6a3ffa998194e",
+      "gitBlobSha1": "f881359977e408b5ba94486c92b0805ae615be95"
     },
     {
       "file": "games/tyaga/src/tutorial/index.ts",
@@ -524,6 +530,67 @@
         "en": "Barrier"
       }
     },
+    "runtimeEntityNameSuppliers": [
+      {
+        "expression": "e.customModel==='lift-control'?{ru:'Нижний пульт подъёмника',en:'Lower lift controls'}:e.customModel==='lift-transmission'?{ru:'Приводная стойка подъёмника',en:'Lift drive mounting stand'}:BODY[e.kind].name",
+        "alternatives": [
+          {
+            "ru": "Нижний пульт подъёмника",
+            "en": "Lower lift controls",
+            "conditions": [
+              {
+                "expression": "e.customModel==='lift-control'",
+                "branch": "true"
+              }
+            ],
+            "repeats": [],
+            "componentAncestors": [],
+            "source": {
+              "file": "games/tyaga/src/server-world/world.ts",
+              "utf16Start": 78459,
+              "utf16End": 78514,
+              "line": 814,
+              "column": 47,
+              "nodeSha256": "b617a3237f51b747078cb29e814c9b4b069049c08916ac765cb6cda8ce85a8b8"
+            }
+          },
+          {
+            "ru": "Приводная стойка подъёмника",
+            "en": "Lift drive mounting stand",
+            "conditions": [
+              {
+                "expression": "e.customModel==='lift-control'",
+                "branch": "false"
+              },
+              {
+                "expression": "e.customModel==='lift-transmission'",
+                "branch": "true"
+              }
+            ],
+            "repeats": [],
+            "componentAncestors": [],
+            "source": {
+              "file": "games/tyaga/src/server-world/world.ts",
+              "utf16Start": 78551,
+              "utf16End": 78616,
+              "line": 814,
+              "column": 139,
+              "nodeSha256": "9f36c5a0047f17e9c670eb6c977300ccbee377e721036d9050edc68658cc5590"
+            }
+          }
+        ],
+        "fallbackDictionary": "bodyNames",
+        "source": {
+          "file": "games/tyaga/src/server-world/world.ts",
+          "utf16Start": 78423,
+          "utf16End": 78634,
+          "line": 814,
+          "column": 11,
+          "nodeSha256": "ce0c6912e2cceb84a9f248121be5dec0082b913aeb31a7d8a061150d75ce4387"
+        },
+        "acceptance": "NOT_TESTED_BY_SOURCE_INVENTORY"
+      }
+    ],
     "labelBindings": {
       "socketName": [
         {
@@ -723,9 +790,9 @@
         "componentAncestors": [],
         "source": {
           "file": "games/tyaga/src/server-world/actions.ts",
-          "utf16Start": 44085,
-          "utf16End": 44157,
-          "line": 355,
+          "utf16Start": 45403,
+          "utf16End": 45475,
+          "line": 374,
           "column": 32,
           "nodeSha256": "1f0b836ce8af4998e9062257c752b906b4a22e3ce44097d0e1e9daab1917629a"
         }
@@ -758,9 +825,9 @@
         "componentAncestors": [],
         "source": {
           "file": "games/tyaga/src/server-world/actions.ts",
-          "utf16Start": 44172,
-          "utf16End": 44268,
-          "line": 355,
+          "utf16Start": 45490,
+          "utf16End": 45586,
+          "line": 374,
           "column": 119,
           "nodeSha256": "67d89e74912781b46e9d115e5f66d4b3c2e9e5313721a4200f660c2877d5c563"
         }
@@ -793,9 +860,9 @@
         "componentAncestors": [],
         "source": {
           "file": "games/tyaga/src/server-world/actions.ts",
-          "utf16Start": 44269,
-          "utf16End": 44369,
-          "line": 355,
+          "utf16Start": 45587,
+          "utf16End": 45687,
+          "line": 374,
           "column": 216,
           "nodeSha256": "eb3ca11b4d621ef236bcac56a6baab1417ccfa3419fc08564ad1cb2eb9eef715"
         }
@@ -837,9 +904,9 @@
         "componentAncestors": [],
         "source": {
           "file": "games/tyaga/src/server-world/actions.ts",
-          "utf16Start": 44632,
-          "utf16End": 44799,
-          "line": 358,
+          "utf16Start": 45950,
+          "utf16End": 46117,
+          "line": 377,
           "column": 98,
           "nodeSha256": "e1fe10ac7d738b1254339d6f1e238676b1970d851f8591ee9c2ed66db2763927"
         }
@@ -881,9 +948,9 @@
         "componentAncestors": [],
         "source": {
           "file": "games/tyaga/src/server-world/actions.ts",
-          "utf16Start": 44807,
-          "utf16End": 44909,
-          "line": 359,
+          "utf16Start": 46125,
+          "utf16End": 46227,
+          "line": 378,
           "column": 7,
           "nodeSha256": "5bc488b4f0313358d7b679d324f38f1a557600ed80325ee128aa5614deb631a5"
         }
@@ -954,9 +1021,9 @@
         "componentAncestors": [],
         "source": {
           "file": "games/tyaga/src/server-world/actions.ts",
-          "utf16Start": 45122,
-          "utf16End": 45242,
-          "line": 361,
+          "utf16Start": 46440,
+          "utf16End": 46560,
+          "line": 380,
           "column": 180,
           "nodeSha256": "d6665c6599976be8ecedf38618aa5d199807e05e5470faa86742678018acffb7"
         }
@@ -1006,9 +1073,9 @@
         "componentAncestors": [],
         "source": {
           "file": "games/tyaga/src/server-world/actions.ts",
-          "utf16Start": 45288,
-          "utf16End": 45526,
-          "line": 363,
+          "utf16Start": 46606,
+          "utf16End": 46844,
+          "line": 382,
           "column": 7,
           "nodeSha256": "14debf1c1aea4ceebe44b5ec6ebc20e43d7580324e40fbfe9627f2d904bf4fcd"
         }
@@ -1062,9 +1129,9 @@
         "componentAncestors": [],
         "source": {
           "file": "games/tyaga/src/server-world/actions.ts",
-          "utf16Start": 45572,
-          "utf16End": 45843,
-          "line": 364,
+          "utf16Start": 46890,
+          "utf16End": 47161,
+          "line": 383,
           "column": 45,
           "nodeSha256": "fc1ef45a844e6023aea7dd968336d376a3941a636adaba3a2274e7d5658390a5"
         }
@@ -1118,9 +1185,9 @@
         "componentAncestors": [],
         "source": {
           "file": "games/tyaga/src/server-world/actions.ts",
-          "utf16Start": 45933,
-          "utf16End": 46249,
-          "line": 365,
+          "utf16Start": 47251,
+          "utf16End": 47567,
+          "line": 384,
           "column": 89,
           "nodeSha256": "ac9ab20ae44a82eb591425a6fabd52703eca9f6ee3ca76f525df663b2c59fdc6"
         }
@@ -1182,9 +1249,9 @@
         "componentAncestors": [],
         "source": {
           "file": "games/tyaga/src/server-world/actions.ts",
-          "utf16Start": 46282,
-          "utf16End": 46546,
-          "line": 366,
+          "utf16Start": 47600,
+          "utf16End": 47864,
+          "line": 385,
           "column": 32,
           "nodeSha256": "c9a0022aafb367cf9326a323ac458b124b79b04c54becc1df8a7898ec79590ef"
         }
@@ -1234,9 +1301,9 @@
         "componentAncestors": [],
         "source": {
           "file": "games/tyaga/src/server-world/actions.ts",
-          "utf16Start": 46715,
-          "utf16End": 46897,
-          "line": 368,
+          "utf16Start": 48033,
+          "utf16End": 48215,
+          "line": 387,
           "column": 92,
           "nodeSha256": "8ce57dc53aa5d9d87082f0a543e5d62575688b6c977dc88e368012abc2320848"
         }
@@ -1282,9 +1349,9 @@
         "componentAncestors": [],
         "source": {
           "file": "games/tyaga/src/server-world/actions.ts",
-          "utf16Start": 46934,
-          "utf16End": 47022,
-          "line": 369,
+          "utf16Start": 48252,
+          "utf16End": 48340,
+          "line": 388,
           "column": 36,
           "nodeSha256": "0014af8c6ed4d4babfac579b414f1d04ee3cb26e8e6933455ad50130f67235ba"
         }
@@ -1330,9 +1397,9 @@
         "componentAncestors": [],
         "source": {
           "file": "games/tyaga/src/server-world/actions.ts",
-          "utf16Start": 47051,
-          "utf16End": 47142,
-          "line": 370,
+          "utf16Start": 48369,
+          "utf16End": 48460,
+          "line": 389,
           "column": 28,
           "nodeSha256": "3a9cffeacfa477a048d48773301b5db738d6275b3d4990f6c05934a1e63f9c00"
         }
@@ -1378,9 +1445,9 @@
         "componentAncestors": [],
         "source": {
           "file": "games/tyaga/src/server-world/actions.ts",
-          "utf16Start": 47200,
-          "utf16End": 47307,
-          "line": 371,
+          "utf16Start": 48518,
+          "utf16End": 48625,
+          "line": 390,
           "column": 57,
           "nodeSha256": "ee68cac17ac23e47fc98e539e23d7012fb82c35f4964f2dff55ad2a5fc03adf8"
         }
@@ -1426,9 +1493,9 @@
         "componentAncestors": [],
         "source": {
           "file": "games/tyaga/src/server-world/actions.ts",
-          "utf16Start": 47352,
-          "utf16End": 47442,
-          "line": 372,
+          "utf16Start": 48670,
+          "utf16End": 48760,
+          "line": 391,
           "column": 44,
           "nodeSha256": "dada5b690de54b8d065f86dabcc081d8ae3a0472545d187222c43c1f0a6c4143"
         }
@@ -1466,9 +1533,9 @@
         "componentAncestors": [],
         "source": {
           "file": "games/tyaga/src/server-world/actions.ts",
-          "utf16Start": 48304,
-          "utf16End": 48570,
-          "line": 383,
+          "utf16Start": 49622,
+          "utf16End": 49888,
+          "line": 402,
           "column": 5,
           "nodeSha256": "d238d0538632f6e5499d6cdd9aa1271b92779816897f0e367a90ed09b4d4e82a"
         }
@@ -1523,9 +1590,9 @@
         "componentAncestors": [],
         "source": {
           "file": "games/tyaga/src/server-world/actions.ts",
-          "utf16Start": 49211,
-          "utf16End": 49385,
-          "line": 389,
+          "utf16Start": 50529,
+          "utf16End": 50703,
+          "line": 408,
           "column": 9,
           "nodeSha256": "07a49de17bf18268331a91d8068a774e8b440efcaf45f647c3af7fd3b2f738ec"
         }
@@ -1584,9 +1651,9 @@
         "componentAncestors": [],
         "source": {
           "file": "games/tyaga/src/server-world/actions.ts",
-          "utf16Start": 49857,
-          "utf16End": 50096,
-          "line": 396,
+          "utf16Start": 51175,
+          "utf16End": 51414,
+          "line": 415,
           "column": 7,
           "nodeSha256": "f14ebf8eb1e222fe251a28683f260a0f4387ad0b756e0b4dfbdae27fdbf3c11e"
         }
@@ -1610,9 +1677,9 @@
         "componentAncestors": [],
         "source": {
           "file": "games/tyaga/src/server-world/actions.ts",
-          "utf16Start": 50110,
-          "utf16End": 50370,
-          "line": 399,
+          "utf16Start": 51428,
+          "utf16End": 51688,
+          "line": 418,
           "column": 3,
           "nodeSha256": "bc560143710c03b3c41faa51506e3a7a3379e12e31b9160bb3755ab27c7dc841"
         }
@@ -1641,9 +1708,9 @@
         "componentAncestors": [],
         "source": {
           "file": "games/tyaga/src/server-world/actions.ts",
-          "utf16Start": 50413,
-          "utf16End": 50591,
-          "line": 400,
+          "utf16Start": 51731,
+          "utf16End": 51909,
+          "line": 419,
           "column": 42,
           "nodeSha256": "3b34e24e03c502ee6d9bfbae23c37f952c40222cec04b33e056375a5398adfda"
         }
@@ -1682,9 +1749,9 @@
         "componentAncestors": [],
         "source": {
           "file": "games/tyaga/src/server-world/actions.ts",
-          "utf16Start": 50677,
-          "utf16End": 50978,
-          "line": 401,
+          "utf16Start": 51995,
+          "utf16End": 52296,
+          "line": 420,
           "column": 85,
           "nodeSha256": "0b2219eb61140ea6c4d23adb6cccc22298c5e83e6b9f0fa3ebab2ffcb75e586a"
         }
@@ -1713,9 +1780,9 @@
         "componentAncestors": [],
         "source": {
           "file": "games/tyaga/src/server-world/actions.ts",
-          "utf16Start": 51018,
-          "utf16End": 51186,
-          "line": 402,
+          "utf16Start": 52336,
+          "utf16End": 52504,
+          "line": 421,
           "column": 39,
           "nodeSha256": "ce797dd161c67bc639f3378d64c93d31fe75813c5b574a1b95bceb01be81505e"
         }
@@ -1744,9 +1811,9 @@
         "componentAncestors": [],
         "source": {
           "file": "games/tyaga/src/server-world/actions.ts",
-          "utf16Start": 51225,
-          "utf16End": 51405,
-          "line": 403,
+          "utf16Start": 52543,
+          "utf16End": 52723,
+          "line": 422,
           "column": 38,
           "nodeSha256": "c6543ebf07053d4404a02f34df9c7cad4ab40fc7842782a54f48d29ecae5141d"
         }
@@ -1785,9 +1852,9 @@
         "componentAncestors": [],
         "source": {
           "file": "games/tyaga/src/server-world/actions.ts",
-          "utf16Start": 51483,
-          "utf16End": 51598,
-          "line": 404,
+          "utf16Start": 52801,
+          "utf16End": 52916,
+          "line": 423,
           "column": 77,
           "nodeSha256": "22e8d8cbfe29fc6ef707a2daf0be25ce580df7daca55c1828b6d9412c954c13d"
         }
@@ -3014,21 +3081,27 @@
       "acceptance": "NOT_TESTED_BY_SOURCE_INVENTORY"
     },
     {
-      "id": "ui:Game:ce3258c2a59019",
+      "id": "ui:Game:ce9678e8876c17",
       "component": "Game",
       "tag": "button",
       "source": {
         "file": "games/tyaga/src/client/Game.tsx",
         "utf16Start": 16775,
-        "utf16End": 16992,
+        "utf16End": 17097,
         "line": 150,
         "column": 938,
-        "nodeSha256": "937c9b082f582c69fa7c93c3b7e99e4e62b7db176bee4850afe393c134ad2500"
+        "nodeSha256": "fa996b6f7cfeef80ecaa07f201bb44d1a409945c3a34e4fc162da512c8ec6d15"
       },
       "label": {
-        "source": "children",
-        "expression": "<Icon name=\"truck\" size={24}/> <span>{Math.round(view?.truck.integrity ?? 100)}<small>%</small></span>",
-        "ruEn": [],
+        "source": "aria-label",
+        "expression": "`${t('Состояние машины', 'Truck integrity')}: ${Math.round(view?.truck.integrity ?? 100)}%`",
+        "ruEn": [
+          {
+            "ru": "Состояние машины",
+            "en": "Truck integrity",
+            "expression": "t('Состояние машины', 'Truck integrity')"
+          }
+        ],
         "tooltip": {
           "expression": "t('Состояние машины', 'Truck integrity')",
           "ruEn": [
@@ -3042,7 +3115,8 @@
       },
       "attributes": {
         "className": "\"ty-cargo-gauge ty-truck-gauge\"",
-        "title": "t('Состояние машины', 'Truck integrity')"
+        "title": "t('Состояние машины', 'Truck integrity')",
+        "aria-label": "`${t('Состояние машины', 'Truck integrity')}: ${Math.round(view?.truck.integrity ?? 100)}%`"
       },
       "handlers": {
         "onClick": {
@@ -3063,10 +3137,10 @@
       "tag": "button",
       "source": {
         "file": "games/tyaga/src/client/Game.tsx",
-        "utf16Start": 17108,
-        "utf16End": 17208,
+        "utf16Start": 17213,
+        "utf16End": 17313,
         "line": 150,
-        "column": 1271,
+        "column": 1376,
         "nodeSha256": "ce5d6e763199b1de6c709549ff8bc1e8e77380323592e02fb29353ca478eca2e"
       },
       "label": {
@@ -3103,8 +3177,8 @@
       "tag": "button",
       "source": {
         "file": "games/tyaga/src/client/Game.tsx",
-        "utf16Start": 17284,
-        "utf16End": 17461,
+        "utf16Start": 17389,
+        "utf16End": 17566,
         "line": 151,
         "column": 39,
         "nodeSha256": "d2376ae46c230b62ca420ccf0585d2df5e391e6bd135dd1cb65416a25544cdd1"
@@ -3144,8 +3218,8 @@
       "tag": "button",
       "source": {
         "file": "games/tyaga/src/client/Game.tsx",
-        "utf16Start": 17488,
-        "utf16End": 17614,
+        "utf16Start": 17593,
+        "utf16End": 17719,
         "line": 151,
         "column": 243,
         "nodeSha256": "b88efb77ea9daa6153d605528f9eae7f58aa256584fae9e265b2d0c8cffbad86"
@@ -3184,8 +3258,8 @@
       "tag": "button",
       "source": {
         "file": "games/tyaga/src/client/Game.tsx",
-        "utf16Start": 17642,
-        "utf16End": 17760,
+        "utf16Start": 17747,
+        "utf16End": 17865,
         "line": 151,
         "column": 397,
         "nodeSha256": "c964d3c7f415d60ec64bec299b73b2eb0c7ba13fba9f70ff8efaa8a15b3a69bf"
@@ -3224,8 +3298,8 @@
       "tag": "button",
       "source": {
         "file": "games/tyaga/src/client/Game.tsx",
-        "utf16Start": 17787,
-        "utf16End": 17906,
+        "utf16Start": 17892,
+        "utf16End": 18011,
         "line": 151,
         "column": 542,
         "nodeSha256": "9c38886d34df974ca9fd401b3c7e13c3d163c5bf262599db01fe3ec7886fff05"
@@ -3264,8 +3338,8 @@
       "tag": "button",
       "source": {
         "file": "games/tyaga/src/client/Game.tsx",
-        "utf16Start": 17977,
-        "utf16End": 18099,
+        "utf16Start": 18082,
+        "utf16End": 18204,
         "line": 152,
         "column": 37,
         "nodeSha256": "06507c5710f02dbb01f2b8b220eed95f3f152ac7ac7d76788cbe390668e1214f"
@@ -3309,8 +3383,8 @@
       "tag": "button",
       "source": {
         "file": "games/tyaga/src/client/Game.tsx",
-        "utf16Start": 18718,
-        "utf16End": 18990,
+        "utf16Start": 18823,
+        "utf16End": 19095,
         "line": 155,
         "column": 225,
         "nodeSha256": "9a36d8d385f221946b5438ce823b1441a5c7055ccc143b4ba623e9ebaed29f57"
@@ -3361,8 +3435,8 @@
       "tag": "button",
       "source": {
         "file": "games/tyaga/src/client/Game.tsx",
-        "utf16Start": 19325,
-        "utf16End": 19416,
+        "utf16Start": 19430,
+        "utf16End": 19521,
         "line": 155,
         "column": 832,
         "nodeSha256": "5594de4143dc78a81b73441915de5ceeb8ed157af60758936a80bd080ba7f2c1"
@@ -3407,8 +3481,8 @@
       "tag": "button",
       "source": {
         "file": "games/tyaga/src/client/Game.tsx",
-        "utf16Start": 19459,
-        "utf16End": 19549,
+        "utf16Start": 19564,
+        "utf16End": 19654,
         "line": 155,
         "column": 966,
         "nodeSha256": "9e081dfca50ce33089721e68707c47a30980ced2173c25b078838a538eaba9e9"
@@ -3448,15 +3522,15 @@
       "acceptance": "NOT_TESTED_BY_SOURCE_INVENTORY"
     },
     {
-      "id": "ui:Game:c5f26bbb7d3562",
+      "id": "ui:Game:57c0739abc9f89",
       "component": "Game",
       "tag": "button",
       "source": {
         "file": "games/tyaga/src/client/Game.tsx",
-        "utf16Start": 19841,
-        "utf16End": 19935,
+        "utf16Start": 19997,
+        "utf16End": 20091,
         "line": 156,
-        "column": 241,
+        "column": 292,
         "nodeSha256": "afab3808b5268b4489a5d13adb6625a253ca19ba46c4b54176a44432cb2fcc90"
       },
       "label": {
@@ -3481,7 +3555,7 @@
       },
       "conditions": [
         {
-          "expression": "prefs.hints && showHelp && !view?.tutorial",
+          "expression": "prefs.hints && showHelp && !view?.tutorial && mode === 'walk' && !self?.holding && !placement",
           "branch": "truthy"
         }
       ],
@@ -3497,8 +3571,8 @@
       "tag": "button",
       "source": {
         "file": "games/tyaga/src/client/Game.tsx",
-        "utf16Start": 20075,
-        "utf16End": 20177,
+        "utf16Start": 20231,
+        "utf16End": 20333,
         "line": 157,
         "column": 94,
         "nodeSha256": "611d0e32f42c8e0c600197e774e652aa4167e6d1e75036b489407c513a2fe2b6"
@@ -3548,8 +3622,8 @@
       "tag": "button",
       "source": {
         "file": "games/tyaga/src/client/Game.tsx",
-        "utf16Start": 21123,
-        "utf16End": 21312,
+        "utf16Start": 21279,
+        "utf16End": 21468,
         "line": 159,
         "column": 639,
         "nodeSha256": "6aca16fa160b7b64facff5e93bd787146d7040c859a79402518a46253a82eea1"
@@ -3604,8 +3678,8 @@
       "tag": "button",
       "source": {
         "file": "games/tyaga/src/client/Game.tsx",
-        "utf16Start": 21376,
-        "utf16End": 21460,
+        "utf16Start": 21532,
+        "utf16End": 21616,
         "line": 159,
         "column": 892,
         "nodeSha256": "213a2c1e57174e5243f9e4715f1e6cef0eb8b3f18109d3b3c2c17caf2396aeb5"
@@ -3654,8 +3728,8 @@
       "tag": "button",
       "source": {
         "file": "games/tyaga/src/client/Game.tsx",
-        "utf16Start": 22627,
-        "utf16End": 22711,
+        "utf16Start": 22783,
+        "utf16End": 22867,
         "line": 160,
         "column": 353,
         "nodeSha256": "213a2c1e57174e5243f9e4715f1e6cef0eb8b3f18109d3b3c2c17caf2396aeb5"
@@ -3704,8 +3778,8 @@
       "tag": "button",
       "source": {
         "file": "games/tyaga/src/client/Game.tsx",
-        "utf16Start": 23707,
-        "utf16End": 23791,
+        "utf16Start": 23863,
+        "utf16End": 23947,
         "line": 161,
         "column": 237,
         "nodeSha256": "213a2c1e57174e5243f9e4715f1e6cef0eb8b3f18109d3b3c2c17caf2396aeb5"
@@ -3754,8 +3828,8 @@
       "tag": "button",
       "source": {
         "file": "games/tyaga/src/client/Game.tsx",
-        "utf16Start": 24196,
-        "utf16End": 24349,
+        "utf16Start": 24352,
+        "utf16End": 24505,
         "line": 162,
         "column": 339,
         "nodeSha256": "41be48f68c19aea608a3b0805ee293d8e1ae8995f46e0e5d96b872245a3aad58"
@@ -3803,8 +3877,8 @@
       "tag": "button",
       "source": {
         "file": "games/tyaga/src/client/Game.tsx",
-        "utf16Start": 24588,
-        "utf16End": 24666,
+        "utf16Start": 24744,
+        "utf16End": 24822,
         "line": 162,
         "column": 731,
         "nodeSha256": "8fa7d7674699e8dc180e47135148ef05e83df6c06704250503dd4487536c1e38"
@@ -3855,8 +3929,8 @@
       "tag": "button",
       "source": {
         "file": "games/tyaga/src/client/Game.tsx",
-        "utf16Start": 25395,
-        "utf16End": 25510,
+        "utf16Start": 25551,
+        "utf16End": 25666,
         "line": 163,
         "column": 622,
         "nodeSha256": "e147648a600ea7cce49a86180eebde9e3feeac61e898e07a71db515c28e270a4"
@@ -3915,8 +3989,8 @@
       "tag": "button",
       "source": {
         "file": "games/tyaga/src/client/Game.tsx",
-        "utf16Start": 25581,
-        "utf16End": 25721,
+        "utf16Start": 25737,
+        "utf16End": 25877,
         "line": 163,
         "column": 808,
         "nodeSha256": "d982a98aebb2cd2f303eb9efed0eea82eb93facea89d7e4a230e5453cc53da2e"
@@ -3968,8 +4042,8 @@
       "tag": "button",
       "source": {
         "file": "games/tyaga/src/client/Game.tsx",
-        "utf16Start": 25971,
-        "utf16End": 26027,
+        "utf16Start": 26127,
+        "utf16End": 26183,
         "line": 164,
         "column": 210,
         "nodeSha256": "75cc5908544c9525be752bc19228598662b28e11b9e380d02685f7027e42f110"
@@ -4023,8 +4097,8 @@
       "tag": "button",
       "source": {
         "file": "games/tyaga/src/client/Game.tsx",
-        "utf16Start": 26146,
-        "utf16End": 26399,
+        "utf16Start": 26302,
+        "utf16End": 26555,
         "line": 166,
         "column": 67,
         "nodeSha256": "eefb7539d85b22b37670679c202c051e4b5bcae823508c1d0c477cefbe98059a"
@@ -4076,8 +4150,8 @@
       "tag": "button",
       "source": {
         "file": "games/tyaga/src/client/Game.tsx",
-        "utf16Start": 26468,
-        "utf16End": 26599,
+        "utf16Start": 26624,
+        "utf16End": 26755,
         "line": 166,
         "column": 389,
         "nodeSha256": "0f84c0c8e19198527fa13ad01e205714c1bbf01e2b0eef9a85912ea033cc3cf5"
@@ -4123,8 +4197,8 @@
       "tag": "button",
       "source": {
         "file": "games/tyaga/src/client/Game.tsx",
-        "utf16Start": 26688,
-        "utf16End": 26790,
+        "utf16Start": 26844,
+        "utf16End": 26946,
         "line": 166,
         "column": 609,
         "nodeSha256": "611d0e32f42c8e0c600197e774e652aa4167e6d1e75036b489407c513a2fe2b6"
@@ -4174,8 +4248,8 @@
       "tag": "button",
       "source": {
         "file": "games/tyaga/src/client/Game.tsx",
-        "utf16Start": 28021,
-        "utf16End": 28196,
+        "utf16Start": 28177,
+        "utf16End": 28352,
         "line": 171,
         "column": 45,
         "nodeSha256": "9ffc8cc8f6edac9e27a1da55f56b63ddbcfcf491b798a4516580b75c4171390b"
@@ -4220,8 +4294,8 @@
       "tag": "button",
       "source": {
         "file": "games/tyaga/src/client/Game.tsx",
-        "utf16Start": 28238,
-        "utf16End": 28416,
+        "utf16Start": 28394,
+        "utf16End": 28572,
         "line": 171,
         "column": 262,
         "nodeSha256": "1c59f2ac5977eb3727f814f5681fbba28b8e260613a62a7ee1138c3ead69f950"
@@ -4266,8 +4340,8 @@
       "tag": "button",
       "source": {
         "file": "games/tyaga/src/client/Game.tsx",
-        "utf16Start": 28501,
-        "utf16End": 28679,
+        "utf16Start": 28657,
+        "utf16End": 28835,
         "line": 171,
         "column": 525,
         "nodeSha256": "711c6960663648aeec067444dd4ec16918682b41e7493eea46090ca92c236b26"
@@ -4312,8 +4386,8 @@
       "tag": "button",
       "source": {
         "file": "games/tyaga/src/client/Game.tsx",
-        "utf16Start": 28734,
-        "utf16End": 28822,
+        "utf16Start": 28890,
+        "utf16End": 28978,
         "line": 171,
         "column": 758,
         "nodeSha256": "9c6045d279b86f2e361147a75b705cfedb1d4a91fc56782b5afaf3705910a16f"
@@ -4357,8 +4431,8 @@
       "tag": "button",
       "source": {
         "file": "games/tyaga/src/client/Game.tsx",
-        "utf16Start": 29367,
-        "utf16End": 29442,
+        "utf16Start": 29523,
+        "utf16End": 29598,
         "line": 174,
         "column": 148,
         "nodeSha256": "53a976372279ff1afa4b50a36c058d87a25774d88301eb7822e218f2c41f3c72"
@@ -4401,8 +4475,8 @@
       "tag": "button",
       "source": {
         "file": "games/tyaga/src/client/Game.tsx",
-        "utf16Start": 29953,
-        "utf16End": 30010,
+        "utf16Start": 30109,
+        "utf16End": 30166,
         "line": 176,
         "column": 346,
         "nodeSha256": "2fa4222ab0892a6b772ef68181f7f5f262d2c382e80d6eb37a4ba2e3aa6eeff5"
@@ -4446,8 +4520,8 @@
       "tag": "button",
       "source": {
         "file": "games/tyaga/src/client/Game.tsx",
-        "utf16Start": 30302,
-        "utf16End": 30375,
+        "utf16Start": 30458,
+        "utf16End": 30531,
         "line": 177,
         "column": 247,
         "nodeSha256": "55000ab6c29650186b3a7a96907fe50de6caa5b52cab8bb8b9b4d4127d316fab"
@@ -4490,8 +4564,8 @@
       "tag": "button",
       "source": {
         "file": "games/tyaga/src/client/Game.tsx",
-        "utf16Start": 31792,
-        "utf16End": 31864,
+        "utf16Start": 31948,
+        "utf16End": 32020,
         "line": 180,
         "column": 403,
         "nodeSha256": "bb08dfdf29dfde9cb3cd252163cc2ba2b9fdecddeb98175e221fe47e941bd5af"
@@ -4535,8 +4609,8 @@
       "tag": "button",
       "source": {
         "file": "games/tyaga/src/client/Game.tsx",
-        "utf16Start": 32865,
-        "utf16End": 32979,
+        "utf16Start": 33021,
+        "utf16End": 33135,
         "line": 182,
         "column": 638,
         "nodeSha256": "8a4fc877274efcf2d918e00da4f3fadbf692abbbdd454d490ec6994c27832c50"
@@ -4583,8 +4657,8 @@
       "tag": "button",
       "source": {
         "file": "games/tyaga/src/client/Game.tsx",
-        "utf16Start": 33027,
-        "utf16End": 33184,
+        "utf16Start": 33183,
+        "utf16End": 33340,
         "line": 182,
         "column": 800,
         "nodeSha256": "1f1a7b3918f029bf3e06fdce236e01ac3b286433c07bbb44babe4898031a865d"
@@ -4636,8 +4710,8 @@
       "tag": "button",
       "source": {
         "file": "games/tyaga/src/client/Game.tsx",
-        "utf16Start": 33677,
-        "utf16End": 33768,
+        "utf16Start": 33833,
+        "utf16End": 33924,
         "line": 184,
         "column": 349,
         "nodeSha256": "59c5ec6689afa4a552fa7a6aaab95f7d8ae776e4cd795ab698a83888c035393c"
@@ -4683,8 +4757,8 @@
       "tag": "button",
       "source": {
         "file": "games/tyaga/src/client/Game.tsx",
-        "utf16Start": 33848,
-        "utf16End": 33943,
+        "utf16Start": 34004,
+        "utf16End": 34099,
         "line": 184,
         "column": 520,
         "nodeSha256": "59c7012961590014e1cb81a4aa4d1d832f310aea63986162cceebda52eb0233d"
@@ -4730,8 +4804,8 @@
       "tag": "button",
       "source": {
         "file": "games/tyaga/src/client/Game.tsx",
-        "utf16Start": 35525,
-        "utf16End": 35582,
+        "utf16Start": 35681,
+        "utf16End": 35738,
         "line": 185,
         "column": 1524,
         "nodeSha256": "2fa4222ab0892a6b772ef68181f7f5f262d2c382e80d6eb37a4ba2e3aa6eeff5"
@@ -4775,8 +4849,8 @@
       "tag": "button",
       "source": {
         "file": "games/tyaga/src/client/Game.tsx",
-        "utf16Start": 35619,
-        "utf16End": 35676,
+        "utf16Start": 35775,
+        "utf16End": 35832,
         "line": 185,
         "column": 1618,
         "nodeSha256": "cae4ce12f799d5bb3218b479b931e180fd0a0a538d82d3926be96c354e2c3e20"
@@ -4820,10 +4894,10 @@
       "tag": "button",
       "source": {
         "file": "games/tyaga/src/client/Game.tsx",
-        "utf16Start": 36098,
-        "utf16End": 36158,
+        "utf16Start": 36190,
+        "utf16End": 36250,
         "line": 186,
-        "column": 331,
+        "column": 267,
         "nodeSha256": "973fc0ff554a52582ac8c19b7d0227d80b60d10b8f77d48564e2b102af7a7fce"
       },
       "label": {
@@ -4861,25 +4935,25 @@
       "acceptance": "NOT_TESTED_BY_SOURCE_INVENTORY"
     },
     {
-      "id": "ui:Game:a41e541d48fb2f",
+      "id": "ui:Game:a682a7ea12e1d6",
       "component": "Game",
       "tag": "button",
       "source": {
         "file": "games/tyaga/src/client/Game.tsx",
-        "utf16Start": 36231,
-        "utf16End": 36329,
+        "utf16Start": 36323,
+        "utf16End": 36384,
         "line": 186,
-        "column": 464,
-        "nodeSha256": "43d42f18a06db8a562b0eab5e67c2d7565429d366e2fff6590c2eb4113a31e51"
+        "column": 400,
+        "nodeSha256": "7e24db91896f29ae1c6502a8f1e68f541e4b29fefd7b89f5b3af80d2103e1a90"
       },
       "label": {
         "source": "children",
-        "expression": "{t('Повторить', 'Try again')}",
+        "expression": "{t('Повторить обучение', 'Repeat training')}",
         "ruEn": [
           {
-            "ru": "Повторить",
-            "en": "Try again",
-            "expression": "t('Повторить', 'Try again')"
+            "ru": "Повторить обучение",
+            "en": "Repeat training",
+            "expression": "t('Повторить обучение', 'Repeat training')"
           }
         ]
       },
@@ -4888,10 +4962,9 @@
       },
       "handlers": {
         "onClick": {
-          "expression": "() => void action({ type: 'tutorial-retry' })",
-          "directActionTypes": [
-            "tutorial-retry"
-          ]
+          "expression": "onRepeat",
+          "directActionTypes": [],
+          "binding": "component prop or lexical binding; inspect componentInstances/source reference"
         }
       },
       "conditions": [
@@ -4913,8 +4986,8 @@
       "tag": "button",
       "source": {
         "file": "games/tyaga/src/client/Game.tsx",
-        "utf16Start": 36646,
-        "utf16End": 36721,
+        "utf16Start": 36716,
+        "utf16End": 36791,
         "line": 187,
         "column": 269,
         "nodeSha256": "b262d359e395c41c6bbb03a1472bb44af7272ef06135b06c2ad9ffd02a2c3fb8"
@@ -4958,8 +5031,8 @@
       "tag": "button",
       "source": {
         "file": "games/tyaga/src/client/Game.tsx",
-        "utf16Start": 36779,
-        "utf16End": 36979,
+        "utf16Start": 36849,
+        "utf16End": 37049,
         "line": 187,
         "column": 402,
         "nodeSha256": "ed071b02e56728575afc22c75e2875589efe0c62eda3b6bc29f37264ccc66282"
@@ -5011,8 +5084,8 @@
       "tag": "button",
       "source": {
         "file": "games/tyaga/src/client/Game.tsx",
-        "utf16Start": 37137,
-        "utf16End": 37299,
+        "utf16Start": 37207,
+        "utf16End": 37369,
         "line": 187,
         "column": 760,
         "nodeSha256": "af4685602fcb9f4b8c69c45f9486833c6d3ad8aa70844767e2fc2a15f7ee6387"
@@ -5059,8 +5132,8 @@
       "tag": "button",
       "source": {
         "file": "games/tyaga/src/client/Game.tsx",
-        "utf16Start": 37379,
-        "utf16End": 37462,
+        "utf16Start": 37449,
+        "utf16End": 37532,
         "line": 187,
         "column": 1002,
         "nodeSha256": "e7227ef26a20bfa5384dadfdb49ca73482176487b2d58c7bfa6f6c119c7734ab"
@@ -5104,8 +5177,8 @@
       "tag": "button",
       "source": {
         "file": "games/tyaga/src/client/Game.tsx",
-        "utf16Start": 37522,
-        "utf16End": 37607,
+        "utf16Start": 37592,
+        "utf16End": 37677,
         "line": 187,
         "column": 1145,
         "nodeSha256": "9aa6090fbf00aa16af54e8ac5e5bffc68ba28d786513c20a3f30b1f81f7f370d"
@@ -5149,8 +5222,8 @@
       "tag": "button",
       "source": {
         "file": "games/tyaga/src/client/Game.tsx",
-        "utf16Start": 37682,
-        "utf16End": 37762,
+        "utf16Start": 37752,
+        "utf16End": 37832,
         "line": 187,
         "column": 1305,
         "nodeSha256": "013590e5cdc79fb52cd4e458f0c93e3a1ec5ed752d4e8a6162d3ff525b6f78a7"
@@ -5194,8 +5267,8 @@
       "tag": "button",
       "source": {
         "file": "games/tyaga/src/client/Game.tsx",
-        "utf16Start": 37839,
-        "utf16End": 37921,
+        "utf16Start": 37909,
+        "utf16End": 37991,
         "line": 187,
         "column": 1462,
         "nodeSha256": "fcdbcb0f3c07d4fefe7aeabdebfa255f3dbe3d26181f6427e4b686f5c5880949"
@@ -5239,8 +5312,8 @@
       "tag": "button",
       "source": {
         "file": "games/tyaga/src/client/Game.tsx",
-        "utf16Start": 37976,
-        "utf16End": 38088,
+        "utf16Start": 38046,
+        "utf16End": 38158,
         "line": 187,
         "column": 1599,
         "nodeSha256": "03ee46df0651b91b33c95d3780bbdf32fe15497dd2c266cf18fe670fafd58287"
@@ -5286,8 +5359,8 @@
       "tag": "button",
       "source": {
         "file": "games/tyaga/src/client/Game.tsx",
-        "utf16Start": 38145,
-        "utf16End": 38243,
+        "utf16Start": 38215,
+        "utf16End": 38313,
         "line": 187,
         "column": 1768,
         "nodeSha256": "250f3b072c71b6f03a0a220a6815183123012b15e2b64a1c4bba8b855b180379"
@@ -5331,8 +5404,8 @@
       "tag": "button",
       "source": {
         "file": "games/tyaga/src/client/Game.tsx",
-        "utf16Start": 38295,
-        "utf16End": 38393,
+        "utf16Start": 38365,
+        "utf16End": 38463,
         "line": 187,
         "column": 1918,
         "nodeSha256": "0094e16eca06969f42b3336ffe97e52f3dfb6779d9c6e0a740750b09272eb099"
@@ -5376,8 +5449,8 @@
       "tag": "button",
       "source": {
         "file": "games/tyaga/src/client/Game.tsx",
-        "utf16Start": 38441,
-        "utf16End": 38500,
+        "utf16Start": 38511,
+        "utf16End": 38570,
         "line": 187,
         "column": 2064,
         "nodeSha256": "3d41e6eecfc4c9b1266dfd705668ceb8d1645b821792a7dec8e0483bb13ff5de"
@@ -5422,8 +5495,8 @@
       "tag": "select",
       "source": {
         "file": "games/tyaga/src/client/Game.tsx",
-        "utf16Start": 39076,
-        "utf16End": 39283,
+        "utf16Start": 39146,
+        "utf16End": 39353,
         "line": 189,
         "column": 391,
         "nodeSha256": "c1db574cb8e28112932a38017463bde230e978ed9b503325a1dcd717f6035d87"
@@ -5491,8 +5564,8 @@
           ],
           "source": {
             "file": "games/tyaga/src/client/Game.tsx",
-            "utf16Start": 39283,
-            "utf16End": 39301,
+            "utf16Start": 39353,
+            "utf16End": 39371,
             "line": 189,
             "column": 598,
             "nodeSha256": "0cd0a5de19a4cd322d20ece9fae2a4422e7d571c7b539dff8ca25ca120abceb9"
@@ -5524,8 +5597,8 @@
           ],
           "source": {
             "file": "games/tyaga/src/client/Game.tsx",
-            "utf16Start": 39358,
-            "utf16End": 39376,
+            "utf16Start": 39428,
+            "utf16End": 39446,
             "line": 189,
             "column": 673,
             "nodeSha256": "d01643a0acd3984d90ebb8e62e1c9c453932a65f5ffb856ea0f230e7bd173e32"
@@ -5539,8 +5612,8 @@
       "tag": "select",
       "source": {
         "file": "games/tyaga/src/client/Game.tsx",
-        "utf16Start": 39529,
-        "utf16End": 39740,
+        "utf16Start": 39599,
+        "utf16End": 39810,
         "line": 189,
         "column": 844,
         "nodeSha256": "0905400e1a310e0d744679a7520e22888172eff41ce23d54575efb3aa2cf33c8"
@@ -5608,8 +5681,8 @@
           ],
           "source": {
             "file": "games/tyaga/src/client/Game.tsx",
-            "utf16Start": 39740,
-            "utf16End": 39758,
+            "utf16Start": 39810,
+            "utf16End": 39828,
             "line": 189,
             "column": 1055,
             "nodeSha256": "0cd0a5de19a4cd322d20ece9fae2a4422e7d571c7b539dff8ca25ca120abceb9"
@@ -5641,8 +5714,8 @@
           ],
           "source": {
             "file": "games/tyaga/src/client/Game.tsx",
-            "utf16Start": 39806,
-            "utf16End": 39824,
+            "utf16Start": 39876,
+            "utf16End": 39894,
             "line": 189,
             "column": 1121,
             "nodeSha256": "d01643a0acd3984d90ebb8e62e1c9c453932a65f5ffb856ea0f230e7bd173e32"
@@ -5656,8 +5729,8 @@
       "tag": "button",
       "source": {
         "file": "games/tyaga/src/client/Game.tsx",
-        "utf16Start": 39895,
-        "utf16End": 40014,
+        "utf16Start": 39965,
+        "utf16End": 40084,
         "line": 189,
         "column": 1210,
         "nodeSha256": "9ede220845236b207f3c8de8948d7fd0e84b7645f3f597df26bb78736f79748c"
@@ -5701,8 +5774,8 @@
       "tag": "button",
       "source": {
         "file": "games/tyaga/src/client/Game.tsx",
-        "utf16Start": 40644,
-        "utf16End": 40728,
+        "utf16Start": 40714,
+        "utf16End": 40798,
         "line": 191,
         "column": 445,
         "nodeSha256": "0ef96ee3ba841e233c37694f857a7abbcf3ee0e372d52d95b92517facb705deb"
@@ -5747,8 +5820,8 @@
       "tag": "button",
       "source": {
         "file": "games/tyaga/src/client/Game.tsx",
-        "utf16Start": 40889,
-        "utf16End": 40964,
+        "utf16Start": 40959,
+        "utf16End": 41034,
         "line": 191,
         "column": 690,
         "nodeSha256": "b262d359e395c41c6bbb03a1472bb44af7272ef06135b06c2ad9ffd02a2c3fb8"
@@ -5792,8 +5865,8 @@
       "tag": "button",
       "source": {
         "file": "games/tyaga/src/client/Game.tsx",
-        "utf16Start": 42064,
-        "utf16End": 42139,
+        "utf16Start": 42134,
+        "utf16End": 42209,
         "line": 194,
         "column": 268,
         "nodeSha256": "f75e73fc2b746c939a001b8bfd67cac4eb81db57812775878c24296a36007986"
@@ -5837,9 +5910,9 @@
       "tag": "button",
       "source": {
         "file": "games/tyaga/src/client/Lobby.tsx",
-        "utf16Start": 2651,
-        "utf16End": 2696,
-        "line": 33,
+        "utf16Start": 3064,
+        "utf16End": 3109,
+        "line": 34,
         "column": 40,
         "nodeSha256": "cabdccae50e242eedd4499b102644720070e8f2daefe7e9e23d9c2a9ce14dd59"
       },
@@ -5875,9 +5948,9 @@
       "tag": "select",
       "source": {
         "file": "games/tyaga/src/client/Lobby.tsx",
-        "utf16Start": 3236,
-        "utf16End": 3563,
-        "line": 36,
+        "utf16Start": 3649,
+        "utf16End": 3976,
+        "line": 37,
         "column": 92,
         "nodeSha256": "57372e4c6ace3fbf49f5cf17e0c00d7df74343a5489b27fd8bc22c981620332c"
       },
@@ -5938,9 +6011,9 @@
           "componentAncestors": [],
           "source": {
             "file": "games/tyaga/src/client/Lobby.tsx",
-            "utf16Start": 3610,
-            "utf16End": 3638,
-            "line": 36,
+            "utf16Start": 4023,
+            "utf16End": 4051,
+            "line": 37,
             "column": 466,
             "nodeSha256": "6d9c937fd2dd9c9bc662bcc329102262e593dddfc012029d6a3d3262d9873383"
           }
@@ -5953,11 +6026,11 @@
       "tag": "select",
       "source": {
         "file": "games/tyaga/src/client/Lobby.tsx",
-        "utf16Start": 3788,
-        "utf16End": 4054,
-        "line": 37,
+        "utf16Start": 4201,
+        "utf16End": 4534,
+        "line": 38,
         "column": 94,
-        "nodeSha256": "9a9ae98647359090209b7f9f49e91728c9197290a9b9dc613c70bb64c15860eb"
+        "nodeSha256": "9d0d2776c4d18c911d8574a84400c71fb68505f5497b61c9a1170b753014a74b"
       },
       "label": {
         "source": "associated-label",
@@ -5973,6 +6046,7 @@
       "attributes": {
         "id": "\"ty-lobby-mode\"",
         "disabled": "!host || !lobby || busy || map === 'tutorial'",
+        "aria-describedby": "modeReason ? 'ty-lobby-mode-reason' : undefined",
         "value": "String(room.settings.mode ?? 'expedition')"
       },
       "handlers": {
@@ -6004,10 +6078,10 @@
           "componentAncestors": [],
           "source": {
             "file": "games/tyaga/src/client/Lobby.tsx",
-            "utf16Start": 4054,
-            "utf16End": 4081,
-            "line": 37,
-            "column": 360,
+            "utf16Start": 4534,
+            "utf16End": 4561,
+            "line": 38,
+            "column": 427,
             "nodeSha256": "4f3cee84d7f861cfc78e9048c21091302ddcb43190823d7b6a6b4632cc2aca16"
           }
         },
@@ -6029,10 +6103,10 @@
           "componentAncestors": [],
           "source": {
             "file": "games/tyaga/src/client/Lobby.tsx",
-            "utf16Start": 4121,
-            "utf16End": 4146,
-            "line": 37,
-            "column": 427,
+            "utf16Start": 4601,
+            "utf16End": 4626,
+            "line": 38,
+            "column": 494,
             "nodeSha256": "4cf9bb9e5d80205e50199100c295fd682fc52248324dd0375a7e0875c9781c02"
           }
         },
@@ -6059,10 +6133,10 @@
           "componentAncestors": [],
           "source": {
             "file": "games/tyaga/src/client/Lobby.tsx",
-            "utf16Start": 4235,
-            "utf16End": 4260,
-            "line": 37,
-            "column": 541,
+            "utf16Start": 4715,
+            "utf16End": 4740,
+            "line": 38,
+            "column": 608,
             "nodeSha256": "ed05bc0367c83b951c8cd76b33f33f9ecdffdee892990c64f3537a8cf5d43f9e"
           }
         }
@@ -6074,9 +6148,9 @@
       "tag": "button",
       "source": {
         "file": "games/tyaga/src/client/Lobby.tsx",
-        "utf16Start": 5834,
-        "utf16End": 6033,
-        "line": 44,
+        "utf16Start": 6395,
+        "utf16End": 6594,
+        "line": 45,
         "column": 717,
         "nodeSha256": "6006b340a4dc4fb0b03af01502518f66418a628e9359e0a2a35f2e347ee76af9"
       },
@@ -6132,9 +6206,9 @@
       "tag": "button",
       "source": {
         "file": "games/tyaga/src/client/Lobby.tsx",
-        "utf16Start": 6308,
-        "utf16End": 6520,
-        "line": 47,
+        "utf16Start": 6869,
+        "utf16End": 7081,
+        "line": 48,
         "column": 58,
         "nodeSha256": "f84edda3bbcc74114c4da5a798689f71aab207925193fe2c27b1ac37fa37fc95"
       },
@@ -6175,9 +6249,9 @@
       "tag": "button",
       "source": {
         "file": "games/tyaga/src/client/Lobby.tsx",
-        "utf16Start": 6573,
-        "utf16End": 6783,
-        "line": 47,
+        "utf16Start": 7134,
+        "utf16End": 7344,
+        "line": 48,
         "column": 323,
         "nodeSha256": "438d24e4efedbc418a4aaf867c9ccb6bcc76f373f7b560d262d805df89c13008"
       },
@@ -6218,9 +6292,9 @@
       "tag": "button",
       "source": {
         "file": "games/tyaga/src/client/Lobby.tsx",
-        "utf16Start": 6848,
-        "utf16End": 7231,
-        "line": 48,
+        "utf16Start": 7409,
+        "utf16End": 7792,
+        "line": 49,
         "column": 11,
         "nodeSha256": "2d922b07e0fc6b9a19300fad7e9934306b136443a77247fcfbb1609f70122a92"
       },
@@ -6261,9 +6335,9 @@
       "tag": "select",
       "source": {
         "file": "games/tyaga/src/client/Lobby.tsx",
-        "utf16Start": 7750,
-        "utf16End": 7900,
-        "line": 52,
+        "utf16Start": 8311,
+        "utf16End": 8461,
+        "line": 53,
         "column": 108,
         "nodeSha256": "9349877a497d74b9a95dbc6de3c3c7bab27c069432cac33fdb0e3b515d4d5900"
       },
@@ -6321,9 +6395,9 @@
           "componentAncestors": [],
           "source": {
             "file": "games/tyaga/src/client/Lobby.tsx",
-            "utf16Start": 7900,
-            "utf16End": 7918,
-            "line": 52,
+            "utf16Start": 8461,
+            "utf16End": 8479,
+            "line": 53,
             "column": 258,
             "nodeSha256": "0cd0a5de19a4cd322d20ece9fae2a4422e7d571c7b539dff8ca25ca120abceb9"
           }
@@ -6351,9 +6425,9 @@
           "componentAncestors": [],
           "source": {
             "file": "games/tyaga/src/client/Lobby.tsx",
-            "utf16Start": 7973,
-            "utf16End": 7991,
-            "line": 52,
+            "utf16Start": 8534,
+            "utf16End": 8552,
+            "line": 53,
             "column": 331,
             "nodeSha256": "d01643a0acd3984d90ebb8e62e1c9c453932a65f5ffb856ea0f230e7bd173e32"
           }
@@ -6366,9 +6440,9 @@
       "tag": "select",
       "source": {
         "file": "games/tyaga/src/client/Lobby.tsx",
-        "utf16Start": 8161,
-        "utf16End": 8323,
-        "line": 53,
+        "utf16Start": 8722,
+        "utf16End": 8884,
+        "line": 54,
         "column": 105,
         "nodeSha256": "ff23db453ef4278921148ecbb672d5b33c3f153818f8af060d7ab3ca1df1181c"
       },
@@ -6426,9 +6500,9 @@
           "componentAncestors": [],
           "source": {
             "file": "games/tyaga/src/client/Lobby.tsx",
-            "utf16Start": 8323,
-            "utf16End": 8341,
-            "line": 53,
+            "utf16Start": 8884,
+            "utf16End": 8902,
+            "line": 54,
             "column": 267,
             "nodeSha256": "0cd0a5de19a4cd322d20ece9fae2a4422e7d571c7b539dff8ca25ca120abceb9"
           }
@@ -6456,9 +6530,9 @@
           "componentAncestors": [],
           "source": {
             "file": "games/tyaga/src/client/Lobby.tsx",
-            "utf16Start": 8379,
-            "utf16End": 8397,
-            "line": 53,
+            "utf16Start": 8940,
+            "utf16End": 8958,
+            "line": 54,
             "column": 323,
             "nodeSha256": "d01643a0acd3984d90ebb8e62e1c9c453932a65f5ffb856ea0f230e7bd173e32"
           }
@@ -6471,9 +6545,9 @@
       "tag": "button",
       "source": {
         "file": "games/tyaga/src/client/Lobby.tsx",
-        "utf16Start": 8831,
-        "utf16End": 9024,
-        "line": 58,
+        "utf16Start": 9392,
+        "utf16End": 9585,
+        "line": 59,
         "column": 29,
         "nodeSha256": "34cb6e77d3be2bac9d5b70644b0eb671cc64db5b5401478bf1a2d236bad8d483"
       },
@@ -6519,9 +6593,9 @@
       "tag": "button",
       "source": {
         "file": "games/tyaga/src/client/Lobby.tsx",
-        "utf16Start": 9168,
-        "utf16End": 9347,
-        "line": 59,
+        "utf16Start": 9729,
+        "utf16End": 9908,
+        "line": 60,
         "column": 29,
         "nodeSha256": "addf02030fc3f9c493d11dade567a2d433f8b4ead0b2ea85e3f24e8042767a16"
       },
@@ -6572,9 +6646,9 @@
       "tag": "button",
       "source": {
         "file": "games/tyaga/src/client/Lobby.tsx",
-        "utf16Start": 10445,
-        "utf16End": 10859,
-        "line": 67,
+        "utf16Start": 11006,
+        "utf16End": 11420,
+        "line": 68,
         "column": 47,
         "nodeSha256": "987dbb24cecff112220b6e97bdb9ceb60079a33ab94c93a386cf974383f107cf"
       },
@@ -6628,9 +6702,9 @@
       "tag": "a",
       "source": {
         "file": "games/tyaga/src/client/Lobby.tsx",
-        "utf16Start": 11055,
-        "utf16End": 11099,
-        "line": 68,
+        "utf16Start": 11616,
+        "utf16End": 11660,
+        "line": 69,
         "column": 58,
         "nodeSha256": "ef986df9f9a4d27a93b1415355c5ba6497e046cddc8e94799f4d2dbf9ca50fd4"
       },
@@ -8675,7 +8749,7 @@
       "componentAncestors": [],
       "controlTemplateIds": [
         "ui:Game:22b924f9d94e64",
-        "ui:Game:ce3258c2a59019",
+        "ui:Game:ce9678e8876c17",
         "ui:Game:81dc47406fbc00",
         "ui:Game:71241f90787fba",
         "ui:Game:c7775680078d20",
@@ -8685,7 +8759,7 @@
         "ui:Game:6888746002f864",
         "ui:Game:3af87f1837befa",
         "ui:Game:ce6e725393d675",
-        "ui:Game:c5f26bbb7d3562",
+        "ui:Game:57c0739abc9f89",
         "ui:Game:2ac453e89c7a8d",
         "ui:Game:6b7f7fe7008bbb",
         "ui:Game:4ab272706a12ae",
@@ -8714,7 +8788,7 @@
         "ui:Game:95c9e7f40745be",
         "ui:Game:124037ae0bf8b0",
         "ui:Game:b4b945609440af",
-        "ui:Game:a41e541d48fb2f",
+        "ui:Game:a682a7ea12e1d6",
         "ui:Game:f7f41192539dc6",
         "ui:Game:fa2ff3e93acb88",
         "ui:Game:a5d4e3360f058b",
@@ -8994,8 +9068,8 @@
       "component": "WorldMap",
       "source": {
         "file": "games/tyaga/src/client/Game.tsx",
-        "utf16Start": 18099,
-        "utf16End": 18146,
+        "utf16Start": 18204,
+        "utf16End": 18251,
         "line": 152,
         "column": 159,
         "nodeSha256": "00ec61856312bea71313c82f84c88557bba71286207f1931638f4ba98d346f8b"
@@ -9031,8 +9105,8 @@
       "component": "ObjectActions",
       "source": {
         "file": "games/tyaga/src/client/Game.tsx",
-        "utf16Start": 24429,
-        "utf16End": 24556,
+        "utf16Start": 24585,
+        "utf16End": 24712,
         "line": 162,
         "column": 572,
         "nodeSha256": "475d3d1f77c238f1dd0f8b8ac9297bfcc648e26d595d060cbbf08ad8c05e8994"
@@ -9071,8 +9145,8 @@
       "component": "TouchControls",
       "source": {
         "file": "games/tyaga/src/client/Game.tsx",
-        "utf16Start": 26893,
-        "utf16End": 27397,
+        "utf16Start": 27049,
+        "utf16End": 27553,
         "line": 167,
         "column": 20,
         "nodeSha256": "b7c250efb087752024fba4af8b4b7c87a5b4e5c7c89e3b9580747b1e552fde00"
@@ -9125,8 +9199,8 @@
       "component": "Dialog",
       "source": {
         "file": "games/tyaga/src/client/Game.tsx",
-        "utf16Start": 31412,
-        "utf16End": 31536,
+        "utf16Start": 31568,
+        "utf16End": 31692,
         "line": 180,
         "column": 23,
         "nodeSha256": "b8bc70e8937a881d2b059816167cfbea6cb41e351bed365ac4ff8956782f59f5"
@@ -9179,8 +9253,8 @@
       "component": "Dialog",
       "source": {
         "file": "games/tyaga/src/client/Game.tsx",
-        "utf16Start": 31938,
-        "utf16End": 32227,
+        "utf16Start": 32094,
+        "utf16End": 32383,
         "line": 181,
         "column": 20,
         "nodeSha256": "5a7c059c24f32b824c455c5e748d6ca96845ab3a35de4a925a95caef59e5dad6"
@@ -9253,8 +9327,8 @@
       "component": "Dialog",
       "source": {
         "file": "games/tyaga/src/client/Game.tsx",
-        "utf16Start": 33376,
-        "utf16End": 33482,
+        "utf16Start": 33532,
+        "utf16End": 33638,
         "line": 184,
         "column": 48,
         "nodeSha256": "aae2587dd1855552962bc3a858060bff976c140376a029664d727cfe1489d4bd"
@@ -9307,8 +9381,8 @@
       "component": "Dialog",
       "source": {
         "file": "games/tyaga/src/client/Game.tsx",
-        "utf16Start": 35819,
-        "utf16End": 35892,
+        "utf16Start": 35975,
+        "utf16End": 36048,
         "line": 186,
         "column": 52,
         "nodeSha256": "f22957a0211f7968744cd103366be974cf6c31c112105dd724d496f38fb1b0e5"
@@ -9361,8 +9435,8 @@
       "component": "Dialog",
       "source": {
         "file": "games/tyaga/src/client/Game.tsx",
-        "utf16Start": 36403,
-        "utf16End": 36492,
+        "utf16Start": 36473,
+        "utf16End": 36562,
         "line": 187,
         "column": 26,
         "nodeSha256": "09d8ffe93443a5e38b7ec7f4c0f03d760416772d411b953195e869830c3b4224"
@@ -9415,8 +9489,8 @@
       "component": "Settings",
       "source": {
         "file": "games/tyaga/src/client/Game.tsx",
-        "utf16Start": 38597,
-        "utf16End": 38684,
+        "utf16Start": 38667,
+        "utf16End": 38754,
         "line": 188,
         "column": 30,
         "nodeSha256": "53a3042476a33741688ef3e0f1f3de8aa57570faf41b32d30cddd56ae4715f8f"
@@ -9460,8 +9534,8 @@
       "component": "Dialog",
       "source": {
         "file": "games/tyaga/src/client/Game.tsx",
-        "utf16Start": 38725,
-        "utf16End": 38819,
+        "utf16Start": 38795,
+        "utf16End": 38889,
         "line": 189,
         "column": 40,
         "nodeSha256": "093bdf88183f28a9cf813280ce8aaedb198a1b7da44b0a9912d6761ba2195ba4"
@@ -9514,8 +9588,8 @@
       "component": "Rules",
       "source": {
         "file": "games/tyaga/src/client/Game.tsx",
-        "utf16Start": 40122,
-        "utf16End": 40198,
+        "utf16Start": 40192,
+        "utf16End": 40268,
         "line": 190,
         "column": 27,
         "nodeSha256": "24ab7394ea3c1d212b7391a142b8ff444f91f1e34742410e1efb194e827ed982"
@@ -9550,8 +9624,8 @@
       "component": "Dialog",
       "source": {
         "file": "games/tyaga/src/client/Game.tsx",
-        "utf16Start": 40232,
-        "utf16End": 40344,
+        "utf16Start": 40302,
+        "utf16End": 40414,
         "line": 191,
         "column": 33,
         "nodeSha256": "0952ecacbe81f6878de661e35ee7bae85937f0ab3b8a8b2ebf25ccf50ed10cb8"
@@ -9605,8 +9679,8 @@
       "component": "WorldMap",
       "source": {
         "file": "games/tyaga/src/client/Game.tsx",
-        "utf16Start": 40344,
-        "utf16End": 40408,
+        "utf16Start": 40414,
+        "utf16End": 40478,
         "line": 191,
         "column": 145,
         "nodeSha256": "8195de60fac8b286fcce366baba0a1683cf84dabc3a7f26cbdde12aa365439f5"
@@ -9644,8 +9718,8 @@
       "component": "Dialog",
       "source": {
         "file": "games/tyaga/src/client/Game.tsx",
-        "utf16Start": 41067,
-        "utf16End": 41146,
+        "utf16Start": 41137,
+        "utf16End": 41216,
         "line": 192,
         "column": 39,
         "nodeSha256": "0c0a218924f445fe5d41963ea5a9b1ceb6f28d845ee4e8d7e49dc5212ea6dcbc"
@@ -9698,8 +9772,8 @@
       "component": "EquipmentList",
       "source": {
         "file": "games/tyaga/src/client/Game.tsx",
-        "utf16Start": 41341,
-        "utf16End": 41600,
+        "utf16Start": 41411,
+        "utf16End": 41670,
         "line": 192,
         "column": 313,
         "nodeSha256": "6f83f9bafb027b2a55ca8a2e6a87a62195fe3085f63bb20f6e8ab0eb549a1943"
@@ -9738,8 +9812,8 @@
       "component": "AttachmentPanel",
       "source": {
         "file": "games/tyaga/src/client/Game.tsx",
-        "utf16Start": 41651,
-        "utf16End": 41795,
+        "utf16Start": 41721,
+        "utf16End": 41865,
         "line": 193,
         "column": 41,
         "nodeSha256": "fd4a40da1420b0726f26b716fceaf419006b9ac6238cf0d083c2c5a6cf7ec95c"
@@ -9788,8 +9862,8 @@
       "component": "Dialog",
       "source": {
         "file": "games/tyaga/src/client/Game.tsx",
-        "utf16Start": 41830,
-        "utf16End": 41924,
+        "utf16Start": 41900,
+        "utf16End": 41994,
         "line": 194,
         "column": 34,
         "nodeSha256": "6e46dcf47e64c8c8da9673a69dd74c4cdeae200b707b6d9791a92ab03f083de9"
@@ -9842,8 +9916,8 @@
       "component": "CrewOrders",
       "source": {
         "file": "games/tyaga/src/client/Game.tsx",
-        "utf16Start": 41924,
-        "utf16End": 42064,
+        "utf16Start": 41994,
+        "utf16End": 42134,
         "line": 194,
         "column": 128,
         "nodeSha256": "baababdab18e7d09a129c6559c051edc08a2a34d790ca7c9cd9f953bd8059a4c"
@@ -9882,8 +9956,8 @@
       "component": "Dialog",
       "source": {
         "file": "games/tyaga/src/client/Game.tsx",
-        "utf16Start": 42251,
-        "utf16End": 42344,
+        "utf16Start": 42321,
+        "utf16End": 42414,
         "line": 195,
         "column": 37,
         "nodeSha256": "2ebfc6625e6806d7f4a540d5ff8ef3a373afd96d54e85ce6441365a85bfd8438"
@@ -9936,9 +10010,9 @@
       "component": "Dialog",
       "source": {
         "file": "games/tyaga/src/client/Lobby.tsx",
-        "utf16Start": 10059,
-        "utf16End": 10152,
-        "line": 65,
+        "utf16Start": 10620,
+        "utf16End": 10713,
+        "line": 66,
         "column": 22,
         "nodeSha256": "35933fb7e682a90bdb1650926b40fca3b386c64c38d8f4117f3f79ab7d11ad36"
       },
@@ -10739,8 +10813,8 @@
       "note": "source mount path, not an enumerated runtime DOM instance or acceptance result"
     },
     {
-      "id": "mounted:781cd4e79302fd173f",
-      "controlTemplateId": "ui:Game:ce3258c2a59019",
+      "id": "mounted:09a3ae7ef624cf2532",
+      "controlTemplateId": "ui:Game:ce9678e8876c17",
       "component": "Game",
       "mountPath": [
         "instance:App:24a4b57fcafb29"
@@ -10909,8 +10983,8 @@
       "note": "source mount path, not an enumerated runtime DOM instance or acceptance result"
     },
     {
-      "id": "mounted:4fee163a50e53c9154",
-      "controlTemplateId": "ui:Game:c5f26bbb7d3562",
+      "id": "mounted:18fb00acf620b9f76f",
+      "controlTemplateId": "ui:Game:57c0739abc9f89",
       "component": "Game",
       "mountPath": [
         "instance:App:24a4b57fcafb29"
@@ -11413,8 +11487,8 @@
       "note": "source mount path, not an enumerated runtime DOM instance or acceptance result"
     },
     {
-      "id": "mounted:93e29bc65a8190b449",
-      "controlTemplateId": "ui:Game:a41e541d48fb2f",
+      "id": "mounted:2c2b20d6555d4aa8f2",
+      "controlTemplateId": "ui:Game:a682a7ea12e1d6",
       "component": "Game",
       "mountPath": [
         "instance:App:24a4b57fcafb29"
@@ -14682,13 +14756,13 @@
       "component": "Game",
       "source": {
         "file": "games/tyaga/src/client/Game.tsx",
-        "utf16Start": 39022,
-        "utf16End": 39047,
+        "utf16Start": 39092,
+        "utf16End": 39117,
         "line": 189,
         "column": 337,
         "nodeSha256": "20b7a9466191834dcd36938482479f2a60c630ae3db924f19456678290d61ed2"
       },
-      "elementUtf16End": 39076,
+      "elementUtf16End": 39146,
       "htmlFor": "\"ty-head\"",
       "textExpression": "{t('Голова', 'Head')}",
       "conditions": [
@@ -14711,13 +14785,13 @@
       "component": "Game",
       "source": {
         "file": "games/tyaga/src/client/Game.tsx",
-        "utf16Start": 39467,
-        "utf16End": 39496,
+        "utf16Start": 39537,
+        "utf16End": 39566,
         "line": 189,
         "column": 782,
         "nodeSha256": "e3a00ebc1a00df479afb8e5a8b463e76a4c2ede780bf1aa8eb5d04ccb92c9ce2"
       },
-      "elementUtf16End": 39529,
+      "elementUtf16End": 39599,
       "htmlFor": "\"ty-backpack\"",
       "textExpression": "{t('Рюкзак', 'Backpack')}",
       "conditions": [
@@ -14740,13 +14814,13 @@
       "component": "Lobby",
       "source": {
         "file": "games/tyaga/src/client/Lobby.tsx",
-        "utf16Start": 3179,
-        "utf16End": 3209,
-        "line": 36,
+        "utf16Start": 3592,
+        "utf16End": 3622,
+        "line": 37,
         "column": 35,
         "nodeSha256": "a9b408febc3eaa8ae1bf7e214bbf51b08032a35bd6a2c9cca9b38befcba557a0"
       },
-      "elementUtf16End": 3236,
+      "elementUtf16End": 3649,
       "htmlFor": "\"ty-lobby-map\"",
       "textExpression": "{t('Карта', 'Map')}",
       "conditions": [],
@@ -14761,13 +14835,13 @@
       "component": "Lobby",
       "source": {
         "file": "games/tyaga/src/client/Lobby.tsx",
-        "utf16Start": 3729,
-        "utf16End": 3760,
-        "line": 37,
+        "utf16Start": 4142,
+        "utf16End": 4173,
+        "line": 38,
         "column": 35,
         "nodeSha256": "2717d1eee0c73a930de23c19338d3db4679ae490cb2c1e217d2364fbcab6bca3"
       },
-      "elementUtf16End": 3788,
+      "elementUtf16End": 4201,
       "htmlFor": "\"ty-lobby-mode\"",
       "textExpression": "{t('Режим', 'Mode')}",
       "conditions": [],
@@ -14782,13 +14856,13 @@
       "component": "Lobby",
       "source": {
         "file": "games/tyaga/src/client/Lobby.tsx",
-        "utf16Start": 7679,
-        "utf16End": 7710,
-        "line": 52,
+        "utf16Start": 8240,
+        "utf16End": 8271,
+        "line": 53,
         "column": 37,
         "nodeSha256": "6bbdef0eacebf8eba86052a39be598ec1e3b356d831f1384a3d6579c59dd2dbf"
       },
-      "elementUtf16End": 7750,
+      "elementUtf16End": 8311,
       "htmlFor": "\"ty-lobby-head\"",
       "textExpression": "{t('Головной убор', 'Headwear')}",
       "conditions": [
@@ -14808,13 +14882,13 @@
       "component": "Lobby",
       "source": {
         "file": "games/tyaga/src/client/Lobby.tsx",
-        "utf16Start": 8093,
-        "utf16End": 8128,
-        "line": 53,
+        "utf16Start": 8654,
+        "utf16End": 8689,
+        "line": 54,
         "column": 37,
         "nodeSha256": "39d127ed75a2be8e9c5508ca9e937ce6115c8aa0394421e18f2bfd583af8fa05"
       },
-      "elementUtf16End": 8161,
+      "elementUtf16End": 8722,
       "htmlFor": "\"ty-lobby-backpack\"",
       "textExpression": "{t('Рюкзак', 'Backpack')}",
       "conditions": [
@@ -16176,9 +16250,9 @@
       },
       "source": {
         "file": "games/tyaga/src/client/terrain-materials.ts",
-        "utf16Start": 10320,
-        "utf16End": 12236,
-        "line": 153,
+        "utf16Start": 10407,
+        "utf16End": 12323,
+        "line": 154,
         "column": 5,
         "nodeSha256": "a50132e2d35954379df712d463fcac0230bc26a7dcbdcad23fdc5f5d3dd843bc"
       },
