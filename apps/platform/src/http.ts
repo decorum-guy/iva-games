@@ -9,6 +9,7 @@ import { MAX_PROFILE_BODY } from './avatar-photo.js';
 import type { SessionRecord, TelegramIntegration } from './types.js';
 import type { TelegramAuth } from './telegram/auth.js';
 import { PlatformService, textField } from './service.js';
+import { attachPlatformRealtime } from './realtime.js';
 
 const PREFIX = '/api/platform/v1';
 const MAX_BODY = 16_384;
@@ -320,8 +321,16 @@ export function createPlatformHttpServer(service: PlatformService, options: Http
     }
   }); });
   const lifecycle = createHttpLifecycle(server, options.shutdownGraceMs);
+  const live = attachPlatformRealtime(server, service, { origin, hosts, cookieName, clientAddress, stopping: () => lifecycle.stopping });
   server.requestTimeout = 15_000;
   server.headersTimeout = 10_000;
   server.keepAliveTimeout = 5_000;
-  return Object.assign(server, { shutdown: () => lifecycle.close() });
+  let shutdownPromise: Promise<void> | undefined;
+  return Object.assign(server, { shutdown: () => {
+    if (!shutdownPromise) {
+      const httpClosed = lifecycle.close();
+      shutdownPromise = (async () => { await live.close(); await httpClosed; })();
+    }
+    return shutdownPromise;
+  } });
 }
