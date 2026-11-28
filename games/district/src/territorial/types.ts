@@ -64,13 +64,13 @@ export interface TerritoryPlayer {
   patrols: number;
 }
 export interface TerritoryOffer {
-  id: string; authorId: string; targetId: string; give: Stock; receive: Stock; parentId?: string; offeredAt?: number;
+  id: string; authorId: string; targetId: string; give: Stock; receive: Stock; parentId?: string; offeredAt?: number; responseDeadlineAt?: number;
   groupId?: string; agreedAt?: number;
   canAccept?: boolean; unavailableReason?: 'author-resources' | 'target-resources' | 'inactive-pair';
 }
 export type TerritoryOfferStatus = 'accepted' | 'declined' | 'withdrawn' | 'expired' | 'replaced' | 'player-left' | 'match-finished';
 export interface TerritoryClosedOffer extends TerritoryOffer {
-  status: TerritoryOfferStatus; closedRevision: number; closedTurn: number; closedRound: number;
+  responseExpired?: boolean; status: TerritoryOfferStatus; closedRevision: number; closedTurn: number; closedRound: number;
 }
 export type TerritoryAction =
   | { type: 'place' | 'settle' | 'upgrade' | 'protect'; nodeId: string }
