@@ -88,7 +88,10 @@ export function TerritorialRoll({ view, lang, onSelect }: { view: TerritoryView;
       {roll && <span className="territory-roll-income">{sum === 7 ? (ru ? 'Семёрка: дохода нет' : 'Seven: no production') : income ? <>
         {ru ? 'Вам: ' : 'You: '}<ResourceStock stock={income.resources} lang={lang}/></> : (ru ? 'Вам: +0 ресурсов' : 'You: +0 resources')}</span>}
     </div>
-    {roll && <button type="button" className="territory-roll-details" onClick={() => setDetails(true)}>{ru ? 'Раздача' : 'Production'}<small>{roll.triggeredTileIds.length} {ru ? 'клеток' : 'tiles'}</small></button>}
+    {roll && <button type="button" className="territory-roll-details" onClick={() => setDetails(true)}>{ru ? 'Раздача' : 'Production'}<small>{roll.triggeredTileIds.length} {ru
+      ? (roll.triggeredTileIds.length % 10 === 1 && roll.triggeredTileIds.length % 100 !== 11 ? 'клетка'
+        : roll.triggeredTileIds.length % 10 >= 2 && roll.triggeredTileIds.length % 10 <= 4 && (roll.triggeredTileIds.length % 100 < 12 || roll.triggeredTileIds.length % 100 > 14) ? 'клетки' : 'клеток')
+      : roll.triggeredTileIds.length === 1 ? 'tile' : 'tiles'}</small></button>}
     {details && roll && <Modal title={ru ? 'Бросок и раздача' : 'Roll and production'} onClose={() => setDetails(false)}>
       <div className="territory-roll-report">
         <div className="territory-dice"><DieFace value={roll.dice[0]}/><DieFace value={roll.dice[1]}/><strong>{roll.sum}</strong></div>
@@ -132,12 +135,12 @@ export function historyTitle(entry: TerritoryHistoryEntry, view: TerritoryView, 
   let title = actions[entry.kind][i];
   if (entry.dice) title += ` ${entry.dice[0]} + ${entry.dice[1]} = ${entry.sum}`;
   if (entry.nodeId) title += ` · ${lang === 'ru' ? 'участок' : 'site'} ${view.map.nodes.findIndex(node => node.id === entry.nodeId) + 1}`;
-  if (entry.edgeId) title += ` · ${lang === 'ru' ? 'ребро' : 'edge'} ${view.map.edges.findIndex(edge => edge.id === entry.edgeId) + 1}`;
+  if (entry.edgeId) title += ` · ${lang === 'ru' ? 'путь' : 'route'} ${view.map.edges.findIndex(edge => edge.id === entry.edgeId) + 1}`;
   if (entry.tileId) title += ' · ' + tileName(view, entry.tileId, lang);
   if (entry.cardKind) title += ' · ' + cardNames[entry.cardKind][i];
   if (entry.kind === 'block' && entry.reason) title += ' · ' + (entry.reason === 'patrol' ? cardNames.patrol[i] : lang === 'ru' ? 'семёрка' : 'seven');
   if (entry.reason === 'consent') return lang === 'ru' ? 'Согласие на обмен · ждёт выбора' : 'Trade consent · awaiting selection';
-  if (entry.offerStatus) title += ' · ' + closed[entry.offerStatus][i];
+  if (entry.offerStatus && !['accept', 'decline', 'cancel'].includes(entry.kind)) title += ' · ' + closed[entry.offerStatus][i];
   if (entry.targetId) title += ' · ' + playerName(view, entry.targetId);
   return title;
 }

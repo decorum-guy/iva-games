@@ -14,7 +14,7 @@ export type BotReply =
       reply_markup?: { inline_keyboard: InlineKeyboardButton[][] } | { keyboard: KeyboardButton[][]; resize_keyboard: true } };
 
 const label = (player: PublicPlayer): string =>
-  `${player.avatar ? AVATARS[player.avatar] + ' ' : ''}${player.displayName} (@${player.handle})`;
+  `${player.avatar ? (player.avatar === 'photo' ? '📷' : AVATARS[player.avatar]) + ' ' : ''}${player.displayName} (@${player.handle})`;
 
 export class TelegramAccountBot {
   constructor(
@@ -55,9 +55,10 @@ export class TelegramAccountBot {
     }
     if (cmd === 'profile') {
       const player = this.platform.publicPlayer(playerId);
+      const avatars = (Object.keys(AVATARS) as AvatarStyle[]).map(avatar => ({ text: AVATARS[avatar], callback_data: `avatar:${avatar}` }));
       return send(`${label(player)}\n${t('Выберите аватар. Чтобы изменить имя, введите /name и новое имя.', 'Choose an avatar. To change your name, enter /name and your new name.')}`,
         [
-          (Object.keys(AVATARS) as AvatarStyle[]).map(avatar => ({ text: AVATARS[avatar], callback_data: `avatar:${avatar}` })),
+          ...Array.from({ length: Math.ceil(avatars.length / 7) }, (_, index) => avatars.slice(index * 7, (index + 1) * 7)),
           [{ text: t('Инициалы', 'Initials'), callback_data: 'avatar:initials' }, { text: t('Профиль на сайте', 'Profile on the website'), url: `${this.platform.publicOrigin}/profile`, style: 'primary' }],
         ]);
     }

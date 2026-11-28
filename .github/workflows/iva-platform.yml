@@ -32,6 +32,7 @@ jobs:
       - run: npm run platform:smoke
       - run: npx playwright install --with-deps chromium
       - run: npm run portal:e2e -- --workers=1
+      - run: node scripts/profile-avatar-browser.mjs
       - run: npm run district:browser
       - run: node scripts/district-interface-browser.mjs
       - run: node scripts/district-trade-browser.mjs
