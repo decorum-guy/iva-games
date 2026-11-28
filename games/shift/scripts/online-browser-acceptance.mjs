@@ -54,6 +54,70 @@ async function bounded(promise, label, timeout = 8000) {
   try { return await Promise.race([promise, new Promise((_, reject) => { timer = setTimeout(() => reject(new Error(`Browser operation timed out: ${label}`)), timeout); })]); }
   finally { clearTimeout(timer); }
 }
+async function failureForensics(instance, peers) {
+  if (!instance?.isConnected()) return { unavailable: 'Browser is disconnected' };
+  const started = Date.now(), url = value => String(value || '').split(/[?#]/, 1)[0].slice(0, 240);
+  const attempt = async (operation, timeout) => {
+    if (timeout <= 0) return { timeout: true };
+    let timer;
+    try { return await Promise.race([Promise.resolve().then(operation).then(value => ({ value })), new Promise(resolve => { timer = setTimeout(() => resolve({ timeout: true }), timeout); })]); }
+    catch (error) { return { error: String(error.message || error).slice(0, 240) }; }
+    finally { clearTimeout(timer); }
+  };
+  const target = info => ({ targetId: info.targetId, type: info.type, url: url(info.url), attached: info.attached, browserContextId: info.browserContextId });
+  let browserSession;
+  const result = { targets: [], peers: [] };
+  try {
+    const attached = await attempt(() => instance.newBrowserCDPSession(), 350); browserSession = attached.value;
+    if (browserSession) {
+      const response = await attempt(() => browserSession.send('Target.getTargets'), 350);
+      if (response.value) result.targets = response.value.targetInfos.filter(info => info.type === 'page').map(target);
+      else result.targetError = response;
+    } else result.targetError = attached;
+  } finally { if (browserSession) await attempt(() => browserSession.detach(), 150); }
+  result.peers = await Promise.all(peers.map(async peer => {
+    const row = { name: peer.name, url: url(peer.page.url()) }, deadline = started + 1700;
+    const remaining = limit => Math.max(0, Math.min(limit, deadline - Date.now()));
+    let session, pauseRequested = false;
+    try {
+      const attached = await attempt(() => peer.page.context().newCDPSession(peer.page), remaining(350)); session = attached.value;
+      if (!session) { row.attachError = attached; return row; }
+      const scriptUrls = new Map();
+      session.on('Debugger.scriptParsed', event => { scriptUrls.set(event.scriptId, event.url); });
+      session.on('Debugger.paused', event => {
+        // Stack metadata only. Never serialize scopeChain, locals or remote objects.
+        row.paused = { reason: event.reason, frames: event.callFrames.slice(0, 8).map(frame => ({
+          functionName: frame.functionName, url: url(frame.url || scriptUrls.get(frame.location.scriptId)), line: frame.location.lineNumber, column: frame.location.columnNumber,
+        })) };
+      });
+      const info = await attempt(() => session.send('Target.getTargetInfo'), remaining(200));
+      if (info.value) row.target = target(info.value.targetInfo); else row.targetError = info;
+      await attempt(() => session.send('Debugger.enable'), remaining(250));
+      const evaluated = await attempt(() => session.send('Runtime.evaluate', { expression: '1', returnByValue: true, awaitPromise: false, silent: true }), remaining(500));
+      row.runtime = evaluated.value ? { type: evaluated.value.result?.type, value: evaluated.value.result?.value,
+        exception: evaluated.value.exceptionDetails?.text } : evaluated;
+      if (evaluated.timeout) {
+        pauseRequested = true;
+        const paused = await attempt(() => session.send('Debugger.pause'), remaining(300));
+        row.pauseRequest = paused.value ? { responded: true } : paused;
+      }
+    } catch (error) { row.error = String(error.message || error).slice(0, 240); }
+    finally {
+      if (session) {
+        // Queue resume even if pause itself missed its deadline. Teardown follows.
+        if (pauseRequested || row.paused) {
+          const resumed = await attempt(() => session.send('Debugger.resume'), 150);
+          row.resume = resumed.value ? { responded: true } : resumed;
+        }
+        const detached = await attempt(() => session.detach(), 150);
+        row.detached = !detached.timeout && !detached.error;
+      }
+    }
+    return row;
+  }));
+  result.elapsedMs = Date.now() - started;
+  return result;
+}
 async function screenshot(page, name) { await page.bringToFront(); await page.screenshot({ path: join(directory, name), fullPage: false, animations: 'disabled', timeout: 30000 }); }
 async function until(test, label, timeout = 12000) { const end = Date.now() + timeout; while (Date.now() < end) { for (const peer of observedPeers) if (peer.failure) throw peer.failure; const result = await test(); if (result) return result; await delay(45); } throw new Error(`Timed out: ${label}`); }
 const compiled = join(directory, 'policy');
@@ -136,12 +200,25 @@ function instrumentBrowser(options = {}) {
     if (latency) setTimeout(transmit, latency); else transmit();
   };
   window.__shiftAcceptance = state;
+  // Passive evidence for CI-only stalls. No renderer RPC, layout read or input.
+  // Keep one small pulse per second; the Node observer retains only its tail.
+  setInterval(() => {
+    if (!state.active) return;
+    console.debug('__shiftAcceptancePulse__' + JSON.stringify({ at: Date.now(), readyState: state.active.readyState,
+      visibility: document.visibilityState, lifecycle: state.socketLifecycles.at(-1) }));
+  }, 1000);
   window.WebSocket = class extends NativeWebSocket {
     constructor(url, protocols) {
       super(url, protocols);
       if (/\/api\/platform\/v1\/rooms\/[^/]+\/live$/.test(new URL(String(url), location.href).pathname)) {
         state.sockets.push(this); state.active = this; state.scope = null;
-        const lifecycle = { socket: state.sockets.length, openedAt: Date.now(), matchId: null, epoch: null, phase: null, tick: null, controllerEpoch: null, closed: false, closeCode: null }; state.socketLifecycles.push(lifecycle);
+        const lifecycle = { socket: state.sockets.length, openedAt: Date.now(), matchId: null, epoch: null, phase: null, tick: null, controllerEpoch: null, closed: false, closeCode: null,
+          nativeMessages: 0, lastNativeMessageAt: null, deliveredMessages: 0, lastDeliveredMessageAt: null, nativeErrors: 0, lastNativeErrorAt: null }; state.socketLifecycles.push(lifecycle);
+        // Count real browser messages before the optional artificial latency
+        // handler. Its synthetic redispatch must not count as another native frame.
+        this.addEventListener('message', event => {
+          if (event.isTrusted) { lifecycle.nativeMessages++; lifecycle.lastNativeMessageAt = Date.now(); }
+        }, true);
         if (latency) {
           const delayed = new WeakSet();
           this.addEventListener('message', event => {
@@ -152,6 +229,7 @@ function instrumentBrowser(options = {}) {
           }, true);
         }
         this.addEventListener('message', event => {
+          lifecycle.deliveredMessages++; lifecycle.lastDeliveredMessageAt = Date.now();
           try {
             const frame = JSON.parse(String(event.data));
             if (frame.type === 'snapshot' && frame.protocol === 'iva-live@1' && frame.wireVersion === 'shift-wire@1') {
@@ -161,6 +239,10 @@ function instrumentBrowser(options = {}) {
               if (state.active === this) state.scope = { protocol, wireVersion, roomId, matchId, epoch };
             }
           } catch { /* The Node-side observer rejects malformed or wrongly scoped frames. */ }
+        });
+        this.addEventListener('error', () => {
+          lifecycle.nativeErrors++; lifecycle.lastNativeErrorAt = Date.now();
+          console.debug('__shiftAcceptancePulse__' + JSON.stringify({ at: Date.now(), event: 'nativeSocketError', readyState: this.readyState, lifecycle }));
         });
         this.addEventListener('close', event => {
           lifecycle.closed = true; lifecycle.closeCode = event.code; lifecycle.closeReason = event.reason; lifecycle.wasClean = event.wasClean; lifecycle.closedAt = Date.now();
@@ -233,11 +315,28 @@ function auditView(view, peer) {
 
 function watchPage(page, name, game) {
   const peer = { page, name, game, view: null, frames: 0, sockets: 0, errors: [], http: [], httpEvents: 0, httpRequests: 0, retired: false, receipts: new Map(), receiptCounts: new Map(), commandsSentAt: new Map(), receiptLatencyMs: [], closes: [], roles: new Set(), motions: new Set(), samples: [], recent: new Map(), commandEnvelopes: new Map(), wireCommandEnvelopes: new Map(), wireErrors: [], expectedLifecycleEvents: [], scopeChecks: 0, staleSocketFramesIgnored: 0, memory: { seq: 0, counter: 0, nextDecisionTick: 0, recentRooms: [] }, lastDriveTick: -1, failure: null };
-  peer.socketHistory = []; peer.browserLifecycles = []; peer.fixtureStages = [];
+  peer.socketHistory = []; peer.browserLifecycles = []; peer.fixtureStages = []; peer.nativePulses = []; peer.pageLifecycle = [];
   observedPeers.push(peer);
+  const lifecycle = (event, details = {}) => {
+    peer.pageLifecycle.push({ at: Date.now(), event, ...details });
+    if (peer.pageLifecycle.length > 16) peer.pageLifecycle.shift();
+  };
+  page.on('crash', () => lifecycle('crash'));
+  page.on('close', () => lifecycle('close'));
+  page.on('framenavigated', frame => {
+    if (frame !== page.mainFrame()) return;
+    const url = frame.url().split(/[?#]/, 1)[0];
+    lifecycle('mainFrameNavigation', { url });
+  });
   page.on('pageerror', error => { peer.errors.push(error.message); });
   page.on('console', message => {
     const prefix = '__shiftAcceptanceLifecycle__', value = message.text();
+    const pulsePrefix = '__shiftAcceptancePulse__';
+    if (value.startsWith(pulsePrefix)) {
+      try { peer.nativePulses.push(JSON.parse(value.slice(pulsePrefix.length))); if (peer.nativePulses.length > 8) peer.nativePulses.shift(); }
+      catch { lifecycle('invalidDiagnosticPulse'); }
+      return;
+    }
     if (!value.startsWith(prefix)) return;
     try { peer.browserLifecycles.push(JSON.parse(value.slice(prefix.length))); }
     catch (error) { peer.failure ||= error; }
@@ -262,7 +361,8 @@ function watchPage(page, name, game) {
       assert.equal(url.search, ''); assert.equal(url.hash, ''); assert.equal(url.username, ''); assert.equal(url.password, '');
     } catch (error) { peer.failure ||= error; return; }
     peer.sockets++; peer.activeSocket = ws; peer.recent.clear();
-    const history = { socket: peer.sockets, openedAt: Date.now(), closedAt: null, scope: null, tick: null, phase: null };
+    const history = { socket: peer.sockets, openedAt: Date.now(), closedAt: null, scope: null, tick: null, phase: null,
+      rawFrames: 0, lastRawFrameAt: null, socketErrors: [] };
     peer.socketHistory.push(history);
     let connectionScope = null, wireScope = null, connectionPhase = null;
     const receive = ({ payload }) => {
@@ -300,6 +400,7 @@ function watchPage(page, name, game) {
       } catch (error) { peer.failure ||= error; }
     };
     ws.on('framereceived', frame => {
+      history.rawFrames++; history.lastRawFrameAt = Date.now();
       try {
         const parsed = JSON.parse(String(frame.payload));
         const scope = auditServerFrame(parsed, game.roomId, wireScope);
@@ -324,6 +425,11 @@ function watchPage(page, name, game) {
         }
         peer.scopeChecks++;
       } catch (error) { peer.failure ||= error; }
+    });
+    ws.on('socketerror', error => {
+      const observation = { at: Date.now(), error: String(error).slice(0, 200) };
+      history.socketErrors.push(observation); if (history.socketErrors.length > 4) history.socketErrors.shift();
+      lifecycle('socketerror', { socket: history.socket, ...observation });
     });
     ws.on('close', () => { history.closedAt = Date.now(); peer.closes.push(history.closedAt); });
   });
@@ -420,7 +526,8 @@ async function retireInactivePeer(old, replacement, reason) {
       oldBefore: before, oldAfter: { frames: old.frames, sockets: old.sockets, httpRequests: old.httpRequests },
       replacementSocketUnchanged: replacement.activeSocket === replacementSocket, replacementSocketClosed: replacementSocket.isClosed(),
       replacementScope, currentScope: replacement.liveScope, replacementEpoch, currentEpoch: replacement.view.self.controllerEpoch,
-      replacementTick, currentTick: replacement.view.tick, replacementFrames, currentFrames: replacement.frames, hudBefore } });
+      replacementTick, currentTick: replacement.view.tick, replacementFrames, currentFrames: replacement.frames, hudBefore,
+      replacementRawSocket: replacement.socketHistory.at(-1), replacementNativePulse: replacement.nativePulses.at(-1) ?? null, replacementPageLifecycle: replacement.pageLifecycle } });
     throw error;
   }
 }
@@ -779,6 +886,11 @@ try {
   assert.ok(matrix.length, 'Unknown --case; use e.g. foundry-3v3');
   for (let batch = 0; batch < matrix.length; batch += concurrency) {
     browserServer = await chromium.launchServer(browserOptions); browser = await chromium.connect(browserServer.wsEndpoint()); report.browserVersion = browser.version();
+    const observedBrowser = browser;
+    observedBrowser.on('disconnected', () => {
+      report.browserLifecycles ??= [];
+      report.browserLifecycles.push({ at: Date.now(), event: 'disconnected', expectedTeardown: browser !== observedBrowser });
+    });
     const games = [];
     for (const item of matrix.slice(batch, batch + concurrency)) {
       const room = await demo.createRoom({ ...item, hostRole: 'navigator', rotateRoles: true, difficulty: 'normal' });
@@ -805,13 +917,19 @@ try {
   report.browserErrors = observedPeers.flatMap(p => p.errors.map(error => ({ game: p.game.label, peer: p.name, error })));
   // Emit before any DOM probe: a failed renderer must not hide the wire evidence
   // in an ephemeral CI file. These fields contain no session cookies or tokens.
-  log({ failureContext: { message: error.message, peers: observedPeers.map((peer, index) => ({
+  log({ failureContext: { message: error.message, browserLifecycles: report.browserLifecycles ?? [], peers: observedPeers.map((peer, index) => ({
     index, game: peer.game.label, name: peer.name, current: peer.game.peers.includes(peer), retired: peer.retired, url: peer.page.url(),
     frames: peer.frames, sockets: peer.sockets, activeSocketClosed: peer.activeSocket?.isClosed() ?? null, scope: peer.liveScope ?? null,
     view: peer.view ? { tick: peer.view.tick, round: peer.view.round, phase: peer.view.phase, seatId: peer.view.self.seatId, controllerEpoch: peer.view.self.controllerEpoch, recoveryTicksRemaining: peer.view.recoveryTicksRemaining } : null,
     failure: peer.failure?.message ?? null, errors: peer.errors.slice(-4), wireErrors: peer.wireErrors.slice(-4),
     socketHistory: peer.socketHistory.slice(-4), browserLifecycles: peer.browserLifecycles.slice(-4), fixtureStages: peer.fixtureStages,
+    nativePulses: peer.nativePulses, pageLifecycle: peer.pageLifecycle,
   })) } });
+  // This probe runs only after the original failure and its passive evidence
+  // have been recorded. It cannot turn a failed gate into a passing one.
+  report.failureForensics = await failureForensics(browser, observedPeers.filter(peer => peer.game.peers.includes(peer) && !peer.retired && !peer.page.isClosed()))
+    .catch(error => ({ probeError: String(error.message || error).slice(0, 240) }));
+  log({ failureForensics: report.failureForensics });
   await writeFile(join(directory, 'failure-http.json'), JSON.stringify(observedPeers.map(p => ({ name: p.name, game: p.game.label, requests: p.http }))), { mode: 0o600 });
   const pages = await Promise.all(observedPeers.slice(-4).map(async peer => {
     try { return { name: peer.name, game: peer.game.label, page: await bounded(peer.page.evaluate(() => ({ url: location.href, readyState: document.readyState, visibility: document.visibilityState, text: document.body.innerText.slice(0, 18000) })), 'Failure DOM observation', 4000) }; }
