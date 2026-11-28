@@ -9,6 +9,7 @@ All geometry, vector paths and synthesis code are original work for Iva Games. N
 - 10 GLBs: six carved stone/brass army figures, Regent, Spire, Archivist, and the tutorial-only ashwood/brass Warden (`sentinel`). Generator: `games/chess/colossus/scripts/generate-colossus-models.mjs`. All geometry is authored in that reproducible source.
 - 25 SVG engravings: each of sixteen player cards and nine boss cards has its own image. Generator: generate-colossus-cards.mjs.
 - 17 mono 32 kHz WAV files: distinct move, capture, promotion tiers, boss responses, impacts, wards, card, fire and finale cues. Generator: `generate-colossus-audio.py`. The audio manifest records measured peaks, duration and SHA-256; the original synthesis source is included.
+- Six comparison clips for armor hits and shield protection live in `src/audio-review/variants`. Generate them with `python3 -B games/chess/colossus/scripts/generate-audio-review-variants.py`. The comparison build bundles these clips on its own entry and plays them through the game mixer at the same gain as the original bank.
 
 The generators were executed successfully before product rendering. Each directory contains a manifest with SHA-256 hashes; GLB manifests also contain dimensions, triangle counts and material mesh counts. Static geometry is merged by material to reduce rendering work, retaining separate stone, brass, armour, fractures, wood and emissive surfaces. One world unit is one board square. Model material names and meshes separate unit stone, inlay, armour and living core.
 

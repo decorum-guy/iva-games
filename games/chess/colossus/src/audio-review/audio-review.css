@@ -40,6 +40,8 @@ h1 { margin: 8px 0 4px; font-size: clamp(2rem, 5vw, 3.5rem); line-height: 1.12; 
 .review-progress { color: #e9d6a3; font-size: .875rem; }
 progress { width: min(170px, 100%); accent-color: var(--brass); }
 .review-header [role="alert"] { margin-top: 12px; color: #ffba9d; }
+.review-link { display:inline-flex; align-items:center; min-height:44px; margin-top:8px; color:var(--brass); text-underline-offset:3px; }
+.review-link:focus-visible { outline:2px solid var(--brass); outline-offset:3px; }
 
 .review-content { display: grid; grid-template-columns: minmax(0, 1fr) minmax(230px, 30%); align-items: start; gap: 26px; }
 .sounds section + section { margin-top: 22px; }
@@ -82,6 +84,31 @@ h2 { font-size: 1.375rem; margin-bottom: 8px; }
 .moments button { width: 100%; text-align: left; }
 .moments li span { color: var(--brass); margin-right: 3px; }
 
+.variant-review .toolbar [role="status"] { font-size:.875rem; color:var(--brass); }
+.comparison + .comparison { margin-top:30px; }
+.comparison > p { color:var(--muted); margin-bottom:12px; }
+.variant-list { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; }
+.variant {
+  display:flex;
+  flex-direction:column;
+  align-items:flex-start;
+  gap:8px;
+  padding:14px;
+  border:1px solid var(--line);
+  border-radius:5px;
+  background:var(--surface);
+  overflow-wrap:anywhere;
+}
+.variant:has(.pick[aria-pressed="true"]) { border-color:var(--brass); }
+.variant h3 { font-size:1rem; }
+.variant p { flex:1; color:var(--muted); font-size:.875rem; }
+.variant-actions { display:flex; flex-wrap:wrap; gap:6px; }
+.variant .pick { margin-top:2px; }
+.variant .pick[aria-pressed="true"] { background:var(--brass); color:#192a2b; }
+
+@media (max-width: 880px) {
+  .variant-list { grid-template-columns:repeat(2,minmax(0,1fr)); }
+}
 @media (max-width: 760px) {
   .review-content { grid-template-columns: minmax(0, 1fr); }
   .moments { position: static; }
@@ -89,4 +116,5 @@ h2 { font-size: 1.375rem; margin-bottom: 8px; }
 @media (max-width: 470px) {
   .sound { grid-template-columns: minmax(0, 1fr); }
   .sound-controls > * { flex: 1; }
+  .variant-list { grid-template-columns:minmax(0,1fr); }
 }

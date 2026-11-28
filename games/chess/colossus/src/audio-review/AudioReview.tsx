@@ -4,11 +4,12 @@ import { playSound, setSoundEnabled, soundForEvents, SOUND_NAMES, stopSounds, un
 import type { SoundName } from '../ui/audio';
 import { cues, cueGroups, moments } from './cues';
 import type { Moment } from './cues';
+import { downloadReview, loadSoundBank } from './reviewFiles';
+import type { BankManifest } from './reviewFiles';
 
 type Decision = '' | 'approved' | 'revise';
 interface Verdict { sha256: string; decision: Decision; note: string }
 type Verdicts = Partial<Record<SoundName, Verdict>>;
-interface Manifest { version: number; sounds: Record<SoundName, { sha256: string }> }
 
 const storageKey = 'colossus.audio-review.v1';
 const text = {
@@ -20,6 +21,7 @@ const text = {
     context: 'Как звучит бой', contextCopy: 'Послушай, как эффекты накладываются друг на друга.',
     group: { army: 'Фигуры', battle: 'Бой', cards: 'Карты и исход' },
     loading: 'Загружаем список звуков…', loadError: 'Не удалось загрузить список звуков.', retry: 'Повторить',
+    variants: 'Новые варианты удара по броне и щита',
     storageError: 'Браузер не сохранил решения. Скачай их перед закрытием страницы.',
     count: (approved: number, total: number) => 'Утверждено ' + approved + ' из ' + total,
   },
@@ -31,6 +33,7 @@ const text = {
     context: 'In battle', contextCopy: 'Hear how the effects sound together.',
     group: { army: 'Pieces', battle: 'Combat', cards: 'Cards and outcomes' },
     loading: 'Loading sounds…', loadError: 'Could not load the sound list.', retry: 'Retry',
+    variants: 'New armor and shield sounds',
     storageError: 'The browser could not save your decisions. Download them before closing the page.',
     count: (approved: number, total: number) => approved + ' of ' + total + ' approved',
   },
@@ -51,7 +54,7 @@ function loadVerdicts(): Verdicts {
 
 export function AudioReview() {
   const [language, setLanguage] = useState<Language>('ru');
-  const [bank, setBank] = useState<Manifest | 'error' | null>(null);
+  const [bank, setBank] = useState<BankManifest | 'error' | null>(null);
   const [verdicts, setVerdicts] = useState(loadVerdicts);
   const [muted, setMuted] = useState(false);
   const [storageError, setStorageError] = useState(false);
@@ -59,15 +62,7 @@ export function AudioReview() {
 
   useEffect(() => {
     const controller = new AbortController();
-    void fetch('/assets/colossus/audio/manifest.json', { signal: controller.signal })
-      .then(async response => {
-        if (!response.ok) throw new Error('Missing sound bank');
-        return await response.json() as Manifest;
-      })
-      .then(manifest => {
-        if (!SOUND_NAMES.every(name => /^[0-9a-f]{64}$/.test(manifest.sounds?.[name]?.sha256))) throw new Error('Incomplete sound bank');
-        setBank(manifest);
-      })
+    void loadSoundBank(controller.signal).then(setBank)
       .catch(() => { if (!controller.signal.aborted) setBank('error'); });
     return () => controller.abort();
   }, []);
@@ -121,12 +116,7 @@ export function AudioReview() {
       lines.push('- **' + cues[name][language] + '** · ' + label + (note ? ' · ' + note : ''));
       lines.push('  ' + name + '.wav · SHA-256 ' + manifest.sounds[name].sha256);
     }
-    const url = URL.createObjectURL(new Blob([lines.join('\n') + '\n'], { type: 'text/markdown;charset=utf-8' }));
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = 'colossus-sound-review.md';
-    link.click();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    downloadReview('colossus-sound-review.md', lines);
   }
 
   return <main className="review">
@@ -144,6 +134,7 @@ export function AudioReview() {
         <progress value={approved} max={SOUND_NAMES.length} aria-label={c.count(approved, SOUND_NAMES.length)}/>
         <p role="status">{c.count(approved, SOUND_NAMES.length)}{revise > 0 && <> · {revise} {c.changed}</>}</p>
       </div>
+      <a className="review-link" href="/audio-variants.html">{c.variants}</a>
       {storageError && <p role="alert">{c.storageError}</p>}
     </header>
 

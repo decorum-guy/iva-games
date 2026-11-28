@@ -8,11 +8,12 @@ export const SOUND_NAMES = [
 export type SoundName = typeof SOUND_NAMES[number];
 export interface SoundCue { name: SoundName; delayMs: number }
 export interface SoundContext { before?: GameState; after?: GameState; key?: string }
+export type SoundSamples = Readonly<Partial<Record<SoundName, string>>>;
 
 const MAX_VOICES = 4;
 const VOLUME = .42;
-const buffers = new Map<SoundName, AudioBuffer>();
-const loading = new Map<SoundName, Promise<AudioBuffer | null>>();
+const buffers = new Map<string, AudioBuffer>();
+const loading = new Map<string, Promise<AudioBuffer | null>>();
 const voices = new Set<{ stop(): void }>();
 const timers = new Set<ReturnType<typeof setTimeout>>();
 const recentKeys = new Set<string>();
@@ -20,6 +21,7 @@ let enabled = false;
 let generation = 0;
 let context: AudioContext | null = null;
 let lifecycleInstalled = false;
+const samplePath = (name: SoundName) => '/assets/colossus/audio/' + name + '.wav';
 
 function cancelPlayback() {
   generation++;
@@ -47,22 +49,27 @@ function audioContext(): AudioContext | null {
   try { context = new Constructor(); } catch { return null; }
   return context;
 }
-async function bufferFor(name: SoundName, ctx: AudioContext): Promise<AudioBuffer | null> {
-  const known = buffers.get(name); if (known) return known;
-  let work = loading.get(name);
+async function bufferFor(url: string, ctx: AudioContext): Promise<AudioBuffer | null> {
+  const known = buffers.get(url); if (known) return known;
+  let work = loading.get(url);
   if (!work) {
     work = (async () => {
       try {
-        const response = await fetch('/assets/colossus/audio/' + name + '.wav', { cache: 'force-cache' });
+        const response = await fetch(url, { cache: 'force-cache' });
         if (!response.ok) return null;
         const buffer = await ctx.decodeAudioData(await response.arrayBuffer());
-        buffers.set(name, buffer); return buffer;
+        buffers.set(url, buffer); return buffer;
       } catch { return null; }
-      finally { loading.delete(name); }
+      finally { loading.delete(url); }
     })();
-    loading.set(name, work);
+    loading.set(url, work);
   }
   return work;
+}
+/** Decode just the clips needed for a comparison before any delayed cue starts. */
+export async function prepareSounds(names: readonly SoundName[], samples?: SoundSamples): Promise<void> {
+  const ctx = audioContext();
+  if (ctx) await Promise.all(names.map(name => bufferFor(samples?.[name] ?? samplePath(name), ctx)));
 }
 /** Invoke in a start/toggle pointer or keyboard gesture. Failure never blocks a move. */
 export function unlockSounds(): void {
@@ -72,16 +79,16 @@ export function unlockSounds(): void {
   if (!ctx) return;
   if (ctx.state === 'suspended') void ctx.resume().catch(() => {});
   // Warm the small local bank once; later delayed cues do not need another gesture.
-  for (const name of SOUND_NAMES) void bufferFor(name, ctx);
+  for (const name of SOUND_NAMES) void bufferFor(samplePath(name), ctx);
 }
 function admit(voice: { stop(): void }) {
   while (voices.size >= MAX_VOICES) voices.values().next().value?.stop();
   voices.add(voice);
 }
-function htmlSound(name: SoundName, ticket: number) {
+function htmlSound(url: string, ticket: number) {
   if (!enabled || ticket !== generation || typeof Audio === 'undefined') return;
   try {
-    const sound = new Audio('/assets/colossus/audio/' + name + '.wav');
+    const sound = new Audio(url);
     sound.volume = VOLUME; sound.preload = 'auto';
     const voice = { stop: () => { sound.pause(); voices.delete(voice); } };
     sound.onended = sound.onerror = () => { voices.delete(voice); };
@@ -90,16 +97,16 @@ function htmlSound(name: SoundName, ticket: number) {
     if (work) void work.catch(() => { voices.delete(voice); });
   } catch { /* No media support or autoplay access: gameplay remains available. */ }
 }
-export function playSound(name: SoundName): void {
+export function playSound(name: SoundName, url = samplePath(name)): void {
   if (!enabled || typeof document !== 'undefined' && document.hidden) return;
   const ticket = generation;
   installLifecycle();
   const ctx = audioContext();
-  if (!ctx) { htmlSound(name, ticket); return; }
+  if (!ctx) { htmlSound(url, ticket); return; }
   if (ctx.state === 'suspended') void ctx.resume().catch(() => {});
-  void bufferFor(name, ctx).then(buffer => {
+  void bufferFor(url, ctx).then(buffer => {
     if (!enabled || ticket !== generation) return;
-    if (!buffer || ctx.state !== 'running') { htmlSound(name, ticket); return; }
+    if (!buffer || ctx.state !== 'running') { htmlSound(url, ticket); return; }
     const source = ctx.createBufferSource();
     const gain = ctx.createGain();
     source.buffer = buffer; gain.gain.value = VOLUME;
@@ -142,7 +149,7 @@ export function cuesForEvents(events: readonly GameEvent[], details: SoundContex
   // One aggregate cue per semantic event class, even for eight simultaneous hits.
   return cues;
 }
-export function soundForEvents(events: readonly GameEvent[], details: SoundContext = {}): SoundCue[] {
+export function soundForEvents(events: readonly GameEvent[], details: SoundContext = {}, samples?: SoundSamples): SoundCue[] {
   const cues = cuesForEvents(events, details);
   if (details.key) {
     if (recentKeys.has(details.key)) return [];
@@ -151,12 +158,12 @@ export function soundForEvents(events: readonly GameEvent[], details: SoundConte
   }
   if (!enabled) return cues;
   for (const cue of cues) {
-    if (!cue.delayMs) playSound(cue.name);
+    if (!cue.delayMs) playSound(cue.name, samples?.[cue.name]);
     else {
       const ticket = generation;
       const timer = setTimeout(() => {
         timers.delete(timer);
-        if (ticket === generation) playSound(cue.name);
+        if (ticket === generation) playSound(cue.name, samples?.[cue.name]);
       }, cue.delayMs);
       timers.add(timer);
     }

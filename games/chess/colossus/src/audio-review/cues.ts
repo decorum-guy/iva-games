@@ -34,26 +34,30 @@ function promotion(key: 'N' | 'R' | 'Q', title: Localized): Moment {
 const beforeBreak = createGame({ seed: 'colossus-audio-review' });
 const afterBreak = { ...beforeBreak, boss: { ...beforeBreak.boss, armor: 0 } };
 
+export const armorVictory: Moment = {
+  id: 'armor-victory',
+  title: { ru: 'Пробитие брони и победа', en: 'Armor breaks and the army wins' },
+  events: [{ type: 'attack', armor: 1, hp: 3 }, { type: 'victory' }],
+  details: { before: beforeBreak, after: afterBreak },
+};
+
+export const wardBlock: Moment = {
+  id: 'ward',
+  title: { ru: 'Карта и срабатывание щита', en: 'Card play and a shield block' },
+  events: [{ type: 'card' }, { type: 'damage', amount: 0, absorbed: 2 }, { type: 'round' }],
+};
+
 export const moments: Moment[] = [
   promotion('N', { ru: 'Ход и превращение в коня или слона', en: 'Move and promote to knight or bishop' }),
   promotion('R', { ru: 'Ход и превращение в ладью', en: 'Move and promote to rook' }),
   promotion('Q', { ru: 'Ход и превращение в ферзя', en: 'Move and promote to queen' }),
-  {
-    id: 'ward',
-    title: { ru: 'Карта и срабатывание щита', en: 'Card play and a shield block' },
-    events: [{ type: 'card' }, { type: 'damage', amount: 0, absorbed: 2 }, { type: 'round' }],
-  },
+  wardBlock,
   {
     id: 'charge',
     title: { ru: 'Таран и гибель фигуры', en: 'Boss charge and a fallen piece' },
     events: [{ type: 'move', unitId: 'boss' }, { type: 'damage', amount: 2 }, { type: 'death' }, { type: 'round' }],
   },
-  {
-    id: 'armor-victory',
-    title: { ru: 'Пробитие брони и победа', en: 'Armor breaks and the army wins' },
-    events: [{ type: 'attack', armor: 1, hp: 3 }, { type: 'victory' }],
-    details: { before: beforeBreak, after: afterBreak },
-  },
+  armorVictory,
   {
     id: 'fire-defeat',
     title: { ru: 'Огонь и поражение', en: 'Fire and defeat' },

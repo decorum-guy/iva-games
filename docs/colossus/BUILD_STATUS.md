@@ -1,5 +1,13 @@
 # COLOSSUS — implementation state
 
+## Owner audio decisions — 28 November 2026
+
+The owner approved 15 of 17 cues in Safari for sound bank v2. The two open cues are **Armor hit** (`armour`) and **Shield or invulnerability** (`shield`). The armor hit needs a contact closer to a strike on a shield. The owner requested several new shield cues for comparison.
+
+The [second listening demo](README.md#прослушивание-звуков) compares the current versions with three original candidates for each cue. Each option can play on its own or inside the same game cue sequence. The six audition files live beside the demo sources. The 17 original game files are byte identical to the reviewed bank. The owner will choose the two replacements in a later listening pass.
+
+The six audition checksums matched the served files. Headless Chromium and WebKit each exercised eight solo plays and eight battle sequences with the game mixer. Both verified selection, reload, report download and preservation of the original review decisions.
+
 ## Terra findings and audio review — 28 November 2026
 
 This follow-up to the audit of `95cf869765ff2b9541bd858bbc69a10f90c9d4af` incorporates main `a3df8369b269c53aea4c3839fade24e7064a4ce1`. The conflict in the shared build status was resolved by keeping both project records.
@@ -10,9 +18,9 @@ This follow-up to the audit of `95cf869765ff2b9541bd858bbc69a10f90c9d4af` incorp
 - **C-01:** The Vite fixture root uses the physical temporary directory path. Both HMR regressions passed on macOS with its default symlinked `TMPDIR`, including the actual WebSocket update and React Refresh check.
 - **Mobile browser checks:** Home and End scroll the focused bestiary details while keeping its selector fixed. Audio initialization now waits for game entry or an audio control in the menu.
 
-The [local listening demo](README.md#прослушивание-звуков) plays the shipped assets through the game's mixer. All 17 file checksums matched, and native Web Audio started all 17 effects and seven event sequences in both headless Chromium and WebKit. Both browsers also verified mute, local decisions, reload and report download. The owner's listening decision and physical phone play remain open.
+The [local listening demo](README.md#прослушивание-звуков) plays the shipped assets through the game's mixer. All 17 file checksums matched, and native Web Audio started all 17 effects and seven event sequences in both headless Chromium and WebKit. Both browsers also verified mute, local decisions, reload and report download. Physical phone play remains open. The owner's listening decisions are recorded above.
 
-Local `npm run check` passed 1,196 tests in 94 files with two Vitest workers and the standard macOS temporary directory. The complete build, workspace and platform HTTP smoke tests, and the targeted board, card and tutorial rerun passed. The current CI checks for the review branch are tracked in [PR #29](https://github.com/decorum-guy/iva-games/pull/29/checks).
+Local `npm run check` passed 1,196 tests in 94 files with two Vitest workers and the standard macOS temporary directory. The complete build, workspace and platform HTTP smoke tests passed. The first full browser rerun passed 35 cases and timed out opening Settings in a mobile test setup. After setting presentation preferences in the test setup and retaining real language and settings actions in dedicated cases, the full rerun passed all 36 cases with two intentional skips. The current CI checks for the review branch are tracked in [PR #29](https://github.com/decorum-guy/iva-games/pull/29/checks).
 
 ## Current-main integration after UI acceptance — 28 November 2026
 
