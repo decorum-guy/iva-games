@@ -24,3 +24,11 @@ The game package contains the fixed-step Rapier chassis/cargo simulation, catalo
 The common live layer is published separately at [PR #42](https://github.com/decorum-guy/iva-games/pull/42), `feat/iva-realtime-foundation`; this game includes that tree. No common layer was present at the initial main baseline. A later Shift documentation branch describes a planned parallel layer but contains no published implementation at the checked ref; integration ownership must remain explicit.
 
 See [ACCEPTANCE.md](ACCEPTANCE.md) for exact executed evidence, discovered defects, source corrections and browser access rejection; [ASSET_VALIDATION.md](ASSET_VALIDATION.md) separates geometry/signal checks from unperformed visual and listening acceptance. No merge or production release has occurred.
+
+## First published game candidate
+
+- Draft [PR #44](https://github.com/decorum-guy/iva-games/pull/44), branch `feat/test-bench`.
+- Commit `6083e95d5bdd987a6fa220f5f81fcf08c59735cf`; exact source tree `1f6275152ad50997f76e2ab462c5a7521d20e1b1`.
+- The authenticated GitHub connector published immutable blobs/tree/commit and created the new branch without force. The tree hash was verified against the local staged tree; fetching and fast-forwarding the local branch preserved all later unstaged diagnostics. The ordinary CLI push could not authenticate, so no CLI push success is claimed.
+- Platform CI [run 46152314851](https://github.com/decorum-guy/iva-games/actions/runs/46152314851) and PR image validation [run 46152314952](https://github.com/decorum-guy/iva-games/actions/runs/46152314952) started for this exact SHA. Results belong in ACCEPTANCE.md after completion.
+- Still **0 personal full browser acceptance cycles and 0 Test Bench production releases**. The expanded owner-pump performance gate failed and is recorded, not hidden by earlier narrower passes.

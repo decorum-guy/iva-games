@@ -241,6 +241,22 @@ async function inspect(player, name, { race = false, low = false } = {}) {
   await page.screenshot({ path: join(output, `${player.name}-${name}.png`), fullPage: false });
 }
 
+async function failureScreen(player) {
+  const page = player.page;
+  const dialog = page.locator('dialog[open]').first();
+  const hasDialog = await dialog.count().catch(() => 0);
+  const scope = hasDialog ? dialog : page.locator('body');
+  const [visibleText, accessibility] = await Promise.all([
+    scope.innerText({ timeout: 2000 }).catch(error => `Unavailable: ${error.message}`),
+    scope.ariaSnapshot({ timeout: 2000 }).catch(error => `Unavailable: ${error.message}`),
+  ]);
+  return {
+    profile: player.name, path: new URL(page.url()).pathname, scope: hasDialog ? 'open dialog' : 'body',
+    visibleText: visibleText.slice(0, 1800), visibleTextTruncated: visibleText.length > 1800,
+    accessibility: accessibility.slice(0, 4200), accessibilityTruncated: accessibility.length > 4200,
+  };
+}
+
 async function settings(player, { locale = player.locale, renderer = '3d', quality = 'low', exhaustive = false } = {}) {
   const page = player.page;
   await page.getByRole('button', { name: label(player, 'Настройки', 'Settings'), exact: true }).click();
@@ -759,7 +775,11 @@ try {
 } catch (error) {
   failure = error; report.status = 'failed'; report.error = error.stack ?? error.message;
   report.lastObserved = players.map(player => ({ profile: player.name, phase: view(player)?.phase, stage: view(player)?.stage, lane: view(player)?.you.lane ? { tick: view(player).you.lane.tick, position: view(player).you.lane.car.position, speed: view(player).you.lane.car.speed, yaw: view(player).you.lane.car.yaw, gates: view(player).you.lane.gatesPassed, cargo: view(player).you.lane.cargo.map(cargo => ({ status: cargo.status, health: cargo.health })) } : null }));
+  report.failureScreens = [];
   for (const player of players) {
+    // Keep the observed names and visible state in the console's final report:
+    // CI deliberately uploads no screenshots, traces or report artifacts.
+    report.failureScreens.push(await failureScreen(player));
     await player.page.screenshot({ path: join(output, `${player.name}-failure.png`), fullPage: true }).catch(() => {});
     await writeFile(join(output, `${player.name}-failure.txt`), await player.page.locator('body').innerText().catch(() => 'Page unavailable'));
   }
