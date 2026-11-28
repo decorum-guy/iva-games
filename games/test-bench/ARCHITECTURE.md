@@ -18,6 +18,18 @@ The shared foundation was developed separately in `feat/iva-realtime-foundation`
 
 At that same check, remote `feat/shift` was `a9fd11dc758a14a46fd0efe7ade0a3766b2ca1c8`. Its only changes from the original main were `games/shift/SPEC.md`, `STATUS.md`, `package.json` and `vitest.config.ts`. Its status says it intends to add a narrow shared realtime interface. No published Shift gateway code or Shift PR was observed. This is a concrete ownership overlap to reconcile before integrating future shared changes, not evidence of a second implemented gateway. The existing optional interface and authenticated endpoint are the reuse point. No repository comment or message to another project owner was sent as part of this inspection.
 
+### Subsequent cross-PR audit after candidate 7
+
+The preceding paragraph records the earlier ref only. A fresh inspection found the following **published draft implementations**, while accepted main remained `1f571a7fa24a5c682a236d5fa0ef5a499f09c24d`:
+
+| Draft | Inspected immutable head | Current transport relationship |
+| --- | --- | --- |
+| [Shift #46](https://github.com/decorum-guy/iva-games/pull/46) | `d917de193ea23a10d01a098a4aa16be709f16ed4` | `apps/platform/src/live.ts` attaches another handler to the same `/api/platform/v1/rooms/:id/live` path, using `LiveGameSession` / `openLiveSession`, `shift-wire@1` and `controllerEpoch`. It does not use the #42 `iva-live@1` contract. |
+| [Knock First #48](https://github.com/decorum-guy/iva-games/pull/48) | `3487a7d981cc158d5c649e86eeedee9107fba4ed` | Includes #42 in its history and uses its `RealtimeGameRuntime` / `iva-live@1`. The inspected platform `realtime.ts` is byte-for-byte identical to #42. |
+| [Forpost #47](https://github.com/decorum-guy/iva-games/pull/47) | `5cc963b84aa8401e24621e595beca9ed16f9e0ae` | Separate `apps/realtime-server`, `/ws/realtime/v1`, `iva-realtime-v1`, and a signed admission ticket from `/rooms/:id/realtime-ticket`; overlaps platform lifecycle, shared types and deployment, not the same upgrade path. |
+
+These branches are not incorporated into this game or main. Two handlers for the same room-live URL are **not an agreed common foundation**. The integration requirement is one #42 platform gateway, with a game-specific Shift adapter to its optional runtime contract and unchanged game-owned state/receipts; #48 already reuses that gateway. Forpost's separate service requires an explicit compatibility decision for lifecycle, shared contracts, images, compose and backups. This is an unresolved cross-PR integration boundary, not authorization to overwrite another game's branch or silently change its transport. No such edits, merges or external messages were performed. Recheck the actual shared main before any accepted release.
+
 ## Build and local run
 
 Use Node 24 as in CI. From the repository root:

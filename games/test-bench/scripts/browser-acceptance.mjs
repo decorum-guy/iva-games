@@ -41,9 +41,9 @@ let port = 0;
 let relay;
 const report = {
   status: 'running', method: 'Automated Chromium UI against production client/server bundles',
-  scope: 'Two isolated account contexts and two explicit bots; public UI inputs and observed snapshots',
+  scope: 'Automated 2D online protocol/controller diagnostic with two isolated account contexts and two explicit bots; separate 3D practice, tutorial and fault checks',
   humanPlaytest: false, audioListening: false, physicalDevice: false, mockedGameApi: false,
-  directGameplayApiCommands: 0, externalMessages: 0, fullCups: 0, tutorial: 'not started',
+  directGameplayApiCommands: 0, externalMessages: 0, fullCups: 0, fullCupsMode: '2D browser automation; neither human play nor 3D online acceptance', tutorial: 'not started',
   extendedCoverage: {
     enabled: extended, flag: 'IVA_BROWSER_EXTENDED=1', targetedZeroScoreTieCups: 0,
     looseCargoPickup: { status: extended ? 'not started' : 'disabled' },
@@ -55,13 +55,13 @@ const report = {
   workingTreeDirty: !!execFileSync('git', ['status', '--porcelain'], { cwd: root, encoding: 'utf8' }).trim(),
   scopes: [], requiredScopeFailures: [], scenarios: [], cups: [], metrics: [], coldTransfers: [], layouts: [], browserErrors: [], consoleErrors: [], consoleErrorsDropped: 0, failedAssets: [], expectedOfflineAssetFailures: [], actionErrors: [], observedGameActions: {},
   controls: { keyboardEvents: 0, touchGestures: 0, acceptedUiActions: 0 },
-  roomResponses: [], restoreChecks: [], restoreCommands: [], localDriverTraces: [],
+  roomResponses: [], roomKeyboardActivations: [], restoreChecks: [], restoreCommands: [], restartChecks: [], driveStages: [], localDriverTraces: [],
   controller: {
     method: 'Real keyboard W/A/D/Space/E/R, with normal bot decisions and wheel-angle feedback from received own-lane snapshots',
     delayedPrecision: { enabled: latencyMs > 0, track: 'precision', configuredPerDirectionMs: latencyMs, horizon: 'Decision wall time plus configured input delay minus snapshot.serverTime', inputHistory: 'Last 30 actually observed browser WebSocket input frames, in send order, including frames preceding the snapshot', deliveryEstimate: 'Runner framesent observation time plus configured relay delay', wheelEstimate: 'Snapshot wheel angle replayed at 60 Hz toward each historical steering target, with rate 2.8 rad/s and the snapshot speed limit', poseEstimate: 'Constant received x/z velocity and yaw angular velocity; y, speed and all other lane fields unchanged', clockAssumption: 'Isolated runner and server share one host wall clock. Snapshot timestamp can be later than its physics step; estimates require real-browser validation.', resetScope: 'Socket connection, match, epoch, stage and phase; only controller history is cleared', gameStateMutation: false },
   },
   transport: { path: latencyMs ? 'Owned loopback TCP delay relay for HTTP and WebSocket bytes' : 'Direct owned loopback', configuredPerDirectionMs: latencyMs, publicInternetMeasurement: false },
-  openCoverage: ['Actual listening', 'Physical touch hardware', 'Human browser play'],
+  openCoverage: ['Actual listening', 'Physical touch hardware', 'Human browser play', '3D online driving/performance remains unaccepted: candidate 7 Direct Alice did not finish Precision with SwiftShader; this run uses 2D online without replacing that failure'],
 };
 const http = (url, options = {}) => fetch(url, { ...options, signal: AbortSignal.timeout(8000), redirect: 'error' });
 
@@ -108,24 +108,26 @@ function compactFinalReport() {
     status: report.status, method: report.method, scope: report.scope, ...buildIdentity(),
     humanPlaytest: report.humanPlaytest, audioListening: report.audioListening, physicalDevice: report.physicalDevice,
     directGameplayApiCommands: report.directGameplayApiCommands, externalMessages: report.externalMessages,
-    fullCups: report.fullCups, tutorial: report.tutorial,
+    fullCups: report.fullCups, fullCupsMode: report.fullCupsMode, tutorial: report.tutorial,
     extendedCoverage: { enabled: extended, flag: report.extendedCoverage.flag, targetedZeroScoreTieCups: report.extendedCoverage.targetedZeroScoreTieCups, ...Object.fromEntries(['looseCargoPickup', 'zeroScoreTieCup', 'originalFinishedCupReturn'].map(key => [key, { status: report.extendedCoverage[key].status, error: report.extendedCoverage[key].error }])) },
     scopes: report.scopes.map(verdict), requiredScopeFailures: report.requiredScopeFailures, scenarios: report.scenarios.map(verdict),
-    cups: report.cups.map(cup => ({ roomId: cup.roomId, matchId: cup.matchId, status: cup.status, completedStages: cup.stages.length, stages: cup.stages.map(stage => ({ stage: stage.stage, track: stage.track, mirrored: stage.mirrored, results: stage.results, sameProtocol: stage.sameProtocol, reset: stage.reset, disconnect: stage.disconnect, restart: stage.restart })), standings: cup.standings })),
-    controls: report.controls, observedGameActions: report.observedGameActions, roomResponses: report.roomResponses,
+    cups: report.cups.map(cup => ({ roomId: cup.roomId, matchId: cup.matchId, mode: cup.mode, renderers: cup.renderers, status: cup.status, completedStages: cup.stages.length, stages: cup.stages.map(stage => ({ stage: stage.stage, track: stage.track, mirrored: stage.mirrored, results: stage.results, sameProtocol: stage.sameProtocol, reset: stage.reset, disconnect: stage.disconnect, restart: stage.restart })), standings: cup.standings })),
+    controls: report.controls, observedGameActions: report.observedGameActions, roomResponses: report.roomResponses, roomKeyboardActivations: report.roomKeyboardActivations,
     errorCounts: { uncaught: report.browserErrors.length, console: report.consoleErrors.length, consoleOccurrences: report.consoleErrors.reduce((sum, item) => sum + item.occurrences, 0), consoleDropped: report.consoleErrorsDropped, failedAssets: report.failedAssets.length, unexpectedActions: report.actionErrors.length, expectedOfflineAssets: report.expectedOfflineAssetFailures.length, transport: players.map(player => ({ profile: player.name, count: player.transportErrors.length })) },
     coldTransfers: report.coldTransfers.map(value => ({ profile: value.profile, scope: value.scope, transferBytes: value.transferBytes, encodedBodyBytes: value.encodedBodyBytes, transferredEncodedBodyBytes: value.transferredEncodedBodyBytes, transferIsBrowserEstimate: value.transferIsBrowserEstimate, exactWireBytesMeasured: value.exactWireBytesMeasured, fixedHeaderAllowanceBytes: value.fixedHeaderAllowanceBytes, navigationEntries: value.navigationEntries, resourceEntries: value.resourceEntries, cachedRepeatCount: value.inSceneCachedRepeats.length, unavailableCount: value.zeroOrUnavailableEntries.length, excludedOriginCount: value.excludedOrigins.length, readiness: value.readiness, budget: value.budget })),
     transport: report.transport, onlineRenderers: report.onlineRenderers,
     controller: { ...report.controller, profiles: report.controller.profiles?.map(({ samples, resetObservations, ...stats }) => ({ ...stats, sampleCount: samples.length, recordedResetCount: resetObservations.length })) },
     restoreChecks: report.restoreChecks.map(({ snapshots, inputFrames, ...check }) => ({ ...check, recordedSnapshots: snapshots.length, recordedInputFrames: inputFrames.length })),
     restoreCommands: report.restoreCommands,
+    restartChecks: report.restartChecks,
+    driveStages: report.driveStages.map(({ profiles, ...stage }) => ({ ...stage, profiles: profiles.map(({ firstObservations, trajectory, ...profile }) => ({ ...profile, firstObservationCount: firstObservations.length, retainedTrajectoryCount: trajectory.length })) })),
     localDriverTraces: report.localDriverTraces.map(({ observations, keyTransitions, ...trace }) => ({ ...trace, recordedObservations: observations.length, recordedKeyTransitions: keyTransitions.length })),
     metrics: report.metrics,
     layouts: report.layouts.map(({ name, profile, width, height, scrollWidth, controls }) => ({ name, profile, width, height, scrollWidth, offscreen: controls.filter(control => control.visible && !control.inViewport) })),
     assetLoads: report.assetLoads ?? players.map(player => ({ profile: player.name, files: player.loadedAssets.size, receivedSnapshots: player.receivedFrames, sentInputFrames: player.sentInputs, socketConnections: player.socketConnections, socketCloses: player.socketCloses })),
     openCoverage: report.openCoverage, lastObserved: report.lastObserved, error: report.error, cleanupError: report.cleanupError,
     evidenceFormat: 'test-bench-browser@1 NDJSON; multipart dataFragment values concatenate in part order into the exact JSON value. Every output line is at most 8192 bytes.',
-    omittedFromConsole: 'Complete resource lists and complete local-driver traces remain in the ignored local report. Scenario evidence, scope diagnostics, counters and build identities are emitted separately.',
+    omittedFromConsole: 'Complete resource lists and complete local-driver traces remain in the ignored local report. Bounded drive-stage trajectories, restart checks, scenario evidence, scope diagnostics, counters and build identities are emitted separately.',
   };
 }
 
@@ -174,7 +176,7 @@ async function requiredScope(id, name, work, dependencies = []) {
   } finally {
     const { failureScreens, ...verdict } = row;
     await emitEvidence('scope', verdict);
-    for (const screen of failureScreens ?? []) await emitEvidence('scope-screen', { scope: id, ...screen });
+    for (const screen of failureScreens ?? []) await emitEvidence('scope-screen', { scopeId: id, ...screen });
   }
 }
 async function availablePort() {
@@ -419,7 +421,7 @@ async function action(player, locator, type, activation = 'click') {
   return body.view;
 }
 async function roomAction(player, locator, endpoint, activation = 'click') {
-  let result; let metadata;
+  let result; let metadata; let keyboardActivation;
   const previousUrl = player.page.url();
   // /rooms can destroy its document immediately after the client consumes the
   // response. Metadata survives; a CDP body read still races that navigation.
@@ -433,20 +435,44 @@ async function roomAction(player, locator, endpoint, activation = 'click') {
     return true;
   });
   const activate = async () => {
-    if (activation === 'Space') { await locator.focus(); await locator.press('Space'); report.controls.keyboardEvents += 2; }
-    else await locator.click();
+    if (activation !== 'Space') { await locator.click(); return; }
+    keyboardActivation = { profile: player.name, endpoint, key: 'Space', status: 'waiting for enabled and focused control', startedAtMs: Date.now() };
+    report.roomKeyboardActivations.push(keyboardActivation);
+    await expect(locator).toBeEnabled();
+    await locator.focus(); await expect(locator).toBeFocused();
+    const element = await locator.elementHandle(); assert.ok(element);
+    const inspectControl = () => element.evaluate(button => ({ capturedAtMs: Date.now(), connected: button.isConnected, enabled: !button.matches(':disabled'), focused: document.activeElement === button, label: button.textContent?.trim().slice(0,160) ?? '', documentFocused: document.hasFocus(), visibility: document.visibilityState }));
+    try {
+      keyboardActivation.beforeDispatch = await inspectControl();
+      keyboardActivation.dispatchedAtMs = Date.now();
+      await locator.press('Space'); report.controls.keyboardEvents += 2;
+      keyboardActivation.acknowledgedAtMs = Date.now(); keyboardActivation.status = 'key dispatched';
+    } finally {
+      // Keep the same DOM element handle: a successful ready action changes
+      // its accessible name, so the original name locator may no longer match.
+      keyboardActivation.afterDispatch = await inspectControl().catch(error => ({ unavailable: error.message }));
+      await element.dispose();
+    }
   };
-  await Promise.all([pending, activate()]);
-  if (endpoint === '/rooms') {
-    await player.page.waitForURL(url => url.origin === origin && /^\/rooms\/[^/]+$/.test(url.pathname) && url.href !== previousUrl, { waitUntil: 'commit' });
-    const roomId = decodeURIComponent(new URL(player.page.url()).pathname.split('/').at(-1));
-    // Observe the room reached by the real UI. This GET never creates a room,
-    // replays its POST, issues gameplay commands or changes application state.
-    result = await player.account.request('/rooms/' + encodeURIComponent(roomId));
-    assert.equal(result.room.roomId, roomId); assert.equal(result.room.gameId, 'test-bench');
-    metadata.navigationPath = new URL(player.page.url()).pathname; metadata.followup = 'Read-only GET of the room reached by UI navigation';
+  try {
+    await Promise.all([pending, activate()]);
+    if (endpoint === '/rooms') {
+      await player.page.waitForURL(url => url.origin === origin && /^\/rooms\/[^/]+$/.test(url.pathname) && url.href !== previousUrl, { waitUntil: 'commit' });
+      const roomId = decodeURIComponent(new URL(player.page.url()).pathname.split('/').at(-1));
+      // Observe the room reached by the real UI. This GET never creates a room,
+      // replays its POST, issues gameplay commands or changes application state.
+      result = await player.account.request('/rooms/' + encodeURIComponent(roomId));
+      assert.equal(result.room.roomId, roomId); assert.equal(result.room.gameId, 'test-bench');
+      metadata.navigationPath = new URL(player.page.url()).pathname; metadata.followup = 'Read-only GET of the room reached by UI navigation';
+    }
+    if (keyboardActivation) { keyboardActivation.status = 'response confirmed'; keyboardActivation.responseStatus = metadata.status; }
+    report.controls.acceptedUiActions++; return result;
+  } catch (error) {
+    if (keyboardActivation) { keyboardActivation.status = 'failed'; keyboardActivation.error = error.message; }
+    throw error;
+  } finally {
+    if (keyboardActivation) await emitEvidence('room-keyboard-activation', keyboardActivation);
   }
-  report.controls.acceptedUiActions++; return result;
 }
 async function inspect(player, name, { race = false, low = false } = {}) {
   const page = player.page;
@@ -1097,6 +1123,39 @@ async function keyboardDrive(player) {
   if (decision.interact && Date.now() - player.lastInteract > 450) { await player.page.keyboard.press('KeyE'); report.controls.keyboardEvents += 2; player.lastInteract = Date.now(); }
 }
 
+function observedDriveState(player) {
+  const snapshot = player.snapshot, current = snapshot?.view, lane = current?.you.lane;
+  const sent = player.lastSent;
+  return {
+    readAtMs: Date.now(), receivedAtMs: player.receivedAt ?? null, serverTime: snapshot?.serverTime ?? null,
+    receivedFrameCount: player.receivedFrames, snapshotConnection: player.snapshotConnection ?? null,
+    roomId: current?.roomId ?? null, matchId: current?.matchId ?? null, participantId: current?.you.participantId ?? null,
+    epoch: snapshot?.epoch ?? null, phase: current?.phase ?? null, phaseId: current?.phaseId ?? null, stage: current?.stage ?? null,
+    lastAcceptedSeq: snapshot?.lastAcceptedSeq ?? null, heldKeys: [...player.held],
+    sentInputFrameCount: player.sentInputs,
+    lastSentInput: sent ? { seq: sent.seq, matchId: sent.matchId, epoch: sent.epoch, phaseId: sent.payload?.phaseId, throttle: sent.payload?.throttle, steering: sent.payload?.steering, brake: sent.payload?.brake } : null,
+    lane: lane ? { tick: lane.tick, position: { ...lane.car.position }, speed: lane.car.speed, yaw: lane.car.yaw, charge: lane.car.charge, wheelSteering: lane.car.wheels[0]?.steering ?? null, gatesPassed: lane.gatesPassed, interaction: lane.interaction, resets: lane.resets, finished: lane.finished, cargo: lane.cargo.map(cargo => ({ id: cargo.id, status: cargo.status, health: cargo.health })) } : null,
+  };
+}
+
+function captureDriveStage(trace, participants, force = false) {
+  for (const [index, player] of participants.entries()) {
+    const profile = trace.profiles[index], observation = observedDriveState(player);
+    profile.readCount++;
+    const previous = profile.lastObservation;
+    profile.lastObservation = observation;
+    if (observation.matchId === trace.matchId && observation.stage === trace.stage && observation.phase === 'racing' && observation.lane) profile.lastRacingObservation = observation;
+    if (previous?.receivedFrameCount === observation.receivedFrameCount && !force) continue;
+    profile.sampledSnapshotCount++;
+    if (profile.firstObservations.length < 4) profile.firstObservations.push(observation);
+    const last = profile.trajectory.at(-1);
+    if (force || !last || observation.readAtMs - last.readAtMs >= 500 || last.phase !== observation.phase || last.epoch !== observation.epoch) {
+      profile.trajectory.push(observation);
+      if (profile.trajectory.length > 32) { profile.trajectory.shift(); profile.evictedTrajectorySamples++; }
+    }
+  }
+}
+
 async function reconnect(player, roomId) {
   const before = player.snapshot; const epoch = before.epoch;
   await keys(player); player.intentionalOffline = true; await player.context.setOffline(true);
@@ -1114,26 +1173,65 @@ async function reconnect(player, roomId) {
 }
 
 async function restartDuringRace(alice, bob) {
-  for (const player of [alice, bob]) await keys(player, ['Space']);
-  await delay(150); const before = [alice, bob].map(player => player.snapshot);
-  await stop(); await start();
-  for (const [index, player] of [alice, bob].entries()) {
-    await waitView(player, current => current.phase === 'recovering' && current.matchId === before[index].matchId, 'five-second recovery after real server restart', 12000);
-    const recovered = view(player);
-    assert.deepEqual(recovered.you.build.blueprint, before[index].view.you.build.blueprint);
-    assert.equal(recovered.you.lane.resets, before[index].view.you.lane.resets);
-    assert.ok(recovered.you.lane.car.charge <= before[index].view.you.lane.car.charge + .001);
-    assert.notEqual(player.snapshot.epoch, before[index].epoch);
-    await expect(player.page.locator('.tb-countdown')).toBeVisible();
-    await expect(player.page.locator('.tb-countdown')).toContainText(label(player, 'Возвращаемся на трассу', 'Returning to the track'));
-    assert.ok(Number(await player.page.locator('.tb-countdown strong').textContent()) >= 1, 'Recovery has a visible positive countdown');
+  const check = { scopeId: 'normalCup', roomId: view(alice).roomId, matchId: view(alice).matchId, stage: view(alice).stage, status: 'running', startedAtMs: Date.now(), profiles: [alice, bob].map(player => ({ profile: player.name, participantId: view(player).you.participantId })) };
+  report.restartChecks.push(check);
+  try {
+    for (const player of [alice, bob]) await keys(player, ['Space']);
+    await delay(150); const before = [alice, bob].map(player => player.snapshot);
+    for (const [index, player] of [alice, bob].entries()) check.profiles[index].before = { observation: observedDriveState(player), blueprint: structuredClone(before[index].view.you.build.blueprint) };
+    await stop(); check.serverStoppedAtMs = Date.now();
+    await start(); check.serverReadyAtMs = Date.now();
+    for (const [index, player] of [alice, bob].entries()) {
+      await waitView(player, current => current.phase === 'recovering' && current.matchId === before[index].matchId, 'five-second recovery after real server restart', 12000);
+      const recovered = view(player), profile = check.profiles[index];
+      profile.recovered = { observation: observedDriveState(player), blueprint: structuredClone(recovered.you.build.blueprint) };
+      assert.deepEqual(recovered.you.build.blueprint, before[index].view.you.build.blueprint);
+      assert.equal(recovered.you.lane.resets, before[index].view.you.lane.resets);
+      assert.ok(recovered.you.lane.car.charge <= before[index].view.you.lane.car.charge + .001);
+      assert.notEqual(player.snapshot.epoch, before[index].epoch);
+      profile.persistenceAssertions = 'passed';
+      await expect(player.page.locator('.tb-countdown')).toBeVisible();
+      await expect(player.page.locator('.tb-countdown')).toContainText(label(player, 'Возвращаемся на трассу', 'Returning to the track'));
+      profile.recoveryUi = { text: await player.page.locator('.tb-countdown').innerText(), countdown: Number(await player.page.locator('.tb-countdown strong').textContent()) };
+      assert.ok(profile.recoveryUi.countdown >= 1, 'Recovery has a visible positive countdown');
+      profile.recoveryScreenAssertions = 'passed';
+    }
+    for (const [index, player] of [alice, bob].entries()) {
+      await waitView(player, current => current.phase === 'racing', 'resumed race after recovery', 8000);
+      check.profiles[index].resumed = observedDriveState(player);
+      await keys(player); await focusLane(player);
+    }
+    check.status = 'passed';
+    return { realProcessRestart: true, persistedBuilds: true, noBatteryRefill: true, recoveryScreen: true, freshEpochs: true };
+  } catch (error) { check.status = 'failed'; check.error = error.message; throw error; }
+  finally {
+    check.finishedAtMs = Date.now();
+    for (const [index, player] of [alice, bob].entries()) check.profiles[index].lastObservation = observedDriveState(player);
+    await emitEvidence('restart-check', check);
   }
-  for (const player of [alice, bob]) { await waitView(player, current => current.phase === 'racing', 'resumed race after recovery', 8000); await keys(player); await focusLane(player); }
-  return { realProcessRestart: true, persistedBuilds: true, noBatteryRefill: true, recoveryScreen: true, freshEpochs: true };
 }
 
 async function driveStage(alice, bob, roomId, stage) {
   const saved = { stage, track: view(alice).track.id, mirrored: view(alice).track.mirrored, events: {}, disconnect: null, restart: null, reset: null };
+  const trace = { scopeId: 'normalCup', roomId, matchId: view(alice).matchId, stage, track: saved.track, mirrored: saved.mirrored, mode: report.fullCupsMode, status: 'running', startedAtMs: Date.now(), observationMethod: 'Read-only own public snapshots and actual last sent input at driver-loop boundaries; first four and last 32 trajectory samples, at most twice per second except phase/epoch transitions', profiles: [alice, bob].map(player => ({ profile: player.name, participantId: view(player).you.participantId, renderer: report.onlineRenderers?.profiles.find(profile => profile.profile === player.name)?.renderer ?? null, readCount: 0, sampledSnapshotCount: 0, evictedTrajectorySamples: 0, firstObservations: [], trajectory: [] })) };
+  report.driveStages.push(trace); captureDriveStage(trace, [alice, bob], true);
+  try {
+    const result = await exerciseDriveStage(alice, bob, roomId, stage, saved, trace);
+    trace.status = 'passed'; return result;
+  } catch (error) { trace.status = 'failed'; trace.error = error.message; throw error; }
+  finally {
+    captureDriveStage(trace, [alice, bob], true); trace.finishedAtMs = Date.now();
+    trace.completedChecks = { disconnect: saved.disconnect, restart: saved.restart, reset: saved.reset, sameProtocol: saved.sameProtocol ?? null };
+    trace.restartStatus = report.restartChecks.find(check => check.matchId === trace.matchId && check.stage === stage)?.status ?? 'not attempted';
+    trace.committed = [alice, bob].map(player => {
+      const current = view(player), record = current?.matchId === trace.matchId ? current.stages[stage] : null;
+      return { profile: player.name, participantId: current?.you.participantId ?? null, results: record?.results ?? null, events: record ? Object.fromEntries(Object.entries(record.events).map(([participantId, events]) => [participantId, { count: events.length, finalEvents: events.slice(-12) }])) : null };
+    });
+    await emitEvidence('drive-stage', trace);
+  }
+}
+
+async function exerciseDriveStage(alice, bob, roomId, stage, saved, trace) {
   const seen = new Map([alice, bob].map(player => [player.name, new Map()]));
   const maxCharge = {};
   if (stage === 0) {
@@ -1172,6 +1270,7 @@ async function driveStage(alice, bob, roomId, stage) {
   const deadline = Date.now() + 115000;
   let disconnected = false, restarted = false, snapshots = false;
   while (Date.now() < deadline) {
+    captureDriveStage(trace, [alice, bob]);
     const current = [alice, bob].map(player => view(player));
     if (current.every(state => state?.stage === stage && state.phase === 'debrief')) break;
     for (const player of [alice, bob]) {
@@ -1228,7 +1327,7 @@ async function driveStage(alice, bob, roomId, stage) {
 
 async function cup(alice, bob) {
   const created = await scenario('Create four-seat room, invite/kick/reinvite, bots, ready and start through UI', () => createCup(alice, bob));
-  const record = { ...created, stages: [] }; report.cups.push(record);
+  const record = { ...created, mode: report.fullCupsMode, renderers: structuredClone(report.onlineRenderers.profiles), stages: [] }; report.cups.push(record);
   for (let stage = 0; stage < 3; stage++) {
     const builds = await scenario(`Cup stage ${stage + 1}: briefing and legal build controls`, () => buildStage(alice, bob, stage));
     const raced = await scenario(`Cup stage ${stage + 1}: two keyboard drivers and two bots`, () => driveStage(alice, bob, created.roomId, stage));
@@ -1478,13 +1577,13 @@ try {
   });
   if (!lesson.ok) report.tutorial = 'failed';
   await requiredScope('onlinePreparation', 'Configure both online renderers through normal settings UI', async () => {
-    const renderers = [await prepareProfile(alice, 'ru', latencyMs ? '2d' : '3d'), await prepareProfile(bob, 'en', '2d')];
-    report.onlineRenderers = { reason: latencyMs ? 'Both profiles use 2D for delayed-path driving; separate 3D practice checks are retained' : 'Direct-path Alice uses 3D and Bob uses 2D', profiles: renderers };
+    const renderers = [await prepareProfile(alice, 'ru', '2d'), await prepareProfile(bob, 'en', '2d')];
+    report.onlineRenderers = { mode: '2D protocol/controller diagnostic', reason: 'Both profiles use 2D after the observed candidate 7 Direct 3D Precision failure; separate 3D practice, tutorial and fault checks remain required', prior3dFailure: { candidate: 7, jobId: 141033750423, profile: 'alice', track: 'precision', result: 'Not finished at the real 3900-tick deadline', hardwarePerformanceAccepted: false }, profiles: renderers };
   });
   await requiredScope('browserNetwork', 'Resource Timing path interval and separate JavaScript completion after renderer settings', () => browserPathProbe(alice), ['onlinePreparation']);
   // A failed measurement/practice/tutorial still makes the overall run fail,
   // but does not suppress independent online evidence through normal UI.
-  const finished = await requiredScope('normalCup', 'Independent normal three-stage cup: two keyboard drivers and two explicit bots', () => cup(alice, bob), ['onlinePreparation']);
+  const finished = await requiredScope('normalCup', 'Automated 2D normal three-stage cup: two keyboard drivers and two explicit bots', () => cup(alice, bob), ['onlinePreparation']);
   const original = finished.ok ? { ...finished.value, standings: structuredClone(view(alice).standings), stages: structuredClone(view(alice).stages) } : null;
   if (extended) {
     const pickup = await requiredScope('looseCargoPickup', 'Independent extended surviving loose-cargo pickup after the normal cup attempt', async () => {
@@ -1493,7 +1592,7 @@ try {
     });
     if (!pickup.ok && report.extendedCoverage.looseCargoPickup.status === 'not started') report.extendedCoverage.looseCargoPickup = { status: 'blocked', error: 'Normal UI preparation for this independent target failed' };
     const tie = await requiredScope('zeroScoreTieCup', 'Independent targeted zero-score tie with three real deadlines', async () => {
-      await prepareProfile(alice, 'ru', latencyMs ? '2d' : '3d'); await prepareProfile(bob, 'en', '2d');
+      await prepareProfile(alice, 'ru', '2d'); await prepareProfile(bob, 'en', '2d');
       return extendedScenario('zeroScoreTieCup', 'Extended: separate zero-score tie cup, two humans, no bots, three real deadlines', () => zeroScoreTieCup(alice, bob));
     });
     if (!tie.ok && report.extendedCoverage.zeroScoreTieCup.status === 'not started') report.extendedCoverage.zeroScoreTieCup = { status: 'blocked', error: 'Normal UI preparation for this independent target failed' };
