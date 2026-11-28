@@ -127,6 +127,7 @@
  .territory-map-first { gap:5px; }
  .territory-map-first .territory-top { row-gap:4px; }
  .territory-map-first .territory-players>li { padding-block:3px; }
+ .territory-map-first .territory-map-tools .ta-offer { padding-block:3px 5px;gap:3px; }
  .territory-map-first .territory-roll { min-height:35px;padding-block:3px;gap:5px; }
  .territory-map-first .territory-die,.territory-map-first .territory-die-empty { width:26px;height:26px; }
  .territory-map-first .territory-roll-copy>small { display:none; }
