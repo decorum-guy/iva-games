@@ -262,6 +262,10 @@ class PromotionIsolationTest(unittest.TestCase):
         if binary == 'compose.sh':
             if args[1] == 'ps':
                 return f'{args[-1]}-container'
+            if args[1:4] == ('exec', '-T', 'realtime'):
+                self.assertEqual(args[4:6], ('node', '/app/scripts/realtime-control.mjs'))
+                self.mutations.append(('control', args[-1]))
+                return ''
             self.assertEqual(args[1:10], ('up', '-d', '--no-deps', '--no-build', '--pull', 'never',
                                           '--wait', '--wait-timeout', '75'))
             for service in args[10:]:
@@ -324,6 +328,68 @@ class PromotionIsolationTest(unittest.TestCase):
         self.assertTrue(all(mutation[1] == 'platform' for mutation in self.mutations))
         self.assertEqual(activation.load(activation.CONFIG / 'pins.json'), self.previous)
         self.assertTrue((activation.STATE / 'pending.json').exists())
+
+    def add_realtime(self):
+        service = {'image': 'realtime-old', 'sha': 'a' * 40, 'inputs': 'a' * 64, 'compatibility': 'f' * 64}
+        self.previous['services']['realtime'] = service
+        self.candidate['services']['realtime'] = copy.deepcopy(service)
+        activation.save(activation.CONFIG / 'pins.json', self.previous)
+
+    def test_platform_update_drains_and_backs_up_realtime_without_recreating_it(self):
+        self.add_realtime()
+        with patch.object(activation, 'public_health', return_value=True):
+            activation.promote(self.candidate, self.previous)
+        self.assertEqual(self.mutations, [('control', 'drain'), ('backup', 'platform'), ('backup', 'realtime'),
+                                         ('up', 'platform', 'platform-new'), ('control', 'resume')])
+        report = activation.load(activation.STATE / 'last-deploy.json')
+        self.assertEqual(set(report['untouched_before']), {'chess', 'realtime', 'caddy'})
+        self.assertEqual(report['untouched_before'], report['untouched_after'])
+
+    def test_realtime_update_preserves_both_other_images_and_backs_up_admission_state(self):
+        self.add_realtime()
+        self.candidate['services']['platform'] = copy.deepcopy(self.previous['services']['platform'])
+        self.candidate['services']['realtime']['image'] = 'realtime-new'
+        with patch.object(activation, 'public_health', return_value=True):
+            activation.promote(self.candidate, self.previous)
+        self.assertEqual(self.mutations, [('control', 'drain'), ('backup', 'platform'), ('backup', 'realtime'),
+                                         ('up', 'realtime', 'realtime-new')])
+
+    def test_realtime_is_resumed_if_the_backup_fails_before_promotion(self):
+        self.add_realtime()
+        self.backup_fails = True
+        with self.assertRaisesRegex(RuntimeError, 'backup failed'):
+            activation.promote(self.candidate, self.previous)
+        self.assertEqual(self.mutations, [('control', 'drain'), ('backup', 'platform'), ('control', 'resume')])
+        self.assertEqual(activation.load(activation.CONFIG / 'pins.json'), self.previous)
+
+    def test_failed_platform_start_resumes_unchanged_realtime_after_compatible_rollback(self):
+        self.add_realtime()
+        def command(*args, **options):
+            result = self.command(*args, **options)
+            if pathlib.Path(args[0]).name == 'compose.sh' and args[1] == 'up' and options['env'].get('PLATFORM_IMAGE') == 'platform-new':
+                raise RuntimeError('candidate failed')
+            return result
+        with patch.object(activation, 'command', side_effect=command), patch.object(activation, 'public_health', return_value=True):
+            with self.assertRaisesRegex(RuntimeError, 'candidate failed'):
+                activation.promote(self.candidate, self.previous)
+        self.assertEqual(self.mutations[-2:], [('up', 'platform', 'platform-old'), ('control', 'resume')])
+        self.assertFalse((activation.STATE / 'pending.json').exists())
+
+    def test_first_realtime_release_does_not_back_up_a_nonexistent_service(self):
+        self.candidate['services']['realtime'] = {'image': 'realtime-first', 'sha': 'b' * 40, 'inputs': 'b' * 64, 'compatibility': 'f' * 64}
+        with patch.object(activation, 'public_health', return_value=True):
+            activation.promote(self.candidate, self.previous)
+        self.assertEqual(self.mutations, [('backup', 'platform'), ('up', 'platform', 'platform-new'), ('up', 'realtime', 'realtime-first')])
+
+    def test_new_image_count_requires_explicit_existing_host_integration(self):
+        for enabled, count in ((False, 3), (True, 2)):
+            activation.save(activation.CONFIG / 'activation.json', {'realtime_enabled': enabled})
+            request = ('a' * 40 + ' ' + ' '.join(['sha256:' + 'b' * 64] * count) + '\nfixture_token\n').encode()
+            stdin = type('Input', (), {'buffer': io.BytesIO(request)})()
+            with self.subTest(enabled=enabled), patch.object(activation.sys, 'stdin', stdin), patch.object(activation, 'verify_main') as verify:
+                with self.assertRaisesRegex(RuntimeError, 'host integration'):
+                    activation.deploy()
+                verify.assert_not_called()
 
 
 class BackupTimeoutTest(unittest.TestCase):

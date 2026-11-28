@@ -1,0 +1,72 @@
+# Forpost interactive inventory
+
+This is the implementation inventory and acceptance checklist. It is derived from the current source. **No row is marked browser-passed yet.** `N/H/P/S/D/W/OK/E` denotes normal, hover, pressed, selected, disabled with reason, waiting, success, and error. Touch has no hover requirement. Each applicable state requires observation in the actual candidate build.
+
+| ID | Element / action | Applicable states | Required original-scenario check |
+|---|---|---|---|
+| M01 | Language RU/EN | N/H/P/S/OK | Menu, game, modal and error copy switch; saved reload |
+| M02 | Three map choices | N/H/P/S/OK | Preview, name and server-selected map agree |
+| M03 | Team size 1/2/3 | N/H/P/S/OK | Equal 2N seats, explicit bot labels |
+| M04 | Bot level | N/H/P/S/OK | All three profiles; no extra HP/damage/economy |
+| M05 | Callsign | N/S/D/OK/E | Empty fallback, maximum length, escaped text |
+| M06 | Weapon and tool | N/H/P/S/OK | All nine pairings; actual starting equipment |
+| M07 | Start practice | N/H/P/D/W/OK/E | Double click, full server, no network, retry |
+| M08 | Resume | N/H/P/D/W/OK/E | Valid/expired match, reload, no active match |
+| M09 | Online link | N/H/P/OK/E | Portal sign-in, room creation, return to game |
+| M10 | Tutorial entry | N/H/P/OK | Seven selectable lessons; no regular save mutation |
+| M11 | Settings entry | N/H/P/OK | Focus trap, Escape, focus restoration |
+| L01 | Create room / room settings | N/H/P/D/W/OK/E | 2/4/6 seats, all maps and server-random map |
+| L02 | Per-seat team | N/H/P/S/D/W/OK/E | Own unready human / host bot; unbalanced start refused |
+| L03 | Per-seat weapon/tool | N/H/P/S/D/W/OK/E | Ownership, ready lock, start preserves selected loadout |
+| L04 | Per-bot level | N/H/P/S/D/W/OK/E | Individual profiles; human level mutation rejected |
+| L05 | Add/remove bot | N/H/P/D/W/OK/E | Full room, explicit labels, readiness reset |
+| L06 | Ready/unready/start | N/H/P/S/D/W/OK/E | Complete equal teams, reserved seat, stale revision |
+| L07 | Open/return to operation | N/H/P/W/OK/E | Signed account admission; no guest/account confusion |
+| F01 | Keyboard movement | N/P/D/OK | WASD/arrows, diagonal normalization, release, text focus |
+| F02 | Mouse aim/fire | N/P/D/OK | Hold vs tap, all weapons, release outside canvas |
+| F03 | Reload / ammo button | N/H/P/D/W/OK/E | Partial/empty/full magazine, death, switching weapon |
+| F04 | Tool button / Space | N/H/P/D/W/OK/E | Barrier placement, smoke clipping, held repair/release |
+| F05 | Mode switch / Tab | N/H/P/S/D/W/OK/E | Fighter→tactics→fighter; autopilot stops immediately |
+| F06 | Own unit bar / 1–4 | N/H/P/S/D/OK | Fighter/builder/two drones, dead unit disappearance |
+| F07 | Unit/building/transport selection | N/H/P/S/D/OK | Own, ally, enemy, hidden enemy, stale building memory |
+| F08 | Shift selection / drag rectangle | N/P/S/OK | Own units only, additive selection, empty rectangle |
+| F09 | Tactical pan / wheel / pinch | N/P/OK | Full map, clamped edges, no accidental order |
+| F10 | Minimap / whole map / zoom ± | N/H/P/OK | Correct coordinates with letterboxing and side swap |
+| F11 | Move/guard/attack/capture/escort/return/stop | N/H/P/S/D/W/OK/E | Legal own-unit command and hidden/stale target refusal |
+| F12 | Context order / right click | N/P/D/W/OK/E | Enemy attack vs move; browser context menu suppressed |
+| F13 | Route north/south | N/H/P/S/D/W/OK/E | Current transport unaffected, cooldown, shared author |
+| F14 | Team pings | N/H/P/D/W/OK/E | Only teammates receive; point validity and limits |
+| F15 | Respawn base/field post | N/H/P/S/D/W/OK/E | Dead fighter, unpowered/suppressed/destroyed post fallback |
+| B01 | Choose pad / B / pad selector | N/H/P/S/D/OK | Own side, occupied and reserved pads, bridge pad |
+| B02 | Eight module options | N/H/P/D/OK/E | Price/power/time, exact shortage/limit/network reason |
+| B03 | Build preview/confirm/cancel | N/H/P/S/D/W/OK/E | Footprint, legal/illegal color, failed command stays open |
+| B04 | Queue item cancel | N/H/P/D/W/OK/E | Before/after work, full/partial reserve, credit cap |
+| B05 | Queue up/down | N/H/P/D/W/OK/E | Active order fixed; future orders reordered |
+| B06 | Builder stop/resume | N/H/P/S/D/W/OK/E | Physical work pauses without losing reservation |
+| B07 | Power priority up/down | N/H/P/S/D/W/OK/E | Consumer order, shortage, generator restoration |
+| B08 | Drone production/cancel | N/H/P/D/W/OK/E | Powered/unpowered queue, two-drone limit, refund |
+| B09 | Battery manual aim/auto | N/H/P/S/D/W/OK/E | Own battery, turn speed, allowed target types |
+| B10 | Sell/confirm/cancel sale | N/H/P/D/W/OK/E | Damage quiet window, 2s sale, queued dock refunds, cap |
+| H01 | Menu/help/settings | N/H/P/OK | Gameplay input neutral while modal open |
+| H02 | Modal close/Escape/outside click | N/H/P/OK | No click-through shot; focus restored; Tab trapped |
+| H03 | Renderer 3D/2D | N/H/P/S/W/OK/E | Preserves match/input, WebGL loss, model failure |
+| H04 | Detail high/low | N/H/P/S/W/OK | Low models load; no stale geometry or material leaks |
+| H05 | Text scale 100/115/130% | N/H/P/S/OK | 390×600 and landscape; no clipped actions |
+| H06 | Master/effect/UI volume and mute | N/P/S/OK | Independent gain, user gesture unlock, no resumed old shots |
+| H07 | Reduced motion / aim assist | N/H/P/S/OK | Persistent, visible targets only, no hidden aim assistance |
+| H08 | On-screen controls switch | N/H/P/S/OK | Sticks/fire/tool/reload fit and remain operable |
+| T01 | Movement stick | N/P/D/OK | Multitouch, cancel, orientation, lost capture |
+| T02 | Aim stick and fire threshold | N/P/D/OK | Below/above35%, last aim, release of every pointer |
+| T03 | Separate fire / reload / tool | N/P/D/W/OK/E | Simultaneous movement, focus loss, interrupted repair |
+| S01 | Connection/reconnect/pause status | N/W/OK/E | Controls neutral; stale screen identified; recovery state |
+| S02 | View-only / take-control | N/H/P/D/W/OK/E | Two tabs/devices, increasing generation, old controller silent |
+| S03 | Health/ammo/power/credits | N/D/W/OK/E | Own data, visible reasons, no opponent private stats |
+| S04 | Error/success toast/dismiss | N/H/P/W/OK/E | Localized actionable text; no hidden target data |
+| U01 | Lesson selection/skip/restart/resume | N/H/P/S/W/OK/E | All seven isolated fixtures and saved stage |
+| U02 | Lesson markers/current objective | N/S/W/OK | One actual predicate at a time; stage changes only on success |
+| U03 | Next lesson/start practice | N/H/P/D/W/OK/E | Final operation result does not cover lesson action |
+| R01 | Operation result/next operation | N/W/OK | Reason, deliveries, side swap and timer |
+| R02 | Final score/statistics | N/OK | Correct win/draw, final-only private combat totals |
+| R03 | Replay/back to room/main menu | N/H/P/D/W/OK/E | No duplicated result, new match ID, preserved account room |
+
+Global cases: keyboard-only navigation; touch emulation and physical device separately labelled; focus loss, tab backgrounding, pointercancel/lost capture, screen rotation; 390×600 and landscape; every modal at130%; browser console/network errors; retry with changed world state; server and client build identities. Disabled controls must expose a nearby reason where it is not already explicit in the visible state.

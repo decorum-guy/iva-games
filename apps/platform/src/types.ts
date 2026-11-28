@@ -47,8 +47,10 @@ export interface GameRuntime {
     actionId: string; expectedRevision: number; payload: unknown;
   }): Promise<unknown>;
   status?(matchId: string): Promise<{ finished: boolean; outcome?: unknown }>;
+  issueRealtimeTicket?(matchId: string, playerId: string, session: { sessionHash: string; expiresAt: number }): Promise<unknown>;
+  acknowledgeResult?(matchId: string, resultId: string): Promise<void>;
 }
-export interface GameRegistration extends Pick<SessionRegistration, 'resolveRoomVersion'> {
+export interface GameRegistration extends Pick<SessionRegistration, 'resolveRoomVersion' | 'validateStart'> {
   gameId: string;
   collectionId?: 'chess' | 'other';
   title: string;
