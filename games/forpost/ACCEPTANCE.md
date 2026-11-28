@@ -2,7 +2,7 @@
 
 ## Status
 
-Implementation is in progress. This document records observed results, not a release certificate. Browser acceptance rounds completed: **0**. No public Forpost release has been made by this task.
+Implementation is in progress. This document records observed results, not a release certificate. Executor-operated browser passages: **0**. Completed automated UI rounds: **5**, none accepted as a whole; one automated full match (FP02, 2D). No public Forpost release has been made by this task.
 
 Sources: the normative project documents merged from PR #41 at `0479cdd43d783afbccc54ed7050637a052edb220`, the local implementation, and actual command results. No remembered conversations or fabricated play sessions are used as evidence.
 
@@ -228,3 +228,33 @@ Precondition/cleanup/focus/collector/District-helper changes await a new immutab
 ### Local verification of the post-R4 candidate
 
 Clean local commit `4730994b95746b31ecf6e5c99415a814957c6e8c`, tree `d24ee6afd350d27267a6022681117040f3e750f1`, passed boundaries, global types/lint, 26 Node harness tests, 80 infrastructure tests and the Forpost client build. [Exact commands/exit codes/log hashes](qa/local-round-5.json). These are focused candidate checks, not another executed UI round, full unit-suite rerun, image build or deployment. New native CI must report its own checkout and client/runtime identities.
+
+## Repository CI round 5 — automated, not executor browser play
+
+Actual completed [platform run 46175575314](https://github.com/decorum-guy/iva-games/actions/runs/46175575314) checked PR head `defb53049ffc594a42c01eb61cdc0a8667f4d756`, source tree `7b3bfe3688c52a5da1833e18a288fe7cd75d6db5`, merge/build revision `9ebeb9e75054876409d81e615743254a1ba976ac`. Runtime `sha256:e943da72ab09c23299e5649a6339a40dc02807a7cced95f98467a1f7c31abbb7`; client `sha256:45e5392176830ca3b151d7956e63a228a26a51046f5fcabeb3d52fbb388a76d1`. [Sanitized numeric evidence](qa/ci-round-5.json) retains source identities and raw-log checksums, not session credentials or raw worlds.
+
+**25 PASS / 7 FAIL in 32 UI executions:** Chromium 16/22, WebKit 9/10. FP02 in 2D completed one real network match through visible controls in 9.5 minutes: actual tactical escort order, two operations, final winner B, tick 16775, result panel and return to menu. This is one automated passage, not executor-operated play, acceptance of all maps, successful delivery by the controlled team or 3D performance. The controlled team recorded zero deliveries in that match.
+
+Four map jobs (FP01/FP03 in both renderers) observed an actual `paused/SERVER_BUSY` message. FP02 3D failed differently: a 1500ms click timed out after an enabled, visible and stable fighter button reached the scroll-into-view step. No overload pause was observed in that job. None of these five map failures is converted to a pass by the independent FP02 result.
+
+| Finding | Original-scenario replay in R5 | Remaining boundary |
+|---|---|---|
+| D22, default-3D tutorial clock | Construction/queue/power/completion/save-resume PASS again, 38.5s | 3D frame-time acceptance still open |
+| D24, restart before new Worker readiness | First lesson and movement with visible Restart focused PASS in Chromium 7.4s and WebKit 9.9s | Physical keyboard/device matrix not inferred |
+| D25, practice response/cleanup | Final lesson → real HTTP201 practice PASS in both; subsequent rooms=0. Late-response lifecycle PASS: create201, abandon200, new lesson0 retained and mode action accepted | Not a full online matrix or arbitrary navigation proof |
+| D26, actual focus loss | Both headless drivers failed `BROWSER_FOCUS_LOSS_UNAVAILABLE` after confirmed initial visible/focused state; Chromium CDP override was actually disabled | Fire-release assertions after the missing event did not run. Same test is prepared for headed Xvfb in R6; no event fabrication or skip |
+| D27/D30, legacy collector | Both image/hour jobs reached the new legacy branch but failed before Docker because the portal asset filenames changed | Canonical two-token correction has 20 focused tests and a fresh actual public read; container replay still pending |
+| D29, slow default 3D | FP01 RAF callback p50/p95 2.4/5.4ms while frame gaps were 266.8/350ms; no measured Scene phase explains the gap | React render/commit, async model completion and GPU completion remain unattributed; no quality reduction or FPS claim |
+
+Native Web Audio replay again decoded all 29 WAVs and verified fresh cue/shot, mute stopping voices, consumed muted events and absence of old shots after reload. No listening occurred. Browser-emulated native touch passed again; no physical phone was tested.
+
+The unchanged core p99 gate passed its original 500 measured samples and 30 warmup steps: 6.322694 / 4.501500 / 3.484693ms. Separate bounded storage diagnosis completed, with actual plain-file fsync p99 118.640ms and FULL SQLite Store.commitBatch call wall p99 18.818ms untraced / 13.538ms traced. The different CI jobs are different machines and windows; these data do not prove every map pause is caused by fsync. Details are in the [writer report](../../docs/iva-games/REALTIME_WRITER_2026_11_28.md).
+
+Chess/platform images, Overdrive (16 PASS/2 SKIP) and Colossus (36 PASS/2 SKIP) passed. Realtime image and the four-room job stopped before Docker/workload; both are failures, with zero seconds of new load. Publish/deploy were skipped. No public revision is accepted.
+
+
+### R5 shared-game replay and next terminal-phase correction
+
+General job141073352848 completed **success**:1440unit/120files(+1opt-in skip),26Node-harness,80Python, types/lint/boundaries,build:all,14realHTTP/WS and all existing-game browser steps passed. D28's original District territorial passage now completed with trade/groupCancel/restart true,298commands,29rounds and one winner. The accepted200/retry assertions stayed active; this does not reconstruct the missing POST trace of R4.
+
+D31 is a separate newly reproduced runtime defect: after a delayed durable final transition, the scheduler's unconditional backlog check could overwrite finished/abandoned/pendingOutcome-paused with SERVER_BUSY. The narrow phase guard applies overload only while still running. [Deterministic red/green evidence](qa/runtime-terminal-phase.json): three failures before,11/11 publication tests after, including a positive control that still pauses an overloaded running match. The1500ms delayed writer-RPC confirmation is fault injection, not an observed1500ms fsync. FULL, thresholds and the committed publication boundary are unchanged. This correction requires a new runtime build and native replay; it does not explain or close the preparation-time map pauses.

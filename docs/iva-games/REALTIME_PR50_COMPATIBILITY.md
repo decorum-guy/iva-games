@@ -2,18 +2,43 @@
 
 ## Статус и источники — 28 ноября 2026
 
-Основной исполнитель проверил через GitHub metadata: [PR50](https://github.com/decorum-guy/iva-games/pull/50) — **draft, не принят и не опубликован**. Совпадение имени протокола не является подтверждением совместимости. `games/tyaga/STATUS.md` в проверенной вершине сообщает о трёх браузерных раундах, нуле полных доставок и незавершённой R04; это отчёт исполнителя Tyaga, а не независимое прохождение в данном аудите.
+Основной исполнитель проверил через GitHub metadata: [PR50](https://github.com/decorum-guy/iva-games/pull/50) — **draft, не принят и не опубликован**. Совпадение имени протокола не является подтверждением совместимости. `games/tyaga/STATUS.md` в новой вершине сообщает о четырёх браузерных раундах, нуле полных доставок и завершённой с дефектами R04; повтор R05 после исправлений ещё не выполнен. Это отчёт исполнителя Tyaga, а не независимое прохождение в данном аудите. Указанный внутри STATUS предыдущий опубликованный commit `b7ab9ed…` является снимком до нового commit; фактическая вершина сверена через git ниже.
 
 Аудит выполнен чтением `git show`/`git diff`, без переключения ветки, изменения production-кода, запуска тестов или браузера.
 
-Повторная проверка перед R4: PR50 остаётся draft, новая вершина `b7ab9ed4265b819299d082e21a6a3957ba1d07de`, tree `14c2e7b9b4992c096fd5d6530aec683294ec8b08`, получена в отдельный ref `refs/remotes/qa/pr50-audit-b7ab9ed`. Единственный новый commit меняет девять CI/fixture/dev-browser scripts. Сравнение `apps/realtime-server/src`, `packages/realtime-kit/src`, `packages/session-kit`, `apps/platform/src` и `packages/game-registry` с указанным ниже `6ab92545` дало нулевую дельту. Выводы о wire/crypto/storage/runtime/catalog остаются применимы; старые результаты исполнения не объявляются результатами новой вершины. Изменённый `deploy/iva-games/verify-realtime-image.sh` требует отдельного согласования с нашей retention-проверкой при будущем объединении. Непринятый PR53 `a148aff7aaccef9820504755e24d849c35980484` содержит только предложенные документы полного цикла; он не включён в ветку и не создаёт новых доступов.
+Историческая повторная проверка перед R4: PR50 оставался draft, вершина `b7ab9ed4265b819299d082e21a6a3957ba1d07de`, tree `14c2e7b9b4992c096fd5d6530aec683294ec8b08`, была получена в отдельный ref `refs/remotes/qa/pr50-audit-b7ab9ed`. Единственный тогда новый commit менял девять CI/fixture/dev-browser scripts. Сравнение `apps/realtime-server/src`, `packages/realtime-kit/src`, `packages/session-kit`, `apps/platform/src` и `packages/game-registry` с указанным ниже `6ab92545` дало нулевую дельту. Выводы о wire/crypto/storage/runtime/catalog сохранялись; старые результаты исполнения не объявлялись результатами новой вершины. Изменённый `deploy/iva-games/verify-realtime-image.sh` требует отдельного согласования с нашей retention-проверкой при будущем объединении. Тогда ещё непринятый PR53 `a148aff7aaccef9820504755e24d849c35980484` содержал предложенные документы полного цикла; дальнейшее принятие отмечено ниже.
+
+Последний delta-аудит после R5: `refs/pull/50/head` получен без checkout/merge в `refs/remotes/qa/pr50-audit-848c626`. Фактический commit — `848c626481a8ada589fb7e3d742af1f47d028e73`, tree — `c1aed62a254744803655048cff4e41d6c369ddd9`. Его родители — ровно `b7ab9ed4265b819299d082e21a6a3957ba1d07de` и принятый main `7c2be21db5743b15b4a42d708ac959039c6b725e`. Таким образом, diff включает уже принятые изменения main и новую работу PR50. Определение «только fixtures» к этой дельте **не применимо**. Детали чтения закреплены в [sanitized evidence](evidence/realtime-pr50-delta-848c626-2026-11-28.json).
 
 | Источник | Commit | Tree |
 |---|---|---|
+| PR50, последний delta-аудит | `848c626481a8ada589fb7e3d742af1f47d028e73` | `c1aed62a254744803655048cff4e41d6c369ddd9` |
+| PR50, предыдущий delta-аудит | `b7ab9ed4265b819299d082e21a6a3957ba1d07de` | `14c2e7b9b4992c096fd5d6530aec683294ec8b08` |
 | PR50 / `refs/remotes/origin/qa-pr50-head` | `6ab9254523c7359bbd174f0304be19d0f68bf40b` | `209a8db27a9df66a7a1c4c832841ffa866947d48` |
-| Forpost HEAD | `e88be1a203142a40801195cbfad1eafe8ea47574` | `f3ff57573fb9ce7f3399e6cc0312aee56160943e` |
+| Forpost, исходная база сравнения контрактов | `e88be1a203142a40801195cbfad1eafe8ea47574` | `f3ff57573fb9ce7f3399e6cc0312aee56160943e` |
 
-Дополнительно прочитаны текущие рабочие версии Forpost, ещё не составляющие новую опубликованную ревизию. Git blob identities на момент чтения: `apps/realtime-server/src/store.ts` — `a80d83d8d33214b684268e90294b1f535e8d22f7`; `artifacts.ts` — `ff4d1a5e97134633bd8b717b421d3faa3836c228`; `content.ts` — `323b720897b703ae03b0882494e4797beb38a227`; `runtime.ts` — `31b69091e9a601622ce36aa987e4574c8df8a291`. Их изменения не устраняют следующие различия контрактов.
+В исходном аудите дополнительно прочитаны тогдашние рабочие версии Forpost, ещё не составлявшие новую опубликованную ревизию. Git blob identities на тот момент: `apps/realtime-server/src/store.ts` — `a80d83d8d33214b684268e90294b1f535e8d22f7`; `artifacts.ts` — `ff4d1a5e97134633bd8b717b421d3faa3836c228`; `content.ts` — `323b720897b703ae03b0882494e4797beb38a227`; `runtime.ts` — `31b69091e9a601622ce36aa987e4574c8df8a291`. Эти исторические identities не выдаются за новые сборки; перечисленные ниже различия контрактов сохраняются.
+
+## Новая дельта `b7ab9ed…` → `848c626…`
+
+Полное сравнение содержит 99 изменённых путей. В истории появились один новый merge commit PR50 и 14 уже принятых commits main. В общем runtime изменены ровно три production-файла; это расширение диагностики, а не только обновление QA:
+
+| Путь | Подтверждённое изменение |
+|---|---|
+| `apps/realtime-server/src/engine.ts` | Добавлены длительности последнего step/batch/serialize/commit, счётчики overload pause/recurrence и последнее наблюдение на игру. События `overload-pause`/`overload-recurred` теперь сохраняют измеренный контекст в payload журнала вместе с прежним полным snapshot. Порог паузы и число catch-up steps не изменены. |
+| `apps/realtime-server/src/server.ts` | Диагностические счётчики `rateLimitKinds` различают input/action/ACK/heartbeat/resync/claim. Выбор существующего limiter вынесен в `charge`; его бюджеты и `RATE_LIMIT` не изменены. |
+| `apps/realtime-server/src/worker-host.ts` | Агрегируются optional overload counters и `overloadMeasuredWorkers`; старые retained workers явно не считаются оснащёнными новой диагностикой. |
+| `games/tyaga/src/client/connection.ts` | Рабочий клиент объединяет ACK до 20 раз/с, сохраняет последние acknowledged/server/pending baselines, блокирует команды до актуального full после смены scope и игнорирует сообщения старого сокета. Это изменение жизненного цикла клиента при прежних wire полях. |
+
+Публичный health по-прежнему удаляет `diagnostics`. Подробный `lastOverload` с worldTick/timing context и per-message counters доступны через прежний подписанный internal metrics route; публичные агрегированные overload counters расширяют health JSON. Наличие этих полей не подтверждает причину перегрузки или принятую ёмкость. Проверено чтением [engine](https://github.com/decorum-guy/iva-games/blob/848c626481a8ada589fb7e3d742af1f47d028e73/apps/realtime-server/src/engine.ts), [gateway](https://github.com/decorum-guy/iva-games/blob/848c626481a8ada589fb7e3d742af1f47d028e73/apps/realtime-server/src/server.ts), [worker host](https://github.com/decorum-guy/iva-games/blob/848c626481a8ada589fb7e3d742af1f47d028e73/apps/realtime-server/src/worker-host.ts) и [клиента](https://github.com/decorum-guy/iva-games/blob/848c626481a8ada589fb7e3d742af1f47d028e73/games/tyaga/src/client/connection.ts).
+
+Побайтово не изменены относительно `b7ab9ed…`: весь `packages/realtime-kit`, `packages/session-kit`, `packages/game-registry`, ticket/bridge crypto, SQLite storage, `GameAdapter` bridge, artifact/client-content code, `main.ts` и `simulation-worker.ts`, `Dockerfile.realtime`, activation и image-verification scripts. Поэтому прежние несовместимости wire/signature/admission/schema/archive/route/registry из таблицы ниже сохраняются. Ни новый Forpost adapter в PR50, ни поддержка его guest practice или RTT context этой дельтой не добавлены.
+
+В `apps/platform/src` дельта ограничена `database.ts`, `http.ts`, `service.ts`: это принятая в main обратимая очистка terminal room history (`room_list_hidden`, `hiddenRoomCount`, clear/restore), уже сохранённая в нашей ветке. Она не является новым согласованием realtime API. Из main также включены District trade fixes и документы полного цикла PR53.
+
+QA-дельта включает connection/recovery/rate-counter regressions, явный control claim при reconnect в network harness, отдельный affinity/CPU-budget учёт и тяжёлые fixture-сцены. `browser-connection.test.ts` использует настоящий TCP/WebSocket с управляемой доставкой browser-like событий и подставленным ticket HTTP; это не rendered browser, Rapier или capacity benchmark. Документы PR50 отделяют пять не прошедших полный gate коротких N2 calibration, частичный netem и ещё не выполненные hour/heavy/R05 проверки. Эти результаты сообщены автором PR50; данный delta-аудит не запускал их повторно и не засчитывает их Forpost.
+
+Текущий PR50 остаётся непринятым. Производственные изменения из него не переносились. Будущее объединение требует прежнего явного согласования протоколов, схем, readers, двух адаптеров и каталога; новый diagnostics/ACK код этого согласования не заменяет.
 
 ## Подтверждённые границы
 

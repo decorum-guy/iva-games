@@ -6,7 +6,8 @@ import { WorkerRpc } from './worker-rpc.js';
 import { assertCheckpointBudget } from './checkpoint.js';
 import type { CheckpointStatus } from './checkpoint.js';
 import { TimingHistogram } from './timing.js';
-const path = (workerData as {path: string}).path;
+import { qaStoreClock } from './qa-trace.js';
+const configuration = workerData as { path: string; qaTrace?: unknown }, path = configuration.path;
 const store = new RealtimeStore(path, { separateCheckpoint: true });
 const checkpoint = new WorkerRpc(new URL('./checkpoint-worker.js', import.meta.url), { path });
 let checkpointStatus: CheckpointStatus | null = null, checkpointFailed = false, closing = false;
@@ -57,5 +58,5 @@ const queue = new StoreQueue(message => {
     return value;
 }, values => { guard(); return store.commitBatch(values); }, reply => parentPort!.postMessage(reply),
 () => ({ writer: { ...store.writerMetrics(), queueP99Ms: queueTiming.p99(), checkpoint: checkpointStatus } }),
-milliseconds => queueTiming.record(milliseconds));
+milliseconds => queueTiming.record(milliseconds), qaStoreClock(configuration.qaTrace));
 parentPort!.on('message', message => queue.enqueue(message));

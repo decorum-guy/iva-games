@@ -1,0 +1,115 @@
+{
+  "format": "iva-realtime-terminal-phase-regression-1",
+  "kind": "Deterministic delayed durable-writer RPC confirmation fault injection; not measured fsync or runtime performance acceptance",
+  "observedBaseCommit": "df581a24808ac6823083f9f735375c94803d1cb7",
+  "sources": {
+    "apps/realtime-server/src/runtime.ts": {
+      "beforeSha256": "34b149f33bab4611a9551e997f90c0273202cfeda6e034ac3cfaca46744d327f",
+      "afterSha256": "5195214c61166acbf75ee1a4030f7dd4a3a7736174820b17b26606553ff5675a",
+      "beforeVerifiedAgainstGitHead": true
+    },
+    "apps/realtime-server/tests/runtime-publication.test.ts": {
+      "beforeNewRegressionsSha256": "aa1449ca82519acb0a79fe1ef5c014c1f35ec287bc1888935e6bedf9f7662f80",
+      "redRunSha256": "85750b29885e8f5bd56f5d7c6d95f441f284d37046758115baff024b28cb1563",
+      "greenRunSha256": "85750b29885e8f5bd56f5d7c6d95f441f284d37046758115baff024b28cb1563",
+      "afterSha256": "85750b29885e8f5bd56f5d7c6d95f441f284d37046758115baff024b28cb1563",
+      "beforeVerifiedAgainstGitHead": true
+    }
+  },
+  "change": {
+    "oldCondition": "if (performance.now() - room.nextTickAt > 1000) {",
+    "newCondition": "if (room.stored.phase === 'running' && performance.now() - room.nextTickAt > 1000) {",
+    "unchangedBacklogThresholdMs": 1000,
+    "unchangedMaxCatchupTicksPerCycle": 2,
+    "unchangedTickRateHz": 30,
+    "fullDurabilityChanged": false,
+    "publicationBoundaryChanged": false,
+    "storeOrCheckpointChanged": false,
+    "coreChanged": false
+  },
+  "faultInjection": {
+    "delayedConfirmationMs": 1500,
+    "mechanism": "Existing mocked WorkerRpc store commit barrier holds acknowledgement; fake monotonic/calendar timers advance while the pre-commit publication remains visible",
+    "actualOneSecondFsyncMeasured": false,
+    "realSQLiteTransactionExecutedByTheseTests": false
+  },
+  "runs": [
+    {
+      "stage": "red",
+      "command": "npx vitest run apps/realtime-server/tests/runtime-publication.test.ts -t 'late durable|still pauses a running' > .qa/runtime-terminal-red.log 2>&1",
+      "exitCode": 1,
+      "log": {
+        "path": ".qa/runtime-terminal-red.log",
+        "sha256": "1c2dbaa068aa14f1c8b802c5c9be73d9dab464c7d62e70c3e21fef0608903d32"
+      },
+      "failed": 3,
+      "passed": 1,
+      "skipped": 7
+    },
+    {
+      "stage": "green",
+      "command": "npx vitest run apps/realtime-server/tests/runtime-publication.test.ts > .qa/runtime-terminal-green.log 2>&1",
+      "exitCode": 0,
+      "log": {
+        "path": ".qa/runtime-terminal-green.log",
+        "sha256": "43662cb5e23be2847c7ed08f8223105e5b508f1979448a487dbf44a6b97d4602"
+      },
+      "failed": 0,
+      "passed": 11,
+      "skipped": 0
+    },
+    {
+      "stage": "types",
+      "command": "npx tsc --noEmit -p tsconfig.json > .qa/runtime-terminal-types.log 2>&1",
+      "exitCode": 0,
+      "log": {
+        "path": ".qa/runtime-terminal-types.log",
+        "sha256": "9aac3da9a7039a99c345545c32f286aa65c358d571bfce7e00d94625d095c829"
+      }
+    },
+    {
+      "stage": "lint",
+      "command": "npx eslint apps/realtime-server/src/runtime.ts apps/realtime-server/tests/runtime-publication.test.ts > .qa/runtime-terminal-eslint.log 2>&1",
+      "exitCode": 0,
+      "log": {
+        "path": ".qa/runtime-terminal-eslint.log",
+        "sha256": "9aac3da9a7039a99c345545c32f286aa65c358d571bfce7e00d94625d095c829"
+      }
+    },
+    {
+      "stage": "diff-check",
+      "command": "git diff --check -- apps/realtime-server/src/runtime.ts apps/realtime-server/tests/runtime-publication.test.ts",
+      "exitCode": 0
+    }
+  ],
+  "observations": [
+    {
+      "scenario": "finished",
+      "oldObserved": "Durably finished result overwritten with phase paused and pauseReason SERVER_BUSY",
+      "fixedObserved": "Finished phase and original committed sequence retained, exactly one outcome, no SERVER_BUSY transition"
+    },
+    {
+      "scenario": "pendingOutcome-paused",
+      "oldObserved": "Durable NO_HUMANS pause overwritten with SERVER_BUSY",
+      "fixedObserved": "NO_HUMANS and pending outcome retained; no outcome before return/countdown; return resolves the saved outcome once without another simulation tick"
+    },
+    {
+      "scenario": "abandoned",
+      "oldObserved": "After room removal persisted abandoned phase overwritten with paused and an extra journal sequence (8 to 9 in this fixture)",
+      "fixedObserved": "Room removed, persistent abandoned outcome and original sequence retained, one outcome, no SERVER_BUSY transition"
+    },
+    {
+      "scenario": "running-positive-control",
+      "oldObserved": "Running match pauses with SERVER_BUSY after writer delay",
+      "fixedObserved": "Same overload pause still occurs exactly once under unchanged threshold"
+    }
+  ],
+  "acceptance": {
+    "browserAcceptance": false,
+    "productionCapacityAcceptance": false,
+    "storagePerformanceAcceptance": false,
+    "explainsPreparationServerBusy": false,
+    "runtimeArtifactRebuilt": false,
+    "committedOrPushedByThisAgent": false
+  }
+}

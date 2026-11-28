@@ -23,13 +23,24 @@ The endpoint has `Cache-Control: no-store`. It exposes no match IDs, participant
 
 The only bootstrap path recognizes the independently observed legacy public portal. It requires all of these positive checks, each through a bounded, same-URL, non-redirecting public GET:
 
-- The portal root is HTTP 200 `text/html`, with the exact reviewed SHA-256 `b0af43f9cda37d8dc17f8613df907719e4f6b537fa92830c9410066df7e7e9b5`.
+- The portal root is HTTP 200 `text/html` and matches the reviewed canonical template SHA-256 `b0b243d662c02857c7b822311be4e3c0a6264acc916f6c8488eb6b0a573c0e10`. Only the eight-character Vite filename tokens in the two exact tags below may vary.
 - Compatibility is either an explicit 404 or HTTP 200 HTML byte-identical to that root.
 - `/api/realtime/v1/health` is also HTTP 200 HTML byte-identical to the root. An actual realtime health response blocks this legacy path.
 - `/health/live` is JSON with exactly `ok: true` and `service: "iva-platform"`.
 - `/api/platform/v1/games` matches the explicit pre-realtime catalogue: available `platform-lab` (`lab-1`) and `district` (`district@0.4` / `district-territorial@1`), three unavailable chess registrations and planned `harbor`. Unknown, duplicate or additional games/fields, changed statuses or different active versions fail this proof.
 
-Only that recognized public legacy response produces an explicit empty bootstrap **build input**, with `bootstrapEvidence: "recognized-public-legacy-portal-v1"` in the collector's sanitized summary. It proves the observed public legacy routing, **not physical absence of saved server data**. A future portal shell/hash or catalogue requires fresh review; it is never guessed to be equivalent. The existing actual-volume gate remains mandatory and rejects any saved dependency missing from the candidate image.
+Raw responses are compared **before** normalization: root and realtime health must be byte-identical, and an HTTP 200 compatibility body must equal both. Different simultaneous portal builds fail even when their canonical templates agree. The existing explicit-404 path still requires the root/health equality and every other positive proof; the 404 itself proves nothing about saved data.
+
+Normalization requires exactly one match for each complete byte pattern:
+
+```text
+<script type="module" crossorigin src="/assets/index-([A-Za-z0-9_-]{8})\.js"></script>
+<link rel="stylesheet" crossorigin href="/assets/index-([A-Za-z0-9_-]{8})\.css">
+```
+
+Only the two captured eight-byte tokens become `00000000` for hashing. All other HTML bytes, tag order, attributes, paths, origins and whitespace remain pinned. Duplicate/missing tags, invalid token length/alphabet, query strings and fragments fail. The original R4 full-body SHA-256 was `b0af43f9cda37d8dc17f8613df907719e4f6b537fa92830c9410066df7e7e9b5`; its historical evidence remains unchanged.
+
+Only that recognized public legacy response produces an explicit empty bootstrap **build input**, with `bootstrapEvidence: "recognized-public-legacy-portal-v1"` in the collector's sanitized summary. It proves the observed public legacy routing, **not physical absence of saved server data**. Any different portal template or catalogue requires fresh review; an ordinary change of the two valid asset tokens does not. The existing actual-volume gate remains mandatory and rejects any saved dependency missing from the candidate image.
 
 For a nonempty inventory the collector:
 
@@ -132,3 +143,13 @@ Test sources cover these concrete cases:
 `verify-realtime-image.sh` now requires the real candidate container to check its empty isolated volume before first startup, publish a sanitized inventory matching real SQLite after creating a practice match, pass an independent read-only verifier after drain, then restart and verify the retained match and store again. The script is part of the existing image job. Merely adding that script is not a report of a successful Docker run.
 
 No production host files, Docker volumes, SSH keys or permissions were changed by this implementation. Applying the updated host activation code remains an administrative integration step at the existing access boundary. Public deployment, final browser acceptance and measured production capacity remain separate gates.
+
+### R5 collector fingerprint defect and canonical correction
+
+R5 checked merge `9ebeb9e75054876409d81e615743254a1ba976ac`, tree `7b3bfe3688c52a5da1833e18a288fe7cd75d6db5` (PR head `defb53049ffc594a42c01eb61cdc0a8667f4d756`). [Realtime image job 141073353167](https://github.com/decorum-guy/iva-games/actions/runs/46175575334/job/141073353167) and [hour job 141073352875](https://github.com/decorum-guy/iva-games/actions/runs/46175575314/job/141073352875) both reached the new legacy proof but stopped at `Unrecognized legacy portal response`. Docker builds, container checks and the hour workload were skipped. Those jobs did not produce new runtime/client image identities or a load result.
+
+A separate actual public read after the failure returned identical 598-byte bodies at root, compatibility and realtime health, with raw SHA-256 `3054b8f086c2457bf9b5be8a5af65a302e846b3effd23040fa19391fa3bfbc10`. Comparing that body with the saved R4 observation proved that only bytes `[438,446)` (JS token `gq6eTcFQ` → `CdXmSpou`) and `[520,528)` (CSS token `BhwHI1bQ` → `DBb4t3H1`) differed. Every other byte was equal. The failed CI log did not retain its HTTP body; the independently observed later response must not be presented as that missing body.
+
+The canonical rule above fixes this verified rebuild variation without accepting arbitrary HTML. Both actual observations are regression fixtures. Additional synthetic filenames test the permitted alphabet; they are not claimed deployed builds. Negative cases cover semantic/structure changes, duplicate/missing/reordered tags, path/origin changes, invalid length/alphabet and inconsistent raw bodies. Existing JSON inventory, auth/network/redirect refusal, exact health/catalogue checks, four-field build input, recursive archive validation and actual host-volume gates remain intact.
+
+Focused verification after this correction passed **20 Python tests**, AST syntax for both Python files and `git diff --check`. A new ordinary unauthenticated `fetch_inventory()` completed successfully in **20.250 seconds**, through all five real public GETs: it positively recognized the legacy response and returned no realtime inventory. It did not generate build input or run Docker, host preflight, deployment or a load test. Sanitized source and execution evidence is in [realtime-canonical-bootstrap-fix-2026-11-28.json](evidence/realtime-canonical-bootstrap-fix-2026-11-28.json). A new image/CI run remains required.

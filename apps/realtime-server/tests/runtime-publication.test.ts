@@ -104,6 +104,70 @@ function blockedCommit() {
 }
 
 describe('publication waits for durable writer confirmation', () => {
+  it('late durable finished commit cannot be replaced with an overload pause', async () => {
+    const { runtime, matchId, sent, resync } = await fixture(); await vi.advanceTimersByTimeAsync(3200);
+    const before = runtime.get(matchId)!; io.finish = true; const block = blockedCommit();
+    await vi.advanceTimersByTimeAsync(40); const candidate = await block.started;
+    expect(candidate.match.phase).toBe('finished');
+    await vi.advanceTimersByTimeAsync(1500); await resync();
+    expect(runtime.get(matchId)).toEqual(before); expect(io.results).toEqual([]);
+    expect(sent.at(-1)).toMatchObject({ phase: 'running', worldTick: before.tick });
+    block.release(); await vi.advanceTimersByTimeAsync(0);
+    expect(runtime.get(matchId)).toMatchObject({ phase: 'finished', tick: candidate.match.tick, outcome: { winner: 'A' }, pauseReason: null });
+    expect(io.records.get(matchId)).toMatchObject({ phase: 'finished', journalSeq: candidate.match.journalSeq });
+    expect(io.results).toHaveLength(1);
+    expect(sent.filter(message => message.type === 'phaseChanged' && message.reason === 'SERVER_BUSY')).toEqual([]);
+  });
+
+  it('late durable pending outcome keeps the no-human pause and resolves only after the return countdown', async () => {
+    const { runtime, matchId, peer, sent } = await fixture(); await vi.advanceTimersByTimeAsync(3200);
+    peer.lastSeen = Date.now() - 10_001; io.finish = true; const block = blockedCommit();
+    await vi.advanceTimersByTimeAsync(40); const candidate = await block.started;
+    expect(candidate.match).toMatchObject({ phase: 'paused', pauseReason: 'NO_HUMANS', outcome: null, pendingOutcome: { winner: 'A' } });
+    await vi.advanceTimersByTimeAsync(1500);
+    expect(io.results).toEqual([]); expect(runtime.get(matchId)!.pendingOutcome).toBeNull();
+    block.release(); await vi.advanceTimersByTimeAsync(0);
+    expect(runtime.get(matchId)).toMatchObject({ phase: 'paused', pauseReason: 'NO_HUMANS', outcome: null, pendingOutcome: { winner: 'A' } });
+    expect(io.records.get(matchId)!.journalSeq).toBe(candidate.match.journalSeq);
+    expect(sent.filter(message => message.type === 'phaseChanged' && message.reason === 'SERVER_BUSY')).toEqual([]);
+    expect(io.results).toEqual([]);
+    const returned: Peer = { ...peer, id: 'returned-socket', lastSeen: Date.now(), claims: { ...peer.claims, ticketId: 'returned-ticket' } };
+    await runtime.connect(returned);
+    expect(runtime.get(matchId)).toMatchObject({ phase: 'running', outcome: null, pendingOutcome: { winner: 'A' } });
+    await vi.advanceTimersByTimeAsync(2900); expect(io.results).toEqual([]);
+    await vi.advanceTimersByTimeAsync(250);
+    expect(runtime.get(matchId)).toMatchObject({ phase: 'finished', tick: candidate.match.tick, pendingOutcome: null, outcome: { winner: 'A' } });
+    expect(io.results).toHaveLength(1);
+    await vi.advanceTimersByTimeAsync(500); expect(io.results).toHaveLength(1);
+  });
+
+  it('late durable abandoned commit is not resurrected by an overload pause after room removal', async () => {
+    const { runtime, matchId, peer, sent } = await fixture(); await vi.advanceTimersByTimeAsync(3200);
+    const room = runtime.rooms.get(matchId)!;
+    // A previously paused room reaches its real expiry. Presence is stale, so
+    // tick must not extend the deadline before saving the abandoned outcome.
+    room.stored.phase = 'paused'; room.stored.pauseReason = 'NO_HUMANS'; room.stored.pausedAt = Date.now() - 1000;
+    room.stored.expiresAt = Date.now() - 1; peer.lastSeen = Date.now() - 10_001;
+    const block = blockedCommit(); await vi.advanceTimersByTimeAsync(40); const candidate = await block.started;
+    expect(candidate.match).toMatchObject({ phase: 'abandoned', outcome: { kind: 'abandoned', winner: null } });
+    await vi.advanceTimersByTimeAsync(1500); expect(io.results).toEqual([]);
+    block.release(); await vi.advanceTimersByTimeAsync(0);
+    expect(runtime.get(matchId)).toBeNull(); expect(runtime.rooms.has(matchId)).toBe(false);
+    expect(io.records.get(matchId)).toMatchObject({ phase: 'abandoned', journalSeq: candidate.match.journalSeq, outcome: { kind: 'abandoned', winner: null } });
+    expect(io.results).toHaveLength(1); expect(peer.close).toHaveBeenCalledWith(1000, 'MATCH_CLOSED');
+    expect(sent.filter(message => message.type === 'phaseChanged' && message.reason === 'SERVER_BUSY')).toEqual([]);
+  });
+
+  it('still pauses a running match when the durable writer delay exceeds the unchanged backlog threshold', async () => {
+    const { runtime, matchId, sent } = await fixture(); await vi.advanceTimersByTimeAsync(3200);
+    const block = blockedCommit(); await vi.advanceTimersByTimeAsync(40); await block.started;
+    await vi.advanceTimersByTimeAsync(1500); block.release(); await vi.advanceTimersByTimeAsync(0);
+    expect(runtime.get(matchId)).toMatchObject({ phase: 'paused', pauseReason: 'SERVER_BUSY', outcome: null });
+    expect(io.records.get(matchId)).toMatchObject({ phase: 'paused', pauseReason: 'SERVER_BUSY' });
+    expect(sent.filter(message => message.type === 'phaseChanged' && message.reason === 'SERVER_BUSY')).toHaveLength(1);
+    expect(io.results).toEqual([]);
+  });
+
   it('keeps resync, committed sequence and platform outcome on the previous state while the result write is blocked', async () => {
     const { runtime, matchId, sent, resync } = await fixture(); await vi.advanceTimersByTimeAsync(3200);
     const before = runtime.get(matchId)!; io.finish = true; const block = blockedCommit();

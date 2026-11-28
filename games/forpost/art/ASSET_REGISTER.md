@@ -150,3 +150,11 @@ Optional full art contact sheet: `blender -b -t 2 --python games/forpost/scripts
 ## Integration acceptance still required
 
 The root implementation must check the full, populated gameplay camera, correct collision scaling, both team marks, weapon range readability, damaged/disabled/selected states, mobile layouts, reduced motion, actual event-to-sound correspondence and measured maximum-scene performance. No physical-phone play, auditory timbre review, public deployment or full game browser acceptance is claimed by this register.
+
+## Static inspection of the actual current GLBs — 2026-11-28
+
+All 52 shipped GLBs (26 families × standard/low) were imported with Blender 4.3.2's glTF importer, rendered through Cycles CPU (one thread, 12 samples), and inspected in a temporary 2240×2020 contact sheet. The per-file hashes were verified before and after rendering against the current model manifest. The root executor directly viewed the resulting image. [Exact import/render identities and limits](../qa/current-glb-inspection.json).
+
+In the single front three-quarter view, no obvious missing or detached parts, large holes or frame-clipped models were observed. Standard/low pairs retain their main silhouettes; small wheels, fans, extractor machinery and decorative edges show expected simplification. The contact sheet SHA-256 is `21d465693f804379d66dc354156527bd53da64e765b178f0bf4a7591a94d53ed`.
+
+This review uses the actual exported files, not the authoring functions used by the earlier 11-family preview. It shows raw materials and both team insignia before runtime selection. Each family has its own framing; the two profiles share a camera, but different families are not to common scale. Rear faces, in-game team colors, material states, damage/power states, animation, effects, occlusion, small-detail legibility at gameplay scale, Three.js performance and sound remain outside this static inspection. No assets or generators were changed by the review; the temporary render is not included as a shipped game asset.

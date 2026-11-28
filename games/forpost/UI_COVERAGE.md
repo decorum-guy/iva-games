@@ -118,3 +118,14 @@ Actual build `51748ae944081b5a33a08a630b42b31310b09546`, head `19042c8…`; [exa
 | L01/L05–L07, R01–R03 | All three maps, 2D/3D, reached their real pinned-client room; each received SERVER_BUSY | Six failures, no complete match/result/replay acceptance |
 
 The following lifecycle case received actual 503/ROOM_LIMIT after the uncleaned practice fixture. Its navigation behavior is not accepted or called a demonstrated product defect. Test cleanup/readiness fixes and numeric renderer phase diagnostics are prepared for the next build, not counted as executed UI successes.
+
+## Observed automated subcases, CI round 5
+
+Build `9ebeb9e75054876409d81e615743254a1ba976ac`, [exact evidence](qa/ci-round-5.json). Chromium 16 PASS/6 FAIL including maps; WebKit 9 PASS/1 FAIL. No inventory row is accepted across all applicable states. Executor-operated passages remain zero.
+
+- F01/U01 restart and movement with the visible button focused passed in both drivers.
+- U03/M07–M08 final lesson → real practice201 and cleanup passed in both. The separate late-response lifecycle observed create201/abandon200 and kept the newly chosen lesson active.
+- B01–B04/B07/U01–U02 default-3D construction/power/save-resume passed again; H06 native 29-clip decode/voice/mute/reload checks passed, without listening.
+- L01/L05–L07/R01–R03 FP02/2D reached a real match result and menu with an actual escort order. It did not score a delivery for the controlled team. Other five map passages failed; no complete all-map or replay acceptance.
+- F02/S01 real focus-loss precondition failed in both headless drivers. Downstream fire-release/stable-ammo checks were not reached. The same tagged scenario moves to mandatory headed Chromium/WebKit Xvfb jobs for R6; this is prepared coverage, not an observed pass.
+- Native emulated multitouch passed again; physical-device and complete visual-state review remain open.

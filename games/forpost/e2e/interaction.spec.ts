@@ -378,10 +378,11 @@ test('final lesson reaches an operation result and starts a separate live practi
   expect(fixtureCleanupFailed, 'OWN_PRACTICE_CLEANUP_FAILED').toBe(false)
 })
 
-test('switching browser tabs while firing releases input and does not resume old shots', async ({ page, context, browserName }) => {
+test('switching browser tabs while firing releases input and does not resume old shots', { tag: '@native-focus' }, async ({ page, context, browser, browserName, headless }) => {
   let focusDriver: CDPSession | undefined
   let other: Page | undefined
   try {
+    console.log(JSON.stringify({ automatedFocusEnvironment: true, browserName, browserVersion: browser.version(), headless, xvfbRunRequested: process.env.FORPOST_FOCUS_XVFB === '1', displayConfigured: !!process.env.DISPLAY }))
     if (browserName === 'chromium') {
       focusDriver = await context.newCDPSession(page)
       // Playwright enables this override by default. Removing it allows actual
@@ -413,6 +414,7 @@ test('switching browser tabs while firing releases input and does not resume old
       console.log(JSON.stringify({ automatedCapabilityFailure: 'BROWSER_FOCUS_LOSS_UNAVAILABLE', browserName }))
       throw error
     }
+    console.log(JSON.stringify({ automatedFocusCapability: 'real-focus-loss-observed', browserName, headless }))
     await other.waitForTimeout(500)
     await page.bringToFront()
     await page.waitForTimeout(100)
@@ -420,5 +422,6 @@ test('switching browser tabs while firing releases input and does not resume old
     expect(released).not.toBe('0/24')
     await page.waitForTimeout(850)
     await expect(ammo).toHaveText(released)
+    console.log(JSON.stringify({ automatedFocusRelease: 'passed', browserName, headless, realLossObserved: true, nonemptyAmmoStable: true, build: await page.locator('[data-build]').getAttribute('data-build') }))
   } finally { await page.mouse.up().catch(() => {}); await other?.close().catch(() => {}); await focusDriver?.detach().catch(() => {}) }
 })

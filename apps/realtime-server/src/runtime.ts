@@ -13,6 +13,8 @@ import { retainedClientDirectory } from './content.js';
 import { TimingHistogram } from './timing.js';
 import { canAdmit, capacityProfile, forpostDemand, ResourceProbe, sumDemand } from './capacity.js';
 import type { CapacityDecision, CapacityProfile, ResourceSample } from './capacity.js';
+import { createQaTrace } from './qa-trace.js';
+import type { QaTrace } from './qa-trace.js';
 
 interface SimulationResult {
   world: string; tick: number; phase: string; outcome: { winner: string | null; resultId: string; operations: unknown[] } | null;
@@ -54,6 +56,7 @@ export class RealtimeRuntime {
   private readonly stepCpuTiming = new TimingHistogram();
   private readonly processStartedAt = performance.now();
   private readonly resourceProbe = new ResourceProbe();
+  private readonly qaTrace: QaTrace | undefined;
   private baselineMemoryBytes = process.memoryUsage().rss;
   private queuedStarts: StoredStart[] = [];
   private readonly activeGuestCreates = new Set<string>();
@@ -76,7 +79,8 @@ export class RealtimeRuntime {
     if (!Number.isSafeInteger(options.maxRooms) || options.maxRooms < 1 || options.maxRooms > 16) throw new Error('INVALID_ROOM_CAPACITY');
     if (options.capacityProfile) options.capacityProfile = capacityProfile(options.capacityProfile, options.artifactId, process.env.NODE_ENV !== 'production');
     const directory = options.workerDirectory ?? new URL('./', import.meta.url);
-    this.store = new WorkerRpc(new URL('store-worker.js', directory), { path: options.databasePath });
+    this.qaTrace = createQaTrace({ buildRevision: options.buildRevision, artifactId: options.artifactId });
+    this.store = new WorkerRpc(new URL('store-worker.js', directory), { path: options.databasePath }, this.qaTrace);
     const simulationDirectory = options.artifactDirectory ? retainedWorkerDirectory(options.artifactDirectory, options.artifactId) : directory;
     this.workers.set(options.artifactId, Array.from({ length: 2 }, () => new WorkerRpc(new URL('simulation-worker.js', simulationDirectory))));
     this.loopDelay.enable();
@@ -242,14 +246,17 @@ export class RealtimeRuntime {
       } catch (error) { await worker.call('drop', matchId); throw error; }
   }
   get(matchId: string): StoredMatch | null { return this.rooms.get(matchId)?.published.match ?? null; }
-  private async persist(room: Room, journal: unknown, receipts: Receipt[] = [], result?: { resultId: string; outcome: unknown }): Promise<void> {
+  private async persist(room: Room, journal: unknown, receipts: Receipt[] = [], result?: { resultId: string; outcome: unknown }, qaTick?: number): Promise<void> {
     if (room.failed) throw new Error('RECOVERY_REQUIRED');
     room.stored.journalSeq++;
     const publication = this.publication(room.stored, room.views);
     const start = performance.now();
     room.journalPendingAt ??= start;
     try {
-      const confirmation = await this.store.call<{ batchSize?: number; writer?: Record<string, unknown> } | undefined>('commit', { match: publication.match, leaseOwner: this.leaseOwner, journal, receipts, result });
+      const value = { match: publication.match, leaseOwner: this.leaseOwner, journal, receipts, result };
+      type Confirmation = { batchSize?: number; writer?: Record<string, unknown> } | undefined;
+      const confirmation = await (qaTick === undefined ? this.store.call<Confirmation>('commit', value)
+        : this.store.callForTick<Confirmation>(qaTick, 'commit', value));
       if (confirmation?.batchSize) this.samples.maxCommitBatchSize = Math.max(this.samples.maxCommitBatchSize, confirmation.batchSize);
       if (confirmation?.writer) this.writerMetrics = confirmation.writer;
     }
@@ -390,18 +397,23 @@ export class RealtimeRuntime {
       if (room.failed || room.busy || now < room.nextTickAt) continue;
       room.busy = true;
       void this.locked(room, async () => {
-        let steps = 0;
-        do { await this.tick(room); room.nextTickAt += 1000 / 30; steps++; }
+        let steps = 0, triggerTickSeq: number | undefined;
+        do { triggerTickSeq = await this.tick(room); room.nextTickAt += 1000 / 30; steps++; }
         while (room.stored.phase === 'running' && performance.now() >= room.nextTickAt && steps < 2);
-        if (performance.now() - room.nextTickAt > 1000) {
+        // A slow durable transition may have finished, abandoned or paused the
+        // room. Only an ongoing simulation can be paused for its tick backlog.
+        const backlogMs = performance.now() - room.nextTickAt;
+        if (room.stored.phase === 'running' && backlogMs > 1000) {
+          this.qaTrace?.freezeOverload(backlogMs, triggerTickSeq);
           room.stored.phase = 'paused'; room.stored.pausedAt = Date.now(); room.stored.pauseReason = 'SERVER_BUSY'; await this.persist(room, { type: 'overloadPause' });
           for (const peer of room.peers.values()) peer.send({ type: 'phaseChanged', ...this.envelope(room, peer), phase: 'paused', reason: 'SERVER_BUSY' });
           room.nextTickAt = performance.now() + 1000;
+          this.qaTrace?.emit('confirmed');
         }
-      }).catch(() => this.failRoom(room)).finally(() => { room.busy = false; });
+      }).catch(() => { this.failRoom(room); this.qaTrace?.emit('failed'); }).finally(() => { room.busy = false; });
     }
   }
-  private async tick(room: Room): Promise<void> {
+  private async tick(room: Room): Promise<number | undefined> {
     const now = Date.now();
     const present = [...room.peers.values()].filter(peer => now - peer.lastSeen < 10_000);
     const lastSignal = Math.max(room.stored.lastHumanAt, ...[...room.peers.values()].map(peer => peer.lastSeen));
@@ -450,8 +462,10 @@ export class RealtimeRuntime {
       return { id, bot: control.temporaryBot, generation: control.generation, rttMs: active?.rttMs ?? 0 };
     });
     const actions = room.actions.splice(0); const start = performance.now(); room.journalPendingAt = start;
+    const qaTick = this.qaTrace?.beginTick(room.nextTickAt, start);
     const simulation = await room.worker.call<SimulationResult>('step', room.stored.matchId, inputs,
       actions.map(({ participantId, actionId, payload }) => ({ participantId, actionId, payload })), controls, true);
+    this.qaTrace?.workerDone(qaTick);
     const elapsed = performance.now() - start; this.stepTiming.record(elapsed);
     if (simulation.workMs !== undefined) this.stepWorkTiming.record(simulation.workMs);
     if (simulation.workCpuMs !== undefined) {
@@ -468,12 +482,14 @@ export class RealtimeRuntime {
       if (present.length) { room.stored.phase = 'finished'; room.stored.outcome = simulation.outcome; result = { resultId: simulation.outcome.resultId, outcome: simulation.outcome }; }
       else { room.stored.phase = 'paused'; room.stored.pendingOutcome = simulation.outcome; room.stored.pausedAt = now; room.stored.pauseReason = 'NO_HUMANS'; }
     }
-    await this.persist(room, { type: 'tick', inputs, controls, actions: actions.map(({ participantId, actionId, payload }) => ({ participantId, actionId, payload })) }, receipts, result);
+    await this.persist(room, { type: 'tick', inputs, controls, actions: actions.map(({ participantId, actionId, payload }) => ({ participantId, actionId, payload })) }, receipts, result, qaTick);
+    this.qaTrace?.tickCommitted(qaTick, performance.now() - room.nextTickAt - 1000 / 30);
     for (const receipt of receipts) {
       const action = room.pending.get(receipt.actionId)!; room.pending.delete(receipt.actionId);
       for (const peer of action.peers) peer.send({ type: 'actionAck', ...this.envelope(room, peer), actionId: receipt.actionId, result: receipt.result });
     }
     if (room.stored.tick % 2 === 0 || receipts.length || room.stored.phase !== 'running') for (const peer of room.peers.values()) this.snapshot(room, peer);
+    return qaTick;
   }
   private failRoom(room: Room): void {
     if (room.failed) return;
@@ -564,6 +580,7 @@ export class RealtimeRuntime {
     try { await this.store.call('release', this.leaseOwner); } catch (error) { failures.push(error); }
     try { await this.store.call('close'); } catch (error) { failures.push(error); }
     await Promise.all([...[...this.workers.values()].flat().map(worker => worker.stop()), this.store.stop()]);
+    this.qaTrace?.close();
     if (failures.length) throw new AggregateError(failures, 'RECOVERY_REQUIRED');
   }
 }

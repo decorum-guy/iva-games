@@ -21,9 +21,13 @@ PORTAL_URL = 'https://iva-games.pro/'
 REALTIME_HEALTH_URL = 'https://iva-games.pro/api/realtime/v1/health'
 PLATFORM_HEALTH_URL = 'https://iva-games.pro/health/live'
 CATALOGUE_URL = 'https://iva-games.pro/api/platform/v1/games'
-# Independently observed public legacy shell on 2026-11-28. A future/different
-# HTML response must be reviewed, not guessed to mean an empty runtime store.
-LEGACY_PORTAL_SHA256 = 'b0af43f9cda37d8dc17f8613df907719e4f6b537fa92830c9410066df7e7e9b5'
+# Two independently observed legacy builds differ only in these asset tokens.
+# Normalize exactly eight bytes in each complete tag; all other bytes stay pinned.
+LEGACY_PORTAL_CANONICAL_SHA256 = 'b0b243d662c02857c7b822311be4e3c0a6264acc916f6c8488eb6b0a573c0e10'
+LEGACY_ASSET_TAGS = (
+    re.compile(rb'<script type="module" crossorigin src="/assets/index-([A-Za-z0-9_-]{8})\.js"></script>'),
+    re.compile(rb'<link rel="stylesheet" crossorigin href="/assets/index-([A-Za-z0-9_-]{8})\.css">'),
+)
 LEGACY_GAMES = {
     'platform-lab': ('other', 'available', 'lab-1', 'lab-1'),
     'district': ('other', 'available', 'district@0.4', 'district-territorial@1'),
@@ -105,16 +109,31 @@ def require_legacy_catalogue(value):
         seen.add(game_id)
 
 
+def require_legacy_portal_template(portal):
+    normalized = portal
+    for pattern in LEGACY_ASSET_TAGS:
+        matches = list(pattern.finditer(normalized))
+        if len(matches) != 1:
+            raise RuntimeError('Unrecognized legacy portal asset tags')
+        match = matches[0]
+        normalized = normalized[:match.start(1)] + b'00000000' + normalized[match.end(1):]
+    if hashlib.sha256(normalized).hexdigest() != LEGACY_PORTAL_CANONICAL_SHA256:
+        raise RuntimeError('Unrecognized legacy portal template')
+
+
 def require_legacy_portal(compatibility_html, opener=None):
     """Recognize public routing only; make no claim about physical saved data."""
     media, portal = fetch_public(PORTAL_URL, opener)
-    if media != 'text/html' or hashlib.sha256(portal).hexdigest() != LEGACY_PORTAL_SHA256:
+    if media != 'text/html':
         raise RuntimeError('Unrecognized legacy portal response')
     if compatibility_html is not None and compatibility_html != portal:
         raise RuntimeError('Compatibility response differs from the legacy portal')
     media, realtime_health = fetch_public(REALTIME_HEALTH_URL, opener)
     if media != 'text/html' or realtime_health != portal:
         raise RuntimeError('Realtime route cannot be classified as legacy portal fallback')
+    # Compare raw responses before normalizing: different concurrent portal
+    # builds must not become equivalent evidence. A 404 has no HTML to compare.
+    require_legacy_portal_template(portal)
     media, health = fetch_public(PLATFORM_HEALTH_URL, opener)
     value = json.loads(health) if media == 'application/json' else None
     if not isinstance(value, dict) or set(value) != {'ok', 'service'} or value['ok'] is not True or value['service'] != 'iva-platform':

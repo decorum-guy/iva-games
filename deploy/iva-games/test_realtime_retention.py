@@ -7,7 +7,7 @@ from pathlib import Path
 import tempfile
 import unittest
 import urllib.error
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 spec = importlib.util.spec_from_file_location('retention_prepare', Path(__file__).with_name('prepare-realtime-image.py'))
 prepare = importlib.util.module_from_spec(spec)
@@ -41,6 +41,8 @@ LEGACY_PORTAL = '''<!doctype html>
   </body>
 </html>
 '''.encode()
+# Byte-exact second public observation; only the two eight-byte tokens changed.
+LEGACY_PORTAL_R5 = LEGACY_PORTAL.replace(b'gq6eTcFQ', b'CdXmSpou').replace(b'BhwHI1bQ', b'DBb4t3H1')
 
 
 def legacy_catalogue():
@@ -114,15 +116,80 @@ class RetentionPreparationTest(unittest.TestCase):
         docker.assert_not_called()
 
     def test_observed_200_portal_fallback_has_an_explicit_verified_bootstrap_path(self):
-        self.assertEqual(len(LEGACY_PORTAL), 598)
-        self.assertEqual(hashlib.sha256(LEGACY_PORTAL).hexdigest(), prepare.LEGACY_PORTAL_SHA256)
-        opener = legacy_opener(); docker = Mock()
-        with tempfile.TemporaryDirectory() as root:
-            result = prepare.prepare(Path(root) / 'input', opener, docker)
-            self.assertTrue(result['bootstrap']); self.assertTrue(result['hostPreflightRequired'])
-        self.assertEqual({call.args[0].full_url for call in opener.open.call_args_list}, {
-            prepare.INVENTORY_URL, prepare.PORTAL_URL, prepare.REALTIME_HEALTH_URL, prepare.PLATFORM_HEALTH_URL, prepare.CATALOGUE_URL})
-        docker.assert_not_called()
+        observations = (
+            (LEGACY_PORTAL, 'b0af43f9cda37d8dc17f8613df907719e4f6b537fa92830c9410066df7e7e9b5'),
+            (LEGACY_PORTAL_R5, '3054b8f086c2457bf9b5be8a5af65a302e846b3effd23040fa19391fa3bfbc10'),
+        )
+        for html, digest in observations:
+            with self.subTest(digest=digest), tempfile.TemporaryDirectory() as root:
+                self.assertEqual(len(html), 598)
+                self.assertEqual(hashlib.sha256(html).hexdigest(), digest)
+                opener = legacy_opener({url: (html, 'text/html') for url in (prepare.INVENTORY_URL, prepare.PORTAL_URL, prepare.REALTIME_HEALTH_URL)})
+                docker = Mock(); target = Path(root) / 'input'
+                result = prepare.prepare(target, opener, docker)
+                self.assertTrue(result['bootstrap']); self.assertTrue(result['hostPreflightRequired'])
+                self.assertEqual(json.loads((target / 'input.json').read_text()), {'format': 1, 'bootstrap': True, 'inventory': None, 'image': None})
+                self.assertEqual({call.args[0].full_url for call in opener.open.call_args_list}, {
+                    prepare.INVENTORY_URL, prepare.PORTAL_URL, prepare.REALTIME_HEALTH_URL, prepare.PLATFORM_HEALTH_URL, prepare.CATALOGUE_URL})
+                docker.assert_not_called()
+
+    def test_only_valid_build_tokens_may_change_without_a_new_portal_review(self):
+        # Synthetic filename variants exercise the allowed alphabet, not a release claim.
+        for js, css in ((b'A0b1C2_-', b'Z9_Y8-X7'), (b'00000000', b'________'), (b'--------', b'12345678')):
+            html = LEGACY_PORTAL.replace(b'gq6eTcFQ', js).replace(b'BhwHI1bQ', css)
+            opener = legacy_opener({url: (html, 'text/html') for url in (prepare.INVENTORY_URL, prepare.PORTAL_URL, prepare.REALTIME_HEALTH_URL)})
+            with self.subTest(js=js, css=css):
+                self.assertIsNone(prepare.fetch_inventory(opener))
+
+    def test_different_raw_builds_are_rejected_before_template_normalization(self):
+        for url in (prepare.INVENTORY_URL, prepare.PORTAL_URL, prepare.REALTIME_HEALTH_URL):
+            opener = legacy_opener({url: (LEGACY_PORTAL_R5, 'text/html')})
+            with self.subTest(url=url), patch.object(prepare, 'require_legacy_portal_template', wraps=prepare.require_legacy_portal_template) as template:
+                with self.assertRaisesRegex(RuntimeError, 'differs from|Realtime route'):
+                    prepare.fetch_inventory(opener)
+                template.assert_not_called()
+
+    def test_semantic_structure_and_non_token_byte_changes_are_rejected(self):
+        variants = (
+            LEGACY_PORTAL.replace(b'<title>Iva Games</title>', b'<title>Other application</title>'),
+            LEGACY_PORTAL.replace(b'id="root"', b'id="different"'),
+            LEGACY_PORTAL.replace(b'#173744', b'#173745'),
+            LEGACY_PORTAL.replace(b'<body>', b'<body><p>Additional content</p>'),
+            LEGACY_PORTAL.replace(b'crossorigin src=', b'src='),
+            LEGACY_PORTAL.replace(b'crossorigin href=', b'href='),
+            LEGACY_PORTAL.replace(b'  <body>', b'   <body>'),
+            LEGACY_PORTAL.replace(b'\n', b'\r\n'),
+        )
+        for index, html in enumerate(variants):
+            opener = legacy_opener({url: (html, 'text/html') for url in (prepare.INVENTORY_URL, prepare.PORTAL_URL, prepare.REALTIME_HEALTH_URL)})
+            with self.subTest(index=index), self.assertRaisesRegex(RuntimeError, 'Unrecognized legacy portal'):
+                prepare.fetch_inventory(opener)
+
+    def test_duplicate_missing_or_reordered_asset_tags_are_rejected(self):
+        js = b'<script type="module" crossorigin src="/assets/index-gq6eTcFQ.js"></script>'
+        css = b'<link rel="stylesheet" crossorigin href="/assets/index-BhwHI1bQ.css">'
+        variants = [LEGACY_PORTAL.replace(tag, replacement) for tag in (js, css) for replacement in (b'', tag + tag)]
+        variants.append(LEGACY_PORTAL.replace(js, b'PLACEHOLDER').replace(css, js).replace(b'PLACEHOLDER', css))
+        for index, html in enumerate(variants):
+            opener = legacy_opener({url: (html, 'text/html') for url in (prepare.INVENTORY_URL, prepare.PORTAL_URL, prepare.REALTIME_HEALTH_URL)})
+            with self.subTest(index=index), self.assertRaisesRegex(RuntimeError, 'Unrecognized legacy portal'):
+                prepare.fetch_inventory(opener)
+
+    def test_asset_path_origin_length_and_alphabet_changes_are_rejected(self):
+        for token, extension in ((b'gq6eTcFQ', b'js'), (b'BhwHI1bQ', b'css')):
+            filename = b'/assets/index-' + token + b'.' + extension
+            invalid_tokens = (b'', b'Ab123_-', b'Ab123_-xy', b'Abcd+123', b'Abcd.123', b'Abcd/123', b'Abcd=123', b'Abcd%123', 'Абвгдёжз'.encode())
+            filenames = [b'/assets/index-' + value + b'.' + extension for value in invalid_tokens]
+            filenames += [b'assets/index-' + token + b'.' + extension,
+                          b'/other/index-' + token + b'.' + extension,
+                          b'/assets/../assets/index-' + token + b'.' + extension,
+                          b'https://iva-games.pro' + filename, b'https://other.invalid' + filename,
+                          b'//other.invalid' + filename, filename + b'?v=1', filename + b'#fragment']
+            for replacement in filenames:
+                html = LEGACY_PORTAL.replace(filename, replacement)
+                opener = legacy_opener({url: (html, 'text/html') for url in (prepare.INVENTORY_URL, prepare.PORTAL_URL, prepare.REALTIME_HEALTH_URL)})
+                with self.subTest(extension=extension, replacement=replacement), self.assertRaisesRegex(RuntimeError, 'Unrecognized legacy portal'):
+                    prepare.fetch_inventory(opener)
 
     def test_arbitrary_or_changed_html_is_never_assumed_empty_even_if_all_three_paths_match(self):
         html = LEGACY_PORTAL.replace(b'index-gq6eTcFQ.js', b'index-unknown.js')

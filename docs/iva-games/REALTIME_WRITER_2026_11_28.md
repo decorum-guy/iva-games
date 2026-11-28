@@ -101,3 +101,21 @@ One complete local diagnostic then recorded 14.686 s, 64 measured file syncs aft
 | Cleanup / completion evidence | Summary complete=true, failures empty, raw directory removed. The separate shell exit-code receipt was not retained; exit 0 is inferred from the successful code path, not independently asserted |
 
 The local result did not reproduce the CI delay and is not production storage/capacity acceptance. Finalize still includes locking/transaction/scheduling and is **not fsync**. CI will run this same diagnostic with an outer timeout and optional own-child tracing; only sanitized stdout enters its logs, never the private report/source/raw files.
+
+## CI R5: actual checkout storage and syscall measurements
+
+Source: completed [storage job141073352646](https://github.com/decorum-guy/iva-games/actions/runs/46175575314/job/141073352646), build `9ebeb9e75054876409d81e615743254a1ba976ac`. [Sanitized exact summary](evidence/realtime-storage-ci-r5-2026-11-28.json). The diagnostic source251-file aggregate `501fd67a34ddb1d5de62207bd75971d092a6d36256819d0ac7bde724d2721aff`, executable `9deb4d721edf1ab7aa946aa2ad56ff364960bb9e47228b9adae2f43566cabfbd` and loaded native SQLite binary `1a03a2916dd210925f8a074d460f0f7a2a28b1aeed2a1c3e2bf1a3b0322276cf` exactly match the local diagnostic. This CI checkout was clean; actual versions Node24.22.3, better-sqlite3 13.2.0, SQLite3.54.1.
+
+The observed VM was AMD EPYC9V45, available parallelism4, kernel7.0.0-1020-azure. Checkout/database/RUNNER_TEMP/tmp used the same ext4 mount `/dev/root`259:1, resolved to NVMe partition nvme0n1p1. Observed mount options included `journal_async_commit,nobarrier,commit=30,data=writeback`; the harness did not change them. FULL SQLite mode alone does not demonstrate power-loss durability of this storage stack.
+
+| Measured case | Samples | p50 ms | p95 ms | p99 ms | Max ms | >50ms |
+|---|---:|---:|---:|---:|---:|---:|
+| Plain-file fsync, untraced |64|8.774|106.905|118.640|118.640|6|
+| Actual FULL SQLite writer, untraced |300|0.541|9.371|18.818|77.877|2|
+| Actual FULL SQLite writer, traced |300|1.058|7.314|13.538|16.213|0|
+
+Warmup was8 file writes and30 SQLite commits per case. SQLite fixtures used actual FP01/N1 core ticks0→330, journal/WAL and final-world verification. The writer histogram includes warmup (330 batches), whereas the table excludes it (300); their p99 values must not be subtracted as if they were paired events. Baseline/traced checkpoint maxima were21.216/2.476ms, zero checkpoint failures.
+
+The measured traced writer thread made309 fsync calls with p99 **12.852ms**, max15.474ms, zero errors;1816 fcntl calls had p99 .031ms, max .328ms, zero errors. No fdatasync was observed. Fourteen fcntl errors exist outside the measured window, which also excludes warmup. Their phase and errno were not retained in the sanitized summary, so their cause is unknown. Syscall wall time includes descheduling and tracing overhead. Whole-system IO PSI increased by2.048s some/2.029s full; it is not per-transaction attribution.
+
+The complete diagnostic took25.423s, reached3,173,232 raw bytes and removed raw traces/databases. Its successful exit means the bounded diagnostic completed. It is **not** a production profile, successful four-room hour, power-loss test or repair of SERVER_BUSY. Plain-file sync delays outside game logic are directly observed, but the short traced SQLite window did not reproduce the100–200ms tails of other map jobs. Different jobs run on different VMs; no one-to-one causal correlation is claimed.

@@ -1,0 +1,1354 @@
+{
+  "kind": "Offline static import/render of shipped GLBs, not in-game or browser acceptance",
+  "blenderVersion": "4.3.2",
+  "engine": "Cycles CPU",
+  "threads": 1,
+  "samples": 12,
+  "tileSize": [
+    280,
+    224
+  ],
+  "viewTransform": "AgX",
+  "cameraDirectionBlenderXYZ": [
+    0.4242640733718872,
+    0.7071068286895752,
+    0.5656854510307312
+  ],
+  "manifestPath": "games/forpost/art/models-manifest.json",
+  "manifestSha256": "e2d8764aac8f534b3c0f64b75d5e55c1cf8220d379176c6e756a77b76838c38e",
+  "scriptSha256": "20a789ab3d6d25e4d518dd2134cc6b1cdcaefd1efa13eb7947cc2601423b9d16",
+  "families": 26,
+  "profiles": [
+    "standard",
+    "low"
+  ],
+  "assets": [
+    {
+      "family": "fighter-carbine",
+      "quality": "standard",
+      "sourcePath": "games/forpost/public/assets/forpost/models/fighter-carbine.glb",
+      "sourceSha256": "8c63d47e20a07c7069dcde0dac09a55c652089dfbc53483d6ed3faa21e5863d6",
+      "sourceBytes": 122972,
+      "tile": "tiles/00-fighter-carbine-standard.png",
+      "tileSha256": "fce1cf43c3c81611d5cc2a2fbe89a4da86b5f84c00dc4bedfe78e34d4b7ef7e5",
+      "importedMeshObjects": 21,
+      "blenderBoundsXYZ": [
+        [
+          -0.45431438088417053,
+          0.49677765369415283
+        ],
+        [
+          -0.4402371346950531,
+          0.9160000085830688
+        ],
+        [
+          0.004999995231628418,
+          1.49375581741333
+        ]
+      ],
+      "orthographicScale": 2.4061527252197266
+    },
+    {
+      "family": "fighter-carbine",
+      "quality": "low",
+      "sourcePath": "games/forpost/public/assets/forpost/models/fighter-carbine-low.glb",
+      "sourceSha256": "dab230971273bb511a0c198e408fb025842ad7c8a3e4557e570510ed7b84a1a4",
+      "sourceBytes": 53676,
+      "tile": "tiles/00-fighter-carbine-low.png",
+      "tileSha256": "fdb292a6089fa411a655f9f19801de5df42476da8899220c669090773029f1bf",
+      "importedMeshObjects": 11,
+      "blenderBoundsXYZ": [
+        [
+          -0.3700000047683716,
+          0.3700000047683716
+        ],
+        [
+          -0.36000001430511475,
+          0.9160000085830688
+        ],
+        [
+          0.004999995231628418,
+          1.4049999713897705
+        ]
+      ],
+      "orthographicScale": 2.4061527252197266
+    },
+    {
+      "family": "fighter-shotgun",
+      "quality": "standard",
+      "sourcePath": "games/forpost/public/assets/forpost/models/fighter-shotgun.glb",
+      "sourceSha256": "0b63631d82c3bad83604f5a52ef0153af6675e2b14970b4a026af53581d9719e",
+      "sourceBytes": 123652,
+      "tile": "tiles/01-fighter-shotgun-standard.png",
+      "tileSha256": "cd65640d43a610d95ad8b0cc8ab9fcead321ef21e7c01a63b5df5abc9ad272dd",
+      "importedMeshObjects": 22,
+      "blenderBoundsXYZ": [
+        [
+          -0.45431438088417053,
+          0.49677765369415283
+        ],
+        [
+          -0.4402371346950531,
+          0.8260000944137573
+        ],
+        [
+          0.004999995231628418,
+          1.49375581741333
+        ]
+      ],
+      "orthographicScale": 2.4061527252197266
+    },
+    {
+      "family": "fighter-shotgun",
+      "quality": "low",
+      "sourcePath": "games/forpost/public/assets/forpost/models/fighter-shotgun-low.glb",
+      "sourceSha256": "3eb7b653a8512c2d183d5d09d56ba349c2fc0406f0def431b9d80dd571eb40de",
+      "sourceBytes": 53680,
+      "tile": "tiles/01-fighter-shotgun-low.png",
+      "tileSha256": "1c0eceada240a3ff618ee1604ecf6243a8b2c0de725b905d262ed59bb1c43cc7",
+      "importedMeshObjects": 11,
+      "blenderBoundsXYZ": [
+        [
+          -0.3700000047683716,
+          0.3700000047683716
+        ],
+        [
+          -0.36000001430511475,
+          0.8260000944137573
+        ],
+        [
+          0.004999995231628418,
+          1.4049999713897705
+        ]
+      ],
+      "orthographicScale": 2.4061527252197266
+    },
+    {
+      "family": "fighter-rifle",
+      "quality": "standard",
+      "sourcePath": "games/forpost/public/assets/forpost/models/fighter-rifle.glb",
+      "sourceSha256": "fbe2ead19c6eb3e1f6ac4817b31039fd638d4fb17bb9e94a5a94b1f2bf76ff62",
+      "sourceBytes": 126112,
+      "tile": "tiles/02-fighter-rifle-standard.png",
+      "tileSha256": "73bae182f75b0827a720ea317ff64421d8fc4d9d7c55acac75af857ad26df348",
+      "importedMeshObjects": 22,
+      "blenderBoundsXYZ": [
+        [
+          -0.45431438088417053,
+          0.49677765369415283
+        ],
+        [
+          -0.4402371346950531,
+          1.1759999990463257
+        ],
+        [
+          0.004999995231628418,
+          1.49375581741333
+        ]
+      ],
+      "orthographicScale": 2.4061527252197266
+    },
+    {
+      "family": "fighter-rifle",
+      "quality": "low",
+      "sourcePath": "games/forpost/public/assets/forpost/models/fighter-rifle-low.glb",
+      "sourceSha256": "70d5c4059469e6b34d2e9bda92ed60bdba0314ab18a88179971c182b33984c3d",
+      "sourceBytes": 57460,
+      "tile": "tiles/02-fighter-rifle-low.png",
+      "tileSha256": "ec56cec78511b26b980dbc3e1638433e0f4e678f7e664c3ba16daa07ead1d5b9",
+      "importedMeshObjects": 12,
+      "blenderBoundsXYZ": [
+        [
+          -0.3700000047683716,
+          0.3700000047683716
+        ],
+        [
+          -0.36000001430511475,
+          1.1759999990463257
+        ],
+        [
+          0.004999995231628418,
+          1.4049999713897705
+        ]
+      ],
+      "orthographicScale": 2.4061527252197266
+    },
+    {
+      "family": "builder",
+      "quality": "standard",
+      "sourcePath": "games/forpost/public/assets/forpost/models/builder.glb",
+      "sourceSha256": "22589a23cef7d69d2d34f14eafd2de0fcfcc2614bb55ca05f97a9b58cc53ec36",
+      "sourceBytes": 68076,
+      "tile": "tiles/03-builder-standard.png",
+      "tileSha256": "2222f4a96207c65ed5127fbefba536d3c8a17f0d5ff866f5a79db9141cec5c48",
+      "importedMeshObjects": 18,
+      "blenderBoundsXYZ": [
+        [
+          -0.29250001907348633,
+          0.3137499690055847
+        ],
+        [
+          -0.26499998569488525,
+          0.5289249420166016
+        ],
+        [
+          -1.9939617956765687e-08,
+          0.8060845732688904
+        ]
+      ],
+      "orthographicScale": 1.4130762815475464
+    },
+    {
+      "family": "builder",
+      "quality": "low",
+      "sourcePath": "games/forpost/public/assets/forpost/models/builder-low.glb",
+      "sourceSha256": "0178ff0c5a27472aaa848fbf874b6373f6ca5b5a892596015d096db1f7b80208",
+      "sourceBytes": 36684,
+      "tile": "tiles/03-builder-low.png",
+      "tileSha256": "185e2fa580a5af66d8e149a86e70522a083e461df4fc90bae3a563dfa06cb246",
+      "importedMeshObjects": 4,
+      "blenderBoundsXYZ": [
+        [
+          -0.29250001907348633,
+          0.30375000834465027
+        ],
+        [
+          -0.26499998569488525,
+          0.5429185628890991
+        ],
+        [
+          0.0,
+          0.8100000023841858
+        ]
+      ],
+      "orthographicScale": 1.4130762815475464
+    },
+    {
+      "family": "drone",
+      "quality": "standard",
+      "sourcePath": "games/forpost/public/assets/forpost/models/drone.glb",
+      "sourceSha256": "5ac1ec37e0c66a4d39ea71744e3261ded27ac7c426635d2a3c6adc5b5400e40c",
+      "sourceBytes": 60836,
+      "tile": "tiles/04-drone-standard.png",
+      "tileSha256": "aec11fd90e7acfab0ba0b125d87e3e2741e6a4e85960da3af733dbeb75370281",
+      "importedMeshObjects": 19,
+      "blenderBoundsXYZ": [
+        [
+          -0.30000001192092896,
+          0.32349997758865356
+        ],
+        [
+          -0.2800000011920929,
+          0.42500001192092896
+        ],
+        [
+          -2.094730966462066e-08,
+          0.5900000333786011
+        ]
+      ],
+      "orthographicScale": 1.2538634538650513
+    },
+    {
+      "family": "drone",
+      "quality": "low",
+      "sourcePath": "games/forpost/public/assets/forpost/models/drone-low.glb",
+      "sourceSha256": "8e5819e09a5f8a62035111ab04d201ec3c243d7df7f9b5ee3b0781927cb29838",
+      "sourceBytes": 34848,
+      "tile": "tiles/04-drone-low.png",
+      "tileSha256": "84228f7467946d6549bec5443c5538c05f6c715bcb3c0c45e8d725264cf770db",
+      "importedMeshObjects": 5,
+      "blenderBoundsXYZ": [
+        [
+          -0.30000001192092896,
+          0.3116999864578247
+        ],
+        [
+          -0.2800000011920929,
+          0.42500001192092896
+        ],
+        [
+          0.0,
+          0.5900000333786011
+        ]
+      ],
+      "orthographicScale": 1.2538634538650513
+    },
+    {
+      "family": "transport",
+      "quality": "standard",
+      "sourcePath": "games/forpost/public/assets/forpost/models/transport.glb",
+      "sourceSha256": "ac0a9b0f477f631fcbcd292c01b2dfddd86ed8f84bc117bce5790814eb4ed112",
+      "sourceBytes": 122496,
+      "tile": "tiles/05-transport-standard.png",
+      "tileSha256": "a194f264d0319e6795e19e555e327d6a7138c4f98b5ca68f87787197b20b575b",
+      "importedMeshObjects": 28,
+      "blenderBoundsXYZ": [
+        [
+          -0.7700000405311584,
+          0.8040000200271606
+        ],
+        [
+          -1.4044221639633179,
+          1.3625000715255737
+        ],
+        [
+          -4.05510292011968e-08,
+          1.3199999332427979
+        ]
+      ],
+      "orthographicScale": 4.396386623382568
+    },
+    {
+      "family": "transport",
+      "quality": "low",
+      "sourcePath": "games/forpost/public/assets/forpost/models/transport-low.glb",
+      "sourceSha256": "44830027bea336342fcd9f9da5299a094b748f9120cfbe42589073a2cb0d6fe8",
+      "sourceBytes": 58052,
+      "tile": "tiles/05-transport-low.png",
+      "tileSha256": "40677e52afd53d8d07e440739338f910683bb8d2fa02d0746bf5b73a5b91c15f",
+      "importedMeshObjects": 5,
+      "blenderBoundsXYZ": [
+        [
+          -0.7700000405311584,
+          0.7838000059127808
+        ],
+        [
+          -1.4044221639633179,
+          1.3625000715255737
+        ],
+        [
+          0.0,
+          1.3199999332427979
+        ]
+      ],
+      "orthographicScale": 4.396386623382568
+    },
+    {
+      "family": "relay",
+      "quality": "standard",
+      "sourcePath": "games/forpost/public/assets/forpost/models/relay.glb",
+      "sourceSha256": "9d5d8876d1452700c5504797d925a13a876589373e1aa61a34280d6be9aa8792",
+      "sourceBytes": 62720,
+      "tile": "tiles/06-relay-standard.png",
+      "tileSha256": "cc1a06112e62a91ee4c38cfa7b9090d1570592b1ac53a16971b02d94b99eead9",
+      "importedMeshObjects": 9,
+      "blenderBoundsXYZ": [
+        [
+          -0.8999999761581421,
+          0.8999999761581421
+        ],
+        [
+          -0.8999999761581421,
+          0.8999999761581421
+        ],
+        [
+          0.0,
+          2.305000066757202
+        ]
+      ],
+      "orthographicScale": 4.6329522132873535
+    },
+    {
+      "family": "relay",
+      "quality": "low",
+      "sourcePath": "games/forpost/public/assets/forpost/models/relay-low.glb",
+      "sourceSha256": "f5d6cad19bb60285cfe2ac3149b60cfa561afc7956583f7d195271e11e6ceb2e",
+      "sourceBytes": 34108,
+      "tile": "tiles/06-relay-low.png",
+      "tileSha256": "dc94b86abe271dc8613961e63abfab69a5295cca80352765515a6c7001361659",
+      "importedMeshObjects": 5,
+      "blenderBoundsXYZ": [
+        [
+          -0.8999999761581421,
+          0.8999999761581421
+        ],
+        [
+          -0.8999999761581421,
+          0.8999999761581421
+        ],
+        [
+          0.0,
+          2.305000066757202
+        ]
+      ],
+      "orthographicScale": 4.6329522132873535
+    },
+    {
+      "family": "generator",
+      "quality": "standard",
+      "sourcePath": "games/forpost/public/assets/forpost/models/generator.glb",
+      "sourceSha256": "60039b777a81e2611b58680ba85caa2b0b9d131be0f14288cceb2f21bb0cc274",
+      "sourceBytes": 112612,
+      "tile": "tiles/07-generator-standard.png",
+      "tileSha256": "32e5e07e7576d666b5adfc44472dce767a7a144396e8e2e4226148db7a7e5a2a",
+      "importedMeshObjects": 17,
+      "blenderBoundsXYZ": [
+        [
+          -0.8999999761581421,
+          0.8999999761581421
+        ],
+        [
+          -0.8999999761581421,
+          0.8999999761581421
+        ],
+        [
+          0.0,
+          1.1600000858306885
+        ]
+      ],
+      "orthographicScale": 3.5891878604888916
+    },
+    {
+      "family": "generator",
+      "quality": "low",
+      "sourcePath": "games/forpost/public/assets/forpost/models/generator-low.glb",
+      "sourceSha256": "692f00818f6284750bd054871757857594448c49ba608a1de8201403a58fffd4",
+      "sourceBytes": 50344,
+      "tile": "tiles/07-generator-low.png",
+      "tileSha256": "4199cc7544a01014f9889d5e6d1c5a41665241de85add5657b7d82eb2608b037",
+      "importedMeshObjects": 5,
+      "blenderBoundsXYZ": [
+        [
+          -0.8999999761581421,
+          0.8999999761581421
+        ],
+        [
+          -0.8999999761581421,
+          0.8999999761581421
+        ],
+        [
+          0.0,
+          1.159999966621399
+        ]
+      ],
+      "orthographicScale": 3.5891878604888916
+    },
+    {
+      "family": "extractor",
+      "quality": "standard",
+      "sourcePath": "games/forpost/public/assets/forpost/models/extractor.glb",
+      "sourceSha256": "80beee5bf944045f41ae566731f652721843f3743e02aef1b1dacedf23c9aa43",
+      "sourceBytes": 67352,
+      "tile": "tiles/08-extractor-standard.png",
+      "tileSha256": "00227bc0ccffb807685a3aba72e6f09631366c18b5402e51900c62b008e8e19f",
+      "importedMeshObjects": 11,
+      "blenderBoundsXYZ": [
+        [
+          -0.8999999761581421,
+          0.8999999761581421
+        ],
+        [
+          -0.8999999761581421,
+          0.8999999761581421
+        ],
+        [
+          0.0,
+          1.5600000619888306
+        ]
+      ],
+      "orthographicScale": 4.092206954956055
+    },
+    {
+      "family": "extractor",
+      "quality": "low",
+      "sourcePath": "games/forpost/public/assets/forpost/models/extractor-low.glb",
+      "sourceSha256": "de2fc9ef00dd50a90304a0d23f3e077930d9c2eae4e6fe5452c16193654c0f71",
+      "sourceBytes": 28620,
+      "tile": "tiles/08-extractor-low.png",
+      "tileSha256": "85a2a1864511ff49373b74b94d67417b7a990241537ce3f96ea4edf522bc7bb1",
+      "importedMeshObjects": 7,
+      "blenderBoundsXYZ": [
+        [
+          -0.8999999761581421,
+          0.8999999761581421
+        ],
+        [
+          -0.8999999761581421,
+          0.8999999761581421
+        ],
+        [
+          0.0,
+          1.5600000619888306
+        ]
+      ],
+      "orthographicScale": 4.092206954956055
+    },
+    {
+      "family": "turret",
+      "quality": "standard",
+      "sourcePath": "games/forpost/public/assets/forpost/models/turret.glb",
+      "sourceSha256": "420fb763cacd9b808de92804a821739c70587fac1e07cdbbf73febf8fae65503",
+      "sourceBytes": 52856,
+      "tile": "tiles/09-turret-standard.png",
+      "tileSha256": "e0763512b8833f7220caffb0e2954d4085ed7a8057483767f3ff12d3c9016ed9",
+      "importedMeshObjects": 12,
+      "blenderBoundsXYZ": [
+        [
+          -0.8999999761581421,
+          0.8999999761581421
+        ],
+        [
+          -0.8999999761581421,
+          1.027500033378601
+        ],
+        [
+          0.0,
+          1.4900000095367432
+        ]
+      ],
+      "orthographicScale": 3.4508578777313232
+    },
+    {
+      "family": "turret",
+      "quality": "low",
+      "sourcePath": "games/forpost/public/assets/forpost/models/turret-low.glb",
+      "sourceSha256": "acbb719505f674c256d58ee94abf3b2e725b1ed14e26a0df73a0241513aa2df0",
+      "sourceBytes": 28292,
+      "tile": "tiles/09-turret-low.png",
+      "tileSha256": "54fe03d736b1a31937e1c7a4902cb972a452d78a7be7d3cd323acd2ed8d3daf8",
+      "importedMeshObjects": 7,
+      "blenderBoundsXYZ": [
+        [
+          -0.8999999761581421,
+          0.8999999761581421
+        ],
+        [
+          -0.8999999761581421,
+          1.0274999141693115
+        ],
+        [
+          0.0,
+          1.4900000095367432
+        ]
+      ],
+      "orthographicScale": 3.4508578777313232
+    },
+    {
+      "family": "dock",
+      "quality": "standard",
+      "sourcePath": "games/forpost/public/assets/forpost/models/dock.glb",
+      "sourceSha256": "6e33e2a5822681fdaca2a83fe6db6692c126d65f9ba57f81d5f940d0b55028c3",
+      "sourceBytes": 64152,
+      "tile": "tiles/10-dock-standard.png",
+      "tileSha256": "f1c9e747a9597014795d350267ab1d1abb96798ce713cd21b7a3c61cacea80d3",
+      "importedMeshObjects": 9,
+      "blenderBoundsXYZ": [
+        [
+          -0.8999999761581421,
+          0.8999999761581421
+        ],
+        [
+          -0.8999999761581421,
+          0.8999999761581421
+        ],
+        [
+          0.0,
+          1.415000081062317
+        ]
+      ],
+      "orthographicScale": 3.790395498275757
+    },
+    {
+      "family": "dock",
+      "quality": "low",
+      "sourcePath": "games/forpost/public/assets/forpost/models/dock-low.glb",
+      "sourceSha256": "ed1fd58404dd4114929b89b78cd6c1b87d2282e99f4a66d8cdb4139cbc2a7c10",
+      "sourceBytes": 27368,
+      "tile": "tiles/10-dock-low.png",
+      "tileSha256": "53ed951ac7f10fa41409225c57acccc1a46fd65a92b74a248b111a52e701d080",
+      "importedMeshObjects": 5,
+      "blenderBoundsXYZ": [
+        [
+          -0.8999999761581421,
+          0.8999999761581421
+        ],
+        [
+          -0.8999999761581421,
+          0.8999999761581421
+        ],
+        [
+          0.0,
+          1.415000081062317
+        ]
+      ],
+      "orthographicScale": 3.790395498275757
+    },
+    {
+      "family": "battery",
+      "quality": "standard",
+      "sourcePath": "games/forpost/public/assets/forpost/models/battery.glb",
+      "sourceSha256": "907157b90c3b33b0b6233489cf7dc0cd3e77a101afc8a3b99436406a812654f5",
+      "sourceBytes": 72552,
+      "tile": "tiles/11-battery-standard.png",
+      "tileSha256": "72a48c4d76a63e65a18e9995c705c754fd5db2c659f9b899f777602daf1b4d06",
+      "importedMeshObjects": 11,
+      "blenderBoundsXYZ": [
+        [
+          -0.8999999761581421,
+          0.8999999761581421
+        ],
+        [
+          -0.8999999761581421,
+          1.21750009059906
+        ],
+        [
+          0.0,
+          1.309999942779541
+        ]
+      ],
+      "orthographicScale": 3.327322006225586
+    },
+    {
+      "family": "battery",
+      "quality": "low",
+      "sourcePath": "games/forpost/public/assets/forpost/models/battery-low.glb",
+      "sourceSha256": "cb1285ab43e99cf904b1e0a9f0e14204a4c2b03421a5ab691e796304a1dc24ea",
+      "sourceBytes": 31284,
+      "tile": "tiles/11-battery-low.png",
+      "tileSha256": "dc57b099e3d4d66794bd462d343e4fc4ac18025a6a26b106bd0f9629cbecd154",
+      "importedMeshObjects": 7,
+      "blenderBoundsXYZ": [
+        [
+          -0.8999999761581421,
+          0.8999999761581421
+        ],
+        [
+          -0.8999999761581421,
+          1.21750009059906
+        ],
+        [
+          0.0,
+          1.309999942779541
+        ]
+      ],
+      "orthographicScale": 3.327322006225586
+    },
+    {
+      "family": "respawn",
+      "quality": "standard",
+      "sourcePath": "games/forpost/public/assets/forpost/models/respawn.glb",
+      "sourceSha256": "32ca35305740e33dd658d3d0539fefed3eb7e773f4cca36cfa1df290c040410a",
+      "sourceBytes": 67364,
+      "tile": "tiles/12-respawn-standard.png",
+      "tileSha256": "2459e8f2cdade997d0230b72f357bba55afa97ae96a3b434769f5f6d0dcf8c88",
+      "importedMeshObjects": 8,
+      "blenderBoundsXYZ": [
+        [
+          -0.8999999761581421,
+          0.8999999761581421
+        ],
+        [
+          -0.8999999761581421,
+          0.8999999761581421
+        ],
+        [
+          0.0,
+          1.665000081062317
+        ]
+      ],
+      "orthographicScale": 4.224249362945557
+    },
+    {
+      "family": "respawn",
+      "quality": "low",
+      "sourcePath": "games/forpost/public/assets/forpost/models/respawn-low.glb",
+      "sourceSha256": "a8d0b7c45214a7eeebb179d0dfc71a85bdaad55d6f2d55088f3ed1e55858344b",
+      "sourceBytes": 27312,
+      "tile": "tiles/12-respawn-low.png",
+      "tileSha256": "6c6f4db3153dcd8d0451ede12e1824ee1b6a83412f98e3c52f43672959d2ec5d",
+      "importedMeshObjects": 5,
+      "blenderBoundsXYZ": [
+        [
+          -0.8999999761581421,
+          0.8999999761581421
+        ],
+        [
+          -0.8999999761581421,
+          0.8999999761581421
+        ],
+        [
+          0.0,
+          1.665000081062317
+        ]
+      ],
+      "orthographicScale": 4.224249362945557
+    },
+    {
+      "family": "bridge",
+      "quality": "standard",
+      "sourcePath": "games/forpost/public/assets/forpost/models/bridge.glb",
+      "sourceSha256": "6931d96753b149c3c77d44657da6954c62b73952c43e32701ed52d2bf5687bb5",
+      "sourceBytes": 56572,
+      "tile": "tiles/13-bridge-standard.png",
+      "tileSha256": "e2ab38317e98910cb2a4dcae5c2305c300e819a8ede4c7fc2b41aab78efef343",
+      "importedMeshObjects": 4,
+      "blenderBoundsXYZ": [
+        [
+          -2.0,
+          2.0
+        ],
+        [
+          -2.0,
+          2.0
+        ],
+        [
+          -0.2549999952316284,
+          0.4875001013278961
+        ]
+      ],
+      "orthographicScale": 6.695304870605469
+    },
+    {
+      "family": "bridge",
+      "quality": "low",
+      "sourcePath": "games/forpost/public/assets/forpost/models/bridge-low.glb",
+      "sourceSha256": "de3be62ae7732910244a23d6f9cf77771d714af8562147eee40fd8cdfaec02b7",
+      "sourceBytes": 27644,
+      "tile": "tiles/13-bridge-low.png",
+      "tileSha256": "ac165be3f78f545b531331ffe3838cdd17dd2e512b7055b99d0aed40c91fe2d7",
+      "importedMeshObjects": 1,
+      "blenderBoundsXYZ": [
+        [
+          -2.0,
+          2.0
+        ],
+        [
+          -2.0,
+          2.0
+        ],
+        [
+          -0.2549999952316284,
+          0.4875001311302185
+        ]
+      ],
+      "orthographicScale": 6.695304870605469
+    },
+    {
+      "family": "foundation",
+      "quality": "standard",
+      "sourcePath": "games/forpost/public/assets/forpost/models/foundation.glb",
+      "sourceSha256": "f78d8c132fcd1a507995890170580d5bfb963645fac38f4cd6933d41ae3410cf",
+      "sourceBytes": 24488,
+      "tile": "tiles/14-foundation-standard.png",
+      "tileSha256": "ba693cfc76b77f4532ec336d06b2757210480f121692221f9c382a31ef1a4928",
+      "importedMeshObjects": 6,
+      "blenderBoundsXYZ": [
+        [
+          -0.8999999761581421,
+          0.8999999761581421
+        ],
+        [
+          -0.8999999761581421,
+          0.8999999761581421
+        ],
+        [
+          0.0,
+          0.26600000262260437
+        ]
+      ],
+      "orthographicScale": 3.0128870010375977
+    },
+    {
+      "family": "foundation",
+      "quality": "low",
+      "sourcePath": "games/forpost/public/assets/forpost/models/foundation-low.glb",
+      "sourceSha256": "8f97f4a62e457b5eadac48ccadb77d3007a1d10c4b94b17041f3bde399c7c17c",
+      "sourceBytes": 11696,
+      "tile": "tiles/14-foundation-low.png",
+      "tileSha256": "4ffe247a8b5451f724899bcfdd9d9a635093ae35b29a0d7ef73f177961cf136a",
+      "importedMeshObjects": 4,
+      "blenderBoundsXYZ": [
+        [
+          -0.8999999761581421,
+          0.8999999761581421
+        ],
+        [
+          -0.8999999761581421,
+          0.8999999761581421
+        ],
+        [
+          0.0,
+          0.26600000262260437
+        ]
+      ],
+      "orthographicScale": 3.0128870010375977
+    },
+    {
+      "family": "wall",
+      "quality": "standard",
+      "sourcePath": "games/forpost/public/assets/forpost/models/wall.glb",
+      "sourceSha256": "0adce8844fa592ed97bf3e03e5e3069026af9228cf58c2f6e44ef41bfe484286",
+      "sourceBytes": 25884,
+      "tile": "tiles/15-wall-standard.png",
+      "tileSha256": "e76478b28f25de38559177700a69cf044c5e78739e07ddd37c4f1348d6bd1466",
+      "importedMeshObjects": 4,
+      "blenderBoundsXYZ": [
+        [
+          -0.5,
+          0.5
+        ],
+        [
+          -0.5,
+          0.5
+        ],
+        [
+          0.0,
+          1.1999999284744263
+        ]
+      ],
+      "orthographicScale": 2.6926305294036865
+    },
+    {
+      "family": "wall",
+      "quality": "low",
+      "sourcePath": "games/forpost/public/assets/forpost/models/wall-low.glb",
+      "sourceSha256": "d8118793c9d2b2aae427e2086965994fccba4c2b348e8dd91c8ed92ba2d7e91d",
+      "sourceBytes": 9444,
+      "tile": "tiles/15-wall-low.png",
+      "tileSha256": "22735af7a142130af71d1defdad140863b998efa428daa4a15a11c673237d333",
+      "importedMeshObjects": 1,
+      "blenderBoundsXYZ": [
+        [
+          -0.5,
+          0.5
+        ],
+        [
+          -0.5,
+          0.5
+        ],
+        [
+          0.0,
+          1.1999999284744263
+        ]
+      ],
+      "orthographicScale": 2.6926305294036865
+    },
+    {
+      "family": "wall-destructible",
+      "quality": "standard",
+      "sourcePath": "games/forpost/public/assets/forpost/models/wall-destructible.glb",
+      "sourceSha256": "49c0dfb64fdab4733286db0f05f2d6f7498d4d089d35739cdaef470aecb0cb86",
+      "sourceBytes": 33144,
+      "tile": "tiles/16-wall-destructible-standard.png",
+      "tileSha256": "a073f48a524b3ce1c4e6e15f29e4be6b9f9182917e80910030d550ea8e2bc19f",
+      "importedMeshObjects": 4,
+      "blenderBoundsXYZ": [
+        [
+          -0.5,
+          0.5
+        ],
+        [
+          -0.5,
+          0.5015000700950623
+        ],
+        [
+          0.0,
+          1.1999999284744263
+        ]
+      ],
+      "orthographicScale": 2.6937403678894043
+    },
+    {
+      "family": "wall-destructible",
+      "quality": "low",
+      "sourcePath": "games/forpost/public/assets/forpost/models/wall-destructible-low.glb",
+      "sourceSha256": "632085011bf22443c45ba5b2f9761e16ac98089b002f40963ce733d5d50b684c",
+      "sourceBytes": 11752,
+      "tile": "tiles/16-wall-destructible-low.png",
+      "tileSha256": "889bb899cf79a55ab48c891fba5c0fcfe0e83a1d058a87c15534a3ec08657d88",
+      "importedMeshObjects": 1,
+      "blenderBoundsXYZ": [
+        [
+          -0.5,
+          0.5
+        ],
+        [
+          -0.5,
+          0.5015000104904175
+        ],
+        [
+          0.0,
+          1.1999999284744263
+        ]
+      ],
+      "orthographicScale": 2.6937403678894043
+    },
+    {
+      "family": "station",
+      "quality": "standard",
+      "sourcePath": "games/forpost/public/assets/forpost/models/station.glb",
+      "sourceSha256": "7cf3521f48aa1bd983081777600856f78f2e97f24a3cd7dfc13b4d30663b01b0",
+      "sourceBytes": 56456,
+      "tile": "tiles/17-station-standard.png",
+      "tileSha256": "2378e3ea6016e8d9e542c3afb8dc5d892a8d25174310614a377ec0665f1810c0",
+      "importedMeshObjects": 5,
+      "blenderBoundsXYZ": [
+        [
+          -2.5,
+          2.5
+        ],
+        [
+          -2.5,
+          2.5
+        ],
+        [
+          0.0,
+          0.0949999988079071
+        ]
+      ],
+      "orthographicScale": 8.369131088256836
+    },
+    {
+      "family": "station",
+      "quality": "low",
+      "sourcePath": "games/forpost/public/assets/forpost/models/station-low.glb",
+      "sourceSha256": "cba15ed59b438b14e45191bf65c74932e4f87ba155992149ec3e7b841bd93bc7",
+      "sourceBytes": 25020,
+      "tile": "tiles/17-station-low.png",
+      "tileSha256": "a459573c605b0ec16d69ad7337b6bc9d07a4e00d184a4726a4045f8fe766d8ca",
+      "importedMeshObjects": 2,
+      "blenderBoundsXYZ": [
+        [
+          -2.5,
+          2.5
+        ],
+        [
+          -2.5,
+          2.5
+        ],
+        [
+          0.0,
+          0.0949999988079071
+        ]
+      ],
+      "orthographicScale": 8.369131088256836
+    },
+    {
+      "family": "complex",
+      "quality": "standard",
+      "sourcePath": "games/forpost/public/assets/forpost/models/complex.glb",
+      "sourceSha256": "268f4ea4397b5e157ebed9db945d4dcca4dbd4227d6806b3c02e6d51c6913e36",
+      "sourceBytes": 53844,
+      "tile": "tiles/18-complex-standard.png",
+      "tileSha256": "1ad0c58ddc5eeebacc7edf8ab5aa23de013db41b903ac390db38624382295324",
+      "importedMeshObjects": 5,
+      "blenderBoundsXYZ": [
+        [
+          -3.0,
+          3.0
+        ],
+        [
+          -3.0,
+          3.0
+        ],
+        [
+          0.0,
+          0.19750000536441803
+        ]
+      ],
+      "orthographicScale": 10.042957305908203
+    },
+    {
+      "family": "complex",
+      "quality": "low",
+      "sourcePath": "games/forpost/public/assets/forpost/models/complex-low.glb",
+      "sourceSha256": "3395249d6b9cd5198f674e76dc3721fca6188615946e10cf679bbd8965b3ef38",
+      "sourceBytes": 27728,
+      "tile": "tiles/18-complex-low.png",
+      "tileSha256": "bbb83e4611287b3bc308f9d55533d356f7b00c0ffeeaff989a947029a9456c08",
+      "importedMeshObjects": 2,
+      "blenderBoundsXYZ": [
+        [
+          -3.0,
+          3.0
+        ],
+        [
+          -3.0,
+          3.0
+        ],
+        [
+          0.0,
+          0.19750000536441803
+        ]
+      ],
+      "orthographicScale": 10.042957305908203
+    },
+    {
+      "family": "ground-concrete",
+      "quality": "standard",
+      "sourcePath": "games/forpost/public/assets/forpost/models/ground-concrete.glb",
+      "sourceSha256": "adaa5f9b49760ed46209041ad03d9003d955fdff61025ea2709183f8a4471bc2",
+      "sourceBytes": 9208,
+      "tile": "tiles/19-ground-concrete-standard.png",
+      "tileSha256": "992badfc754ecfe801ef66d38f8208d12dd60dd0ea15132d22f4ee09399e894d",
+      "importedMeshObjects": 2,
+      "blenderBoundsXYZ": [
+        [
+          -2.0,
+          2.0
+        ],
+        [
+          -2.0,
+          2.0
+        ],
+        [
+          -0.06499999761581421,
+          0.003000000026077032
+        ]
+      ],
+      "orthographicScale": 6.695304870605469
+    },
+    {
+      "family": "ground-concrete",
+      "quality": "low",
+      "sourcePath": "games/forpost/public/assets/forpost/models/ground-concrete-low.glb",
+      "sourceSha256": "9c5ea7e26731cb78c1c9531b03069d7be1629b4127fc89a84a32a1df1bccda3f",
+      "sourceBytes": 7156,
+      "tile": "tiles/19-ground-concrete-low.png",
+      "tileSha256": "5c0d9fbc23fd807d2b944cf1e0bbb9677c8a269cb4341bdd3dce5a76d4031b3f",
+      "importedMeshObjects": 1,
+      "blenderBoundsXYZ": [
+        [
+          -2.0,
+          2.0
+        ],
+        [
+          -2.0,
+          2.0
+        ],
+        [
+          -0.06499999761581421,
+          0.0030000023543834686
+        ]
+      ],
+      "orthographicScale": 6.695304870605469
+    },
+    {
+      "family": "ground-sand",
+      "quality": "standard",
+      "sourcePath": "games/forpost/public/assets/forpost/models/ground-sand.glb",
+      "sourceSha256": "25141607efbba9dc58fd5d26237610c32da052b9d093d833b13c793f73f1f52f",
+      "sourceBytes": 30704,
+      "tile": "tiles/20-ground-sand-standard.png",
+      "tileSha256": "ebdc633123c80e7b8128c80e7e03efec38c815b9a09bf94845df195615f36036",
+      "importedMeshObjects": 3,
+      "blenderBoundsXYZ": [
+        [
+          -2.0,
+          2.0
+        ],
+        [
+          -2.0,
+          2.0
+        ],
+        [
+          -0.06499999761581421,
+          0.0625
+        ]
+      ],
+      "orthographicScale": 6.695304870605469
+    },
+    {
+      "family": "ground-sand",
+      "quality": "low",
+      "sourcePath": "games/forpost/public/assets/forpost/models/ground-sand-low.glb",
+      "sourceSha256": "cfaa06b9ddbad81b738fd2e9f3ac5473ff79fa5649a688db8c62d34100c262d5",
+      "sourceBytes": 7144,
+      "tile": "tiles/20-ground-sand-low.png",
+      "tileSha256": "9380b5943a5769f6739a0f6e9579adb286f48021b4986e4cb4ddd175f628a43a",
+      "importedMeshObjects": 1,
+      "blenderBoundsXYZ": [
+        [
+          -2.0,
+          2.0
+        ],
+        [
+          -2.0,
+          2.0
+        ],
+        [
+          -0.06499999761581421,
+          0.0030000023543834686
+        ]
+      ],
+      "orthographicScale": 6.695304870605469
+    },
+    {
+      "family": "ground-industrial",
+      "quality": "standard",
+      "sourcePath": "games/forpost/public/assets/forpost/models/ground-industrial.glb",
+      "sourceSha256": "f8fe8f53bf6621e1b8f3e5f9da986ef7056814c9bcc0b3fc0f9dcd1c7ed73138",
+      "sourceBytes": 11952,
+      "tile": "tiles/21-ground-industrial-standard.png",
+      "tileSha256": "11f6b54030e232f46f0adbd87a2b32d376ce397881addccf8d6e3f2eb0ca4daa",
+      "importedMeshObjects": 3,
+      "blenderBoundsXYZ": [
+        [
+          -2.0,
+          2.0
+        ],
+        [
+          -2.0,
+          2.0
+        ],
+        [
+          -0.06499999761581421,
+          0.015000000596046448
+        ]
+      ],
+      "orthographicScale": 6.695304870605469
+    },
+    {
+      "family": "ground-industrial",
+      "quality": "low",
+      "sourcePath": "games/forpost/public/assets/forpost/models/ground-industrial-low.glb",
+      "sourceSha256": "6146cd2ca0014cc8c54adb431519f624d1c8c940a855bc20a6cbd8b8c8139b49",
+      "sourceBytes": 9420,
+      "tile": "tiles/21-ground-industrial-low.png",
+      "tileSha256": "25305cb2769ae4e9ef059f3506ead11aaa2c4ddf9be8c68188ab649bf944d4b4",
+      "importedMeshObjects": 1,
+      "blenderBoundsXYZ": [
+        [
+          -2.0,
+          2.0
+        ],
+        [
+          -2.0,
+          2.0
+        ],
+        [
+          -0.06499999761581421,
+          0.015000000596046448
+        ]
+      ],
+      "orthographicScale": 6.695304870605469
+    },
+    {
+      "family": "water",
+      "quality": "standard",
+      "sourcePath": "games/forpost/public/assets/forpost/models/water.glb",
+      "sourceSha256": "48fd41da5019db7d0c501f304f3f65fe4c9aba0159f36dcda5de321efc058812",
+      "sourceBytes": 7512,
+      "tile": "tiles/22-water-standard.png",
+      "tileSha256": "a2770b2fc22ebf6c88a237fad0a7556465427f66100e9d27ca67a854c8d93a79",
+      "importedMeshObjects": 2,
+      "blenderBoundsXYZ": [
+        [
+          -2.0,
+          2.0
+        ],
+        [
+          -2.0,
+          2.0
+        ],
+        [
+          -0.06499999761581421,
+          0.006000000052154064
+        ]
+      ],
+      "orthographicScale": 6.695304870605469
+    },
+    {
+      "family": "water",
+      "quality": "low",
+      "sourcePath": "games/forpost/public/assets/forpost/models/water-low.glb",
+      "sourceSha256": "be1db8ca36b6f240f4387c75e50c2635564cc5f927fc544568154ff37bbafab7",
+      "sourceBytes": 4868,
+      "tile": "tiles/22-water-low.png",
+      "tileSha256": "7ac5615d5b4f3c5ebcb5328df546fa0d73459cd9453eefa71e0e3a6ddbac5b05",
+      "importedMeshObjects": 1,
+      "blenderBoundsXYZ": [
+        [
+          -2.0,
+          2.0
+        ],
+        [
+          -2.0,
+          2.0
+        ],
+        [
+          -0.06499999761581421,
+          0.006000000983476639
+        ]
+      ],
+      "orthographicScale": 6.695304870605469
+    },
+    {
+      "family": "target",
+      "quality": "standard",
+      "sourcePath": "games/forpost/public/assets/forpost/models/target.glb",
+      "sourceSha256": "c898e86373d728d6b6b1cfcfdf1bce9949681b4af8bab9523d9171c9bca0e3bd",
+      "sourceBytes": 27224,
+      "tile": "tiles/23-target-standard.png",
+      "tileSha256": "97c9a2647ac2c2e5631fbcbace3363b67510029f5268e8e97d955b09433e9b8f",
+      "importedMeshObjects": 4,
+      "blenderBoundsXYZ": [
+        [
+          -0.33000001311302185,
+          0.33000001311302185
+        ],
+        [
+          -0.25,
+          0.25
+        ],
+        [
+          0.0,
+          1.4499999284744263
+        ]
+      ],
+      "orthographicScale": 2.4862449169158936
+    },
+    {
+      "family": "target",
+      "quality": "low",
+      "sourcePath": "games/forpost/public/assets/forpost/models/target-low.glb",
+      "sourceSha256": "89fa2fce58454e2251540a210ad265766178ad73748b98eabb9c04dbcc1c95fd",
+      "sourceBytes": 16216,
+      "tile": "tiles/23-target-low.png",
+      "tileSha256": "b3350309edeb77983673fd0443a2745def47aea8b15590a0a8933f6691c2f1db",
+      "importedMeshObjects": 1,
+      "blenderBoundsXYZ": [
+        [
+          -0.33000001311302185,
+          0.33000001311302185
+        ],
+        [
+          -0.25,
+          0.25
+        ],
+        [
+          0.0,
+          1.4499999284744263
+        ]
+      ],
+      "orthographicScale": 2.4862449169158936
+    },
+    {
+      "family": "depot",
+      "quality": "standard",
+      "sourcePath": "games/forpost/public/assets/forpost/models/depot.glb",
+      "sourceSha256": "283662724d0bc858af94d688a5e38684b6ef54c97959197f191c5b0c440ff205",
+      "sourceBytes": 29000,
+      "tile": "tiles/24-depot-standard.png",
+      "tileSha256": "da2685dc5c6c0add50cb1fb073d3d7f5d27fa8cb968e47fec303c44bf37bf437",
+      "importedMeshObjects": 6,
+      "blenderBoundsXYZ": [
+        [
+          -1.5099999904632568,
+          1.5099998712539673
+        ],
+        [
+          -1.5,
+          1.5
+        ],
+        [
+          0.0,
+          2.4049999713897705
+        ]
+      ],
+      "orthographicScale": 6.584000110626221
+    },
+    {
+      "family": "depot",
+      "quality": "low",
+      "sourcePath": "games/forpost/public/assets/forpost/models/depot-low.glb",
+      "sourceSha256": "02e7087709c9b4bc03b83de2c01c9d0dcd91776f954368f8153879b9f56bf5fb",
+      "sourceBytes": 13636,
+      "tile": "tiles/24-depot-low.png",
+      "tileSha256": "8d353cf0db133934a5220d8bfc3ca8d6306e58f5d34959cb44a82dcd00716655",
+      "importedMeshObjects": 2,
+      "blenderBoundsXYZ": [
+        [
+          -1.5099999904632568,
+          1.5099998712539673
+        ],
+        [
+          -1.5,
+          1.5
+        ],
+        [
+          0.0,
+          2.4049999713897705
+        ]
+      ],
+      "orthographicScale": 6.584000110626221
+    },
+    {
+      "family": "crane",
+      "quality": "standard",
+      "sourcePath": "games/forpost/public/assets/forpost/models/crane.glb",
+      "sourceSha256": "73996e83107fd560677d22e8d66915d6fb8bdb8a68e194c1c5039e3b65f9ecc1",
+      "sourceBytes": 42400,
+      "tile": "tiles/25-crane-standard.png",
+      "tileSha256": "ccf860cbe0bed4701776941e42eec25e1ad51bb3b767fb830f80c65d6bc6af12",
+      "importedMeshObjects": 4,
+      "blenderBoundsXYZ": [
+        [
+          -2.589509963989258,
+          3.026160717010498
+        ],
+        [
+          -2.849539041519165,
+          2.558436393737793
+        ],
+        [
+          -0.3967004418373108,
+          5.301868438720703
+        ]
+      ],
+      "orthographicScale": 10.482842445373535
+    },
+    {
+      "family": "crane",
+      "quality": "low",
+      "sourcePath": "games/forpost/public/assets/forpost/models/crane-low.glb",
+      "sourceSha256": "8ce3a369a97ca031dfb0a10ca8d3771c81f75437aa866b478bc331dd00471cff",
+      "sourceBytes": 19744,
+      "tile": "tiles/25-crane-low.png",
+      "tileSha256": "abdd1eea5f2d8ea628447abb66f9f4a59d2305e6335862d44315f27cff322f35",
+      "importedMeshObjects": 1,
+      "blenderBoundsXYZ": [
+        [
+          -2.9423184394836426,
+          3.053751230239868
+        ],
+        [
+          -2.8712880611419678,
+          2.7969970703125
+        ],
+        [
+          -0.3970453441143036,
+          5.579558849334717
+        ]
+      ],
+      "orthographicScale": 10.482842445373535
+    }
+  ],
+  "limits": [
+    "One static front three-quarter view; other sides and animation are not inspected by this render.",
+    "Actual GLBs imported through Blender glTF importer; authoring functions are not used.",
+    "Raw embedded materials, including low-profile vertex colors; no runtime material or state helper is applied.",
+    "Both team insignia geometries are present before the runtime chooses one; this is not faithful in-game team appearance.",
+    "Each family is fitted to the tile; its profiles share camera framing, but different families are not to common scale.",
+    "Cycles studio lighting and AgX differ from the Three.js game renderer; no gameplay, GPU FPS, audio or browser acceptance."
+  ],
+  "contactSheet": {
+    "path": "current-glb-contact-sheet.png",
+    "sha256": "21d465693f804379d66dc354156527bd53da64e765b178f0bf4a7591a94d53ed",
+    "size": [
+      2240,
+      2020
+    ],
+    "labelsScriptSha256": "9abc33c2c6986d7f227d557ce4cb1d67f2dc3f0fcf015cdb672b0b02242abb1b",
+    "retention": "Temporary ignored QA image; not a shipped asset or screenshot of gameplay."
+  },
+  "source": "Actual imports of the 52 shipped GLBs and direct inspection of the resulting PNG; not an in-game browser passage.",
+  "visualObservation": {
+    "reviewedByRoot": true,
+    "viewedImageSha256": "21d465693f804379d66dc354156527bd53da64e765b178f0bf4a7591a94d53ed",
+    "visibleFamilies": 26,
+    "visibleProfilesPerFamily": 2,
+    "obviousMissingDetachedHoledOrFrameClippedGeometryObserved": false,
+    "limits": "Only the stated static view and tile resolution. Tiny-detail readability at gameplay scale and all runtime states remain unaccepted."
+  }
+}

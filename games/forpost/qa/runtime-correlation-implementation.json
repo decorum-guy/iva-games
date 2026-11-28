@@ -1,0 +1,110 @@
+{
+  "format": "iva-runtime-correlation-implementation-1",
+  "kind": "Source implementation and focused verification only; no actual runtime overload capture or performance acceptance",
+  "source": {
+    "format": "iva-forpost-source-2",
+    "gitCommit": "df581a24808ac6823083f9f735375c94803d1cb7",
+    "dirty": true,
+    "sourceSha256": "8654dcb1855edd76e8d70a9a3bfda9eb41b9ef4cf5c99b14e7c4304f02e5680c",
+    "sourceFileCount": 252,
+    "coreSha256": "14d49d29954d0f7f427feea026beb23113699ff8ecb36ec4480f61f339a61e68",
+    "coreFileCount": 18,
+    "method": "SHA-256 of sorted relative paths then exact bytes; independent per-file SHA-256 and strict complete inventory",
+    "providedTraceVerified": false
+  },
+  "files": [
+    {
+      "path": "apps/realtime-server/src/qa-trace.ts",
+      "sha256": "3f432e56e632ee3aaefc2ff1b61355f3d8e49d8d59db07adb74f175448eed318"
+    },
+    {
+      "path": "apps/realtime-server/src/runtime.ts",
+      "sha256": "77f0d71315c8f7d59d5dfa946505f249997ee05810c9ea854fb26c9cbe931c63"
+    },
+    {
+      "path": "apps/realtime-server/src/worker-rpc.ts",
+      "sha256": "0e21fbb0dc647c4c8ed74e8b3ac73e32c6265d475f1a41aa83e70331b2cb3b4e"
+    },
+    {
+      "path": "apps/realtime-server/src/store-queue.ts",
+      "sha256": "5cee0eb79e6e11c322be046ba49e6f1c5757c3862096f10db9d50186376420ea"
+    },
+    {
+      "path": "apps/realtime-server/src/store-worker.ts",
+      "sha256": "c6a74fdfa24b04bd1766202cc7a3eba01f052c97cfd3dc481a40b1b2630ccb1b"
+    },
+    {
+      "path": "apps/realtime-server/tests/qa-trace.test.ts",
+      "sha256": "0a9ecb2442a0acce549993b6f5b464084f5613d7240594c0558f42e3a719e117"
+    },
+    {
+      "path": "docs/iva-games/REALTIME_QA_TRACE.md",
+      "sha256": "fb94e5e7c455689e9aac845fad41a7fd1c758132ce442ce7a3d76c71b031f579"
+    }
+  ],
+  "checks": [
+    {
+      "command": "npx vitest run apps/realtime-server/tests/qa-trace.test.ts apps/realtime-server/tests/runtime-publication.test.ts apps/realtime-server/tests/auth-store.test.ts > .qa/runtime-correlation-tests-r2.log 2>&1",
+      "exitCode": 0,
+      "path": ".qa/runtime-correlation-tests-r2.log",
+      "filesPassed": 3,
+      "testsPassed": 26,
+      "breakdown": {
+        "qaTrace": 8,
+        "publication": 11,
+        "authStore": 7
+      },
+      "logSha256": "0c3b2b0022afbbcfbb5beb0336fae42771693f9fefded80e1352d42487d727ad"
+    },
+    {
+      "command": "npx tsc --noEmit -p tsconfig.json > .qa/runtime-correlation-types-r2.log 2>&1",
+      "exitCode": 0,
+      "path": ".qa/runtime-correlation-types-r2.log",
+      "logSha256": "9aac3da9a7039a99c345545c32f286aa65c358d571bfce7e00d94625d095c829"
+    },
+    {
+      "command": "npx eslint apps/realtime-server/src/qa-trace.ts apps/realtime-server/src/runtime.ts apps/realtime-server/src/worker-rpc.ts apps/realtime-server/src/store-queue.ts apps/realtime-server/src/store-worker.ts apps/realtime-server/tests/qa-trace.test.ts > .qa/runtime-correlation-eslint-r2.log 2>&1",
+      "exitCode": 0,
+      "path": ".qa/runtime-correlation-eslint-r2.log",
+      "logSha256": "9aac3da9a7039a99c345545c32f286aa65c358d571bfce7e00d94625d095c829"
+    },
+    {
+      "command": "git diff --check -- apps/realtime-server/src/qa-trace.ts apps/realtime-server/src/runtime.ts apps/realtime-server/src/worker-rpc.ts apps/realtime-server/src/store-queue.ts apps/realtime-server/src/store-worker.ts apps/realtime-server/tests/qa-trace.test.ts docs/iva-games/REALTIME_QA_TRACE.md",
+      "exitCode": 0
+    }
+  ],
+  "configuration": {
+    "enabledOnly": {
+      "NODE_ENV": "development",
+      "REALTIME_QA_TRACE": "1"
+    },
+    "productionAlwaysDisabled": true,
+    "rows": 2048,
+    "outputBytes": 262144,
+    "windowMs": 60000,
+    "output": "one sanitized JSON line on stderr",
+    "publicApiAdded": false
+  },
+  "verified": [
+    "default disabled including production/test",
+    "all StoreQueue operations and shared commit batch span",
+    "actual worker RPC with interleaved bridge/admission calls and out-of-order replies",
+    "explicit per-tick commit RPC context",
+    "explicit overload-triggering tick independent of latest row allocation",
+    "bounded numeric rows/output and declared evicted prefix/missing trigger",
+    "freeze cutoff immutable under late replies",
+    "monotonic deadline rejects late updates before timer dispatch",
+    "private values/unknown operation strings/error text omitted",
+    "phase guard and existing publication/FIFO behavior remain covered"
+  ],
+  "boundaries": {
+    "actualOverloadCaptured": false,
+    "actualFsyncAttribution": false,
+    "checkpointCorrelation": false,
+    "browserAcceptance": false,
+    "productionCapacityAccepted": false,
+    "runtimeArtifactRebuilt": false,
+    "newLoadRun": false,
+    "committedOrPushedByThisAgent": false
+  }
+}

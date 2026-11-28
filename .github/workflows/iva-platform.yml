@@ -115,11 +115,14 @@ jobs:
         env:
           FORPOST_SCENARIO: ${{ matrix.scenario }}
           FORPOST_MAP_RENDERER: ${{ matrix.renderer }}
+          # One bounded timing-only trace; all other UI/load jobs stay untraced.
+          REALTIME_QA_TRACE: ${{ matrix.scenario == 'FP01' && matrix.renderer == '2d' && '1' || '0' }}
         run: |
           # Each map has its own real server/database/browser process tree. This
           # tests UI outcomes; the independent four-room load probe tests capacity.
           if [ "$FORPOST_SCENARIO" = interface ]; then
-            npm run forpost:e2e -- --workers=1 --grep-invert 'three complete network matches'
+            # The real tab-focus case is preserved in forpost-native-focus below.
+            npm run forpost:e2e -- --workers=1 --grep-invert 'three complete network matches|@native-focus'
           else
             npm run forpost:e2e -- --workers=1 --grep "$FORPOST_SCENARIO: lobby"
           fi
@@ -257,4 +260,33 @@ jobs:
       - name: Exercise settings, keyboard and tutorial actions in WebKit
         env:
           FORPOST_BROWSER: webkit
-        run: npm run forpost:e2e -- interaction.spec.ts --workers=1
+        # Only the real tab-focus case moves to the headed matrix below.
+        run: npm run forpost:e2e -- interaction.spec.ts --workers=1 --grep-invert '@native-focus'
+
+  forpost-native-focus:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chromium, webkit]
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: npx playwright install --with-deps ${{ matrix.browser }}
+      - name: Require real tab focus loss and fire release in headed browsers
+        env:
+          FORPOST_BROWSER: ${{ matrix.browser }}
+          FORPOST_FOCUS_XVFB: '1'
+        run: >-
+          xvfb-run --auto-servernum --server-args='-screen 0 1600x1000x24'
+          npm run forpost:e2e -- interaction.spec.ts --workers=1 --headed --grep '@native-focus'
+      # This is the same assertion-bearing case excluded from the headless suites.
+      # No synthetic blur, private browser control, skip, screenshot or trace.
+      # A driver that cannot create real focus loss still fails the capability gate.

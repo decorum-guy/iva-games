@@ -171,6 +171,16 @@ test.describe('three complete network matches through visible controls', () => {
     await page.getByRole('button', { name: 'Начать игру', exact: true }).click()
     await page.getByRole('link', { name: 'Открыть Форпост', exact: true }).click()
     await expect(page.locator('.fp-game')).toBeVisible()
+    const healthResponse = await page.request.get('/api/realtime/v1/health')
+    expect(healthResponse.ok()).toBe(true)
+    const identity = await healthResponse.json()
+    expect(identity.artifactId).toMatch(/^sha256:[a-f0-9]{64}$/)
+    expect(identity.contentId).toMatch(/^sha256:[a-f0-9]{64}$/)
+    await expect(page.locator('[data-build]')).toHaveAttribute('data-build', identity.buildRevision)
+    expect(new URL(page.url()).pathname).toBe(`/realtime-assets/${identity.contentId.slice(7)}/`)
+    // Keep the successful-map identity as well as failure diagnostics. Do not
+    // print the room URL, query credentials, match identifier or raw world.
+    console.log(JSON.stringify({ automatedBuildIdentity: true, map, renderer, buildRevision: identity.buildRevision, artifactId: identity.artifactId, contentId: identity.contentId }))
     await expect.poll(() => latest()?.mapId).toBe(map)
     await expect.poll(() => latest()?.phase, { timeout: 30_000 }).toBe('battle')
     const stage = page.locator('.fp-stage'), bounds = (await stage.boundingBox())!
