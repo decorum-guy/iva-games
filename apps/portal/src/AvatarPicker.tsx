@@ -81,7 +81,7 @@ export function AvatarPicker({ user, avatar, photo, choose, choosePhoto, onProce
         }}
         onPointerUp={() => { drag.current = null; }} onPointerCancel={() => { drag.current = null; }}
         onKeyDown={event => {
-          const direction = { ArrowLeft: [-.05, 0], ArrowRight: [.05, 0], ArrowUp: [0, -.05], ArrowDown: [0, .05] }[event.key];
+          const direction = { ArrowLeft: [.05, 0], ArrowRight: [-.05, 0], ArrowUp: [0, .05], ArrowDown: [0, -.05] }[event.key];
           if (!direction) return;
           event.preventDefault();
           setCrop(value => ({ ...value, x: clamp(value.x + direction[0]), y: clamp(value.y + direction[1]) }));
