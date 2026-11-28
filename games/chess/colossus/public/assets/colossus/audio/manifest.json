@@ -1,0 +1,177 @@
+{
+  "source": "Original deterministic modal synthesis; no third-party recordings or samples",
+  "generator": "scripts/generate-colossus-audio.py",
+  "version": 2,
+  "sounds": {
+    "move": {
+      "file": "move.wav",
+      "bytes": 12844,
+      "sha256": "90bbdb8627de7360a19e2faeb34b1fc024c4fb52cc689f328d2279283233be35",
+      "seconds": 0.2,
+      "sampleRate": 32000,
+      "channels": 1,
+      "peakDbFS": -6.75,
+      "rmsDbFS": -21.42
+    },
+    "stone": {
+      "file": "stone.wav",
+      "bytes": 28204,
+      "sha256": "7df2b18776af708bfbea212bdd53d6f4ddb9d39b17fc6cb9723481520556d6b1",
+      "seconds": 0.44,
+      "sampleRate": 32000,
+      "channels": 1,
+      "peakDbFS": -5.35,
+      "rmsDbFS": -19.35
+    },
+    "armour": {
+      "file": "armour.wav",
+      "bytes": 34604,
+      "sha256": "f1f8bb7b1e7d7e2ec4aafa18235ec9e9e491fac6c0975867468385c76725336b",
+      "seconds": 0.54,
+      "sampleRate": 32000,
+      "channels": 1,
+      "peakDbFS": -6.02,
+      "rmsDbFS": -20.01
+    },
+    "wound": {
+      "file": "wound.wav",
+      "bytes": 24364,
+      "sha256": "000e9f79b9f0ffdcb47b10c204ddc9339d2cafd353fcd40cd1068665eef59908",
+      "seconds": 0.38,
+      "sampleRate": 32000,
+      "channels": 1,
+      "peakDbFS": -6.38,
+      "rmsDbFS": -19.25
+    },
+    "shield": {
+      "file": "shield.wav",
+      "bytes": 43564,
+      "sha256": "dc8b10f3826f41cd884ec58062f3d0e5be237bac62245b175b7a6e9dd01d1152",
+      "seconds": 0.68,
+      "sampleRate": 32000,
+      "channels": 1,
+      "peakDbFS": -6.75,
+      "rmsDbFS": -20.23
+    },
+    "card": {
+      "file": "card.wav",
+      "bytes": 37164,
+      "sha256": "a59a1990ae7cc98d4a19b21a85397944564e3ca5dee3b231e5b7312c6ae516e4",
+      "seconds": 0.58,
+      "sampleRate": 32000,
+      "channels": 1,
+      "peakDbFS": -7.54,
+      "rmsDbFS": -20.71
+    },
+    "fire": {
+      "file": "fire.wav",
+      "bytes": 55084,
+      "sha256": "56c1704ca06b92dca3fb551767beb12ad62f10637590ae5f40f998335b5541ff",
+      "seconds": 0.86,
+      "sampleRate": 32000,
+      "channels": 1,
+      "peakDbFS": -7.13,
+      "rmsDbFS": -23.61
+    },
+    "victory": {
+      "file": "victory.wav",
+      "bytes": 121644,
+      "sha256": "a63a2caa22cde95ff71000474ccdbf2f09cb535182eefadef6b50dc9f7ba8234",
+      "seconds": 1.9,
+      "sampleRate": 32000,
+      "channels": 1,
+      "peakDbFS": -6.38,
+      "rmsDbFS": -20.17
+    },
+    "defeat": {
+      "file": "defeat.wav",
+      "bytes": 102444,
+      "sha256": "652b427472923a551776b61cf2fe5eb6f7e44a35ac67f3a617d10314d2d1a61e",
+      "seconds": 1.6,
+      "sampleRate": 32000,
+      "channels": 1,
+      "peakDbFS": -6.75,
+      "rmsDbFS": -19.43
+    },
+    "capture": {
+      "file": "capture.wav",
+      "bytes": 53804,
+      "sha256": "264ea4b2f60222168ceb77506f90f849de62c77d992570658f7a468294cb5d6c",
+      "seconds": 0.84,
+      "sampleRate": 32000,
+      "channels": 1,
+      "peakDbFS": -5.51,
+      "rmsDbFS": -20.19
+    },
+    "armor-break": {
+      "file": "armor-break.wav",
+      "bytes": 58924,
+      "sha256": "8a411cb646d474a68eee54d9c11cca492ab3078117dee81c57d3d2373f580a3b",
+      "seconds": 0.92,
+      "sampleRate": 32000,
+      "channels": 1,
+      "peakDbFS": -5.51,
+      "rmsDbFS": -23.1
+    },
+    "promotion-minor": {
+      "file": "promotion-minor.wav",
+      "bytes": 69164,
+      "sha256": "48e0c4ab37a0150b11cfe760ee7e63b915c72b3645b3a0ecb5a08623cdb75fda",
+      "seconds": 1.08,
+      "sampleRate": 32000,
+      "channels": 1,
+      "peakDbFS": -6.75,
+      "rmsDbFS": -19.99
+    },
+    "promotion-rook": {
+      "file": "promotion-rook.wav",
+      "bytes": 85804,
+      "sha256": "5d79bb9dbc6cd50b4a89913bc9f2e4590e25eb973f0b183cd05a52b0e4ac877b",
+      "seconds": 1.34,
+      "sampleRate": 32000,
+      "channels": 1,
+      "peakDbFS": -5.68,
+      "rmsDbFS": -19.52
+    },
+    "promotion-queen": {
+      "file": "promotion-queen.wav",
+      "bytes": 116524,
+      "sha256": "efa61c6cd1200b91f0ee9ca6e21f5cc9852154753372de9b4f3c93466274fee5",
+      "seconds": 1.82,
+      "sampleRate": 32000,
+      "channels": 1,
+      "peakDbFS": -5.85,
+      "rmsDbFS": -18.87
+    },
+    "telegraph": {
+      "file": "telegraph.wav",
+      "bytes": 46124,
+      "sha256": "869db0284352a99083a638c59a82018fb649d91f1aabe0627b0e1ea3abd89fdf",
+      "seconds": 0.72,
+      "sampleRate": 32000,
+      "channels": 1,
+      "peakDbFS": -7.13,
+      "rmsDbFS": -19.11
+    },
+    "heal": {
+      "file": "heal.wav",
+      "bytes": 49964,
+      "sha256": "18858d81f4d3c4e944b5ff289e1a90f940cd581f34145447c40b4989064d2b97",
+      "seconds": 0.78,
+      "sampleRate": 32000,
+      "channels": 1,
+      "peakDbFS": -7.54,
+      "rmsDbFS": -20.8
+    },
+    "boss-move": {
+      "file": "boss-move.wav",
+      "bytes": 43564,
+      "sha256": "41a6194ccddd29b52299df642419f9a52e5f4b65aeb0da0bb1cfaccc81bbd5e0",
+      "seconds": 0.68,
+      "sampleRate": 32000,
+      "channels": 1,
+      "peakDbFS": -5.51,
+      "rmsDbFS": -17.9
+    }
+  }
+}

@@ -151,7 +151,10 @@ try {
   const publicCatalogue = await request(origin + '/api/platform/v1/games');
   assert.equal(publicCatalogue.status, 200);
   const publicGames = (await publicCatalogue.json()).games;
-  assert.deepEqual(publicGames.filter(game => game.collectionId === 'chess').map(game => game.gameId).sort(), ['overdrive', 'remorse']);
+  assert.deepEqual(publicGames.filter(game => game.collectionId === 'chess').map(game => game.gameId).sort(), ['colossus', 'overdrive', 'remorse']);
+  const colossus = publicGames.find(game => game.gameId === 'colossus');
+  assert.equal(colossus.minPlayers, 1);
+  assert.equal(colossus.maxPlayers, 2);
   assert.ok(publicGames.some(game => game.gameId === 'platform-lab' && game.collectionId === 'other'));
   assert.ok(publicGames.filter(game => game.collectionId === 'chess').every(game => game.status === 'unavailable'));
   await checkLiveCatalogue(origin);

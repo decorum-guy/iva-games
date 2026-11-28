@@ -38,6 +38,10 @@ The new evidence includes a partially manual completed Colonist match reported b
 
 Разделы ниже сохраняют историю этапов и применимые ограничения конкретных компонентов. Их старые статусы «не реализовано», «не опубликовано», первоначальное исключение Telegram, требование SMTP и запреты прошлых заданий не переопределяют более позднее решение владельца. При конфликте сначала сверяй актуальный верх BUILD_STATUS и фактический код, не повторяй выполненную активацию или миграцию. После существенного этапа обнови текущую передачу, чтобы следующий чат не восстанавливал её из переписки.
 
+## COLOSSUS — continuation for review, 27 November 2026
+
+The owner explicitly requested completing the third chess game in a separate review branch, including polished 3D/2D, original assets, move/capture/promotion sounds and a short interactive tutorial with its own training-only boss. Continue the existing `feat/colossus-v1` / PR #10 code in `feat/colossus-complete-20261127`, integrated with current main. Read `docs/chess-2/COLOSSUS_RULES.md`, `docs/colossus/CARDS_AND_PRESENTATION.md` and `docs/colossus/BUILD_STATUS.md`. Preserve accepted rules, assets and saves of the other games, the current deployment lifecycle and all parallel District work. Publish logical checkpoints to this branch; do not merge main or deploy production as part of this task. Historical source checks are not current browser acceptance.
+
 ## Current accounts and deployment direction
 
 The owner requested Telegram-only production accounts on 26 November 2026. The portal and bot share profiles, avatars, friends and incoming decisions. New friend requests and player search stay on the portal. The owner enters the dedicated BotFather token on the Mac. See [Telegram accounts](docs/iva-games/TELEGRAM_ACCOUNTS.md). This supersedes the earlier initial-release exclusion of Telegram and mandatory SMTP; preserve the existing local demonstrations and the independent legacy invitation integration. Keep the DNS gate and distinguish CI, staged images, first HTTPS activation and real bot delivery.

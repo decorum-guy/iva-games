@@ -1,20 +1,12 @@
 FROM node:24-bookworm-slim AS build
 WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends python3 make g++ ca-certificates && rm -rf /var/lib/apt/lists/*
-COPY package.json package-lock.json ./
-COPY games/district/package.json ./games/district/package.json
-COPY games/chess/remorse/package.json ./games/chess/remorse/package.json
-COPY games/chess/overdrive/package.json ./games/chess/overdrive/package.json
-COPY packages/engine-sdk/package.json ./packages/engine-sdk/package.json
-COPY apps/server/package.json ./apps/server/package.json
-COPY apps/platform/package.json ./apps/platform/package.json
-COPY apps/portal/package.json ./apps/portal/package.json
-COPY packages/session-kit/package.json ./packages/session-kit/package.json
-COPY packages/telegram-transport/package.json ./packages/telegram-transport/package.json
-RUN npm ci
+# Copy all workspaces before installation so a new registered game needs no Dockerfile list edit.
 COPY . .
+RUN npm ci
 ARG VITE_REMORSE_URL=https://chess.iva-games.pro/
 ARG VITE_OVERDRIVE_URL=https://chess.iva-games.pro/overdrive/
+ARG VITE_COLOSSUS_URL=https://chess.iva-games.pro/colossus/
 RUN npm run build:foundation && npm prune --omit=dev --ignore-scripts
 
 FROM node:24-bookworm-slim AS runtime
@@ -23,6 +15,7 @@ ARG VCS_REF=unknown
 LABEL org.opencontainers.image.source="https://github.com/decorum-guy/iva-games" org.opencontainers.image.revision=$VCS_REF
 ENV NODE_ENV=production PLATFORM_HOST=0.0.0.0 PLATFORM_PORT=4310 PLATFORM_DATABASE_PATH=/data/platform.sqlite PLATFORM_LAB_DATABASE_PATH=/data/platform-lab.sqlite PORTAL_DIST_DIRECTORY=/app/dist-portal
 COPY --from=build /app/package.json /app/package-lock.json ./
+COPY packages/game-registry/games.json ./game-registry.json
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/dist-platform ./dist-platform
 COPY --from=build /app/apps/portal/dist ./dist-portal

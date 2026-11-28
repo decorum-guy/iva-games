@@ -49,6 +49,11 @@ class ImageInputsTest(unittest.TestCase):
             self.write(path + '/src/index.ts', 'export const fixture = 1;')
         for name in ('vite', 'react', 'platform-only', 'shared-sql'):
             self.lock['packages'][f'node_modules/{name}'] = {'version': '1.0.0', 'integrity': f'fixture-{name}-v1'}
+        self.registry = {'version': 1, 'games': [
+            {'gameId': name, 'chess': {'source': 'games/chess/' + name}}
+            for name in ('remorse', 'overdrive')
+        ]}
+        self.write('packages/game-registry/games.json', self.registry)
         self.write('scripts/compose-client.mjs', '/* fixture build step */')
         self.save_manifests()
         self.stage()
@@ -104,6 +109,37 @@ class ImageInputsTest(unittest.TestCase):
         self.save_manifests()
         self.stage()
         self.assertEqual(self.hashes(), self.before)
+
+    def test_registered_chess_workspace_dependency_is_discovered_without_a_hardcoded_root(self):
+        self.registry['games'].append({'gameId': 'future-chess', 'chess': {'source': 'games/chess/future-chess'}})
+        self.write('packages/game-registry/games.json', self.registry)
+        package = {'name': '@chess-2/future-chess', 'dependencies': {'future-mesh': '1.0.0'}}
+        self.write('games/chess/future-chess/package.json', package)
+        self.lock['packages']['games/chess/future-chess'] = package
+        self.lock['packages']['node_modules/future-mesh'] = {'version': '1.0.0', 'integrity': 'future-mesh-v1'}
+        self.save_manifests()
+        self.stage()
+        registered = self.hashes()
+        self.assertTrue(all(registered[name] != self.before[name] for name in self.before))
+        self.lock['packages']['node_modules/future-mesh']['integrity'] = 'future-mesh-v2'
+        self.save_manifests()
+        self.stage()
+        changed = self.hashes()
+        self.assertNotEqual(changed['chess'], registered['chess'])
+        self.assertEqual(changed['platform'], registered['platform'])
+
+    def test_registry_metadata_changes_refresh_both_images(self):
+        self.registry['games'][0]['title'] = {'en': 'Renamed', 'ru': 'Новое имя'}
+        self.write('packages/game-registry/games.json', self.registry)
+        self.stage()
+        after = self.hashes()
+        self.assertTrue(all(after[name] != self.before[name] for name in self.before))
+
+    def test_registry_build_validator_is_part_of_both_service_inputs(self):
+        self.write('scripts/check-game-registry.mjs', '/* changed registration gate */')
+        self.stage()
+        after = self.hashes()
+        self.assertTrue(all(after[name] != self.before[name] for name in self.before))
 
     def test_shared_dependency_upgrade_invalidates_both_services(self):
         self.lock['packages']['node_modules/shared-sql']['integrity'] = 'fixture-sql-v2'

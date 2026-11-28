@@ -1,0 +1,38 @@
+{
+  "armour-a": {
+    "sha256": "64203aea15ad5b9a58eaadcb54be16688276127b3b8c887137cbf90a7709d852",
+    "seconds": 0.36,
+    "peakDbFS": -6.66,
+    "rmsDbFS": -20.5
+  },
+  "armour-b": {
+    "sha256": "54e3d1f8bb9691f3c2ababc79defb701cbaf67b76d7fd97ca73d68a2d7f28ee9",
+    "seconds": 0.41,
+    "peakDbFS": -7.61,
+    "rmsDbFS": -20.5
+  },
+  "armour-c": {
+    "sha256": "9ee0fa89e24a0335ec5e5644f401c33b045c6e30d83f527c3191c331d9f1d2ab",
+    "seconds": 0.3,
+    "peakDbFS": -5.68,
+    "rmsDbFS": -21.22
+  },
+  "shield-a": {
+    "sha256": "fb2f6236305db6799ccde1d20287bc801dfeb31e9da89f16cd32b0200d5cdc7b",
+    "seconds": 0.39,
+    "peakDbFS": -8.75,
+    "rmsDbFS": -20.5
+  },
+  "shield-b": {
+    "sha256": "bcfc5e9532e181b9c27840e332fbe63fccefdd51a4d8bde04fa427ba944e67bc",
+    "seconds": 0.46,
+    "peakDbFS": -7.43,
+    "rmsDbFS": -20.5
+  },
+  "shield-c": {
+    "sha256": "f3adefbad63865d7a410e13954833b4ce83ff7b8abde65a6805ee8ef79d15c84",
+    "seconds": 0.57,
+    "peakDbFS": -5.99,
+    "rmsDbFS": -20.5
+  }
+}

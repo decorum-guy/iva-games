@@ -1,3 +1,4 @@
+import { chessEntryForPath } from '@iva-games/game-registry'
 import { createServer } from 'node:http'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { randomUUID } from 'node:crypto'
@@ -14,6 +15,7 @@ import type { RoomOptions } from './rooms'
 import { RoomStore } from './store'
 import { clientMessage, createRequest, emptyRequest, identifier, joinRequest, OnlineError } from './validation'
 import { createOverdriveGateway } from './overdrive/http'
+import { createColossusGateway } from './colossus/http'
 
 const MAX_BODY = 16_384
 const COOKIE = 'remorse_guest'
@@ -28,6 +30,8 @@ export interface OnlineServerOptions extends RoomOptions {
   heartbeatMs?: number
   overdriveDatabasePath?: string
   shutdownGraceMs?: number
+  colossusDatabasePath?: string
+  colossusPresenceTimeoutMs?: number
 }
 
 class RateLimit {
@@ -107,6 +111,11 @@ export function createOnlineServer(options: OnlineServerOptions) {
     secureCookies: secure, validOrigin, clientAddress, heartbeatMs: options.heartbeatMs,
     now: options.now, inactiveMs: options.inactiveMs, finishedMs: options.finishedMs,
   })
+  const colossus = createColossusGateway({
+    databasePath: options.colossusDatabasePath ?? (options.databasePath === ':memory:' ? ':memory:' : options.databasePath + '.colossus.sqlite'),
+    secureCookies: secure, validOrigin, clientAddress, now: options.now, inactiveMs: options.inactiveMs, finishedMs: options.finishedMs,
+    presenceTimeoutMs: options.colossusPresenceTimeoutMs,
+  })
 
   const server = createServer((request, response) => { void lifecycle.run(async () => {
     response.setHeader('X-Content-Type-Options', 'nosniff')
@@ -116,6 +125,7 @@ export function createOnlineServer(options: OnlineServerOptions) {
       if (closing) throw new OnlineError('serverError', 503)
       const pathname = new URL(request.url ?? '/', 'http://localhost').pathname
       if (await overdrive.handle(request, response, pathname)) return
+      if (await colossus.handle(request, response, pathname)) return
       if (pathname === '/api/health' && request.method === 'GET') {
         store.health()
         json(response, 200, { ok: true, protocol: ONLINE_PROTOCOL, rulesVersion: RULES_VERSION })
@@ -167,13 +177,13 @@ export function createOnlineServer(options: OnlineServerOptions) {
       if (file !== root && !file.startsWith(root + sep)) throw new OnlineError('notYourSeat', 403)
       let info = await stat(file).catch(() => null)
       if (!info?.isFile()) {
-        if (extname(decoded) || decoded.startsWith('/assets/')) { json(response, 404, { error: 'roomMissing' }); return }
-        const overdriveRoute = decoded === '/overdrive' || decoded.startsWith('/overdrive/')
-        file = resolve(root, overdriveRoute ? 'overdrive/index.html' : 'index.html')
+        if (extname(decoded) || /(?:^|\/)assets\//.test(decoded)) { json(response, 404, { error: 'roomMissing' }); return }
+        const entry = chessEntryForPath(decoded)
+        file = resolve(root, entry)
         info = await stat(file).catch(() => null)
         // A separately built game has its entry at the static root. The combined
-        // build retains the dedicated /overdrive/ entry, which takes precedence.
-        if (overdriveRoute && !info?.isFile()) {
+        // build retains the dedicated game entries, which take precedence.
+        if ((entry !== 'index.html') && !info?.isFile()) {
           file = resolve(root, 'index.html')
           info = await stat(file).catch(() => null)
         }
@@ -284,7 +294,7 @@ export function createOnlineServer(options: OnlineServerOptions) {
   let closeWork: Promise<void> | undefined
 
   return {
-    server, service, store, overdrive,
+    server, service, store, overdrive, colossus,
     async listen(port = 4173, host = '127.0.0.1') {
       await new Promise<void>((resolveListen, reject) => {
         server.once('error', reject)
@@ -302,9 +312,9 @@ export function createOnlineServer(options: OnlineServerOptions) {
       const httpClosed = lifecycle.close()
       for (const ws of sockets.clients) ws.terminate()
       const socketsClosed = new Promise<void>(resolveClose => sockets.close(() => resolveClose()))
-      // Both games share HTTP. Keep their stores open until accepted requests
+      // All three games share HTTP. Keep their stores open until accepted requests
       // finish, including actions whose client disconnected during the drain.
-      closeWork = Promise.all([httpClosed, socketsClosed, overdrive.close(httpClosed)]).then(() => { service.close() })
+      closeWork = Promise.all([httpClosed, socketsClosed, overdrive.close(httpClosed), colossus.close(httpClosed)]).then(() => { service.close() })
       return closeWork
     },
   }

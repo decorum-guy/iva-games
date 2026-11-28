@@ -1,3 +1,4 @@
+import { catalogueDefaults } from '@iva-games/game-registry';
 import { createHash, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
 import { chmodSync } from 'node:fs';
 import { hash, verify } from '@node-rs/argon2';
@@ -89,13 +90,8 @@ export class PlatformService {
     if (!Number.isFinite(this.runtimeTimeoutMs) || this.runtimeTimeoutMs < 1 || this.runtimeTimeoutMs > 30_000) throw new Error('Invalid runtime deadline');
     this.db = openPlatformDatabase(options.databasePath);
     this.games = new Map((options.games ?? []).map(game => [game.gameId, game]));
-    for (const [gameId, title] of [['remorse', 'Remorse'], ['overdrive', 'Форсаж'], ['district', 'Район'], ['harbor', 'Гавань']]) {
-      if (!this.games.has(gameId)) this.games.set(gameId, {
-        gameId, title, collectionId: gameId === 'remorse' || gameId === 'overdrive' ? 'chess' : 'other',
-        minPlayers: 2, maxPlayers: gameId === 'harbor' ? 6 : gameId === 'district' ? 4 : 2,
-        supportsBots: false, rulesVersion: 'pending', contentVersion: 'pending',
-        status: gameId === 'district' || gameId === 'harbor' ? 'planned' : 'unavailable',
-      });
+    for (const game of catalogueDefaults()) {
+      if (!this.games.has(game.gameId)) this.games.set(game.gameId, game);
     }
     this.ready = hash(randomBytes(32).toString('hex'), PASSWORD_OPTIONS).then(value => { this.dummyHash = value; });
   }
