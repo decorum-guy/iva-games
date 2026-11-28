@@ -300,6 +300,7 @@ function OfferCard({ offer, view, lang, busy, onAction, onCounter, onResponse, c
   const other = mine ? offer.targetId : offer.authorId;
   const give = mine ? offer.give : offer.receive;
   const shortage = missingStock(view.you.hand, give);
+  const shortageText = stockTotal(shortage) ? `${word(lang,'Не хватает','Missing')}: ${RESOURCES.filter(resource=>shortage[resource]>0).map(resource=>`${shortage[resource]} ${resourceName(resource,lang)}`).join(', ')}` : undefined;
   const [sending, setSending] = useState(false);
   const [failed, setFailed] = useState(false);
   const actionable = view.legal.trade && !busy && !sending;
@@ -317,15 +318,15 @@ function OfferCard({ offer, view, lang, busy, onAction, onCounter, onResponse, c
   const name = nameOf(view,other);
   const player = view.players.find(item=>item.participantId===other);
   const identity = <span className="ta-player-dot" style={{background:['#ca4e37','#2867a8','#79498f','#2c7954'][player?.seatIndex ?? 0]}} title={name} aria-label={name}>{(player?.seatIndex ?? 0)+1}</span>;
-  return <article className={`ta-offer${mine ? ' is-outgoing' : ''}`} data-offer-id={offer.id} data-offer-status={agreed ? 'agreed' : 'waiting'}>
+  return <article className={`ta-offer${mine ? ' is-outgoing' : ''}`} data-offer-id={offer.id} data-offer-status={agreed ? 'agreed' : 'waiting'} aria-description={shortageText}>
     {!compact && <OfferTerms give={offer.give} receive={offer.receive} lang={lang} author={nameOf(view,offer.authorId)}/>}
     <div className="ta-response-chip">{identity}
       {mine ? canChoose ? <button type="button" className="ta-primary" disabled={!actionable || !canAccept}
         aria-label={`${word(lang,'Обменяться','Trade with')} ${name}`} title={offer.unavailableReason==='inactive-pair' ? word(lang,'Обмен возможен только с активным игроком','Trade with the active player') : word(lang,'Выбрать игрока','Choose player')}
         onClick={()=>void respond('accept')}>✅</button> : <span role="img" aria-label={word(lang,'Ждём ответа','Awaiting response')}>🤔</span>
         : agreed ? <span role="img" aria-label={word(lang,'Согласие отправлено · ждём выбора','Agreed · awaiting selection')}>✅</span>
-        : <button type="button" className="ta-primary" disabled={!actionable || !canAccept} aria-label={word(lang,'Принять','Accept')}
-          title={stockTotal(shortage)>0 ? word(lang,'Не хватает ресурсов','Missing resources') : offer.unavailableReason==='author-resources' ? word(lang,'У автора не хватает ресурсов','Sender lacks resources') : word(lang,'Принять','Accept')} onClick={()=>void respond('accept')}>✅</button>}
+        : <button type="button" className="ta-primary" disabled={!actionable || !canAccept} aria-label={word(lang,'Принять','Accept')} aria-description={shortageText}
+          title={shortageText ?? (offer.unavailableReason==='author-resources' ? word(lang,'У автора не хватает ресурсов','Sender lacks resources') : word(lang,'Принять','Accept'))} onClick={()=>void respond('accept')}>✅</button>}
       {!mine && <><button type="button" disabled={busy || sending} aria-label={word(lang,'Другие условия','Counteroffer')} title={word(lang,'Другие условия','Counteroffer')} onClick={()=>onCounter(offer)}>↔</button>
         <button type="button" disabled={!actionable} aria-label={word(lang,'Отклонить','Decline')} title={word(lang,'Отклонить','Decline')} onClick={()=>void respond('decline')}>❌</button></>}
       {mine && !offer.groupId && <button type="button" disabled={!actionable} aria-label={word(lang,'Отозвать','Withdraw')} onClick={()=>void respond('cancel')}>❌</button>}

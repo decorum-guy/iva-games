@@ -575,9 +575,11 @@ try {
   entry = await open('trade-draft');
   const shortageView = await post(entry, entry.hostIndex, { type: 'offer', targetId: entry.expected.otherId, give: stock({ wood: 1 }), receive: stock({ brick: 5 }) });
   assert.equal(shortageView.offers[0].unavailableReason, undefined, 'Author must not learn a hidden counterparty shortage');
-  await expect(pages[entry.guestIndex].getByRole('button',{name:'Accept',exact:true})).toHaveAttribute('title','Missing resources');
+  const ownShortage=Math.max(0,5-(await view(entry,entry.guestIndex)).you.hand.brick);
+  assert.ok(ownShortage>0);
+  await expect(pages[entry.guestIndex].getByRole('button',{name:'Accept',exact:true})).toHaveAccessibleDescription('Missing: '+ownShortage+' Brick');
   await expect(pages[entry.guestIndex].locator('.ta-offer:not(.is-closed)').getByRole('button', { name: 'Accept', exact: true })).toBeDisabled();
-  passed('recipient sees own exact shortage while author receives no hidden-hand availability flag');
+  passed('unfunded consent is disabled, the own shortage has an accessible description, and the author receives no hidden-hand availability flag');
 
   entry = await open('patrol');
   let cardPage = pages[entry.hostIndex];

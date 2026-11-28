@@ -55,7 +55,7 @@ try {
   }
   browser=await chromium.launch({headless:true,args:['--mute-audio'],...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE?{executablePath:process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE}:{})});
   const cases=['en','ru'].flatMap(lang=>[1280,390].map(width=>({lang,width,noneAgree:false}))); cases.push({lang:'en',width:1280,noneAgree:true});
-  for(const {lang,width,noneAgree} of cases) {
+  for(const {lang,width,noneAgree} of process.env.COMPACT_ACCESSIBILITY_ONLY==='1'?[]:cases) {
     const before=await reset(noneAgree);
     const context=await browser.newContext({storageState:h.manifest.accounts[0].storageState,viewport:{width,height:width===390?844:800},hasTouch:width===390});
     await context.addInitScript(language=>localStorage.setItem('iva.portal.language',language),lang);
@@ -118,6 +118,23 @@ try {
     results.push({lang,width,noneAgree,layout,board:boardBefore,expiryStable:true,cancelNoPayment:true,twoConsentsSelected:lang==='en'&&width===1280&&!noneAgree});
     await context.close();
   }
-  await writeFile(join(artifacts,'result.json'),JSON.stringify({gitHead:h.manifest.gitHead,sourceHasWorkingChanges:!!h.manifest.gitStatus,build:h.manifest.buildHashes,syntheticPosition:true,realHttp:true,externalMessages:0,results},null,2));
+  const accessibleBefore=await reset();
+  const touch=await browser.newContext({storageState:h.manifest.accounts[1].storageState,viewport:{width:390,height:844},hasTouch:true});
+  await touch.addInitScript(()=>localStorage.setItem('iva.portal.language','en'));
+  const recipient=await touch.newPage();await recipient.goto(h.origin+path);
+  const offered=await post(a,{type:'offer',targetId:other,give:stock({wood:1}),receive:stock({brick:5})});
+  const incoming=recipient.locator(`[data-offer-id="${offered.offers.find(o=>o.targetId===other).id}"]`);
+  const accept=incoming.getByRole('button',{name:'Accept',exact:true});
+  await expect(accept).toBeDisabled();
+  await expect(accept).toHaveAccessibleDescription('Missing: 4 Brick');
+  await expect(incoming).not.toContainText('Missing');
+  let submitted=0;
+  recipient.on('request',r=>{if(r.method()==='POST'&&r.url().endsWith('/actions')) submitted++;});
+  const hit=await accept.evaluate(el=>{const r=el.getBoundingClientRect(),x=r.x+r.width/2,y=r.y+r.height/2;const target=document.elementFromPoint(x,y);return{x,y,visible:target===el||el.contains(target)};});
+  assert.ok(hit.visible);await recipient.touchscreen.tap(hit.x,hit.y);await recipient.waitForTimeout(150);
+  assert.equal(submitted,0,'Native touch on unfunded consent submits no command');
+  assert.deepEqual((await current(b)).you.hand,accessibleBefore.players[other].hand);
+  await touch.close();
+  await writeFile(join(artifacts,process.env.COMPACT_ACCESSIBILITY_ONLY==='1'?'result-accessibility.json':'result.json'),JSON.stringify({gitHead:h.manifest.gitHead,sourceHasWorkingChanges:!!h.manifest.gitStatus,build:h.manifest.buildHashes,syntheticPosition:true,realHttp:true,externalMessages:0,accessibleOwnShortage:true,nativeDisabledNoSubmit:true,results},null,2));
   console.log(JSON.stringify({passed:true,artifacts,variants:results.length}));
 } finally {if(browser) await browser.close();await h.dispose();}
