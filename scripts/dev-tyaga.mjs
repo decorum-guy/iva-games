@@ -9,10 +9,13 @@ import { mkdir, readFile, writeFile, readdir, readlink, stat, open, unlink } fro
 import { join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { tyagaQaConfig } from './tyaga-qa-config.mjs';
+import { inspectProcessAffinity, requestedServerCpus, validateServerAffinity } from './realtime-load-affinity.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const { qa, ports, origin } = tyagaQaConfig(root);
 const args = new Set(process.argv.slice(2));
+const realtimeCpus = requestedServerCpus(process.env.TYAGA_REALTIME_CPUS, 'TYAGA_REALTIME_CPUS');
+if (realtimeCpus && process.platform !== 'linux') throw new Error('TYAGA_REALTIME_CPUS requires Linux taskset and /proc');
 const children = new Map();
 const lockToken = randomUUID();
 let proxy, lockOwned = false, stopping = false, runnerReady = false, realtimeLaunch, buildId;
@@ -76,18 +79,30 @@ async function health(url, label) {
 }
 async function startProcess(name, file, env) {
   const log = await open(join(qa, `${name}.log`), 'a', 0o600);
-  const child = spawn(process.execPath, [file], { cwd: root, env: { ...process.env, ...env }, stdio: ['ignore', log.fd, log.fd] });
-  const record = { child, expectedExit: false, startedAt: Date.now() };
-  children.set(name, record); await log.close();
+  const pinned = name === 'realtime' && realtimeCpus !== null;
+  const child = spawn(pinned ? 'taskset' : process.execPath, pinned ? ['-c', realtimeCpus.join(','), process.execPath, file] : [file], { cwd: root, env: { ...process.env, ...env }, stdio: ['ignore', log.fd, log.fd] });
+  const record = { child, expectedExit: false, startedAt: Date.now(), affinity: null };
+  children.set(name, record);
   child.once('error', error => { console.error(`${name} could not start: ${error.message}`); if (!stopping && !record.expectedExit) void stop(1); });
   child.once('exit', (code, signal) => { if (!stopping && !record.expectedExit) { console.error(`${name} exited (${code ?? signal}); see ${join(qa, `${name}.log`)}`); void stop(1); } });
+  await log.close();
   return record;
+}
+async function recordRealtimeAffinity() {
+  if (!realtimeCpus) return;
+  const record = children.get('realtime'), actual = inspectProcessAffinity(record.child.pid);
+  validateServerAffinity(realtimeCpus, actual); record.affinity = actual;
+  const runner = inspectProcessAffinity(process.pid);
+  const evidence = { kind: 'Opt-in local affinity, not a CPU quota or exclusive reservation', requestedRealtimeCpus: realtimeCpus,
+    realtime: actual, runner, runnerUsesDisjointCpus: runner.threadCpuSets.every(mask => mask.every(cpu => !realtimeCpus.includes(cpu))) };
+  const path = join(qa, 'build.json'), build = JSON.parse(await readFile(path, 'utf8'));
+  await writeFile(path, JSON.stringify({ ...build, cpuAffinity: evidence }, null, 2), { mode: 0o600 });
 }
 const alive = record => !!record && record.child.exitCode === null && record.child.signalCode === null;
 function runnerStatus() {
   return { ready: runnerReady && !stopping, buildId: buildId ?? null, runnerPid: process.pid, ports,
     services: Object.fromEntries([...children].map(([name, record]) => [name, { pid: record.child.pid,
-      running: alive(record), exitCode: record.child.exitCode, signal: record.child.signalCode, startedAt: record.startedAt }])),
+      running: alive(record), exitCode: record.child.exitCode, signal: record.child.signalCode, startedAt: record.startedAt, affinity: record.affinity }])),
     realtimeRestartDelayMs: lastRealtimeCrashAt === null ? 0 : Math.max(0, lastRealtimeCrashAt + 15_100 - Date.now()) };
 }
 async function terminateOwnRealtime(signal) {
@@ -114,6 +129,7 @@ async function startOwnRealtime() {
   await checkPort(ports.realtime);
   await startProcess('realtime', realtimeLaunch.file, realtimeLaunch.env);
   await health(`http://127.0.0.1:${ports.realtime}/health/realtime/ready`, 'Realtime');
+  await recordRealtimeAffinity();
   lastRealtimeCrashAt = null;
   return { restarted: true };
 }
@@ -248,6 +264,7 @@ try {
     REALTIME_TYAGA_STATIC_DIRECTORY: join(root, 'games/tyaga/dist'), REALTIME_MAX_MATCHES: '12' } };
   await startProcess('realtime', realtimeLaunch.file, realtimeLaunch.env);
   await health(`http://127.0.0.1:${ports.realtime}/health/realtime/ready`, 'Realtime');
+  await recordRealtimeAffinity();
   await startProcess('platform', 'dist-platform/main.js', { ...common, PLATFORM_HOST: '127.0.0.1', PLATFORM_PORT: String(ports.platform),
     PORTAL_ORIGIN: origin, PLATFORM_ALLOWED_ORIGINS: allowedOrigins, PLATFORM_ALLOWED_HOSTS: Object.values(ports).flatMap(port => [`127.0.0.1:${port}`, `localhost:${port}`]).join(','),
     PLATFORM_DATABASE_PATH: join(qa, 'platform.sqlite'), PLATFORM_LAB_DATABASE_PATH: join(qa, 'platform-lab.sqlite'), MAIL_MODE: 'file', MAIL_FILE_DIRECTORY: join(qa, 'mail'),

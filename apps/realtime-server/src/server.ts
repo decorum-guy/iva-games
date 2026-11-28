@@ -33,9 +33,10 @@ interface Peer {
 const FULL_REASONS = ['initial', 'periodic', 'client-request', 'missing-baseline', 'epoch-change', 'control-change', 'backpressure', 'delta-not-smaller'] as const;
 type FullReason = typeof FULL_REASONS[number];
 const reasons = () => Object.fromEntries(FULL_REASONS.map(reason => [reason, 0])) as Record<FullReason, number>;
+const rateKinds = (): Record<ClientMessage['type'], number> => ({ input: 0, action: 0, ackSnapshot: 0, heartbeat: 0, resync: 0, claimControl: 0 });
 function counters() { return { framesReceived: 0, framesSent: 0, jsonBytesReceived: 0, jsonBytesSent: 0,
   fullSnapshots: 0, deltaSnapshots: 0, resyncRequests: 0, coalescedInputs: 0, expiredInputs: 0, rateLimits: 0,
-  backpressureCloses: 0, queueOverflows: 0, maxBufferedBytes: 0, maxQueuedFrames: 0, fullReasons: reasons() }; }
+  backpressureCloses: 0, queueOverflows: 0, maxBufferedBytes: 0, maxQueuedFrames: 0, fullReasons: reasons(), rateLimitKinds: rateKinds() }; }
 const json = (response: ServerResponse, status: number, value: unknown): void => {
   response.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' });
   response.end(JSON.stringify(value));
@@ -58,8 +59,14 @@ export function createRealtimeHttpServer(options: RealtimeHttpOptions): Server &
   const peers = new Map<string, Peer>();
   const totals = counters(), snapshotLatency = new BoundedTiming();
   const loopDelay = monitorEventLoopDelay({ resolution: 10 }); loopDelay.enable();
-  const increment = (peer: Peer, field: Exclude<keyof ReturnType<typeof counters>, 'fullReasons'>, amount = 1): void => { peer.counters[field] += amount; totals[field] += amount; };
+  const increment = (peer: Peer, field: Exclude<keyof ReturnType<typeof counters>, 'fullReasons' | 'rateLimitKinds'>, amount = 1): void => { peer.counters[field] += amount; totals[field] += amount; };
   const maximum = (peer: Peer, field: 'maxBufferedBytes' | 'maxQueuedFrames', value: number): void => { peer.counters[field] = Math.max(peer.counters[field], value); totals[field] = Math.max(totals[field], value); };
+  const charge = (peer: Peer, message: ClientMessage, arrivedAt: number): void => {
+    const limiter = message.type === 'input' ? peer.inputs : message.type === 'action' ? peer.actions : message.type === 'ackSnapshot' ? peer.acknowledgements : peer.control;
+    if (limiter.take(arrivedAt)) return;
+    peer.counters.rateLimitKinds[message.type] += 1; totals.rateLimitKinds[message.type] += 1;
+    throw new RealtimeError('RATE_LIMIT', 429);
+  };
   const diagnostics = () => ({ totals, snapshotRequest: snapshotLatency.report(),
     eventLoop: { delaySamples: loopDelay.count, p99DelayMs: loopDelay.count ? loopDelay.percentile(99) / 1e6 : null,
       maxDelayMs: loopDelay.count ? loopDelay.max / 1e6 : null, utilization: performance.eventLoopUtilization() },
@@ -232,8 +239,7 @@ export function createRealtimeHttpServer(options: RealtimeHttpOptions): Server &
           try { value = JSON.parse(data.toString()); } catch { throw new RealtimeError('INVALID_JSON'); }
           if (peer.claims) {
             parsed = parseClientMessage(value);
-            const limiter = parsed.type === 'input' ? peer.inputs : parsed.type === 'action' ? peer.actions : parsed.type === 'ackSnapshot' ? peer.acknowledgements : peer.control;
-            if (!limiter.take(receivedAt)) throw new RealtimeError('RATE_LIMIT', 429);
+            charge(peer, parsed, receivedAt);
             if (parsed.type === 'input') {
               // Keep only the newest not-yet-processed continuous state. Discrete
               // commands retain their own bounded queue and durable receipts.
@@ -271,10 +277,7 @@ export function createRealtimeHttpServer(options: RealtimeHttpOptions): Server &
             if (parsed?.type === 'input') { pendingInput = null; inputQueued = false; }
             const message = input?.message ?? parsed ?? parseClientMessage(value);
             if (message.type === 'action') actionId = message.actionId;
-            if (!parsed) {
-              const limiter = message.type === 'input' ? peer.inputs : message.type === 'action' ? peer.actions : message.type === 'ackSnapshot' ? peer.acknowledgements : peer.control;
-              if (!limiter.take(receivedAt)) throw new RealtimeError('RATE_LIMIT', 429);
-            }
+            if (!parsed) charge(peer, message, receivedAt);
             if (message.type === 'input') {
               const arrival = input?.receivedAt ?? receivedAt;
               if (mono() - arrival <= INPUT_TIMEOUT_MS) await options.runtime.call('input', peer.id, message, arrival);

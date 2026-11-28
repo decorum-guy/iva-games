@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { createContext, useContext, useEffect, useRef } from 'react';
 import type { ReactNode } from 'react';
 
 export type IconName = 'arrow' | 'truck' | 'mountain' | 'water' | 'wind' | 'rope' | 'hand' | 'tool' | 'close' | 'menu' | 'map' | 'crew' | 'sound' | 'mute' | 'check' | 'flag' | 'pause' | 'retry' | 'jump' | 'brake' | 'help' | 'sun' | 'settings' | 'plus' | 'minus' | 'box' | 'link' | 'exit';
@@ -32,11 +32,13 @@ const paths: Record<IconName, ReactNode> = {
   exit: <><path d="M11 4H4v16h7m-1-8h12m-4-4 4 4-4 4"/></>,
 };
 export function Icon({ name, size = 22 }: { name: IconName; size?: number }) { return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.65" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{paths[name]}</svg>; }
+export const DialogNoticeContext = createContext<{ message: string; error: boolean; closeLabel: string; onClose: () => void } | null>(null);
 export function Dialog({ title, children, onClose, closeLabel = 'Закрыть / Close', className = '' }: { title: string; children: ReactNode; onClose: () => void; closeLabel?: string; className?: string }) {
   const ref = useRef<HTMLDialogElement>(null);
+  const notice = useContext(DialogNoticeContext);
   useEffect(() => { const dialog = ref.current!; const focus = document.activeElement as HTMLElement | null; dialog.showModal(); return () => { dialog.close(); focus?.focus(); }; }, []);
   return <dialog ref={ref} className={'ty-dialog ' + className} onCancel={event => { event.preventDefault(); onClose(); }} onClick={event => { if (event.target === event.currentTarget) { const rect = event.currentTarget.getBoundingClientRect(); if (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom) onClose(); } }}>
-    <header><h2>{title}</h2><button className="ty-icon-button" aria-label={closeLabel} onClick={onClose}><Icon name="close"/></button></header>
+    <header><h2>{title}</h2><button className="ty-icon-button" aria-label={closeLabel} onClick={onClose}><Icon name="close"/></button>{notice && <div className={'ty-dialog-notice ' + (notice.error ? 'error' : '')} role={notice.error ? 'alert' : 'status'}><span>{notice.message}</span><button className="ty-icon-button" aria-label={notice.closeLabel} onClick={notice.onClose}><Icon name="close" size={18}/></button></div>}</header>
     <div className="ty-dialog-body">{children}</div>
   </dialog>;
 }

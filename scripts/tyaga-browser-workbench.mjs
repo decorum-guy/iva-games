@@ -8,7 +8,7 @@ import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createInterface } from 'node:readline';
-import { chromium } from 'playwright';
+import { chromium, webkit } from 'playwright';
 import { tyagaQaConfig } from './tyaga-qa-config.mjs';
 import { applyLoadChanges } from './realtime-load-view.mjs';
 
@@ -16,6 +16,8 @@ const root = fileURLToPath(new URL('..', import.meta.url));
 const { qa, origin } = tyagaQaConfig(root);
 const label = process.argv.find(a => a.startsWith('--round='))?.slice(8) ?? 'preflight';
 if (!/^[a-zA-Z0-9-]+$/.test(label)) throw new Error('Invalid QA label');
+const browserEngine=process.env.TYAGA_BROWSER??'chromium';
+if(!['chromium','webkit'].includes(browserEngine))throw new Error('TYAGA_BROWSER must be chromium or webkit');
 const directory = resolve(qa, label); await mkdir(directory, { recursive: true });
 const runner = spawn(process.execPath, ['scripts/dev-tyaga.mjs', ...(process.argv.includes('--no-build') ? ['--no-build'] : [])], { cwd: root, env: process.env, stdio: ['ignore', 'inherit', 'inherit', 'ipc'] });
 let browser, input, active = 0, stopping = false, counter = 0;
@@ -34,11 +36,13 @@ function serviceControl(command) {
 async function stop() {
   if (stopping) return; stopping = true;
   input?.close(); process.stdin.pause();
-  let browserTimer;
-  const browserClosed=await Promise.race([Promise.resolve(browser?.close()).then(()=>true),new Promise(done=>{browserTimer=setTimeout(()=>done(false),5000);})]).finally(()=>clearTimeout(browserTimer));
+  let browserTimer, browserCloseError;
+  const browserStopStarted=performance.now();
+  const browserClosed=await Promise.race([Promise.resolve(browser?.close()).then(()=>true,error=>{browserCloseError=error.message;return false;}),new Promise(done=>{browserTimer=setTimeout(()=>done(false),20000);})]).finally(()=>clearTimeout(browserTimer));
+  const browserCloseWaitMs=performance.now()-browserStopStarted;
   runner.kill('SIGTERM');
   const runnerStopped=await new Promise(done => { if (runner.exitCode !== null) return done({code:runner.exitCode,forced:false}); const timeout = setTimeout(() => { runner.kill('SIGKILL'); done({code:null,forced:true}); }, 35000); runner.once('exit', code => { clearTimeout(timeout); done({code,forced:false}); }); });
-  const result={browserClosed,runner:runnerStopped};
+  const result={browserClosed,browserCloseWaitMs,...(browserCloseError?{browserCloseError}:{}),runner:runnerStopped};
   await writeFile(resolve(directory,'shutdown.json'),JSON.stringify(result,null,2));
   console.log(JSON.stringify({shutdown:result}));
   if(!browserClosed || runnerStopped.forced || runnerStopped.code!==0) process.exitCode=1;
@@ -56,25 +60,36 @@ async function ready() {
 async function addClient(viewport = { width:1366, height:768 }, mobile = false) {
   const context = await browser.newContext({ viewport, isMobile:mobile, hasTouch:mobile, deviceScaleFactor:1 });
   context.setDefaultTimeout(8000); context.setDefaultNavigationTimeout(15000);
-  const page = await context.newPage(), client = { context, page, view:null, snapshot:null, bases:new Map(), errors:[], failed:[], wire:{received:0,sent:0,sentTypes:{},errorCodes:{},lastReceived:null,lastSent:null,lastSnapshotAt:null,closed:0} };
+  const page = await context.newPage(), client = { context, page, view:null, snapshot:null, bases:new Map(), serverBaseline:null, activeSocket:null, errors:[], console:[], failed:[], wire:{received:0,sent:0,sentTypes:{},errorCodes:{},actions:[],lastReceived:null,lastSent:null,lastSnapshotAt:null,closed:0} };
   clients.push(client); active = clients.length - 1;
-  page.on('framenavigated',frame=>{if(frame===page.mainFrame()){client.view=null;client.snapshot=null;client.bases.clear();}});
+  page.on('framenavigated',frame=>{if(frame===page.mainFrame()){client.view=null;client.snapshot=null;client.bases.clear();client.serverBaseline=null;client.activeSocket=null;}});
   page.on('pageerror', error => {
     const known=client.errors.find(item=>item.message===error.message);
     if(known) known.count++; else client.errors.push({message:error.message,stack:error.stack,count:1});
   });
+  page.on('console', message => {
+    if(!['error','warning'].includes(message.type()))return;
+    const text=message.text().replace(/ticket=[^&\s]+/g,'ticket=REDACTED').slice(0,4000),known=client.console.find(item=>item.type===message.type()&&item.text===text);
+    if(known)known.count++;else if(client.console.length<100)client.console.push({type:message.type(),text,count:1});
+  });
   page.on('requestfailed', request => client.failed.push({ url:request.url().replace(/ticket=[^&]+/g,'ticket=REDACTED'), error:request.failure()?.errorText }));
   page.on('websocket', socket => {
+    client.activeSocket=socket;
     socket.on('close',()=>{client.wire.closed++;});
-    socket.on('framesent',frame=>{try{const message=JSON.parse(frame.payload.toString());client.wire.sent++;client.wire.sentTypes[message.type]=(client.wire.sentTypes[message.type]??0)+1;client.wire.lastSent={type:message.type,inputSeq:message.inputSeq,at:Date.now()};}catch{/* diagnostic only */}});
+    socket.on('framesent',frame=>{try{const message=JSON.parse(frame.payload.toString());client.wire.sent++;client.wire.sentTypes[message.type]=(client.wire.sentTypes[message.type]??0)+1;client.wire.lastSent={type:message.type,inputSeq:message.inputSeq,at:Date.now()};if(message.type==='input')client.wire.lastInput={inputSeq:message.inputSeq,payload:message.payload,at:Date.now()};}catch{/* diagnostic only */}});
     socket.on('framereceived', frame => {
+      if(client.activeSocket!==socket)return;
       try {
         const message = JSON.parse(frame.payload.toString());
         client.wire.received++;client.wire.lastReceived={type:message.type,snapshotSeq:message.snapshotSeq,code:message.code,at:Date.now()};
         if(message.type==='error'&&typeof message.code==='string')client.wire.errorCodes[message.code]=(client.wire.errorCodes[message.code]??0)+1;
-        if (message.type === 'full') { client.view=message.view; client.snapshot=message; client.bases.set(message.snapshotSeq,message.view); client.wire.lastSnapshotAt=Date.now(); }
-        if (message.type === 'delta' && client.bases.has(message.baselineSnapshotSeq)) { client.view=applyLoadChanges(client.bases.get(message.baselineSnapshotSeq),message.changes); client.snapshot={...message,view:client.view}; client.bases.set(message.snapshotSeq,client.view); client.wire.lastSnapshotAt=Date.now(); }
-        while(client.bases.size>64) client.bases.delete(client.bases.keys().next().value);
+        if(message.type==='actionAck'||message.type==='error'&&message.actionId){client.wire.actions.push({type:message.type,actionId:message.actionId,epoch:message.epoch,result:message.result,code:message.code,at:Date.now()});if(client.wire.actions.length>32)client.wire.actions.shift();}
+        if (message.type === 'full') {
+          if(message.matchId!==client.snapshot?.matchId||message.epoch!==client.snapshot?.epoch||message.controllerGeneration!==client.snapshot?.controllerGeneration){client.bases.clear();client.serverBaseline=null;}
+          client.view=message.view; client.snapshot=message; client.bases.set(message.snapshotSeq,message.view); client.wire.lastSnapshotAt=Date.now();
+        }
+        if (message.type === 'delta' && message.matchId===client.snapshot?.matchId && message.epoch===client.snapshot?.epoch && message.controllerGeneration===client.snapshot?.controllerGeneration && client.bases.has(message.baselineSnapshotSeq)) { client.serverBaseline=message.baselineSnapshotSeq;client.view=applyLoadChanges(client.bases.get(message.baselineSnapshotSeq),message.changes); client.snapshot={...message,view:client.view}; client.bases.set(message.snapshotSeq,client.view); client.wire.lastSnapshotAt=Date.now(); }
+        while(client.bases.size>64)client.bases.delete([...client.bases.keys()].find(sequence=>sequence!==client.serverBaseline&&sequence!==client.snapshot?.snapshotSeq));
       } catch { /* Full/delta is separately covered by protocol tests. */ }
     });
   });
@@ -91,9 +106,9 @@ async function evidence(client, name) {
   const prefix=String(++counter).padStart(3,'0')+'-'+name.replace(/[^a-zA-Z0-9-]/g,'-');
   const file=resolve(directory,prefix+'.png'); await client.page.screenshot({path:file,fullPage:true,timeout:20000});
   const text=await client.page.locator('body').innerText(); await writeFile(resolve(directory,prefix+'.txt'),text);
-  await writeFile(resolve(directory,prefix+'-diagnostics.json'),JSON.stringify({errors:client.errors,failed:client.failed,wire:client.wire},null,2));
+  await writeFile(resolve(directory,prefix+'-diagnostics.json'),JSON.stringify({errors:client.errors,console:client.console,failed:client.failed,wire:client.wire},null,2));
   if(client.view) await writeFile(resolve(directory,prefix+'-view.json'),JSON.stringify(client.view));
-  console.log(JSON.stringify({evidence:file, url:client.page.url(), text:text.slice(0,10000), errors:client.errors,failed:client.failed.slice(-8)}));
+  console.log(JSON.stringify({evidence:file, url:client.page.url(), text:text.slice(0,10000), errors:client.errors,console:client.console,failed:client.failed.slice(-8)}));
 }
 async function walkByKeyboard(client, command) {
   if (!Number.isFinite(command.x) || !Number.isFinite(command.z)) throw new Error('A finite walking target is required');
@@ -192,7 +207,7 @@ async function execute(command) {
     case 'drive': await driveByKeyboard(client,command);break;
     case 'hover': await locator(page,command).hover();break;
     case 'focus-element': await locator(page,command).focus();break;
-    case 'key': for(const key of command.keys)await page.keyboard.down(key); await page.waitForTimeout(Math.min(command.ms??500,15000)); for(const key of command.keys)await page.keyboard.up(key); break;
+    case 'key': try{for(const key of command.keys)await page.keyboard.down(key); await page.waitForTimeout(Math.min(command.ms??500,15000));}finally{for(const key of command.keys)await page.keyboard.up(key);} break;
     case 'keydown': for(const key of command.keys)await page.keyboard.down(key); break;
     case 'keyup': for(const key of command.keys)await page.keyboard.up(key); break;
     case 'tap': await page.touchscreen.tap(command.x,command.y); break;
@@ -212,7 +227,7 @@ async function execute(command) {
     case 'offline': await client.context.setOffline(command.enabled); break;
     case 'reload': await page.reload(); break;
     case 'service': {const status=await serviceControl(command.action);await appendFile(resolve(directory,'service-events.jsonl'),JSON.stringify({command:command.action,status})+'\n');console.log(JSON.stringify({service:status}));break;}
-    case 'diagnostics': console.log(JSON.stringify({wire:client.wire,errors:client.errors,failed:client.failed.slice(-8),dom:await page.evaluate(()=>({visibility:document.visibilityState,focused:document.hasFocus(),active:document.activeElement?.tagName,scale:getComputedStyle(document.documentElement).getPropertyValue('--ty-text-scale'),viewport:{width:innerWidth,height:innerHeight},dialogs:[...document.querySelectorAll('dialog[open]')].map(e=>e.getAttribute('aria-label'))})),snapshot:client.snapshot?{tick:client.view?.tick,seq:client.snapshot.snapshotSeq,phase:client.snapshot.phase,hasControl:client.snapshot.hasControl,generation:client.snapshot.controllerGeneration,epoch:client.snapshot.epoch}:null}));break;
+    case 'diagnostics': console.log(JSON.stringify({wire:client.wire,errors:client.errors,console:client.console,failed:client.failed.slice(-8),dom:await page.evaluate(()=>({visibility:document.visibilityState,focused:document.hasFocus(),active:document.activeElement?.tagName,scale:getComputedStyle(document.documentElement).getPropertyValue('--ty-text-scale'),viewport:{width:innerWidth,height:innerHeight},dialogs:[...document.querySelectorAll('dialog[open]')].map(e=>e.getAttribute('aria-label'))})),snapshot:client.snapshot?{tick:client.view?.tick,seq:client.snapshot.snapshotSeq,phase:client.snapshot.phase,hasControl:client.snapshot.hasControl,generation:client.snapshot.controllerGeneration,epoch:client.snapshot.epoch}:null}));break;
     case 'performance': {
       const duration=Math.max(1000,Math.min(command.ms??5000,15000));
       const measurement=await page.evaluate(ms=>new Promise(done=>{
@@ -227,7 +242,8 @@ async function execute(command) {
       const start=Date.now(),before=structuredClone(client.wire),tickBefore=client.view?.tick;
       await page.waitForTimeout(Math.max(1000,Math.min(command.ms??10000,15000)));
       const elapsedMs=Date.now()-start,sentByType=Object.fromEntries(Object.entries(client.wire.sentTypes).map(([kind,count])=>[kind,count-(before.sentTypes[kind]??0)]));
-      const result={elapsedMs,sentByType,inputHz:(sentByType.input??0)*1000/elapsedMs,errorCodes:client.wire.errorCodes,tickBefore,tickAfter:client.view?.tick,phase:client.snapshot?.phase};
+      const errorDelta=Object.fromEntries(Object.entries(client.wire.errorCodes).map(([code,count])=>[code,count-(before.errorCodes[code]??0)]));
+      const result={elapsedMs,sentByType,inputHz:(sentByType.input??0)*1000/elapsedMs,errorCodes:client.wire.errorCodes,errorDelta,tickBefore,tickAfter:client.view?.tick,phase:client.snapshot?.phase};
       await appendFile(resolve(directory,'wire-samples.jsonl'),JSON.stringify(result)+'\n');console.log(JSON.stringify({wireSample:result}));break;
     }
     case 'state': {
@@ -238,7 +254,9 @@ async function execute(command) {
       const report=await page.locator('button,input,select,a,[tabindex]').evaluateAll(elements=>elements.map(e=>{
         const b=e.getBoundingClientRect(),s=getComputedStyle(e),label=e.getAttribute('aria-label')||e.labels?.[0]?.textContent?.trim()||e.textContent?.trim();
         const ids=(e.getAttribute('aria-describedby')??'').split(/\s+/).filter(Boolean);
-        return {tag:e.tagName,label:label?.slice(0,200),disabled:!!e.disabled,reason:e.title||ids.map(id=>document.getElementById(id)?.textContent).filter(Boolean).join(' '),tabIndex:e.tabIndex,pressed:e.getAttribute('aria-pressed'),expanded:e.getAttribute('aria-expanded'),visible:b.width>0&&b.height>0&&s.visibility!=='hidden'&&s.display!=='none',rect:{x:b.x,y:b.y,width:b.width,height:b.height},fontSize:s.fontSize,color:s.color,background:s.backgroundColor,clipped:e.scrollWidth>e.clientWidth+1||e.scrollHeight>e.clientHeight+1};
+        const inViewport=b.right>0&&b.bottom>0&&b.left<innerWidth&&b.top<innerHeight,centerX=b.left+b.width/2,centerY=b.top+b.height/2;
+        const hit=inViewport?document.elementFromPoint(centerX,centerY):null;
+        return {tag:e.tagName,label:label?.slice(0,200),disabled:!!e.disabled,reason:e.title||ids.map(id=>document.getElementById(id)?.textContent).filter(Boolean).join(' '),tabIndex:e.tabIndex,pressed:e.getAttribute('aria-pressed'),expanded:e.getAttribute('aria-expanded'),visible:b.width>0&&b.height>0&&s.visibility!=='hidden'&&s.display!=='none',inViewport,centerHitTarget:!!hit&&(hit===e||e.contains(hit)),rect:{x:b.x,y:b.y,width:b.width,height:b.height},fontSize:s.fontSize,color:s.color,background:s.backgroundColor,clipped:e.scrollWidth>e.clientWidth+1||e.scrollHeight>e.clientHeight+1};
       }));
       const result={client:active,url:page.url(),viewport:page.viewportSize(),elements:report};
       await appendFile(resolve(directory,'ui-audit.jsonl'),JSON.stringify(result)+'\n');
@@ -262,20 +280,39 @@ async function execute(command) {
 }
 try{
   const health=await ready();
-  let executablePath=process.env.TYAGA_CHROMIUM;
-  const packaged=resolve(root,'.qa/tyaga/browser-runtime/node_modules/@sparticuz/chromium/build/index.js');
-  if(!executablePath && existsSync(packaged)) {
-    process.env.TMPDIR=resolve(qa,'browser-runtime/tmp'); await mkdir(process.env.TMPDIR,{recursive:true});
-    const packagedChromium=(await import(packaged)).default; executablePath=await packagedChromium.executablePath();
+  if(browserEngine==='chromium'){
+    let executablePath=process.env.TYAGA_CHROMIUM;
+    const packaged=resolve(root,'.qa/tyaga/browser-runtime/node_modules/@sparticuz/chromium/build/index.js');
+    if(!executablePath && existsSync(packaged)) {
+      process.env.TMPDIR=resolve(qa,'browser-runtime/tmp'); await mkdir(process.env.TMPDIR,{recursive:true});
+      const packagedChromium=(await import(packaged)).default; executablePath=await packagedChromium.executablePath();
+    }
+    // Keep normal browser origin/security checks. Only software WebGL is enabled
+    // inside this disposable QA context; do not use the package's insecure args.
+    browser=await chromium.launch({...(executablePath?{executablePath}:{}),headless:true,args:['--no-sandbox','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
+  }else{
+    browser=await webkit.launch({headless:true,...(process.env.TYAGA_WEBKIT_EXECUTABLE?{executablePath:process.env.TYAGA_WEBKIT_EXECUTABLE}:{})});
   }
-  // Keep normal browser origin/security checks. Only software WebGL is enabled
-  // inside this disposable QA context; do not use the package's insecure args.
-  browser=await chromium.launch({...(executablePath?{executablePath}:{}),headless:true,args:['--no-sandbox','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
   await addClient();
   const build=JSON.parse(await readFile(resolve(qa,'build.json'),'utf8'));
-  await writeFile(resolve(directory,'build.json'),JSON.stringify({...build,health,browser:browser.version(),renderer:'Chromium software WebGL / SwiftShader',kind:'automated UI browser'},null,2));
-  console.log(JSON.stringify({ready:true,round:label,buildId:build.buildId,browser:browser.version(),clients:clients.length}));
+  const webgl=await clients[0].page.locator('canvas').evaluateAll(canvases=>canvases.map(canvas=>{
+    const gl=canvas.getContext('webgl2')??canvas.getContext('webgl');if(!gl)return null;
+    const debug=gl.getExtension('WEBGL_debug_renderer_info');return{version:gl.getParameter(gl.VERSION),renderer:gl.getParameter(gl.RENDERER),vendor:gl.getParameter(gl.VENDOR),unmaskedRenderer:debug?gl.getParameter(debug.UNMASKED_RENDERER_WEBGL):null};
+  }).filter(Boolean));
+  await writeFile(resolve(directory,'build.json'),JSON.stringify({...build,health,browser:browser.version(),browserEngine,hostPlatform:process.platform,hostArch:process.arch,webgl,renderer:webgl.map(info=>info.unmaskedRenderer??info.renderer).join('; ')||'Not observed',rendererSource:'WebGL-reported strings; not physical GPU or device identification',kind:'automated UI browser'},null,2));
+  console.log(JSON.stringify({ready:true,round:label,buildId:build.buildId,browser:browser.version(),browserEngine,webgl,clients:clients.length}));
   await evidence(clients[0],'menu');
   input=createInterface({input:process.stdin,crlfDelay:Infinity});
-  for await(const line of input){try{if(line.trim()&&!(await execute(JSON.parse(line))))break;}catch(error){console.log(JSON.stringify({commandError:error.message}));}}
+  for await(const line of input){
+    if(!line.trim())continue;
+    const startedAt=Date.now(),before=clients[active]?.snapshot;
+    let command,error,keepGoing=true;
+    try{command=JSON.parse(line);keepGoing=await execute(command);}catch(caught){error=caught.message;console.log(JSON.stringify({commandError:error}));}
+    const client=clients[active],after=client?.snapshot;
+    const cursor=snapshot=>snapshot?{matchId:snapshot.matchId,epoch:snapshot.epoch,generation:snapshot.controllerGeneration,seq:snapshot.snapshotSeq,tick:snapshot.view?.tick,phase:snapshot.phase}:null;
+    await appendFile(resolve(directory,'command-outcomes.jsonl'),JSON.stringify({id:crypto.randomUUID(),startedAt,finishedAt:Date.now(),client:active,command:command?{...command,...(command.cmd==='fill'?{value:'[UI test value]'}:{})}:null,
+      uiDispatch:error?'error':'completed',error:error??null,before:cursor(before),after:cursor(after),evidenceCounter:counter,
+      receivedActionReplies:client?.wire.actions.filter(reply=>reply.at>=startedAt)??[],kind:'UI dispatch record; server success and gameplay consequences require the recorded replies, views and screenshots'})+'\n');
+    if(!keepGoing)break;
+  }
 }catch(error){console.error(error);process.exitCode=1;}finally{await stop();process.exit(process.exitCode??0);}

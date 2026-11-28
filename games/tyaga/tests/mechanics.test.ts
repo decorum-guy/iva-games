@@ -4,6 +4,7 @@ import { TyagaWorld } from '../src/server-world/world';
 import { NEUTRAL_INPUT } from '../src/core/config';
 import { V, add, distance, length, localPoint, quatAxis, quatMul, rotate, sub } from '../src/core/math';
 import RAPIER from '@dimforge/rapier3d-compat';
+import { kineticState } from './r04-fixtures';
 const participants=[{participantId:'alice',displayName:'Alice',seatIndex:0,bot:false},{participantId:'bob',displayName:'Bob',seatIndex:1,bot:false}];
 async function fixture(){return TyagaWorld.create({matchId:'mechanics',mapId:'tutorial',participants});}
 function step(w:TyagaWorld,n:number,inputs:Record<string,unknown>={}){for(let i=0;i<n;i++)w.step(inputs);}
@@ -77,11 +78,17 @@ it('P08 a sustained physical overload breaks the fully paid-out cable and keeps 
   w.addBody({id:'overload-winch',kind:'winch',position:V(18,22,6),fixed:true});
   w.addBody({id:'overload-load',kind:'block',position:V(18.45,4.22,6.17),size:V(.5,.5,.5),mass:3000});
   const rope=w.addLink('rope','overload-winch','drum','overload-load','ring--1--1');
+  const ids=['overload-load',rope.hookId!,rope.collarId!,...rope.segments!.map(s=>s.id)];
+  let breakEnergy:{before:ReturnType<typeof kineticState>;after:ReturnType<typeof kineticState>}|null=null;
+  const detach=w.detachLink.bind(w);w.detachLink=(id,broken=false)=>{if(id===rope.id&&broken){const before=kineticState(w,ids);detach(id,broken);breakEnergy={before,after:kineticState(w,ids)};}else detach(id,broken);};
   let brokeAt=-1,maximum=0;const history:unknown[]=[];
   for(let i=0;i<180;i++){w.step();maximum=Math.max(maximum,rope.tension);if(i%6===0){const j=w.physics.impulseJoints.get(rope.drumJoint!)as import('@dimforge/rapier3d-compat').PrismaticImpulseJoint;history.push({tick:i,tension:rope.tension,overload:rope.overload,y:w.body('overload-load').translation().y,joint:{limits:j.limitsEnabled(),min:j.limitsMin(),max:j.limitsMax(),anchor1:j.anchor1(),anchor2:j.anchor2(),frame1:j.frameX1(),frame2:j.frameX2()},collar:w.body(rope.collarId!).rotation()});}if(rope.broken){brokeAt=i/60;break;}}
   const velocityAtBreak={...w.body('overload-load').linvel()};
-  evidence('P08-rope-break',{maximumTension:maximum,brokeAt,length:rope.length,broken:rope.broken,hookJoint:rope.hookJoint!==undefined&&Boolean(w.physics.impulseJoints.get(rope.hookJoint)),velocityAtBreak,freeEndKind:w.state.entities[rope.collarId!].kind,collar:{position:{...w.body(rope.collarId!).translation()},mass:w.body(rope.collarId!).mass()},segments:rope.segments!.map(s=>({id:s.id,position:{...w.body(s.id).translation()},mass:w.body(s.id).mass()})),history});
+  evidence('P08-rope-break',{maximumTension:maximum,brokeAt,length:rope.length,broken:rope.broken,hookJoint:rope.hookJoint!==undefined&&Boolean(w.physics.impulseJoints.get(rope.hookJoint)),velocityAtBreak,breakEnergy,freeEndKind:w.state.entities[rope.collarId!].kind,collar:{position:{...w.body(rope.collarId!).translation()},mass:w.body(rope.collarId!).mass()},segments:rope.segments!.map(s=>({id:s.id,position:{...w.body(s.id).translation()},mass:w.body(s.id).mass()})),history});
   expect(rope.broken).toBe(true);expect(brokeAt).toBeGreaterThanOrEqual(.25);expect(rope.hookJoint).toBeDefined();expect(w.physics.impulseJoints.get(rope.hookJoint!)).not.toBeNull();
+  expect(breakEnergy).not.toBeNull();const measured=breakEnergy! as {before:ReturnType<typeof kineticState>;after:ReturnType<typeof kineticState>};
+  for(let i=0;i<measured.before.bodies.length;i++){expect(measured.after.bodies[i].position).toEqual(measured.before.bodies[i].position);expect(measured.after.bodies[i].linearVelocity).toEqual(measured.before.bodies[i].linearVelocity);expect(measured.after.bodies[i].angularVelocity).toEqual(measured.before.bodies[i].angularVelocity);}
+  expect(measured.after.energy-measured.before.energy).toBeLessThan(.25);
   const before=w.body('overload-load').translation().y;step(w,12);expect(w.body('overload-load').translation().y).toBeLessThan(before-.1);
  }finally{w.dispose();}
 });

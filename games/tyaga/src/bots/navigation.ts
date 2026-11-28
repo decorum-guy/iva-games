@@ -1,4 +1,5 @@
 import { add, distance, mix, V } from '../core/math';
+import { BODY } from '../core/config';
 import type { TyagaMap, TyagaView, Vec3 } from '../core/types';
 
 export interface NavigationMemory { path?:Vec3[];pathGoal?:Vec3;pathUpdatedAt?:number;blockedFor?:number }
@@ -26,13 +27,17 @@ function groundPath(view:TyagaView,a:Vec3,b:Vec3,ground:(v:TyagaView,p:Vec3)=>nu
  for(let i=0;i<=count;i++){
   const p=mix(a,b,i/count),h=ground(view,add(p,V(0,1,0)));
   if(h===null||previous!==null&&Math.abs(h-previous)>.8)return false;
+  // A walkable riverbed is not a safe foot route. Plan against the published
+  // high-water mark so a helper does not enter a crossing that floods while
+  // following a moving truck. The existing raised footpath remains usable.
+  if(view.map.waterVolumes.some(w=>p.x>w.min.x&&p.x<w.max.x&&p.z>w.min.z&&p.z<w.max.z&&h+BODY.character.size.y/2<w.baseLevel+w.amplitude+.15))return false;
   previous=h;
  }
  return true;
 }
 /** Navigation observes only published geometry and emits foot waypoints. */
 export function footWaypoint(view:TyagaView,actor:Vec3,goal:Vec3,memory:NavigationMemory,now:number,ground:(v:TyagaView,p:Vec3)=>number|null):Vec3{
- if(!memory.pathGoal||distance(goal,memory.pathGoal)>2||now-(memory.pathUpdatedAt??-100)>1||!memory.path?.length){
+ if(!memory.pathGoal||distance(goal,memory.pathGoal)>2||now-(memory.pathUpdatedAt??-100)>1||memory.path===undefined){
   memory.pathUpdatedAt=now;memory.pathGoal={...goal};
   if(groundPath(view,actor,goal,ground)){memory.path=[{...goal}];}
   else{
@@ -42,7 +47,7 @@ export function footWaypoint(view:TyagaView,actor:Vec3,goal:Vec3,memory:Navigati
    const costs=new Map<string,number>(),previous=new Map<string,string>(),open=new Set<string>();
    for(const start of starts){costs.set(start.n.id,start.d);open.add(start.n.id);}
    let found:string|undefined;
-   while(open.size){
+   while(open.size&&ends.size){
     let next:string|undefined,best=Infinity;for(const id of open){const score=(costs.get(id)??Infinity)+distance(nodes.get(id)!.position,goal);if(score<best){best=score;next=id;}}
     if(!next)break;open.delete(next);if(ends.has(next)){found=next;break;}
     const node=nodes.get(next)!;
@@ -57,5 +62,7 @@ export function footWaypoint(view:TyagaView,actor:Vec3,goal:Vec3,memory:Navigati
  }
  const path=memory.path??[];
  while(path.length>1&&Math.hypot(path[0].x-actor.x,path[0].z-actor.z)<.65)path.shift();
- return path[0]??goal;
+ // No route means wait on the current support. A direct fallback here used
+ // to walk straight into the same water or gap that the planner rejected.
+ return path[0]??actor;
 }

@@ -76,7 +76,7 @@ def transforms(doc):
 
 def models():
     manifest=json.loads((ASSETS/'models/manifest.json').read_text())
-    expected={'truck','character','generator-large','mast','pump-large','generator','optics','pump','deck','beam','winch','anchor','strap','jack','repair','drive','crate','pontoon','ferry-deck','lift','block','ramp','ring','barrier'}
+    expected={'truck','character','generator-large','mast','pump-large','generator','optics','pump','deck','beam','winch','anchor','strap','jack','repair','drive','crate','pontoon','ferry-deck','lift','block','ramp','ring','bridge-mount','barrier'}
     found={a['assetId'] for a in manifest['assets']}
     check(expected<=found,f'Missing runtime models: {sorted(expected-found)}')
     check(len(found)==len(manifest['assets']),'Duplicate model assetId')
@@ -91,7 +91,14 @@ def models():
         check(all('uri' not in item for item in doc.get('buffers',[])),f'{name}: external buffer')
         names={node.get('name') for node in doc['nodes']}
         check(set(asset.get('sockets',{}))<=names,f'{name}: missing named socket')
-        tri=0;points=[]
+        parents={child:i for i,node in enumerate(doc['nodes']) for child in node.get('children',[])}
+        def interaction_hardware(index):
+            while index is not None:
+                if doc['nodes'][index].get('extras',{}).get('interactionHardware'):
+                    return True
+                index=parents.get(index)
+            return False
+        tri=0;points=[];structure=[];triangles=[];material_points={}
         for i,node in enumerate(doc['nodes']):
             if 'mesh' not in node: continue
             for primitive in doc['meshes'][node['mesh']]['primitives']:
@@ -101,7 +108,14 @@ def models():
                 count=doc['accessors'][primitive['indices']]['count'] if 'indices' in primitive else len(positions)
                 tri+=count//3
                 homogeneous=np.column_stack([positions,np.ones(len(positions))])
-                points.append((world[i]@homogeneous.T).T[:,:3])
+                transformed=(world[i]@homogeneous.T).T[:,:3]
+                points.append(transformed)
+                material_name=doc.get('materials',[])[primitive['material']].get('name','') if 'material' in primitive else ''
+                material_points.setdefault(material_name,[]).append(transformed)
+                if not interaction_hardware(i):
+                    structure.append(transformed)
+                indices=accessor(doc,binary,primitive['indices']).ravel() if 'indices' in primitive else np.arange(len(positions))
+                triangles.append(transformed[indices].reshape((-1,3,3)))
                 if 'WEIGHTS_0' in primitive['attributes']:
                     weights=accessor(doc,binary,primitive['attributes']['WEIGHTS_0'])
                     check(np.max(np.abs(weights.sum(axis=1)-1))<1e-4,f'{name}: skin weight sum')
@@ -121,10 +135,55 @@ def models():
         if points:
             xyz=np.concatenate(points);low=xyz.min(axis=0);high=xyz.max(axis=0)
             size=high-low;center=(high+low)/2
-            if name in {'winch','anchor','strap','jack','repair','drive','ring','crate','hook','beam','deck-folded','generator-large','generator','optics','pump-large','pump','mast','deck'}:
+            if name in {'winch','anchor','strap','jack','repair','drive','ring','crate','hook','beam','deck-folded','generator-large','generator','optics','pump-large','pump','mast'}:
                 check(np.max(np.abs(size-np.array(asset['dimensionsXYZ'])))<.001,f'{name}: dimensions differ from physics')
                 check(np.max(np.abs(center))<.001,f'{name}: origin is not bounds-centre')
-            result.append({'assetId':name,'triangles':tri,'bytes':path.stat().st_size,'visualBoundsXYZ':[round(float(v),4) for v in size],'visualCentreXYZ':[round(float(v),4) for v in center]})
+            extra={}
+            if name=='deck':
+                body=np.concatenate(structure);struct_low=body.min(axis=0);struct_high=body.max(axis=0)
+                check(np.max(np.abs(struct_high-struct_low-np.array(asset['dimensionsXYZ'])))<.001,'deck: structural dimensions differ')
+                check(np.max(np.abs((struct_high+struct_low)/2))<.001,'deck: structural origin is not centred')
+                check(len(asset['collider']['parts'])==7,'deck: expected seven open-slot collider parts')
+                expected_parts=[{'center':[0,0,0],'halfExtents':[1.6,.09,1.5]}]+[
+                    {'center':[x,0,z],'halfExtents':[.2,.09,hz]}
+                    for x in [-1.8,1.8] for z,hz in [(0,1.13),(-1.435,.065),(1.435,.065)]]
+                check(asset['collider']['parts']==expected_parts,'deck: collider must retain the confirmed .24m slots')
+                check(asset['sockets'].get('socket-handle-0')==[0,.1,-1.5] and asset['sockets'].get('socket-handle-1')==[0,.1,1.5],'deck: canonical handles differ')
+                faces=np.concatenate(triangles)
+                # Orthogonal rays across the real arc envelope must pass through
+                # the authored slot, not merely through an empty bounding box.
+                hits=0;samples=0
+                direction=np.array([0.,-1.,0.])
+                for sx in [-1,1]:
+                    for sz in [-1,1]:
+                        check(asset['sockets'].get(f'socket-ring-{sx}-{sz}')==[sx*1.8,.09,sz*1.25],'deck: canonical mount socket differs')
+                        for x in np.linspace(1.62,1.98,7)*sx:
+                            for z in [sz*1.25+offset for offset in [-.105,-.08,-.04,0,.04,.08,.105]]:
+                                origin=np.array([x,.5,z]);samples+=1
+                                edge1=faces[:,1]-faces[:,0];edge2=faces[:,2]-faces[:,0]
+                                h=np.cross(direction,edge2);a=np.einsum('ij,ij->i',edge1,h)
+                                valid=np.abs(a)>1e-10;inv=np.divide(1,a,out=np.zeros_like(a),where=valid)
+                                s=origin-faces[:,0];u=inv*np.einsum('ij,ij->i',s,h)
+                                q=np.cross(s,edge1);v=inv*np.einsum('j,ij->i',direction,q)
+                                distance=inv*np.einsum('ij,ij->i',edge2,q)
+                                if np.any(valid & (u>=0) & (v>=0) & (u+v<=1) & (distance>=0) & (distance<=1)):
+                                    hits+=1
+                check(hits==0,f'deck: authored geometry closes {hits} of {samples} slot rays')
+                extra={'structuralBoundsXYZ':[round(float(v),4) for v in struct_high-struct_low],
+                    'clearSlotRays':samples-hits,'slotRaySamples':samples,'interactionHardwareExcludedFromStructuralBounds':True}
+            if name=='bridge-mount':
+                check(asset['origin']=='socket' and asset['sockets'].get('socket-ring')==[0,0,0],'bridge-mount: socket-origin differs')
+                check(np.max(np.abs(size-np.array(asset['dimensionsXYZ'])))<.001,'bridge-mount: dimensions differ')
+                check(abs(low[1]+.28)<.001 and abs(high[1]-.152*80/93)<.001,'bridge-mount: embedded plate/arc bounds differ')
+                check(len(asset['collider']['parts'])==23,'bridge-mount: expected plate, four bolts, two stands and sixteen arc hulls')
+                eye=np.concatenate(material_points['ochre'])
+                hull=np.concatenate([np.array(part['vertices']).reshape((-1,3)) for part in asset['collider']['parts'] if part['shape']=='convexHull'])
+                distances=np.linalg.norm(eye[:,None,:]-hull[None,:,:],axis=2)
+                mismatch=max(float(distances.min(axis=0).max()),float(distances.min(axis=1).max()))
+                check(mismatch<1e-5,'bridge-mount: arc collider vertices do not match rendered mesh')
+                check(np.concatenate(material_points['alloy'])[:,1].max()<=-.18+1e-6,'bridge-mount: bolt projects above road datum')
+                extra={'arcColliderVertexDeviationMeters':mismatch,'embeddedBoltTopY':round(float(np.concatenate(material_points['alloy'])[:,1].max()),6)}
+            result.append({'assetId':name,'triangles':tri,'bytes':path.stat().st_size,'visualBoundsXYZ':[round(float(v),4) for v in size],'visualCentreXYZ':[round(float(v),4) for v in center],**extra})
         for i,node in enumerate(doc['nodes']):
             socket=asset.get('sockets',{}).get(node.get('name'))
             if socket:

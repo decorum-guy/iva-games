@@ -4,7 +4,7 @@ Run from the repository: blender -b --python games/tyaga/art/source/generate_mod
 Canonical coordinates are metres, X forward, Y up, Z right. Blender stores Z up;
 the p() conversion and glTF's standard axis conversion cancel exactly. Dynamic
 models use the same centre origins as the authoritative physics. Static scenery
-has a ground origin, declared per asset in manifest.json.
+uses the ground or attachment origin declared per asset in manifest.json.
 """
 import bpy
 import hashlib
@@ -404,6 +404,37 @@ def pump(large=True):
     return root
 
 
+def recessed_end_board(root, start, end, near, far, mat):
+    # A 25mm deep, 30mm wide real rebate seats each metal guide. Its top
+    # replaces the wood surface; no coplanar painted-on box remains.
+    if near < -1.3:
+        top = [(far, .065), (far - .03, .065), (far - .03, .09), (near, .09)]
+    elif near > 1.3:
+        top = [(far, .09), (near + .03, .09), (near + .03, .065), (near, .065)]
+    else:
+        top = [(far, .065), (far - .03, .065), (far - .03, .09), (near + .03, .09), (near + .03, .065), (near, .065)]
+    profile = [(near, -.02), (far, -.02)] + top
+    count = len(profile)
+    vertices = [tuple(p((x, y, z))) for x in [start, end] for z, y in profile]
+    faces = [tuple(range(count)), tuple(reversed(range(count, 2 * count)))]
+    faces += [(i, i + count, (i + 1) % count + count, (i + 1) % count) for i in range(count)]
+    mesh = bpy.data.meshes.new('rebated-board')
+    mesh.from_pydata(vertices, [], faces)
+    mesh.update()
+    obj = bpy.data.objects.new('rebated-board', mesh)
+    bpy.context.collection.objects.link(obj)
+    finish(obj, 'rebated-board', mat, root, False)
+    bpy.context.view_layer.objects.active = obj
+    modifier = obj.modifiers.new('Rebate edge rounding', 'BEVEL')
+    modifier.width = .004
+    modifier.segments = 2
+    bpy.ops.object.modifier_apply(modifier=modifier.name)
+    modifier = obj.modifiers.new('Rebate weighted normals', 'WEIGHTED_NORMAL')
+    modifier.keep_sharp = True
+    bpy.ops.object.modifier_apply(modifier=modifier.name)
+    return obj
+
+
 def deck(folded=False):
     root = group('tyaga-deck-' + ('folded' if folded else 'open'))
     if folded:
@@ -416,17 +447,44 @@ def deck(folded=False):
         handle(root, 'handle-left', (-.3, .2, -.5), (.3, .2, -.5), (0, .08, 0))
         handle(root, 'handle-right', (-.3, .2, .5), (.3, .2, .5), (0, .08, 0))
     else:
-        for z in [-1.40, 0, 1.40]:
-            box(root, 'bridge-girder', (0, -.04, z), (4, .1, .12), 'steel', .015)
+        grips = group('deck-interaction-hardware', root)
+        grips['interactionHardware'] = True
+        box(root, 'bridge-girder', (0, -.04, 0), (4, .1, .12), 'steel', .015)
+        for side in [-1, 1]:
+            box(root, 'bridge-girder-middle', (0, -.04, side * 1.40), (3.2, .1, .12), 'steel', .015)
+            for x in [-1.8, 1.8]:
+                # The widened slot cuts 30mm into the original girder too.
+                box(root, 'bridge-girder-notched-end', (x, -.04, side * 1.415), (.4, .1, .09), 'steel', .012)
         for i in range(16):
-            box(root, 'individual-board', (-1.87 + i * .249, .035, 0), (.239, .11, 3.0), 'wood-light' if i % 3 else 'wood', .018)
+            x = -1.87 + i * .249
+            cuts = sorted([x - .1195, x + .1195] +
+                [boundary for boundary in [-1.60, 1.60] if x - .1195 < boundary < x + .1195])
+            for start, end in zip(cuts, cuts[1:]):
+                # Four real open-ended slots. The wood and the compound body
+                # use the same X +/-1.60 boundary and Z +/-1.13, +/-1.37 cuts.
+                z_ranges = [(-1.5, -1.37), (-1.13, 1.13), (1.37, 1.5)] if abs((start + end) / 2) > 1.60 else [(-1.5, 1.5)]
+                for near, far in z_ranges:
+                    mat = 'wood-light' if i % 3 else 'wood'
+                    if len(z_ranges) > 1:
+                        recessed_end_board(root, start, end, near, far, mat)
+                    else:
+                        box(root, 'individual-board', ((start + end) / 2, .035, (near + far) / 2),
+                            (end - start, .11, far - near), mat, .012)
             for z in [-1.40, 1.40]:
-                cyl(root, 'board-pin', (-1.87 + i * .249, .092, z), .022, .008, 'steel', 'y', 6)
-        for x in [-1.88, 1.88]:
-            for z in [-1.4, 1.4]:
-                eye(root, 'socket-deck-' + str(x) + '-' + str(z), (x, 0, z), 'y', .075)
-        handle(root, 'handle-left', (-.25, -.02, -1.28), (.25, -.02, -1.28), (0, 0, -.08))
-        handle(root, 'handle-right', (-.25, -.02, 1.28), (.25, -.02, 1.28), (0, 0, .08))
+                cyl(grips, 'board-pin', (x, .091, z), .022, .008, 'steel', 'y', 6)
+        for sx in [-1, 1]:
+            for sz in [-1, 1]:
+                for offset in [-.135, .135]:
+                    box(root, 'mount-slot-guide', (sx * 1.8, .0775, sz * 1.25 + offset),
+                        (.4, .025, .03), 'ochre', .004)
+                socket(root, f'socket-ring-{sx}-{sz}', (sx * 1.8, .09, sz * 1.25))
+        # These small grips are interaction hardware, not load-bearing timber.
+        # Keep their centres at the authoritative carry points, including Y=.10.
+        for index, sz in enumerate([-1, 1]):
+            for x in [-.28, .28]:
+                line(grips, 'carry-handle-foot', (x, .04, sz * 1.40), (x, .10, sz * 1.50), .018, 'steel')
+            line(grips, 'carry-handle-grip', (-.28, .10, sz * 1.50), (.28, .10, sz * 1.50), .020, 'steel', 12)
+            socket(grips, f'socket-handle-{index}', (0, .10, sz * 1.50), 'handle')
     return root
 
 
@@ -744,6 +802,44 @@ def rock_ring():
     return root
 
 
+def bridge_mount():
+    # Origin is the canonical eye centre. Only bridge mounts have a buried base;
+    # ordinary hill/ferry rock rings keep their own existing model and origin.
+    root = group('tyaga-bridge-mount')
+    box(root, 'embedded-mount-plate', (0, -.25, 0), (.36, .06, .36), 'steel', .010)
+    for x in [-.12, .12]:
+        for z in [-.12, .12]:
+            cyl(root, 'embedded-mount-bolt', (x, -.202, z), .035, .04, 'alloy', 'y', 6)
+    for x in [-.10, .10]:
+        box(root, 'mount-eye-stand', (x, -.14, 0), (.04, .18, .05), 'steel', .006)
+    arc = ring(root, 'bridge-mount-eye', (0, 0, 0), .12, .032, 'ochre', 'z', 16)
+    # Preserve the actual ellipse of the original exported ring, not a guessed
+    # bounding cube. Blender Z is canonical Y.
+    arc.scale.z = 80 / 93
+    socket(root, 'socket-ring', (0, 0, 0))
+    return root
+
+
+def bridge_mount_collider():
+    parts = [{'name': 'plate', 'shape': 'box', 'center': [0, -.25, 0], 'halfExtents': [.18, .03, .18]}]
+    parts += [{'name': f'bolt-{x}-{z}', 'shape': 'cylinder', 'center': [x, -.202, z],
+        'radius': .035, 'halfHeight': .02, 'axis': 'Y'} for x in [-.12, .12] for z in [-.12, .12]]
+    parts += [{'name': f'stand-{x}', 'shape': 'box', 'center': [x, -.14, 0],
+        'halfExtents': [.02, .09, .025]} for x in [-.10, .10]]
+    for i in range(16):
+        vertices = []
+        for section in [i, (i + 1) % 16]:
+            a = TAU * section / 16
+            for j in range(6):
+                b = TAU * j / 6
+                radius = .12 + math.cos(b) * .032
+                vertices += [radius * math.cos(a), radius * math.sin(a) * 80 / 93, math.sin(b) * .032]
+        parts.append({'name': f'eye-{i:02d}', 'shape': 'convexHull', 'vertices': vertices})
+    return {'shape': 'compound', 'parts': parts,
+        'physicsSource': 'games/tyaga/src/server-world/compound.ts:bridgeMountParts',
+        'mountDomain': 'AnchorDefinition.mount=deck only; socket-origin at bridge mounting point'}
+
+
 def hazard_edge():
     root = group('tyaga-hazard-edge')
     for z in [-.5, .5]:
@@ -797,7 +893,7 @@ def export_asset(asset_id, builder, dimensions, mass=None, origin='center', coll
     merge_static(root)
     bpy.context.view_layer.update()
     if asset_id in {'winch', 'anchor', 'strap', 'jack', 'repair', 'drive', 'ring', 'crate', 'hook', 'beam', 'deck-folded',
-                     'generator-large', 'generator', 'optics', 'pump-large', 'pump', 'mast', 'deck'}:
+                     'generator-large', 'generator', 'optics', 'pump-large', 'pump', 'mast'}:
         # Tool dimensions are art/physics agreed. Bake the production normalization
         # into the exported hierarchy; the game never compensates with a guess scale.
         def normalized_body_mesh(obj):
@@ -875,6 +971,16 @@ def export_asset(asset_id, builder, dimensions, mass=None, origin='center', coll
             {'center': [-.255, -.433, 0], 'halfExtents': [.075, .167, .3], 'massFraction': .10},
             {'center': [.55, .55, 0], 'halfExtents': [.05, .05, .075], 'massFraction': .05}],
             'physicsSource': 'games/tyaga/src/server-world/world.ts:createBody'}
+    if asset_id == 'deck':
+        collider = {'shape': 'compound', 'parts': [
+            {'center': [0, 0, 0], 'halfExtents': [1.6, .09, 1.5]}] +
+            [{'center': [x, 0, z], 'halfExtents': [.2, .09, half_z]}
+                for x in [-1.8, 1.8] for z, half_z in [(0, 1.13), (-1.435, .065), (1.435, .065)]],
+            'openSlots': [{'x': sorted([1.6 * sx, 2 * sx]), 'z': [1.25 * sz - .12, 1.25 * sz + .12], 'throughY': True}
+                for sx in [-1, 1] for sz in [-1, 1]],
+            'interactionHardware': {'node': 'deck-interaction-hardware', 'role': 'carrying grips and small fastener heads; not a load-bearing surface',
+                'socketCenters': [[0, .10, -1.50], [0, .10, 1.50]]},
+            'physicsSource': 'games/tyaga/src/server-world/compound.ts:deckParts'}
     entry = dict(assetId=asset_id, runtimePath='/assets/tyaga/models/' + filename,
         source='games/tyaga/art/source/generate_models.py', author='Iva Games / original procedural production',
         license='project-original', version='tyaga-art@1', origin=origin, units='metres',
@@ -942,6 +1048,7 @@ ASSETS = [
     ('camp', camp, [2.4, 1.5, 1], None, 'ground'),
     ('station', station, [4, 2.9, 2.8], None, 'ground'),
     ('ring', rock_ring, [.36, .32, .36], None),
+    ('bridge-mount', bridge_mount, [.36, .28 + .152 * 80 / 93, .36], None, 'socket', bridge_mount_collider()),
     ('hazard-edge', hazard_edge, [.12, .7, 1.2], None, 'ground'),
     ('barrier', barrier, [.12, .75, 3.4], 35),
 ]

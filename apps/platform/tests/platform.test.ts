@@ -343,6 +343,44 @@ describe('Iva Games platform: independent HTTP clients and persistent authority'
     expect((await host.client.room(lobby.roomId)).state).toBe('lobby');
   });
 
+  it('clears and restores only the requesting player’s finished rooms without deleting matches or active rooms', async () => {
+    const f = await fixture(); const host = await signup(f, 'hoster'); const guest = await signup(f, 'guest');
+    await befriend(host, guest);
+    const lobby = await newRoom(host.client);
+    let playing = await newRoom(host.client);
+    playing = (await host.client.request<{ room: Room }>(`/rooms/${playing.roomId}/bots`, { difficulty: 'easy', expectedRevision: playing.revision })).body.room;
+    await host.client.request(`/rooms/${playing.roomId}/ready`, { ready: true, expectedRevision: playing.revision });
+    playing = (await host.client.request<{ room: Room }>(`/rooms/${playing.roomId}/start`, { expectedRevision: playing.revision })).body.room;
+    let finished = await newRoom(host.client);
+    finished = (await host.client.request<{ room: Room }>(`/rooms/${finished.roomId}/bots`, { difficulty: 'easy', expectedRevision: finished.revision })).body.room;
+    await host.client.request(`/rooms/${finished.roomId}/ready`, { ready: true, expectedRevision: finished.revision });
+    finished = (await host.client.request<{ room: Room }>(`/rooms/${finished.roomId}/start`, { expectedRevision: finished.revision })).body.room;
+    f.platform.db.prepare("UPDATE rooms SET state='finished' WHERE room_id=?").run(finished.roomId);
+    const shared = await newRoom(host.client);
+    await acceptJoin(guest.client, await invite(host.client, shared, guest.account.playerId));
+    expect((await host.client.request(`/rooms/${shared.roomId}/cancel`, {})).status).toBe(200);
+
+    expect((await host.client.request('/rooms/history/clear', {})).status).toBe(200);
+    let listed = (await host.client.request<{ rooms: Room[]; hiddenRoomCount: number }>('/rooms')).body;
+    expect(listed.rooms.map(room => room.roomId).sort()).toEqual([lobby.roomId, playing.roomId].sort());
+    expect(listed.hiddenRoomCount).toBe(2);
+    expect((await guest.client.request<{ rooms: Room[] }>('/rooms')).body.rooms.map(room => room.roomId)).toContain(shared.roomId);
+    expect((await host.client.room(shared.roomId)).state).toBe('cancelled');
+    expect((await host.client.room(finished.roomId)).matchId).toBe(finished.matchId);
+
+    await f.stop();
+    const restarted = await fixture({ directory: f.directory });
+    const client = restarted.client(); client.cookie = host.client.cookie; client.csrf = host.client.csrf;
+    listed = (await client.request<{ rooms: Room[]; hiddenRoomCount: number }>('/rooms')).body;
+    expect(listed.hiddenRoomCount).toBe(2);
+    const later = await newRoom(client); await client.request(`/rooms/${later.roomId}/cancel`, {});
+    expect((await client.request<{ rooms: Room[] }>('/rooms')).body.rooms.map(room => room.roomId)).toContain(later.roomId);
+    expect((await client.request('/rooms/history/restore', {})).status).toBe(200);
+    listed = (await client.request<{ rooms: Room[]; hiddenRoomCount: number }>('/rooms')).body;
+    expect(listed.hiddenRoomCount).toBe(0);
+    expect(listed.rooms.map(room => room.roomId)).toEqual(expect.arrayContaining([lobby.roomId, playing.roomId, finished.roomId, shared.roomId, later.roomId]));
+  });
+
   it('keeps actionable invitations ahead of bounded terminal history without changing access', async () => {
     const f = await fixture(); const host = await signup(f, 'hoster'); const secondHost = await signup(f, 'another'); const guest = await signup(f, 'guest');
     await befriend(host, guest); await befriend(secondHost, guest);

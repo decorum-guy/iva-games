@@ -20,6 +20,13 @@ interface ActiveMatch {
   lastSnapshotTick: number; lastLeaseAt: number; frozen: boolean;
   healthySince: number | null;
   committedAt: number; dirtySince: number | null;
+  lastStepMs: number; lastBatchStepMs: number; lastBatchSteps: number;
+  lastSerializeMs: number; lastCommitMs: number;
+}
+interface OverloadObservation {
+  kind: 'pause' | 'recurred'; observedAt: number; worldTick: number;
+  schedulerGapMs: number; accumulatedLagMs: number; stepIntervalMs: number; maxCatchUpSteps: number;
+  lastStepMs: number; lastBatchStepMs: number; lastBatchSteps: number; lastSerializeMs: number; lastCommitMs: number;
 }
 export interface EngineOptions {
   storage: StorageClient; adapters: GameAdapter[]; ownerId?: string;
@@ -47,7 +54,8 @@ export class RealtimeEngine {
   private readonly ownedArtifactIds?: Set<string>;
   private readonly cloneViews: boolean;
   private readonly timings = new Map<string, GameTimings>();
-  readonly metrics = { steps: 0, commits: 0, maxStepMs: 0, maxCommitMs: 0, failures: 0, startedAt: Date.now() };
+  private readonly lastOverloads = new Map<string, OverloadObservation>();
+  readonly metrics = { steps: 0, commits: 0, maxStepMs: 0, maxCommitMs: 0, failures: 0, overloadPauses: 0, overloadRecurrences: 0, startedAt: Date.now() };
   constructor(options: EngineOptions) {
     this.storage = options.storage; this.adapters = new Map(options.adapters.map(adapter => [`${adapter.gameId}:${adapter.rulesVersion}:${adapter.contentVersion}`, adapter]));
     this.ownerId = options.ownerId ?? randomUUID(); this.maxMatches = options.maxMatches ?? 4;
@@ -72,7 +80,7 @@ export class RealtimeEngine {
       ...control, connected: false, connectionId: null, input: adapter.neutralInput(), lastInputAt: -Infinity,
       lastActiveAt: now, inputSeq: -1, consumedSeq: -1,
     }])), lastHumanAt: now, lastMono: now, accumulator: 0, lastSnapshotTick: stored.meta.worldTick, lastLeaseAt: this.wall(), frozen: false, healthySince: null,
-      committedAt: now, dirtySince: null };
+      committedAt: now, dirtySince: null, lastStepMs: 0, lastBatchStepMs: 0, lastBatchSteps: 0, lastSerializeMs: 0, lastCommitMs: 0 };
   }
   private listControls(match: ActiveMatch): ControllerState[] {
     return [...match.controls.values()].map(({ participantId, kind, connected, controllerGeneration }) => ({ participantId, kind, connected, controllerGeneration }));
@@ -132,10 +140,23 @@ export class RealtimeEngine {
       games: [...this.adapters.values()].map(adapter => this.manifest(adapter)),
       capacity: this.maxMatches, activeMatches: [...this.matches.values()].filter(match => !['finished', 'abandoned'].includes(match.stored.meta.phase)).length,
       draining: this.draining, metrics: this.metrics,
-      ...(includeDiagnostics ? { diagnostics: { games: [...this.timings].map(([gameId, timings]) => ({ gameId, ...timings.report() })),
+      ...(includeDiagnostics ? { diagnostics: { games: [...this.timings].map(([gameId, timings]) => ({ gameId, ...timings.report(), lastOverload: this.lastOverloads.get(gameId) ?? null })),
         uncommittedAgeMs: Math.max(0, ...[...this.matches.values()].map(match => match.dirtySince === null ? 0 : this.mono() - match.dirtySince)),
         runningSnapshotAgeMs: Math.max(0, ...[...this.matches.values()].filter(match => match.stored.meta.phase === 'running').map(match => this.mono() - match.committedAt)),
         loadedWorlds: this.matches.size, connectedClients: this.connections.size } } : {}) };
+  }
+  private observeOverload(match: ActiveMatch, kind: OverloadObservation['kind'], schedulerGapMs: number): OverloadObservation {
+    // A fixed-size last observation per registered game complements the durable
+    // per-match journal. It records measured timing context, not an inferred
+    // cause, and contains no player/input/world payloads.
+    const observation: OverloadObservation = { kind, observedAt: this.wall(), worldTick: match.stored.meta.worldTick,
+      schedulerGapMs, accumulatedLagMs: match.accumulator, stepIntervalMs: 1000 / match.adapter.tickRate,
+      maxCatchUpSteps: match.adapter.tickRate === 60 ? 4 : 2, lastStepMs: match.lastStepMs,
+      lastBatchStepMs: match.lastBatchStepMs, lastBatchSteps: match.lastBatchSteps,
+      lastSerializeMs: match.lastSerializeMs, lastCommitMs: match.lastCommitMs };
+    this.lastOverloads.set(match.adapter.gameId, observation);
+    if (kind === 'pause') this.metrics.overloadPauses += 1; else this.metrics.overloadRecurrences += 1;
+    return observation;
   }
   async create(gameId: string, input: StartMatchRequest, admission?: { hostPlayerId?: string; reservationId?: string; clientContentHash?: string; clientRoute?: string }): Promise<{ matchId: string }> {
     checkJson(input);
@@ -201,7 +222,7 @@ export class RealtimeEngine {
     const timings = this.timings.get(match.adapter.gameId)!;
     const serializationStarted = this.mono();
     const world = match.adapter.serialize(match.world), now = this.wall();
-    timings.serialize.observe(this.mono() - serializationStarted);
+    match.lastSerializeMs = this.mono() - serializationStarted; timings.serialize.observe(match.lastSerializeMs);
     const next = { ...match.stored.meta, journalSeq: match.stored.meta.journalSeq + 1 };
     const before = this.mono();
     try {
@@ -211,6 +232,7 @@ export class RealtimeEngine {
       Object.assign(match.stored.meta, next); match.lastLeaseAt = now;
       if (full) match.lastSnapshotTick = next.worldTick;
       const completed = this.mono(), duration = completed - before;
+      match.lastCommitMs = duration;
       timings.commit.observe(duration); timings.uncommitted.observe(completed - match.dirtySince);
       match.committedAt = completed; match.dirtySince = null;
       this.metrics.commits += 1; this.metrics.maxCommitMs = Math.max(this.metrics.maxCommitMs, duration);
@@ -396,8 +418,9 @@ export class RealtimeEngine {
           if (gap > 100) {
             match.healthySince = null;
             if (meta.phase === 'recovering') {
+              const observation = this.observeOverload(match, 'recurred', gap);
               meta.phase = 'paused'; meta.resumeAt = null; match.accumulator = 0;
-              await this.persist(match, 'overload-recurred', {}, true);
+              await this.persist(match, 'overload-recurred', observation, true);
             }
           } else match.healthySince ??= now;
           if (meta.phase === 'paused' && humans.length && match.healthySince !== null && now - match.healthySince >= 1000) {
@@ -411,16 +434,19 @@ export class RealtimeEngine {
           await this.persist(match, 'resume', {}, true);
         }
         if (meta.phase !== 'running') { match.lastMono = now; continue; }
-        match.accumulator += Math.max(0, now - match.lastMono); match.lastMono = now;
+        const schedulerGap = Math.max(0, now - match.lastMono);
+        match.accumulator += schedulerGap; match.lastMono = now;
         const interval = 1000 / match.adapter.tickRate;
         const maxSteps = match.adapter.tickRate === 60 ? 4 : 2;
         if (match.accumulator > interval * maxSteps + 500) {
+          const observation = this.observeOverload(match, 'pause', schedulerGap);
           meta.phase = 'paused'; meta.pauseReason = 'overload'; meta.returnUntil = wall + RETURN_WINDOW_MS; meta.resumeAt = null; match.accumulator = 0; match.healthySince = null;
-          await this.persist(match, 'overload-pause', {}, true); continue;
+          await this.persist(match, 'overload-pause', observation, true); continue;
         }
         const count = Math.min(maxSteps, Math.floor(match.accumulator / interval));
         if (!count) continue;
         const steps: ReplayStep[] = [];
+        match.lastBatchStepMs = 0; match.lastBatchSteps = 0;
         let checkpointId: string | null = null;
         for (let index = 0; index < count; index++) {
           const inputs: Record<string, unknown> = {};
@@ -433,6 +459,7 @@ export class RealtimeEngine {
           const context: StepContext = { dt, controllers: this.listControls(match), elapsedSeconds: meta.elapsedSeconds, attempt: meta.attempt };
           const start = this.mono(); match.dirtySince ??= start; match.adapter.step(match.world, inputs, context);
           const duration = this.mono() - start; this.timings.get(match.adapter.gameId)!.step.observe(duration);
+          match.lastStepMs = duration; match.lastBatchStepMs += duration; match.lastBatchSteps += 1;
           this.metrics.maxStepMs = Math.max(this.metrics.maxStepMs, duration); this.metrics.steps += 1;
           meta.worldTick += 1; match.accumulator -= interval;
           steps.push({ inputs, context });

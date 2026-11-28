@@ -65,11 +65,23 @@ describe('authoritative control and durable recovery', () => {
       let snapshot = f.engine.snapshot('first');
       expect(snapshot).toMatchObject({ phase: 'paused', pauseReason: 'overload', hasControl: true, resumeAt: null, worldTick: before.worldTick });
       expect(f.store.recovery(f.matchId).snapshot.seq).toBe(snapshot.committedJournalSeq);
+      const observation = JSON.parse((f.store.db.prepare("SELECT payload FROM rt_journal WHERE match_id=? AND kind='overload-pause'").get(f.matchId) as { payload: string }).payload);
+      expect(observation).toMatchObject({ kind: 'pause', observedAt: f.clock.wall, worldTick: before.worldTick,
+        schedulerGapMs: 750, accumulatedLagMs: 750, stepIntervalMs: 1000 / 60, maxCatchUpSteps: 4,
+        lastStepMs: 0, lastBatchStepMs: 0, lastSerializeMs: 0, lastCommitMs: 0 });
+      expect(f.engine.health()).not.toHaveProperty('diagnostics');
+      expect(f.engine.health(true)).toMatchObject({ metrics: { overloadPauses: 1, overloadRecurrences: 0 },
+        diagnostics: { games: [{ gameId: 'fixture', lastOverload: observation }] } });
       await advance(1100);
       snapshot = f.engine.snapshot('first'); expect(snapshot.phase).toBe('recovering'); expect(snapshot.resumeAt).not.toBeNull();
       await advance(500);
       f.clock.wall += 200; f.clock.mono += 200; await f.engine.tick();
       expect(f.engine.snapshot('first')).toMatchObject({ phase: 'paused', pauseReason: 'overload', resumeAt: null });
+      expect(f.engine.health(true)).toMatchObject({ metrics: { overloadPauses: 1, overloadRecurrences: 1 },
+        diagnostics: { games: [{ gameId: 'fixture', lastOverload: { kind: 'recurred', schedulerGapMs: 200, accumulatedLagMs: 0 } }] } });
+      const recurrence = JSON.parse((f.store.db.prepare("SELECT payload FROM rt_journal WHERE match_id=? AND kind='overload-recurred'").get(f.matchId) as { payload: string }).payload);
+      expect(recurrence).toMatchObject({ kind: 'recurred', schedulerGapMs: 200, accumulatedLagMs: 0 });
+      expect(JSON.stringify(recurrence)).not.toContain('player1'); expect(JSON.stringify(recurrence)).not.toContain('inputs');
       await advance(1100); await advance(3100);
       snapshot = f.engine.snapshot('first');
       expect(snapshot).toMatchObject({ phase: 'running', pauseReason: null, hasControl: true, returnUntil: null, epoch: before.epoch, controllerGeneration: before.controllerGeneration });

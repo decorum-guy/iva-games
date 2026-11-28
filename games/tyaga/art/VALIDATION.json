@@ -2,21 +2,6 @@
   "scope": "asset byte/geometry contracts; not gameplay or listening acceptance",
   "models": [
     {
-      "assetId": "deck",
-      "triangles": 3748,
-      "bytes": 203888,
-      "visualBoundsXYZ": [
-        4.0,
-        0.18,
-        3.0
-      ],
-      "visualCentreXYZ": [
-        0.0,
-        -0.0,
-        0.0
-      ]
-    },
-    {
       "assetId": "anchor",
       "triangles": 992,
       "bytes": 33172,
@@ -615,6 +600,46 @@
         -0.0,
         0.0
       ]
+    },
+    {
+      "assetId": "bridge-mount",
+      "triangles": 596,
+      "bytes": 34176,
+      "visualBoundsXYZ": [
+        0.36,
+        0.4108,
+        0.36
+      ],
+      "visualCentreXYZ": [
+        0.0,
+        -0.0746,
+        0.0
+      ],
+      "arcColliderVertexDeviationMeters": 8.27996287895287e-09,
+      "embeddedBoltTopY": -0.182
+    },
+    {
+      "assetId": "deck",
+      "triangles": 6196,
+      "bytes": 417172,
+      "visualBoundsXYZ": [
+        4.0,
+        0.21,
+        3.04
+      ],
+      "visualCentreXYZ": [
+        0.0,
+        0.015,
+        0.0
+      ],
+      "structuralBoundsXYZ": [
+        4.0,
+        0.18,
+        3.0
+      ],
+      "clearSlotRays": 196,
+      "slotRaySamples": 196,
+      "interactionHardwareExcludedFromStructuralBounds": true
     }
   ],
   "audio": [

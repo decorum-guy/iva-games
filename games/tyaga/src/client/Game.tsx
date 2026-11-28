@@ -8,7 +8,7 @@ import { TyagaScene } from './scene';
 import { TyagaAudio } from './audio';
 import { TouchControls, useGameInput } from './controls';
 import type { InputMode } from './controls';
-import { Dialog, Icon } from './ui';
+import { Dialog, DialogNoticeContext, Icon } from './ui';
 import type { IconName } from './ui';
 import type { Preferences } from './App';
 import { Settings, Rules } from './App';
@@ -31,10 +31,11 @@ export function Game({ room, lang, prefs, onPrefs, onLanguage, onExit, onRepeat,
   const [notice, setNotice] = useState<{ message: string; error: boolean } | null>(null), [busy, setBusy] = useState(false), [graphicsError, setGraphicsError] = useState(false);
   const [compact, setCompact] = useState(window.innerWidth <= 650);
   useEffect(() => { const resize = () => setCompact(window.innerWidth <= 650); window.addEventListener('resize', resize); return () => window.removeEventListener('resize', resize); }, []);
-  const [lessonExpanded, setLessonExpanded] = useState(false);
+  const [lessonExpanded, setLessonExpanded] = useState(window.innerWidth > 650);
   const [miniMap, setMiniMap] = useState(true), [showHelp, setShowHelp] = useState(true), [expandedObject, setExpandedObject] = useState(false);
   const latestView = useRef(view);
   const noticeTimer = useRef(0), lastEpoch = useRef<number | null>(null), actionPending = useRef(false), appearanceAttempt = useRef('');
+  const noticeEvent = useRef<{ epoch: number; id: number } | null>(null);
   const selected = view?.entities.find(e => e.id === selectedId && e.active);
   const self = view?.participants.find(p => p.participantId === view.participantId);
   const playerId = room.members.find(member => member.participantId === self?.participantId)?.playerId;
@@ -58,8 +59,8 @@ export function Game({ room, lang, prefs, onPrefs, onLanguage, onExit, onRepeat,
       await audio.current?.unlock();
       if (command.type === 'appearance' && playerId) rememberAppearance(room.roomId, playerId, command);
       const response = await connection.action(command) as { ok?: boolean; code?: string; message?: { ru: string; en: string } };
-      if (response?.message) showNotice(response.message[lang], response.ok === false);
-      if (response?.ok === false) return false;
+      if (response?.ok === false) { showNotice(response.message?.[lang] ?? errorCopy(response.code ?? 'INVALID_ACTION', lang), true); return false; }
+      if (response?.message) showNotice(response.message[lang]);
       if (command.type === 'appearance' && playerId) clearPendingAppearance(room.roomId, playerId);
       if (['release', 'grab', 'operate', 'jack'].includes(command.type)) setExpandedObject(false);
       if (command.type === 'grab') setSelectedId(command.itemId);
@@ -117,6 +118,14 @@ export function Game({ room, lang, prefs, onPrefs, onLanguage, onExit, onRepeat,
   useEffect(() => { scene.current?.setOptions({ quality: prefs.quality, reducedMotion: prefs.reducedMotion, flashes: prefs.flashes, shake: prefs.shake, showSockets: panel === 'attachments' }); audio.current?.setPreferences(prefs.muted, prefs.volume); }, [prefs, panel]);
   useEffect(() => { if (lastEpoch.current !== null && lastEpoch.current !== state.snapshot?.epoch) { setSelectedId(null); setMark(null); setPlacement(null); pendingSelection.current = null; } lastEpoch.current = state.snapshot?.epoch ?? null; }, [state.snapshot?.epoch]);
   useEffect(() => { if (state.status !== 'connected') audio.current?.silence(); }, [state.status]);
+  useEffect(() => {
+    if (!view || !state.snapshot) return;
+    const epoch = state.snapshot.epoch, newest = Math.max(0, ...view.events.map(event => event.id)), previous = noticeEvent.current;
+    noticeEvent.current = { epoch, id: newest };
+    if (!previous || previous.epoch !== epoch) return;
+    const failed = view.events.findLast(event => event.id > previous.id && event.type === 'operation-failed' && event.participantId === view.participantId && event.message);
+    if (failed?.message) showNotice(failed.message[lang], true);
+  }, [view, state.snapshot, lang]);
   useEffect(() => { if (selectedId && view && !view.entities.some(entity => entity.id === selectedId && entity.active)) { setSelectedId(null); setExpandedObject(false); } }, [selectedId, view]);
   useEffect(() => {
     if (!playerId || state.status !== 'connected' || !state.snapshot?.hasControl || state.snapshot.phase !== 'running' || view?.phase !== 'running') return;
@@ -135,14 +144,15 @@ export function Game({ room, lang, prefs, onPrefs, onLanguage, onExit, onRepeat,
   const lifting = !controlledLink && (controlled?.kind === 'jack' || controlled?.kind === 'lift' || controlled?.id.startsWith('lift-'));
   const toolLabels = lifting ? { negative: t('Опустить', 'Lower'), positive: t('Поднять', 'Raise'), neutral: t('Удержать', 'Hold') } : { negative: t('Выпустить', 'Pay out'), positive: t('Тянуть', 'Pull'), neutral: t('Удержать', 'Hold') };
   const placementReason = blockedReason || (placement && !placement.supported ? t('Выберите устойчивую поверхность', 'Choose a supported surface') : placement && !placement.withinReach ? t('Место должно быть не дальше 2 м от вас', 'Choose a position within 2 m of you') : '');
-  return <div className={'ty-app ty-game ' + (prefs.reducedMotion ? 'reduced-motion' : '')} data-match-id={room.matchId ?? ''} data-rules-version={view?.rulesVersion} data-content-version={view?.contentVersion}>
+  const hasDialog = !!panel || !!view?.vote || view?.phase === 'failed' || graphicsError || !!view?.tutorial?.completed;
+  return <DialogNoticeContext.Provider value={notice ? { ...notice, closeLabel: t('Скрыть сообщение', 'Dismiss message'), onClose: () => setNotice(null) } : null}><div className={'ty-app ty-game ' + (prefs.reducedMotion ? 'reduced-motion' : '')} data-match-id={room.matchId ?? ''} data-rules-version={view?.rulesVersion} data-content-version={view?.contentVersion}>
     <div className="ty-world" ref={container}/>
     <header className="ty-hud"><div className="ty-hud-title"><span className="ty-brand-mini">ТЯГА</span><span>{view ? translated(MAP_COPY[view.mapId].name, lang) : room.title}<small>{view?.mode === 'practice' ? t('Практика', 'Practice') : view?.mode === 'tutorial' ? t('Обучение', 'Training') : t('Доставьте все три груза', 'Deliver all three loads')}</small></span></div><div className="ty-cargo-gauges">{cargo.map(entity => <button key={entity.id} className={'ty-cargo-gauge ' + ((entity.integrity ?? 100) < 35 ? 'danger' : '')} title={`${entity.name[lang]}: ${Math.round(entity.integrity ?? 100)}%`} aria-label={`${entity.name[lang]}: ${Math.round(entity.integrity ?? 100)}%`} onClick={() => { setSelectedId(entity.id); setExpandedObject(true); }}><Icon name={itemIcons[entity.kind] ?? 'box'} size={22}/><span>{Math.round(entity.integrity ?? 100)}<small>%</small></span><i style={{ width: `${entity.integrity ?? 100}%` }}/></button>)}<button className="ty-cargo-gauge ty-truck-gauge" title={t('Состояние машины', 'Truck integrity')} onClick={() => { setSelectedId(view?.entities.find(e => e.kind === 'truck')?.id ?? null); setExpandedObject(true); }}><Icon name="truck" size={24}/><span>{Math.round(view?.truck.integrity ?? 100)}<small>%</small></span></button></div><button className="ty-icon-button" aria-label={t('Меню', 'Menu')} onClick={() => openPanel('menu')}><Icon name="menu"/></button></header>
     <div className="ty-world-toolbar"><button className="ty-icon-button" aria-label={t('Карта', 'Map')} aria-pressed={compact ? undefined : miniMap} onClick={() => compact ? openPanel('map') : setMiniMap(!miniMap)}><Icon name="map"/></button><button className="ty-icon-button" aria-label={t('Команда и поручения', 'Crew and orders')} onClick={() => openPanel('crew')}><Icon name="crew"/></button><button className="ty-icon-button" aria-label={t('Оборудование', 'Equipment')} onClick={() => openPanel('inventory')}><Icon name="box"/></button><button className="ty-icon-button" aria-label={t('Крепления', 'Attachments')} onClick={() => openPanel('attachments')}><Icon name="link"/></button></div>
     {view && miniMap && !compact && <button className="ty-minimap" aria-label={t('Открыть большую карту', 'Open large map')} onClick={() => openPanel('map')}><WorldMap lang={lang} view={view} mark={mark}/><span>{t('Карта', 'Map')} <kbd>M</kbd></span></button>}
     {view?.weather.warning && <div className="ty-wind-warning" role="status"><Icon name="wind"/>{t('Приближается порыв', 'Gust approaching')} →</div>}
     {view?.weather.gust && <div className="ty-wind-warning active" role="status"><Icon name="wind"/>{t('Порыв ветра', 'Wind gust')} →</div>}
-    {view?.tutorial && !view.tutorial.completed && state.status === 'connected' && state.snapshot?.phase === 'running' && state.snapshot.hasControl && <section className={'ty-tutorial ' + (compact && !lessonExpanded ? 'compact' : '')}>{compact && <button className="ty-lesson-toggle" aria-label={lessonExpanded ? t('Свернуть обучение', 'Collapse training') : t('Развернуть обучение', 'Expand training')} aria-expanded={lessonExpanded} onClick={() => setLessonExpanded(!lessonExpanded)}><Icon name={lessonExpanded ? 'minus' : 'plus'} size={18}/></button>}<div><span className="ty-eyebrow">{t('Пробуем вместе', 'Let’s try it')} · {view.tutorial.step + 1}/{view.tutorial.total}</span><h2>{view.tutorial.title[lang]}</h2><p>{view.tutorial.instruction[lang]}</p></div><div className="ty-tutorial-actions"><button className="ty-text-button" onClick={() => void action({ type: 'tutorial-retry' })}>{t('Повторить шаг', 'Retry step')}</button><button className="ty-text-button" onClick={() => void action({ type: 'tutorial-skip' })}>{t('Пропустить', 'Skip')}</button></div></section>}
+    {view?.tutorial && !view.tutorial.completed && state.status === 'connected' && state.snapshot?.phase === 'running' && state.snapshot.hasControl && <section className={'ty-tutorial ' + (!lessonExpanded ? 'compact' : '')}><button className="ty-lesson-toggle" aria-label={lessonExpanded ? t('Свернуть обучение', 'Collapse training') : t('Развернуть обучение', 'Expand training')} aria-expanded={lessonExpanded} aria-controls="ty-lesson-detail" onClick={() => setLessonExpanded(!lessonExpanded)}><Icon name={lessonExpanded ? 'minus' : 'plus'} size={18}/></button><div><span className="ty-eyebrow">{t('Пробуем вместе', 'Let’s try it')} · {view.tutorial.step + 1}/{view.tutorial.total}</span><h2>{view.tutorial.title[lang]}</h2><p id="ty-lesson-detail">{view.tutorial.instruction[lang]}</p></div><div className="ty-tutorial-actions"><button className="ty-text-button" onClick={() => void action({ type: 'tutorial-retry' })}>{t('Повторить шаг', 'Retry step')}</button><button className="ty-text-button" onClick={() => void action({ type: 'tutorial-skip' })}>{t('Пропустить', 'Skip')}</button></div></section>}
     {prefs.hints && showHelp && !view?.tutorial && <div className="ty-first-hint"><span>{t('Подойдите к кабине и нажмите E. У машины можно выбрать любой инструмент.', 'Walk up to the cab and press E. Choose tools beside the truck.')}</span><button aria-label={t('Скрыть подсказку', 'Dismiss hint')} onClick={() => setShowHelp(false)}><Icon name="close" size={16}/></button></div>}
     {view && !placement && <div className="ty-context-stack">{compact && view.finishReady && <button className="ty-button primary" disabled={busy} onClick={() => void action({ type: 'finish' })}>{t('Завершить доставку', 'Complete delivery')}<Icon name="check"/></button>}
       {mode === 'walk' && self?.holding && !compact && <div className="ty-carry-hint">{t('Z / X — опустить / поднять · R / Shift+R — повернуть · Q — отпустить', 'Z / X — lower / raise · R / Shift+R — rotate · Q — release')}</div>}
@@ -161,7 +171,7 @@ export function Game({ room, lang, prefs, onPrefs, onLanguage, onExit, onRepeat,
       <div className="ty-placement-actions"><button className="ty-button secondary" disabled={busy} aria-label={t('Повернуть предпросмотр влево на 15°', 'Rotate preview left by 15°')} onClick={() => rotatePlacement(1)}><Icon name="retry" size={18}/>15°</button><button className="ty-button secondary" disabled={busy} aria-label={t('Повернуть предпросмотр вправо на 15°', 'Rotate preview right by 15°')} onClick={() => rotatePlacement(-1)}><span className="ty-rotate-reverse"><Icon name="retry" size={18}/></span>15°</button><button className="ty-button primary" disabled={!!placementReason} aria-describedby={placementReason ? 'ty-placement-reason' : undefined} onClick={() => void confirmPlacement()}><Icon name="check"/>{t('Разместить', 'Place')}</button><button className="ty-button subtle" disabled={busy} onClick={() => setPlacement(null)}>{t('Отмена', 'Cancel')}</button></div>
       {placementReason && <p id="ty-placement-reason" className="ty-action-reason" role="status">{placementReason}</p>}<small className="ty-placement-keyhint">{t('Стрелки / WASD — место · R / Shift+R — поворот · E / Enter — разместить · Esc — отмена', 'Arrows / WASD: position · R / Shift+R: rotate · E / Enter: place · Esc: cancel')}</small>
     </section>}
-    {notice && <div className={'ty-toast ' + (notice.error ? 'error' : '')} role={notice.error ? 'alert' : 'status'}>{notice.message}<button aria-label={t('Закрыть', 'Close')} onClick={() => setNotice(null)}><Icon name="close" size={16}/></button></div>}
+    {notice && !hasDialog && <div className={'ty-toast ' + (notice.error ? 'error' : '')} role={notice.error ? 'alert' : 'status'}>{notice.message}<button aria-label={t('Закрыть', 'Close')} onClick={() => setNotice(null)}><Icon name="close" size={16}/></button></div>}
     {state.error && !notice && <div className="ty-connection-error" role="alert">{errorCopy(state.error, lang)}</div>}
     {state.status !== 'connected' && <div className="ty-connection-overlay"><div className="ty-spinner"/><h2>{state.status === 'connecting' ? t('Готовим экспедицию', 'Preparing your expedition') : t('Возвращаем связь', 'Reconnecting')}</h2><p>{t('Ваша машина и грузы сохраняются на сервере.', 'Your truck and cargo are kept on the server.')}</p><button className="ty-button secondary" onClick={onExit}>{t('В меню', 'Back to menu')}</button></div>}
     {state.status === 'connected' && !state.snapshot?.hasControl && !view?.outcome && <div className="ty-control-banner"><p>{t('Вашим персонажем управляет бот или другое устройство.', 'A bot or another device is controlling your character.')}</p><button className="ty-button primary" onClick={() => connection.claim()}>{t('Вернуть управление', 'Take back control')}</button></div>}
@@ -183,5 +193,5 @@ export function Game({ room, lang, prefs, onPrefs, onLanguage, onExit, onRepeat,
     {panel === 'attachments' && view && <AttachmentPanel view={view} selected={selected} lang={lang} blocked={blockedReason} onAction={a => action(a)} onClose={() => openPanel(null)}/>}
     {panel === 'crew' && view && <Dialog title={t('Работа для каждого', 'A job for everyone')} onClose={() => openPanel(null)}><CrewOrders view={view} selectedId={selectedId} mark={mark} lang={lang} blocked={blockedReason} onAction={command => void action(command)}/><button className="ty-button subtle wide" onClick={() => openPanel('map')}>{t('Поставить метку', 'Set a marker')}<Icon name="map"/></button></Dialog>}
     {panel === 'journal' && view && <Dialog title={t('Журнал экспедиции', 'Expedition journal')} onClose={() => openPanel(null)}><ol className="ty-journal">{view.events.filter(e => e.message).slice().reverse().map(e => <li key={e.id}><time>{Math.floor(e.tick / 3600)}:{String(Math.floor(e.tick / 60) % 60).padStart(2, '0')}</time><span>{e.message?.[lang]}</span></li>)}</ol></Dialog>}
-  </div>;
+  </div></DialogNoticeContext.Provider>;
 }

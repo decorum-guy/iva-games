@@ -32,7 +32,7 @@ class Builder {
   }
   ring(id: string, p: readonly number[], limit = 30000): void { this.anchors.push({ id, position: vec(p), limit }); }
   bridge(id: string, centers: number[], y: number, z: number): void {
-    for (const x of centers) for (const end of [-1, 1]) for (const side of [-1, 1]) this.ring(`${id}-mount-${x}-${end}-${side}`, [x + 1.8 * end, y + .18, z + 1.25 * side], 42000);
+    for (const x of centers) for (const end of [-1, 1]) for (const side of [-1, 1]) this.anchors.push({ id: `${id}-mount-${x}-${end}-${side}`, position: V(x + 1.8 * end, y + .18, z + 1.25 * side), limit: 42000, mount: 'deck' });
   }
   connectGraphs(): { nodes: RoadNode[]; edges: RoadEdge[] } {
     // Merge graph junctions through their actual common road/pad geometry. This
@@ -96,7 +96,7 @@ function valley(): TyagaMap {
   b.road('ford-far-foot',[[60,-.2,50],[62,.1,46]],1.2,'stone','walk');
   b.road('hill-foot',[[101,1,29],[107,3.5,29],[115,6,30],[115,6,32]],1.2,'stone','walk');
   const graph = b.connectGraphs();
-  return { id:'valley',version:'valley@2',name:{ru:'Мостовая долина',en:'Bridge Valley'},subtitle:{ru:'Две переправы. Один большой генератор.',en:'Two crossings. One enormous generator.'},bounds:V(180,40,64),abyssY:-12,start:V(12,0,32),surfaces:b.surfaces,anchors:b.anchors,
+  return { id:'valley',version:'valley@3',name:{ru:'Мостовая долина',en:'Bridge Valley'},subtitle:{ru:'Две переправы. Один большой генератор.',en:'Two crossings. One enormous generator.'},bounds:V(180,40,64),abyssY:-12,start:V(12,0,32),surfaces:b.surfaces,anchors:b.anchors,
     waterVolumes:[{id:'river',min:V(43,-4,24),max:V(53,0,57),baseLevel:0,amplitude:0,period:90,flow:V()}],
     checkpoints:[zone('valley-cp1',[76,0,32],'Долинная стоянка','Valley camp'),zone('valley-cp2',[132,6,32],'Стоянка на плато','Plateau camp')],finish:zone('valley-finish',[168,6,32],'Станция «Долина»','Valley station',16,14),
     roadGraph:graph,footGraph:graph,cargo:['generator-large','optics','pump'],tools:{deck:4,beam:4,winch:1,anchor:4,strap:10,jack:2,repair:6},startBodies:[],windProfile:null,
@@ -136,7 +136,7 @@ function quarry(): TyagaMap {
   b.pad('checkpoint-a',[100,0,48]); b.pad('checkpoint-b',[162,4,48]);
   // One-metre bank segments join without a vertical seam.
   for(let x=120;x<146;x++) { const bank0=Math.min(1,(x-120)/4,(146-x)/6)*18*Math.PI/180;
-    b.road(`shelf-${x}`,[[x,(x-120)*4/26,48],[x+1,(x+1-120)*4/26,48]],4,'wet-stone','road',-Math.max(0,bank0)); }
+    b.road(`shelf-${x}`,[[x,(x-120)*4/26,48],[x+1,(x+1-120)*4/26,48]],4,'wet-stone','road',Math.max(0,bank0)); }
   b.road('shelf-exit',[[146,4,48],[162,4,48]],5,'wet-stone');
   b.road('shelf-bypass-near',[[114,0,48],[120,0,76],[134,14*4/31,76]],5);
   b.road('shelf-bypass-far',[[137.2,17.2*4/31,76],[151,4,76],[154,4,48]],5); b.pad('shelf-turn-a',[120,0,76],8,8); b.pad('shelf-turn-b',[151,4,76],8,8);
@@ -146,13 +146,19 @@ function quarry(): TyagaMap {
   b.road('block-bypass',[[178,4,48],[183,4,58],[194,4,58],[199,4,48]],3.6,'stone');
   b.pad('finish-pad',[210,4,48],16,14,'wood');
   b.ring('water-ring-1',[44,-2.8,43]); b.ring('water-ring-2',[60,-2.8,43]); b.ring('water-ring-3',[76,-1.2,43]);
-  b.road('water-foot',[[42,-2.9,43],[60,-2.9,43],[76,-1.3,43],[82,0,43]],1.2,'wet-stone','walk');
+  b.road('water-foot',[[42,-2.9,43],[60,-2.9,43],[76,-1.3,43],[82,-16/9,43]],1.2,'wet-stone','walk');
+  // Visible, narrow approaches join the existing footpath to the real road
+  // edges. They do not provide a second truck crossing. The far approach
+  // shares the road's cross-grade, avoiding a vertical lip at the junction.
+  b.road('water-foot-near',[[40,-8/3,45.5],[42,-2.9,43]],1.2,'wet-stone','walk');
+  b.road('water-foot-far',[[82,-16/9,43],[82,-16/9,45.5]],1.2,'wet-stone','walk',Math.atan2(4,18));
+  b.edges.push({from:'quarry-entry:1',to:'water-foot-near:0',width:1.2,kind:'walk',bidirectional:true},{from:'water-foot-far:1',to:'quarry-entry:4',width:1.2,kind:'walk',bidirectional:true});
   b.ring('ferry-near-ring',[38,-2.5,60]); b.ring('ferry-far-ring',[84,-2.5,68]);
   b.ring('shelf-ring-1',[124,2,44]); b.ring('shelf-ring-2',[140,4.5,44]);
   b.road('shelf-foot',[[119,0,44],[124,1.6,44],[140,4.1,44],[148,4,44]],1.2,'stone','walk');
   b.pad('equipment-niche',[82,1,20],5,5,'stone'); b.road('equipment-foot',[[75,1,24],[82,1,20]],1.2,'stone','walk');
   const graph=b.connectGraphs();
-  return {id:'quarry',version:'quarry@3',name:{ru:'Затопленный карьер',en:'Flooded Quarry'},subtitle:{ru:'Мачта, мокрый камень и свой паром.',en:'A long mast, wet rock and your own ferry.'},bounds:V(224,40,96),abyssY:-18,start:V(12,0,48),surfaces:b.surfaces,anchors:b.anchors,
+  return {id:'quarry',version:'quarry@4',name:{ru:'Затопленный карьер',en:'Flooded Quarry'},subtitle:{ru:'Мачта, мокрый камень и свой паром.',en:'A long mast, wet rock and your own ferry.'},bounds:V(224,40,96),abyssY:-18,start:V(12,0,48),surfaces:b.surfaces,anchors:b.anchors,
     waterVolumes:[{id:'low-water',min:V(44,-4,40),max:V(76,-3.2,54),baseLevel:-3.2,amplitude:.25,period:90,flow:V(0,0,250)},{id:'ferry-basin',min:V(38,-6,56),max:V(86,-3.2,72),baseLevel:-3.2,amplitude:.25,period:90,flow:V(0,0,250)},{id:'ferry-service-well',min:V(37.7,-6,65.5),max:V(38,-3.2,67.1),baseLevel:-3.2,amplitude:.25,period:90,flow:V(0,0,250)}],
     checkpoints:[zone('quarry-cp1',[100,0,48],'Верхняя стоянка','Upper camp'),zone('quarry-cp2',[162,4,48],'Каменная стоянка','Stone camp')],finish:zone('quarry-finish',[210,4,48],'Станция «Карьер»','Quarry station',16,14),roadGraph:graph,footGraph:graph,
     cargo:['mast','generator','pump'],tools:{deck:3,beam:6,winch:1,anchor:6,strap:12,jack:2,repair:8},windProfile:null,
@@ -206,7 +212,7 @@ function ridge(): TyagaMap {
   b.road('climb-foot',[[39,1,49],[48,3.6,49],[67,10.1,49],[76,10,49]],1.2,'stone','walk');
   b.road('last-foot',[[198,10,49],[219,16.1,49]],1.2,'stone','walk');
   const graph=b.connectGraphs();
-  return {id:'ridge',version:'ridge@1',name:{ru:'Ветровой хребет',en:'Wind Ridge'},subtitle:{ru:'Большой насос. Высота. Ветер.',en:'A giant pump. Height. Wind.'},bounds:V(260,56,104),abyssY:-30,start:V(12,0,52),surfaces:b.surfaces,anchors:b.anchors,waterVolumes:[],
+  return {id:'ridge',version:'ridge@2',name:{ru:'Ветровой хребет',en:'Wind Ridge'},subtitle:{ru:'Большой насос. Высота. Ветер.',en:'A giant pump. Height. Wind.'},bounds:V(260,56,104),abyssY:-30,start:V(12,0,52),surfaces:b.surfaces,anchors:b.anchors,waterVolumes:[],
     checkpoints:[zone('ridge-cp1',[92,10,52],'Стоянка у ущелья','Gorge camp'),zone('ridge-cp2',[164,10,52],'Высокая стоянка','High camp')],finish:zone('ridge-finish',[242,16,52],'Станция «Хребет»','Ridge station',16,14),roadGraph:graph,footGraph:graph,
     cargo:['pump-large','generator','optics'],tools:{deck:4,beam:4,winch:1,anchor:4,strap:12,jack:2,repair:8},
     startBodies:[{id:'lift-platform',kind:'lift',position:V(222,10.1,72),mass:450},{id:'lift-drive',kind:'drive',position:V(212,10.65,68)},{id:'lift-barrier-near',kind:'barrier',position:V(217.9,10.6,72)},{id:'lift-barrier-far',kind:'barrier',position:V(226.1,10.6,72)}],
@@ -223,7 +229,7 @@ function tutorial(): TyagaMap {
   b.ring('training-ring',[34,1.8,14]);
   b.pad('training-support-a',[34,0,28],1,4,'stone');b.pad('training-support-b',[37,0,28],1,4,'stone');b.bridge('training-bridge',[35.5],0,28);
   const graph=b.connectGraphs();
-  return {id:'tutorial',version:'tutorial@1',name:{ru:'Учебная площадка',en:'Training grounds'},subtitle:{ru:'Восемь дел перед экспедицией.',en:'Eight practical steps before the expedition.'},bounds:V(48,15,36),abyssY:-8,start:V(12,0,18),surfaces:b.surfaces,anchors:b.anchors,waterVolumes:[],
+  return {id:'tutorial',version:'tutorial@2',name:{ru:'Учебная площадка',en:'Training grounds'},subtitle:{ru:'Восемь дел перед экспедицией.',en:'Eight practical steps before the expedition.'},bounds:V(48,15,36),abyssY:-8,start:V(12,0,18),surfaces:b.surfaces,anchors:b.anchors,waterVolumes:[],
     checkpoints:[zone('tutorial-cp',[35,0,8],'Учебная стоянка','Training camp')],finish:zone('tutorial-finish',[35,0,8],'Учебная площадка','Training grounds'),roadGraph:graph,footGraph:graph,
     cargo:['generator-large','optics','pump'],tools:{deck:4,beam:4,winch:1,anchor:4,strap:14,jack:2,repair:6},
     startBodies:[{id:'training-light',kind:'beam',position:V(13,.2,22),mass:24},{id:'training-heavy',kind:'deck',position:V(17,.15,24)},{id:'training-anchor',kind:'anchor',position:V(25,.4,14)}],windProfile:null,

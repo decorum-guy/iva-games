@@ -23,7 +23,7 @@ const canonical = value => JSON.stringify(value, (_key, item) => item && typeof 
 const signature = (purpose, value) => sign(null, Buffer.from(`${purpose}\n${value}`), key).toString('base64url');
 const sleep = milliseconds => new Promise(resolve => setTimeout(resolve, milliseconds));
 const clients = new Set(), cases = [], outages = [];
-let ownedQdisc = false, prepared = null;
+let ownedQdisc = false, prepared = null, activeCase = { stage: 'initial-connection' };
 const emptyInput = { moveX: 0, moveZ: 0, run: false, throttle: 0, steer: 0, brake: false, tool: 0 };
 function command(name, commandArgs) {
   const result = spawnSync(name, commandArgs, { encoding: 'utf8', timeout: 10_000, maxBuffer: 1024 * 1024 });
@@ -56,6 +56,8 @@ class Client {
     this.participant = participant; this.snapshot = null; this.hello = null; this.baselines = new Map(); this.receipts = new Map();
     this.input = { ...emptyInput }; this.inputSeq = 0; this.frames = 0; this.errors = []; this.errorCount = 0; this.rtts = []; this.pings = new Map(); this.closed = null;
     this.resyncAt = 0; this.dropAckFor = null; this.ignoredAck = null; this.stopping = false; this.lastStateAt = performance.now();
+    this.ackTimer = null; this.pendingAck = null; this.lastAcknowledged = null; this.serverBaseline = null;
+    this.awaitingFull = false; this.claimAttempts = []; this.claimCount = 0; this.lastClaimAt = -Infinity;
     const now = Date.now(), claims = { issuer: 'iva-platform', audience: 'iva-realtime', keyId: 'network-test', ticketId: randomBytes(24).toString('base64url'),
       playerId: participant.playerId, participantId: participant.participantId, matchId: prepared.matchId, roomId: prepared.input.roomId, rosterHash: prepared.status.rosterHash,
       gameId: 'tyaga', rulesVersion: prepared.status.manifest.rulesVersion, contentVersion: prepared.status.manifest.contentVersion, protocolVersion: 'iva-realtime@1',
@@ -69,23 +71,28 @@ class Client {
       try {
         const frame = JSON.parse(bytes); this.frames += 1;
         if (frame.type === 'hello') this.hello = frame;
-        if (frame.type === 'error') { this.errorCount += 1; if (this.errors.length < 50) this.errors.push({ code: frame.code, actionId: frame.actionId, silenceMs: performance.now() - this.lastStateAt }); }
+        if (frame.type === 'error') {
+          this.errorCount += 1; if (this.errors.length < 50) this.errors.push({ code: frame.code, actionId: frame.actionId, silenceMs: performance.now() - this.lastStateAt });
+          if (['STALE_EPOCH', 'STALE_CONTROLLER'].includes(frame.code)) { this.awaitingFull = true; this.resetAcknowledgements(); this.resync(); }
+        }
+        if (frame.type === 'controlChanged') { this.awaitingFull = true; this.resetAcknowledgements(); this.resync(); }
         if (frame.type === 'heartbeat' && this.pings.has(frame.nonce)) { this.rtts.push(performance.now() - this.pings.get(frame.nonce)); this.pings.delete(frame.nonce); }
         if (frame.type === 'actionAck') {
           if (this.dropAckFor === frame.actionId) { this.dropAckFor = null; this.ignoredAck = frame; }
           else this.receipts.set(frame.actionId, frame);
         }
         if (!['full', 'delta'].includes(frame.type)) return;
+        if (this.snapshot && (frame.epoch !== this.snapshot.epoch || frame.controllerGeneration !== this.snapshot.controllerGeneration)) this.resetAcknowledgements();
         if (frame.type === 'delta') {
           const baseline = this.baselines.get(frame.baselineSnapshotSeq);
-          if (!baseline) { if (performance.now() - this.resyncAt > 250) { this.resyncAt = performance.now(); this.send({ type: 'resync' }); } return; }
+          if (!baseline || this.awaitingFull) { this.resync(); return; }
           frame.view = applyLoadChanges(baseline, frame.changes);
+          this.serverBaseline = frame.baselineSnapshotSeq;
         }
-        if (this.snapshot && frame.epoch !== this.snapshot.epoch) this.baselines.clear();
+        if (frame.type === 'full') this.awaitingFull = false;
         this.snapshot = frame; this.lastStateAt = performance.now(); this.baselines.set(frame.snapshotSeq, frame.view);
-        while (this.baselines.size > 64) this.baselines.delete(this.baselines.keys().next().value);
         this.inputSeq = Math.max(this.inputSeq, frame.lastConsumedInputSeq);
-        this.send({ type: 'ackSnapshot', snapshotSeq: frame.snapshotSeq });
+        this.acknowledge(frame);
       } catch (error) { this.errorCount += 1; if (this.errors.length < 50) this.errors.push({ code: 'PROJECTION_FAILED', detail: error.message }); }
     });
     this.inputTimer = setInterval(() => { if (this.snapshot?.hasControl && this.snapshot.phase === 'running') this.send({ type: 'input', inputSeq: ++this.inputSeq, payload: this.input }); }, 1000 / 30);
@@ -95,8 +102,54 @@ class Client {
       this.send({ type: 'heartbeat', nonce });
     }, 500);
   }
-  send(message) { if (this.socket.readyState === WebSocket.OPEN && (this.snapshot || this.hello)) this.socket.send(JSON.stringify({ ...scope(this), ...message })); }
-  async ready() { await waitUntil(() => this.snapshot?.hasControl && this.snapshot.phase === 'running', 25_000, 'Independent controller did not enter the running world'); return this; }
+  send(message) {
+    if (this.socket.readyState !== WebSocket.OPEN || (!this.snapshot && !this.hello) || (this.awaitingFull && message.type !== 'resync')) return false;
+    this.socket.send(JSON.stringify({ ...scope(this), ...message })); return true;
+  }
+  resetAcknowledgements() {
+    clearTimeout(this.ackTimer); this.ackTimer = null; this.pendingAck = null;
+    this.lastAcknowledged = null; this.serverBaseline = null; this.baselines.clear();
+  }
+  pruneBaselines() {
+    while (this.baselines.size > 64) this.baselines.delete([...this.baselines.keys()].find(sequence => sequence !== this.lastAcknowledged && sequence !== this.serverBaseline && sequence !== this.pendingAck?.snapshotSeq));
+  }
+  acknowledge(frame) {
+    this.pendingAck = { snapshotSeq: frame.snapshotSeq, epoch: frame.epoch, controllerGeneration: frame.controllerGeneration }; this.pruneBaselines();
+    if (this.ackTimer) return;
+    this.ackTimer = setTimeout(() => {
+      this.ackTimer = null; const pending = this.pendingAck; this.pendingAck = null;
+      if (!pending || pending.epoch !== this.snapshot?.epoch || pending.controllerGeneration !== this.snapshot?.controllerGeneration || !this.baselines.has(pending.snapshotSeq)) return;
+      if (this.send({ type: 'ackSnapshot', snapshotSeq: pending.snapshotSeq })) this.lastAcknowledged = pending.snapshotSeq;
+      this.pruneBaselines();
+    }, 50);
+  }
+  resync() { if (performance.now() - this.resyncAt > 250) { this.resyncAt = performance.now(); this.send({ type: 'resync' }); } }
+  diagnostic() {
+    const s = this.snapshot;
+    return { frames: this.frames, closed: this.closed, lastStateAgeMs: performance.now() - this.lastStateAt,
+      snapshot: s ? { phase: s.phase, pauseReason: s.pauseReason, hasControl: s.hasControl, epoch: s.epoch, controllerGeneration: s.controllerGeneration,
+        snapshotSeq: s.snapshotSeq, worldTick: s.worldTick, resumeAt: s.resumeAt } : null,
+      errors: this.errors, errorCount: this.errorCount, retainedBaselines: this.baselines.size, claimCount: this.claimCount, claimAttempts: this.claimAttempts };
+  }
+  async ready() {
+    const deadline = performance.now() + 25_000;
+    while (performance.now() < deadline) {
+      if (this.snapshot?.hasControl && this.snapshot.phase === 'running') return this;
+      if (this.closed !== null) throw new Error('Independent controller socket closed before ready');
+      // This isolated same-player test client explicitly requests control if a
+      // replacement authenticates before the previous TCP close reaches the
+      // server. Production observer admission remains unchanged.
+      if (this.snapshot && !this.snapshot.hasControl && !this.awaitingFull && performance.now() - this.lastClaimAt >= 1000) {
+        if (this.send({ type: 'claimControl', expectedGeneration: this.snapshot.controllerGeneration })) {
+          this.lastClaimAt = performance.now(); this.claimCount += 1;
+          if (this.claimAttempts.length < 8) this.claimAttempts.push({ epoch: this.snapshot.epoch, controllerGeneration: this.snapshot.controllerGeneration, worldTick: this.snapshot.worldTick });
+          this.awaitingFull = true; this.resetAcknowledgements();
+        }
+      }
+      await sleep(25);
+    }
+    throw new Error('Independent controller did not enter the running world');
+  }
   async action(actionId, payload) {
     const deadline = performance.now() + 20_000;
     while (performance.now() < deadline) {
@@ -105,7 +158,7 @@ class Client {
     }
     throw new Error('Durable action acknowledgement unavailable');
   }
-  stop() { this.stopping = true; clearInterval(this.inputTimer); clearInterval(this.heartbeatTimer); this.socket.terminate(); clients.delete(this); }
+  stop() { this.stopping = true; clearInterval(this.inputTimer); clearInterval(this.heartbeatTimer); this.resetAcknowledgements(); this.socket.terminate(); clients.delete(this); }
 }
 async function pair() {
   const values = prepared.input.participants.map(participant => new Client(participant));
@@ -162,19 +215,22 @@ try {
   connected.forEach(client=>client.stop());await sleep(100);
   const profiles=netem?[0,80,160,300].flatMap(rttMs=>[0,30].flatMap(jitterMs=>[0,1,5].map(lossPercent=>({rttMs,jitterMs,lossPercent})))):[{rttMs:0,jitterMs:0,lossPercent:0}];
   for (const profile of profiles) {
+    activeCase = { stage: 'impaired-connection', ...profile };
     const applied=impairment(profile);connected=await pair();const before=connected.map(client=>client.frames);await sleep(8000);
     const sample={...profile,applied,measuredSeconds:8,clients:connected.map((client,index)=>({frames:client.frames-before[index],closed:client.closed,errors:client.errors,errorCount:client.errorCount,
-      heartbeatRtt:{count:client.rtts.length,p50Ms:quantile(client.rtts,.5),p99Ms:quantile(client.rtts,.99)}})),
+      claimCount:client.claimCount,claimAttempts:client.claimAttempts,heartbeatRtt:{count:client.rtts.length,p50Ms:quantile(client.rtts,.5),p99Ms:quantile(client.rtts,.99)}})),
       qdisc:netem?JSON.parse(command('tc',['-j','-s','qdisc','show','dev','lo'])):null};
     assert.ok(sample.clients.every(client=>client.frames>1),'Both clients must receive state under the requested impairment');
     for(const client of sample.clients){assert.equal(client.errorCount,client.errors.length,'Error evidence overflow');assert.deepEqual(unexpectedNetworkErrors(client.errors,profile.lossPercent),[],'Unexpected error code under live TCP impairment');}
     clearImpairment();connected.forEach(client=>client.stop());await sleep(100);
+    activeCase = { stage: 'profile-restoration', ...profile };
     connected=await pair();for(const client of connected)assertRetained(client,expected);
     const retry=await connected[0].action(actionId,payload);assert.equal(retry.committedJournalSeq,receipt.committedJournalSeq);
     sample.recoverySucceeded=true;sample.singleItemRetained=true;cases.push(sample);console.log(JSON.stringify({event:'network-profile',...sample}));
     connected.forEach(client=>client.stop());await sleep(100);
   }
   if(netem)for(const seconds of [1,5,15]) {
+    activeCase = { stage: 'blackhole', seconds };
     connected=await pair();const previous=connected[0].snapshot,started=performance.now();
     const applied=impairment({rttMs:0,jitterMs:0,lossPercent:100});await sleep(seconds*1000);const qdisc=JSON.parse(command('tc',['-j','-s','qdisc','show','dev','lo']));
     clearImpairment();const actualBlackholeSeconds=(performance.now()-started)/1000;
@@ -200,7 +256,8 @@ try {
     matchId:prepared.matchId,ordinaryCrateApproach:true,unpackedPhysicalItems:1,crateMassDecreaseKg:6,applicationAckLossDeduplicated:true,cases,outages,
     limitations:['Protocol clients, not browser/mobile/rendered acceptance.','Netem loss affects real TCP packets; RTT and jitter are requested settings, observed heartbeat RTT is reported separately.',
       'Zero nominal RTT with nonzero jitter applies a reported 0.001 ms one-way base: tc rejects a normal distribution at exactly zero latency.','This does not complete a map or measure hour-long capacity.']};
-} catch(error) { report={passed:false,mode,netemExecuted:netem,matrixComplete:false,error:error.message,manifest:prepared?.status.manifest,cases,outages}; }
+} catch(error) { report={passed:false,mode,netemExecuted:netem,matrixComplete:false,error:error.message,activeCase,
+  failedClients:[...clients].map(client=>client.diagnostic()),manifest:prepared?.status.manifest,cases,outages}; }
 finally {
   for(const client of clients)client.stop();
   try{clearImpairment();}catch(error){report.passed=false;report.cleanupError=error.message;}

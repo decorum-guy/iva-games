@@ -5,9 +5,10 @@ import { clone } from 'three/addons/utils/SkeletonUtils.js';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import type { EntityView, ItemKind, TyagaView, Vec3, WheelView } from '../core/types';
 import { BODY } from '../core/config';
+import { TerrainMaterials, terrainUVs } from './terrain-materials';
+import { ContactShadow } from './contact-shadow';
 
 const COLORS = ['#D97736', '#37BCD0', '#EBC75A', '#8160A4', '#D85E76', '#397D68'];
-const SURFACES: Record<string, string> = { stone: '#b6c8be', wood: '#ac875b', soil: '#b7ab86', 'wet-stone': '#738e92', mud: '#82775d', ice: '#bfdfdf', steel: '#637c80' };
 const base = import.meta.env.BASE_URL + 'assets/tyaga/models/';
 type Resource = THREE.Material | THREE.BufferGeometry | THREE.Texture;
 type WheelNode = { spin: THREE.Object3D; steering: THREE.Object3D; index: number };
@@ -80,6 +81,7 @@ export class TyagaScene {
   private selectedId: string | null = null;
   private selectionRing = new THREE.Mesh(new THREE.TorusGeometry(.6, .035, 6, 40), new THREE.MeshBasicMaterial({ color: '#37BCD0', depthTest: false, depthWrite: false }));
   private heightLine = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]), new THREE.LineDashedMaterial({ color: '#344955', dashSize: .13, gapSize: .09, depthTest: false, transparent: true, opacity: .65 }));
+  private contactShadows = Array.from({ length: 2 }, () => new ContactShadow(resource => this.resources.add(resource)));
   private socketGeometry = new THREE.SphereGeometry(.09, 8, 6);
   private socketFree = new THREE.MeshBasicMaterial({ color: '#37BCD0', depthTest: false, depthWrite: false });
   private socketOccupied = new THREE.MeshBasicMaterial({ color: '#D97736', depthTest: false, depthWrite: false });
@@ -129,6 +131,7 @@ export class TyagaScene {
     this.resources.add(this.placementMaterial);
     this.selectionRing.rotation.x = -Math.PI / 2; this.selectionRing.renderOrder = 5; this.selectionRing.visible = false; this.heightLine.renderOrder = 6; this.heightLine.visible = false;
     this.scene.add(this.selectionRing, this.heightLine); collectResources(this.selectionRing, this.resources); collectResources(this.heightLine, this.resources);
+    for (const shadow of this.contactShadows) this.scene.add(shadow.mesh);
     const warning = canvasTexture((c, size) => { c.fillStyle = '#EBC75A'; c.strokeStyle = '#344955'; c.lineWidth = 8; c.beginPath(); c.moveTo(size / 2, 9); c.lineTo(size - 9, size - 13); c.lineTo(9, size - 13); c.closePath(); c.fill(); c.stroke(); c.fillStyle = '#344955'; c.textAlign = 'center'; c.font = 'bold 72px sans-serif'; c.fillText('!', size / 2, 99); });
     this.warningMaterial = new THREE.SpriteMaterial({ map: warning, depthTest: false, depthWrite: false });
     const normalBytes = new Uint8Array(64 * 64 * 4);
@@ -218,21 +221,19 @@ export class TyagaScene {
     this.mapGeneration++; this.restoreOccluders(); this.clear(this.ground); this.clear(this.markers); disposeResources(this.mapResources);
     const map = view.map, background = view.mapId === 'ridge' ? '#dae3e8' : view.mapId === 'quarry' ? '#c9dddd' : '#dce8e4';
     this.scene.background = new THREE.Color(background); (this.scene.fog as THREE.Fog).color.set(background);
-    const strata = canvasTexture((c, size) => {
-      c.fillStyle = '#aebdb0'; c.fillRect(0, 0, size, size);
-      for (let y = 0; y < size; y += 15) { c.strokeStyle = y % 30 ? '#9baea2' : '#b9c6b7'; c.lineWidth = 4; c.beginPath(); c.moveTo(0, y); c.bezierCurveTo(40, y + 4, 84, y - 5, size, y + 2); c.stroke(); }
-      for (let i = 0; i < 220; i++) { c.fillStyle = i % 2 ? '#a5b5aa' : '#c0ccbd'; c.fillRect((i * 47) % size, (i * 73) % size, 1.5, 1.5); }
-    }); this.mapResources.add(strata);
+    const terrain = new TerrainMaterials(view.mapId, this.options.quality === 'low', Math.min(this.renderer.capabilities.getMaxAnisotropy(), this.options.quality === 'low' ? 2 : 4), resource => this.mapResources.add(resource));
     for (const surface of map.surfaces) {
-      const color = surface.kind === 'rock' ? view.mapId === 'ridge' ? '#81939a' : view.mapId === 'quarry' ? '#849e9c' : '#91a18a' : SURFACES[surface.material];
-      const material = this.material(color, surface.material === 'steel' ? .5 : 0, surface.material === 'ice' ? .3 : .9);
-      if (surface.kind === 'rock') material.map = strata;
+      const material = terrain.material(surface);
       let geometry: THREE.BufferGeometry;
       if (surface.mesh) {
         geometry = new THREE.BufferGeometry();
         geometry.setAttribute('position', new THREE.Float32BufferAttribute(surface.mesh.vertices, 3));
-        geometry.setIndex(surface.mesh.indices); geometry.computeVertexNormals();
+        geometry.setIndex(surface.mesh.indices);
+        // Independent face UVs avoid stretching top textures down the cliff.
+        // The triangle positions and authoritative collision mesh are unchanged.
+        const faces = geometry.toNonIndexed(); geometry.dispose(); geometry = faces; geometry.computeVertexNormals();
       } else geometry = new THREE.BoxGeometry(surface.size.x, surface.size.y, surface.size.z);
+      terrainUVs(geometry, surface);
       const object = this.mesh(geometry, material, surface.position);
       object.quaternion.set(surface.rotation.x, surface.rotation.y, surface.rotation.z, surface.rotation.w); object.userData.surface = true; object.userData.surfaceId = surface.id; this.ground.add(object);
       // Every solid surface, including the lower rock strata, comes from the same
@@ -459,18 +460,36 @@ export class TyagaScene {
     const piston = dynamic.modelRoot.getObjectByName('jack-piston');
     if (piston && mechanism?.piston !== undefined) { piston.userData.restY ??= piston.position.y; piston.position.y = piston.userData.restY + mechanism.piston; }
   }
-  private updateHeightIndicator(selected?: Dynamic) {
-    this.selectionRing.visible = !!selected; this.heightLine.visible = false; if (!selected) return;
-    const origin = selected.root.position.clone(); origin.y += .02;
+  private supportBelow(dynamic: Dynamic) {
+    const origin = dynamic.root.position.clone(); origin.y += .02;
     this.raycaster.set(origin, new THREE.Vector3(0, -1, 0)); this.raycaster.far = 100;
     const hits = this.raycaster.intersectObjects([this.ground, this.actors], true);
-    const hit = hits.find(h => !h.object.userData.decor && visibleInScene(h.object) && (h.object.userData.surface || (h.object.userData.entityId && h.object.userData.entityId !== selected.entity.id && this.dynamics.get(h.object.userData.entityId)?.entity.kind !== 'character')));
-    const bottom = selected.root.position.y - selected.entity.size.y / 2, supportY = hit?.point.y ?? bottom;
-    this.selectionRing.position.set(selected.root.position.x, supportY + .045, selected.root.position.z); this.selectionRing.scale.set(Math.max(.7, Math.min(2.6, selected.entity.size.x * .65)), Math.max(.7, Math.min(2.6, selected.entity.size.z * .65)), 1);
-    if (hit && bottom - supportY > .18) {
-      const positions = this.heightLine.geometry.getAttribute('position'); positions.setXYZ(0, origin.x, supportY + .05, origin.z); positions.setXYZ(1, origin.x, bottom, origin.z); positions.needsUpdate = true; this.heightLine.geometry.computeBoundingSphere(); this.heightLine.computeLineDistances(); this.heightLine.visible = true;
-    }
     this.raycaster.far = Infinity;
+    // A Surface proxy remains the physical support even when its authored
+    // station/camp model hides that box. Decorative model overhangs are not floors.
+    const hit = hits.find(h => h.object instanceof THREE.Mesh && !h.object.userData.decor && (h.object.userData.surfaceId || (visibleInScene(h.object) && h.object.userData.entityId && h.object.userData.entityId !== dynamic.entity.id && this.dynamics.get(h.object.userData.entityId)?.entity.kind !== 'character')));
+    if (!hit || !(hit.object instanceof THREE.Mesh) || !hit.face) return null;
+    const normal = hit.face.normal.clone().applyMatrix3(new THREE.Matrix3().getNormalMatrix(hit.object.matrixWorld)).normalize();
+    if (normal.y < .25) return null;
+    const x = new THREE.Vector3(1, 0, 0).applyQuaternion(dynamic.root.quaternion), y = new THREE.Vector3(0, 1, 0).applyQuaternion(dynamic.root.quaternion), z = new THREE.Vector3(0, 0, 1).applyQuaternion(dynamic.root.quaternion);
+    const size = dynamic.entity.size, halfHeight = .5 * (Math.abs(x.y) * size.x + Math.abs(y.y) * size.y + Math.abs(z.y) * size.z);
+    return { mesh: hit.object, point: hit.point, normal, bottom: dynamic.root.position.y - halfHeight };
+  }
+  private updateHeightIndicator(selected?: Dynamic, held?: Dynamic) {
+    this.selectionRing.visible = false; this.heightLine.visible = false;
+    for (const shadow of this.contactShadows) shadow.mesh.visible = false;
+    const targets = [...new Set([selected, held].filter((target): target is Dynamic => !!target))];
+    for (let index = 0; index < targets.length; index++) {
+      const target = targets[index], support = this.supportBelow(target); if (!support) continue;
+      this.contactShadows[index].update(support.mesh, support.point, support.normal, target.root, target.entity.size, support.bottom - support.point.y, this.options.quality === 'low');
+      if (target !== selected) continue;
+      this.selectionRing.visible = true; this.selectionRing.position.copy(support.point).addScaledVector(support.normal, .045);
+      this.selectionRing.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), support.normal);
+      this.selectionRing.scale.set(Math.max(.7, Math.min(2.6, target.entity.size.x * .65)), Math.max(.7, Math.min(2.6, target.entity.size.z * .65)), 1);
+      if (support.bottom - support.point.y > .18) {
+        const positions = this.heightLine.geometry.getAttribute('position'); positions.setXYZ(0, target.root.position.x, support.point.y + .05, target.root.position.z); positions.setXYZ(1, target.root.position.x, support.bottom, target.root.position.z); positions.needsUpdate = true; this.heightLine.geometry.computeBoundingSphere(); this.heightLine.computeLineDistances(); this.heightLine.visible = true;
+      }
+    }
   }
   private updateOcclusion(self?: Dynamic) {
     const next = new Set<THREE.Material>();
@@ -523,7 +542,7 @@ export class TyagaScene {
       if (!this.options.reducedMotion && this.options.shake > 0 && now < this.shakeUntil) { const amplitude = this.shakeStrength * this.options.shake * (this.shakeUntil - now) / 220; target.x += Math.sin(now * .047) * amplitude; target.z += Math.sin(now * .061) * amplitude; }
       this.camera.position.set(target.x + Math.cos(elevation) * Math.cos(azimuth) * distance, target.y + Math.sin(elevation) * distance, target.z + Math.cos(elevation) * Math.sin(azimuth) * distance); this.camera.lookAt(target); this.camera.updateMatrixWorld();
       const sun = this.scene.getObjectByName('sun') as THREE.DirectionalLight; sun.position.copy(this.focus).add(new THREE.Vector3(-25, 48, 20)); sun.target.position.copy(this.focus); sun.target.updateMatrixWorld();
-      this.scene.updateMatrixWorld(); this.updateHeightIndicator(this.selectedId ? this.dynamics.get(this.selectedId) : undefined); this.updateOcclusion(self);
+      this.scene.updateMatrixWorld(); this.updateHeightIndicator(this.selectedId ? this.dynamics.get(this.selectedId) : undefined, person?.holding ? this.dynamics.get(person.holding) : undefined); this.updateOcclusion(self);
       for (const child of this.ground.children) if (child.name === 'water') child.position.y = this.view.weather.waterLevel ?? child.userData.base;
       if (!this.options.reducedMotion) { this.waterNormal.offset.x += dt * .014; this.waterNormal.offset.y += dt * .008; }
     }

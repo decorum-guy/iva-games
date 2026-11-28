@@ -169,10 +169,13 @@ describe('actual HTTP/WebSocket boundary', () => {
     expect((await get('/internal/realtime/v1/metrics')).status).toBe(401);
     first.send({ ...scope(initial), type: 'resync' });
     await first.frame(frame => frame.type === 'full' && Number(frame.snapshotSeq) > initial.snapshotSeq);
+    for (let index = 0; index < 91; index++) first.send({ ...scope(initial), type: 'ackSnapshot', snapshotSeq: initial.snapshotSeq });
+    await first.frame(frame => frame.type === 'error' && frame.code === 'RATE_LIMIT');
     await vi.waitFor(async () => {
       const report = await get('/internal/realtime/v1/metrics', true);
       expect(report.status).toBe(200);
-      expect(report.value).toMatchObject({ gateway: { totals: { resyncRequests: 1, fullReasons: { 'client-request': 1 } },
+      expect(report.value).toMatchObject({ gateway: { totals: { resyncRequests: 1, rateLimits: 1,
+        rateLimitKinds: { input: 0, action: 0, ackSnapshot: 1, heartbeat: 0, resync: 0, claimControl: 0 }, fullReasons: { 'client-request': 1 } },
         connections: [{ authenticated: true }] }, diagnostics: { games: [{ gameId: 'fixture' }] } });
       const encoded = JSON.stringify(report.value);
       expect(encoded).not.toContain('player1'); expect(encoded).not.toContain('Player one'); expect(encoded).not.toContain('rosterHash');

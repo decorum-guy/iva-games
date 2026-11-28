@@ -9,8 +9,9 @@ import type { BodyOptions, EntityRecord, GameState, LinkRecord, SavedWorld } fro
 import { performAction, finishOperation, interactionsFor, zoneConditions } from './actions';
 import { chooseBotAction } from '../bots';
 import { advanceTutorial, tutorialView } from '../tutorial';
+import { bridgeMountParts, deckParts } from './compound';
 
-export const PHYSICS_BUILD_HASH = 'rapier3d-0.21.0:17cfa80eebd8de0291b948496dbffba724b98b489687f8272ca236a7bbf1dd4b:tyaga-solver-12-4-rope64-v6';
+export const PHYSICS_BUILD_HASH = 'rapier3d-0.21.0:17cfa80eebd8de0291b948496dbffba724b98b489687f8272ca236a7bbf1dd4b:tyaga-solver-12-4-rope64-v9';
 let initialization: Promise<void> | undefined;
 export function initializePhysics(): Promise<void> { return initialization ??= RAPIER.init().then(()=>{if(RAPIER.version()!=='0.21.0')throw new Error(`INCOMPATIBLE_RAPIER_RUNTIME:${RAPIER.version()}`);}); }
 export class TyagaWorld {
@@ -66,7 +67,7 @@ export class TyagaWorld {
   private initializeTerrain():void {
     const fixed=this.physics.getRigidBody(this.state.fixedBodyHandle);
     for(const shape of this.map.surfaces){const geometry=shape.mesh?RAPIER.ColliderDesc.trimesh(new Float32Array(shape.mesh.vertices),new Uint32Array(shape.mesh.indices),RAPIER.TriMeshFlags.FIX_INTERNAL_EDGES):RAPIER.ColliderDesc.cuboid(shape.size.x/2,shape.size.y/2,shape.size.z/2);const d=geometry.setTranslation(shape.position.x,shape.position.y,shape.position.z).setRotation(shape.rotation).setFriction(FRICTION[shape.material]).setRestitution(.02);const collider=this.physics.createCollider(d,fixed);this.state.colliderBodies[collider.handle]=`surface:${shape.id}`;this.state.colliderMaterials[collider.handle]=shape.material;}
-    for(const anchor of this.map.anchors){const e=this.addBody({id:anchor.id,kind:'ring',position:anchor.position,fixed:true});e.anchorLimit=anchor.limit;}
+    for(const anchor of this.map.anchors){const e=this.addBody({id:anchor.id,kind:'ring',position:anchor.position,fixed:true,...(anchor.mount==='deck'?{customModel:'bridge-mount',size:V(.36,.28+.152*80/93,.36)}:{})});e.anchorLimit=anchor.limit;}
   }
   addBody(options:BodyOptions):EntityRecord{
     const p=BODY[options.kind];const size=options.size??p.size;const q=options.rotation??Q();
@@ -82,6 +83,11 @@ export class TyagaWorld {
       makeCollider(RAPIER.ColliderDesc.cuboid(2.5,.07,1.1).setTranslation(-.3,-.37,0),mass*.07);
       const main=this.map.cargo[0];const high=main==='mast'?1.15:.15;
       for(const x of main==='mast'?[-1.6,1.6]:[-1.9,.5])makeCollider(RAPIER.ColliderDesc.cuboid(.15,high/2,.9).setTranslation(x,.35+high/2,0),0);
+    }else if(options.kind==='ring'&&options.customModel==='bridge-mount'){
+      for(const descriptor of bridgeMountParts())makeCollider(descriptor,0);
+    }else if(options.kind==='deck'&&!options.folded){
+      const parts=deckParts(),volume=parts.reduce((sum,part)=>sum+part.volume,0);
+      for(const part of parts)makeCollider(part.descriptor,mass*part.volume/volume);
     }else if(options.kind==='jack'){
       makeCollider(RAPIER.ColliderDesc.cuboid(.25,.12,.18).setTranslation(0,-.24,0),mass*.7);
       makeCollider(RAPIER.ColliderDesc.cuboid(.08,.18,.08).setTranslation(0,-.05,0),mass*.25);
@@ -99,10 +105,17 @@ export class TyagaWorld {
       for(const z of [-2.04,2.04]){makeCollider(RAPIER.ColliderDesc.cuboid(4,.04,.04).setTranslation(0,.95,z),0);for(const x of [-3.2,0,3.2])makeCollider(RAPIER.ColliderDesc.cuboid(.04,.375,.04).setTranslation(x,.575,z),0);}
     }else if(options.kind==='rope-segment')makeCollider(RAPIER.ColliderDesc.capsule(Math.max(.001,size.y/2-.04),.04),mass);
     else makeCollider(RAPIER.ColliderDesc.cuboid(size.x/2,size.y/2,size.z/2),mass);
-    const e:EntityRecord={id:options.id,kind:options.kind,handle:body.handle,colliders,size:{...size},baseMass:mass,sockets:socketsFor(options.kind,size),required:options.required??false,active:true,fixed:options.fixed??false,submergedSeconds:0,lastSafe:{...options.position},...(options.integrity!==undefined?{integrity:options.integrity}:{}),...(options.folded?{folded:true}:{})};
+    const e:EntityRecord={id:options.id,kind:options.kind,handle:body.handle,colliders,size:{...size},baseMass:mass,sockets:socketsFor(options.kind,size),required:options.required??false,active:true,fixed:options.fixed??false,submergedSeconds:0,lastSafe:{...options.position},...(options.integrity!==undefined?{integrity:options.integrity}:{}),...(options.folded?{folded:true}:{}),...(options.customModel?{customModel:options.customModel}:{})};
     this.state.entities[options.id]=e;return e;
   }
   removeBody(id:string):void{const e=this.state.entities[id];if(!e?.active)return;for(const h of e.colliders){delete this.state.colliderBodies[h];delete this.state.colliderMaterials[h];}const b=this.physics.getRigidBody(e.handle);if(b)this.physics.removeRigidBody(b);e.active=false;}
+  unfoldDeckGeometry(id:string):void{
+    const e=this.state.entities[id],body=this.body(id),mass=body.mass();
+    for(const handle of e.colliders){this.physics.removeCollider(this.physics.getCollider(handle),true);delete this.state.colliderBodies[handle];delete this.state.colliderMaterials[handle];}
+    e.colliders=[];const parts=deckParts(),volume=parts.reduce((sum,part)=>sum+part.volume,0);
+    for(const part of parts){const collider=this.physics.createCollider(part.descriptor.setMass(mass*part.volume/volume).setFriction(.8).setRestitution(.015).setActiveEvents(RAPIER.ActiveEvents.CONTACT_FORCE_EVENTS).setContactForceEventThreshold(20),body);e.colliders.push(collider.handle);this.state.colliderBodies[collider.handle]=id;this.state.colliderMaterials[collider.handle]='wood';}
+    body.recomputeMassPropertiesFromColliders();
+  }
   private initializeCargo():void{
     const p=this.map.start;this.addBody({id:'truck',kind:'truck',position:add(p,V(0,.98,0)),mass:1000,integrity:100,required:true});
     this.addBody({id:'equipment-crate',kind:'crate',position:add(p,V(-.3,.93,0))});
@@ -145,13 +158,13 @@ export class TyagaWorld {
   closestSocket(id:string,point:Vec3,role?:SocketView['role']):SocketView|null{const e=this.state.entities[id];if(!e?.active)return null;return e.sockets.filter(s=>!role||s.role===role).map(s=>this.socket(id,s.id)!).sort((a,b)=>distance(a.world,point)-distance(b.world,point))[0]??null;}
   pointVelocity(body:RigidBody,point:Vec3):Vec3{return add(body.linvel(),cross(body.angvel(),sub(point,body.worldCom())));}
   bodyPoint(id:string,local:Vec3):Vec3{const b=this.body(id);return worldPoint(b.translation(),b.rotation(),local);}
-  canReach(participantId:string,id:string,socketId?:string,range:number=PHYSICS.interact):{ok:boolean;distance:number;code:string}{
+  canReach(participantId:string,id:string,socketId?:string,range:number=PHYSICS.interact,consumedItemId?:string):{ok:boolean;distance:number;code:string}{
     const c=this.state.characters[participantId];const e=this.state.entities[id];if(!c||!e?.active)return{ok:false,distance:Infinity,code:'NOT_FOUND'};
     const actor=this.body(c.bodyId);const chest=add(actor.translation(),V(0,.25,0));
     const socket=socketId?this.socket(id,socketId):this.closestSocket(id,chest);const target=socket?.world??this.body(id).translation();
     const d=distance(chest,target);if(d>range)return{ok:false,distance:d,code:'TOO_FAR'};
     const ray=new RAPIER.Ray(chest,norm(sub(target,chest)));
-    const hit=this.physics.castRay(ray,Math.max(0,d-.08),true,undefined,undefined,undefined,actor,collider=>{const eid=this.state.colliderBodies[collider.handle];return (collider.collisionGroups()&0xffff)!==0&&eid!==id&&eid!==c.bodyId&&!eid?.startsWith('rope:');});
+    const hit=this.physics.castRay(ray,Math.max(0,d-.08),true,undefined,undefined,undefined,actor,collider=>{const eid=this.state.colliderBodies[collider.handle];return (collider.collisionGroups()&0xffff)!==0&&eid!==id&&eid!==c.bodyId&&(consumedItemId===undefined||eid!==consumedItemId)&&!eid?.startsWith('rope:');});
     if(hit)return{ok:false,distance:d,code:'BLOCKED'};return{ok:true,distance:d,code:'OK'};
   }
   ground(position:Vec3,max=4,excludeId?:string):{point:Vec3;normal:Vec3;bodyId:string|null;material:MaterialId;collider:Collider}|null{
@@ -306,10 +319,13 @@ export class TyagaWorld {
   step(inputs?:Record<string,unknown>,context?:{controllers:ControllerState[];elapsedSeconds:number;attempt:number;dt:number}):void{
     if(context){this.setControllers(context.controllers);this.state.elapsedSeconds=context.elapsedSeconds;this.state.rewinds=context.attempt;}
     if(inputs)for(const [id,input]of Object.entries(inputs))if(this.state.characters[id])this.inputs[id]=normalizeInput(input);
-    if(this.state.phase==='finished'||this.state.phase==='failed')return;
+    if(this.state.phase==='finished')return;
+    // Decision timers use the runtime's fixed steps even when failed physics
+    // is paused. A declined rewind must not lock the crew out permanently.
+    if(this.state.voteCooldown>0)this.state.voteCooldown=Math.max(0,this.state.voteCooldown-DT);
+    if(this.state.phase==='failed')return;
     if(this.state.vote){this.state.vote.remaining-=DT;if(this.state.vote.remaining<=0)this.cancelVote('TIMEOUT');return;}
     if(!context)this.state.elapsedSeconds+=DT;
-    if(this.state.voteCooldown>0)this.state.voteCooldown-=DT;
     for(const c of Object.values(this.state.characters))if(c.controller.kind==='bot'){
       if(this.state.tick%6!==0&&c.botMemory.input){this.inputs[c.participant.participantId]={...c.botMemory.input};continue;}
       const decision=chooseBotAction(this.view(c.participant.participantId),c.botMemory,this.state.worldTime);

@@ -10,9 +10,9 @@ external volume. A source commit does not perform this one-time preparation.
 In the isolated development executor used for this implementation, the own SSH
 directory/config and `SSH_AUTH_SOCK` were absent. The only matching SSH/deploy/
 GitHub environment variable name was `GH_PAGER`; no credential values were
-printed. Docker CLI was also absent. Therefore host installation and real Docker
-image acceptance have not been performed by these source changes. The image
-workflow contains the Docker checks for the exact candidate image.
+printed. Docker CLI was also absent in that local executor. Host installation
+has not been performed or verified through that access. Docker image checks
+have since executed in GitHub Actions; their actual results are recorded below.
 
 The GitHub connector reports repository administration/push permission, but has
 no exposed Actions-variable operation. The local `gh` client is unauthenticated;
@@ -20,11 +20,11 @@ read-only requests to repository/environment variables return HTTP 401. Thus the
 actual production `IVA_REALTIME_ENABLED` value is unknown, and an absent local
 host credential is not evidence that a particular administrator lacks access.
 
-The read-only audit found main at
+The initial read-only audit found main at
 `357f60049e83b298bb5bbc2f760654fbd02384e3` and the successful existing
 [release run 46140795659](https://github.com/decorum-guy/iva-games/actions/runs/46140795659).
 Its deployment log confirms that SHA and the District catalogue smoke check.
-The current main workflow/handler still use two application images. Direct
+At that audit, the production workflow/handler used two application images. Direct
 requests to the public realtime health paths returned portal HTML, not realtime
 health JSON, and the platform catalogue contained no Tyaga entry. These checks
 do not inspect private host files or prove that no preliminary host preparation
@@ -35,6 +35,30 @@ The CI account remains restricted to
 command, sudoers scope, stdin-only token transport, release lock, provenance
 checks, backup thaw traps, and selective replacement are preserved. Do not use
 that account to run a shell or install these files.
+
+## Recorded CI image and network results
+
+Commit `b7ab9ed4265b819299d082e21a6a3957ba1d07de` passed all three image jobs in
+[release-image run 46169113385](https://github.com/decorum-guy/iva-games/actions/runs/46169113385).
+The [realtime job 141053233365](https://github.com/decorum-guy/iva-games/actions/runs/46169113385/job/141053233365)
+built `sha256:fa9b971cc71483db2a80dac7c33abbd784c6ed543d49cdf59b95cda60e9dcd5f`.
+Both its initial and restored-container checks passed: real Rapier, two sockets,
+movement, a durable action receipt, static assets and durable recovery. This
+also verifies the corrected disposable public-key permissions. The
+[platform image job](https://github.com/decorum-guy/iva-games/actions/runs/46169113385/job/141053233543)
+and [chess image job](https://github.com/decorum-guy/iva-games/actions/runs/46169113385/job/141053233603)
+passed. Publish and deploy were skipped. No installed-host preparation or
+public Tyaga revision follows from these CI successes.
+
+The same commit's [real TCP impairment job 141053233494](https://github.com/decorum-guy/iva-games/actions/runs/46169113462/job/141053233494)
+passed 14 matrix profiles, then failed to obtain a controlling connection for
+nominal RTT 160 ms, jitter 0 ms, loss 5%. Full-matrix and blackhole acceptance
+remain open. Source review found a possible harness race: a replacement socket
+can correctly enter as an observer before the previous close reaches the server.
+The next source explicitly claims control for that isolated same-player test
+client, coalesces ACKs, and records terminal scope/claim evidence. The old failure
+lacked that terminal evidence; its exact cause and the new fix's effectiveness
+require the next real CI run. No production takeover rule was loosened.
 
 ## Changes installed once by an administrator
 
@@ -117,8 +141,11 @@ provisioner and deliberately refuses an existing `release.env`.
 
    The placeholder cannot be used to start realtime. The normal, reviewed
    three-image release overrides it with a verified immutable digest.
-   `REALTIME_MAX_MATCHES=2` is a conservative admission limit, not a measured VPS
-   capacity claim. Increase it only after a recorded load test on that host.
+   `REALTIME_MAX_MATCHES=2` is the source example, not a measured VPS capacity.
+   The existing two-room calibrations did not meet all acceptance gates. Choose
+   the actual limit only after the corresponding hour and maximum-scene tests
+   on the deployment allocation; a smaller declared capacity is valid only when
+   it is measured as well.
    No modification of private Telegram or mail credentials is needed.
 
 5. Preserve every existing field of `/etc/iva-games/activation.json` and add

@@ -43,4 +43,4 @@ export interface GameState {
   initialParticipantIds:string[];pendingCheckpointId:string|null;
 }
 export interface SavedWorld { schema:1;physicsBuildHash:string;physics:string;state:GameState }
-export interface BodyOptions { id:string;kind:EntityKind;position:Vec3;rotation?:Quat;size?:Vec3;mass?:number;fixed?:boolean;required?:boolean;integrity?:number;folded?:boolean }
+export interface BodyOptions { id:string;kind:EntityKind;position:Vec3;rotation?:Quat;size?:Vec3;mass?:number;fixed?:boolean;required?:boolean;integrity?:number;folded?:boolean;customModel?:string }

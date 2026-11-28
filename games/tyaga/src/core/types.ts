@@ -75,7 +75,7 @@ export interface Surface {
   mesh?: { vertices: number[]; indices: number[] };
 }
 export interface WaterVolume { id: string; min: Vec3; max: Vec3; baseLevel: number; amplitude: number; period: number; flow: Vec3 }
-export interface AnchorDefinition { id: string; position: Vec3; limit: number; ground?: boolean }
+export interface AnchorDefinition { id: string; position: Vec3; limit: number; ground?: boolean; mount?: 'deck' }
 export interface MapZone { id: string; position: Vec3; size: Vec3; label: { ru: string; en: string } }
 export interface RoadNode { id: string; position: Vec3 }
 export interface RoadEdge { from: string; to: string; width: number; kind: 'road' | 'walk' | 'jump' | 'bridge' | 'ferry' | 'lift'; bidirectional?: boolean }

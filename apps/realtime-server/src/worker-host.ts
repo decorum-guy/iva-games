@@ -21,7 +21,8 @@ interface Health { ok: boolean; failedMatches: number; service: string; protocol
   unavailableMatches?: number;
   recoveringWorkers?: number; failedWorkers?: number; workerRestarts?: number; queuedStarts?: number;
   diagnostics?: unknown;
-  metrics: { steps: number; commits: number; maxStepMs: number; maxCommitMs: number; failures: number; startedAt: number } }
+  metrics: { steps: number; commits: number; maxStepMs: number; maxCommitMs: number; failures: number; startedAt: number;
+    overloadPauses?: number; overloadRecurrences?: number; overloadMeasuredWorkers?: number } }
 
 /** The one SQLite writer is shared by preallocated versioned simulation workers.
  * Old matches keep their exact local artifact; a deployed update supplies the
@@ -201,6 +202,10 @@ export class WorkerHost implements RuntimeClient {
         steps: reports.reduce((sum, report) => sum + report.metrics.steps, 0),
         commits: reports.reduce((sum, report) => sum + report.metrics.commits, 0),
         failures: reports.reduce((sum, report) => sum + report.metrics.failures, 0),
+        overloadPauses: reports.reduce((sum, report) => sum + (report.metrics.overloadPauses ?? 0), 0),
+        overloadRecurrences: reports.reduce((sum, report) => sum + (report.metrics.overloadRecurrences ?? 0), 0),
+        // Retained older workers do not retroactively gain instrumentation.
+        overloadMeasuredWorkers: reports.filter(report => report.metrics.overloadPauses !== undefined).length,
         maxStepMs: Math.max(0, ...reports.map(report => report.metrics.maxStepMs)),
         maxCommitMs: Math.max(0, ...reports.map(report => report.metrics.maxCommitMs)),
         startedAt: Math.min(Date.now(), ...reports.map(report => report.metrics.startedAt)),

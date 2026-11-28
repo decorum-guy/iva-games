@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import Database from 'better-sqlite3';
 import type { ActionEnvelope, Participant } from '@iva-games/session-kit';
-import { applyTerritory, createTerritory, viewTerritory } from '../src/territorial/core';
+import { advanceTerritory, applyTerritory, createTerritory, viewTerritory } from '../src/territorial/core';
 import { TerritoryRuntime } from '../src/territorial/runtime';
 import { territoryMaps } from '../src/territorial/maps';
 import { randomStream } from '../src/random';
@@ -30,7 +30,7 @@ async function fixture(members = participants) {
   s.players.a.hand = stock({ wood: 2 }); s.players.b.hand = stock({ brick: 1 }); if (s.players.c) s.players.c.hand = stock({ brick: 1 });
   db.prepare('UPDATE district_territorial_matches SET state_json=? WHERE match_id=?').run(JSON.stringify(s), matchId);
   cleanups.push(() => { runtime.close(); db.close(); rmSync(directory, { recursive: true, force: true }); });
-  return { clock, matchId, path, read, get runtime() { return runtime; },
+  return { clock, matchId, path, read, write(state: TerritoryState) { db.prepare('UPDATE district_territorial_matches SET state_json=? WHERE match_id=?').run(JSON.stringify(state),matchId); }, get runtime() { return runtime; },
     reopen() { runtime.close(); runtime = new TerritoryRuntime(path, () => clock.now); },
     async view(id: string) { return runtime.viewForPlayer(matchId, id); },
     async action(id: string, actionId: string, payload: Record<string, unknown>) {
@@ -143,6 +143,86 @@ describe('Independent PR26 transactional and provenance audit', () => {
     state=applyTerritory(state,'b',{type:'accept',offerId:active.id},5);
     expect(state.players.c).toEqual(before.c); expect(state.players.d).toEqual(before.d);
     expect(state.players.b.hand).toEqual(stock({wood:1})); expect(state.offers).toEqual([]);
+  });
+
+  it('expires only unanswered recipients at exactly ten seconds, retaining consent and privacy after restart', async () => {
+    const f=await fixture(); const before=f.read().players;
+    await f.action('a','ten-second-broadcast',{type:'offer',targetId:'b',give:stock({wood:1}),receive:stock({brick:1})});
+    const [b,c]=f.read().offers;
+    expect(b.responseDeadlineAt).toBe(20_000);
+    await f.action('b','early-consent',{type:'accept',offerId:b.id});
+    f.clock.now=19_999; const lastView=await f.view('c');
+    expect(lastView.offers[0].canAccept).toBe(true);
+    expect(()=>applyTerritory(f.read(),'c',{type:'accept',offerId:c.id},20_000)).toThrow();
+    f.clock.now=20_000;
+    await expect(f.runtime.applyAction(f.matchId,'c',envelope(lastView,'boundary-consent',{type:'accept',offerId:c.id}))).rejects.toMatchObject({code:'STALE_REVISION'});
+    expect(f.read().players).toEqual(before);
+    expect(f.read().offers).toHaveLength(1);
+    expect(f.read().offers[0]).toMatchObject({id:b.id,agreedAt:10_000});
+    expect(f.read().offerHistory?.find(offer=>offer.id===c.id)).toMatchObject({status:'expired',responseExpired:true});
+    expect(JSON.stringify(await f.view('c'))).not.toContain(b.id);
+    f.reopen(); f.clock.now=35_000;
+    expect((await f.view('a')).offers[0].canAccept).toBe(true);
+    await f.action('a','choose-after-response-window',{type:'accept',offerId:b.id});
+    expect(f.read().players.a.hand).toEqual(stock({wood:1,brick:1}));
+    expect(f.read().players.c).toEqual(before.c);
+  });
+
+  it('keeps two consents after the reply window and serializes cancellation against author selection', async () => {
+    const f=await fixture(); const before=f.read().players;
+    const offers=await group(f); f.clock.now+=15_000; f.reopen();
+    const view=await f.view('a'); expect(view.offers).toHaveLength(2);
+    const select=envelope(view,'race-select-consented',{type:'accept',offerId:offers[0].id});
+    const cancel=envelope(view,'race-cancel-consented',{type:'cancel',offerId:offers[0].id});
+    const other=new TerritoryRuntime(f.path,()=>f.clock.now);
+    try {
+      const results=await Promise.allSettled([f.runtime.applyAction(f.matchId,'a',select),other.applyAction(f.matchId,'a',cancel)]);
+      expect(results.filter(result=>result.status==='fulfilled')).toHaveLength(1);
+      expect(f.read().offers).toEqual([]);
+      const selected=results[0].status==='fulfilled';
+      expect(f.read().players.a.hand).toEqual(selected ? stock({wood:1,brick:1}) : before.a.hand);
+      const final=f.read();
+      await f.runtime.applyAction(f.matchId,'a',selected ? select : cancel);
+      expect(f.read()).toEqual(final);
+    } finally { other.close(); }
+  });
+
+  for(const dated of [true,false]) it(`restores ${dated ? 'dated' : 'undated'} legacy quotes without resetting their response clock`,async()=>{
+    const f=await fixture(participants.slice(0,2));
+    await f.action('a','legacy-clock-offer',{type:'offer',targetId:'b',give:stock({wood:1}),receive:stock({brick:1})});
+    const legacy=f.read(); delete legacy.offers[0].groupId; delete legacy.offers[0].responseDeadlineAt;
+    if(dated) legacy.offers[0].offeredAt=5_000; else delete legacy.offers[0].offeredAt;
+    f.write(legacy); f.reopen(); const before=f.read().players;
+    const restored=await f.view('b'); const due=dated ? 15_000 : 20_000;
+    expect(restored.offers[0].responseDeadlineAt).toBe(due);
+    f.clock.now=due-1; f.reopen(); expect((await f.view('b')).offers[0].responseDeadlineAt).toBe(due);
+    f.clock.now=due; expect((await f.view('b')).offers).toEqual([]);
+    expect(f.read().players).toEqual(before);
+    expect(f.read().offerHistory?.[0]).toMatchObject({status:'expired',responseExpired:true});
+    expect(advanceTerritory(f.read(),due+1000)).toEqual(f.read());
+  });
+
+  it('expires offline unanswered quotes on the first command after restart, without a status read',async()=>{
+    const f=await fixture(participants.slice(0,2)); const before=f.read().players;
+    const offered=await f.action('a','offline-reply-window',{type:'offer',targetId:'b',give:stock({wood:1}),receive:stock({brick:1})});
+    const id=offered.offers[0].id;
+    const command=envelope(offered,'offline-late-command',{type:'accept',offerId:id});
+    f.clock.now=30_000; f.reopen();
+    await expect(f.runtime.applyAction(f.matchId,'b',command)).rejects.toMatchObject({code:'STALE_REVISION'});
+    expect(f.read().offers).toEqual([]); expect(f.read().players).toEqual(before);
+    expect(f.read().offerHistory?.[0]).toMatchObject({responseExpired:true,status:'expired'});
+  });
+
+  it('materializes reply expiry before turn expiry after a long offline interval',async()=>{
+    const f=await fixture(); const before=f.read().players;
+    await f.action('a','long-offline-quote',{type:'offer',targetId:'b',give:stock({wood:1}),receive:stock({brick:1})});
+    const [b,c]=f.read().offers;
+    await f.action('b','long-offline-consent',{type:'accept',offerId:b.id});
+    f.clock.now=f.read().deadlineAt!+1; f.reopen(); await f.view('a');
+    expect(f.read().players).toEqual(before);
+    expect(f.read().offerHistory?.find(offer=>offer.id===c.id)).toMatchObject({responseExpired:true,status:'expired'});
+    expect(f.read().offerHistory?.find(offer=>offer.id===b.id)).not.toHaveProperty('responseExpired');
+    expect(f.read().offers).toEqual([]);
   });
 
   it('serializes competing author choices after restart and preserves the exact receipt without another transfer', async () => {

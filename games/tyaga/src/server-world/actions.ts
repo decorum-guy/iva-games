@@ -5,6 +5,7 @@ import type { ActionResult, InteractionView, ItemKind, MapZone, SocketView, Tyag
 import type { OperationRecord } from './state';
 import type { TyagaWorld } from './world';
 import { socketsFor } from './objects';
+import { rememberTutorialWinchRelease } from '../tutorial';
 
 export const MESSAGES:Record<string,{ru:string;en:string}>={
   OK:{ru:'Готово',en:'Done'},STARTED:{ru:'Выполняется',en:'In progress'},NOT_FOUND:{ru:'Предмет уже недоступен',en:'The item is no longer available'},
@@ -16,7 +17,7 @@ export const MESSAGES:Record<string,{ru:string;en:string}>={
   NOT_STORED:{ru:'Предмет уже извлечён',en:'The item is already unpacked'},NO_SPACE:{ru:'Освободите место',en:'Clear some space'},NO_SUPPORT:{ru:'Нужна устойчивая опора',en:'A stable support is needed'},
   MOVING:{ru:'Сначала остановитесь',en:'Stop first'},ATTACHED:{ru:'Сначала снимите крепления',en:'Remove the attachments first'},NO_ITEM:{ru:'Нет подходящего предмета',en:'No suitable item is available'},
   TOO_LONG:{ru:'Точка слишком далеко',en:'The attachment point is too far'},SOCKET_OCCUPIED:{ru:'Проушина уже занята',en:'This socket is occupied'},
-  STRAP_BLOCKED:{ru:'Ремень проходит через препятствие',en:'The strap would pass through an obstacle'},ANCHOR_MATERIAL:{ru:'Якорь устанавливается в грунт или грязь',en:'Ground anchors need soil or mud'},
+  STRAP_BLOCKED:{ru:'Ремень проходит через препятствие',en:'The strap would pass through an obstacle'},ROPE_BLOCKED:{ru:'Трос пересекает корпус или препятствие. Разверните лебёдку или выберите другую точку.',en:'The cable crosses a housing or obstacle. Turn the winch or choose another attachment.'},ANCHOR_MATERIAL:{ru:'Якорь устанавливается в грунт или грязь',en:'Ground anchors need soil or mud'},
   SLOPE:{ru:'Опора слишком наклонена',en:'The support is too steep'},NO_REPAIR:{ru:'Требуется ремонт механизма',en:'The mechanism needs repair'},CARGO_NO_REPAIR:{ru:'Груз в поле не ремонтируется',en:'Cargo cannot be repaired in the field'},SUPPORTED_LOAD:{ru:'Уберите людей и груз с предмета',en:'Remove people and cargo from this item'},
   ALREADY_FULL:{ru:'Ремонт не требуется',en:'No repair is needed'},ROPE_BUSY:{ru:'Сначала остановите лебёдку',en:'Stop the winch first'},CONFIRM_TENSION:{ru:'Трос нагружен. Удерживайте снятие',en:'Cable under load. Hold to detach'},
   ALIGN:{ru:'Подведите настоящие детали к креплениям',en:'Bring the parts into alignment'},FERRY_LOCKS:{ru:'Закройте все четыре замка',en:'Close all four ferry locks'},NO_DRIVE:{ru:'Сначала установите привод',en:'Install the drive first'},
@@ -31,7 +32,7 @@ export const MESSAGES:Record<string,{ru:string;en:string}>={
 };
 export function reply(code='OK',ok=code==='OK'||code==='STARTED'):ActionResult{return{result:{ok,code,message:MESSAGES[code]??MESSAGES.INVALID_ACTION}};}
 function fail(code:string):never {throw new Error(code);}
-function checkReach(w:TyagaWorld,pid:string,id:string,socket?:string,range?:number):void{const r=w.canReach(pid,id,socket,range);if(!r.ok)fail(r.code);}
+function checkReach(w:TyagaWorld,pid:string,id:string,socket?:string,range?:number,consumedItemId?:string):void{const r=w.canReach(pid,id,socket,range,consumedItemId);if(!r.ok)fail(r.code);}
 function finiteVector(v:unknown):v is Vec3{return Boolean(v&&typeof v==='object'&&['x','y','z'].every(k=>Number.isFinite((v as Record<string,unknown>)[k])));}
 function parseAction(value:unknown):TyagaAction{
   if(!value||typeof value!=='object'||Array.isArray(value))fail('INVALID_ACTION');
@@ -65,9 +66,21 @@ function strapPathClear(w:TyagaWorld,fromId:string,from:SocketView,toId:string,t
     // Eyelets are slightly inset in the source meshes. Permit only their
     // short terminal entry, never a path through an entire endpoint body.
     if(id===fromId&&hit.timeOfImpact<.025){const exit=hit.collider.castRay(ray,d,false),eyeClearance=w.state.entities[id]?.kind==='winch'?.65:.25;if(exit>=0&&exit<=eyeClearance)return true;}
-    if(id===toId&&hit.timeOfImpact>=d-.25)return true;
+    if(id===toId&&hit.timeOfImpact>=d-(w.state.entities[id]?.kind==='winch'?.65:.25))return true;
     clear=false;return false;
   },undefined,undefined,undefined,undefined,collider=>(collider.collisionGroups()&0xffff)!==0&&w.state.colliderBodies[collider.handle]!==itemId&&w.state.colliderBodies[collider.handle]!==actorId);
+  return clear;
+}
+function ropePathClear(w:TyagaWorld,fromId:string,from:SocketView,toId:string,to:SocketView):boolean{
+  const d=distance(from.world,to.world),ray=new RAPIER.Ray(from.world,norm(sub(to.world,from.world)));let clear=true;
+  w.physics.intersectionsWithRay(ray,d,true,hit=>{
+    const id=w.state.colliderBodies[hit.collider.handle];
+    // A drum outlet may be slightly inset, but the newly laid cable must
+    // leave that local outlet, not cross any other part of its own housing.
+    if(id===fromId&&hit.timeOfImpact<.025){const exit=hit.collider.castRay(ray,d,false);if(exit>=0&&exit<=.08)return true;}
+    if(id===toId&&hit.timeOfImpact>=d-.25)return true;
+    clear=false;return false;
+  },undefined,undefined,undefined,undefined,collider=>(collider.collisionGroups()&0xffff)!==0&&w.state.entities[w.state.colliderBodies[collider.handle]]?.kind!=='character');
   return clear;
 }
 
@@ -78,7 +91,9 @@ export function performAction(w:TyagaWorld,pid:string,value:unknown):ActionResul
     if(state.phase==='finished')return reply('FINISHED',false);
     if(state.vote&&!['vote','cancel','end-attempt'].includes(a.type))return reply('VOTING',false);
     if(state.phase==='failed'&&!['rewind','vote','cancel','end-attempt'].includes(a.type))return reply('FAILED',false);
-    if(c.rescueAt!==null&&a.type!=='cancel')return reply('BUSY',false);
+    // A failed world pauses personal rescue. Decisions must remain reachable
+    // so the crew can restore a checkpoint or end the attempt while falling.
+    if(c.rescueAt!==null&&!['rewind','vote','cancel','end-attempt'].includes(a.type))return reply('BUSY',false);
     switch(a.type){
       case 'jump':{
         if(c.controlling)fail('BUSY');if(!c.grounded||state.tick-c.jumpTick<15)fail('NO_SUPPORT');const body=w.body(c.bodyId);body.applyImpulse(V(0,80*PHYSICS.jump,0),true);c.grounded=false;c.jumpTick=state.tick;w.emit('jump',c.bodyId,pid);return reply();
@@ -90,7 +105,7 @@ export function performAction(w:TyagaWorld,pid:string,value:unknown):ActionResul
       case 'release':{
         const driving=c.controlling==='truck';const old=w.body(c.bodyId).translation();let exit:Vec3|null=null;
         if(driving){const truck=w.body('truck');if(length(truck.linvel())>1)fail('MOVING');for(const z of [2,-2,2.8,-2.8]){const p=worldPoint(truck.translation(),truck.rotation(),V(2.3,0,z));const g=w.ground(add(p,V(0,2,0)),5,'truck');if(g){const target=add(g.point,V(0,.91,0));if(clearAt(w,target,V(.6,1.75,.6),Q(),c.bodyId)){exit=target;break;}}}if(!exit)fail('NO_SPACE');}
-        const held=c.holding?.itemId;w.releaseCharacter(pid);if(exit){const b=w.body(c.bodyId);b.setTranslation(exit,true);b.setRotation(Q(),true);b.setLinvel(V(),true);}w.emit('released',held??c.bodyId,pid);if(!driving)c.lastPosition={...old};return reply();
+        const held=c.holding?.itemId;rememberTutorialWinchRelease(w,pid);w.releaseCharacter(pid);if(exit){const b=w.body(c.bodyId);b.setTranslation(exit,true);b.setRotation(Q(),true);b.setLinvel(V(),true);}w.emit('released',held??c.bodyId,pid);if(!driving)c.lastPosition={...old};return reply();
       }
       case 'grab':{
         const e=state.entities[a.itemId];if(!e?.active||e.fixed||['truck','ring','rope-segment','character','lift'].includes(e.kind))fail('NOT_FOUND');if(c.controlling)fail('BUSY');if(c.holding)fail('HANDS_BUSY');
@@ -121,18 +136,23 @@ export function performAction(w:TyagaWorld,pid:string,value:unknown):ActionResul
       }
       case 'attach':{
         const from=w.socket(a.fromId,a.fromSocket),to=w.socket(a.toId,a.toSocket);if(!from||!to||a.fromId===a.toId)fail('NOT_FOUND');const kind=a.kind??'strap';if(!['strap','rope','deck','ferry-lock'].includes(kind))fail('INVALID_ACTION');
+        const strap=kind==='strap'?(a.itemId?state.inventory[a.itemId]:Object.values(state.inventory).find(i=>i.kind==='strap'&&(i.state==='stored'||i.state==='world'))):undefined;
+        if(kind==='strap'&&(!strap||strap.kind!=='strap'||!['stored','world'].includes(strap.state)))fail('NO_ITEM');
+        // The selected loose unit is picked up by this operation; it cannot
+        // obstruct its own eyelet. Its own reach is still checked separately.
+        const consumedItemId=strap?.state==='world'?(strap.bodyId??strap.id):undefined;
         const existing=kind==='rope'?Object.values(state.links).find(l=>l.kind==='rope'&&l.fromId===a.fromId&&l.spoolMass):undefined;
-        if(existing?.detached&&existing.hookId){checkReach(w,pid,existing.hookId,'handle-0');checkReach(w,pid,a.toId,a.toSocket);}else checkReach(w,pid,a.fromId,a.fromSocket);const d=distance(from.world,to.world);
+        if(existing?.detached&&existing.hookId){checkReach(w,pid,existing.hookId,'handle-0');checkReach(w,pid,a.toId,a.toSocket);}else checkReach(w,pid,a.fromId,a.fromSocket,undefined,consumedItemId);const d=distance(from.world,to.world);
         if(kind==='rope'){
           if((a.fromId!=='truck'&&state.entities[a.fromId]?.kind!=='winch')||a.fromSocket!==(a.fromId==='truck'?'front-winch':'drum'))fail('INVALID_ACTION');if(d>18||!existing&&d<1.5)fail('TOO_LONG');
           if(existing?.broken)fail('NO_REPAIR');if(existing&&!existing.detached)fail('BUSY');if(existing?.hookId&&distance(w.body(existing.hookId).translation(),to.world)>.3)fail('ALIGN');
           if(!['ring','lock','handle'].includes(to.role))fail('INVALID_ACTION');
-          if(!existing){const hit=w.physics.castRay(new RAPIER.Ray(from.world,norm(sub(to.world,from.world))),Math.max(0,d-.1),true,undefined,undefined,undefined,w.body(a.fromId),collider=>state.colliderBodies[collider.handle]!==a.toId&&state.entities[state.colliderBodies[collider.handle]]?.kind!=='character');if(hit)fail('BLOCKED');}
+          if(!existing&&!ropePathClear(w,a.fromId,from,a.toId,to))fail('ROPE_BLOCKED');
           return start(w,pid,a,1,existing?.hookId??a.fromId);
         }
         if(kind==='strap'){
           if(from.role!=='ring'||to.role!=='ring')fail('INVALID_ACTION');if(d>2)fail('TOO_LONG');
-          const item=a.itemId?state.inventory[a.itemId]:Object.values(state.inventory).find(i=>i.kind==='strap'&&(i.state==='stored'||i.state==='world'));if(!item||item.kind!=='strap'||!['stored','world'].includes(item.state))fail('NO_ITEM');if(item.state==='stored')checkReach(w,pid,'equipment-crate');else checkReach(w,pid,item.id);
+          const item=strap!;if(item.state==='stored')checkReach(w,pid,'equipment-crate');else checkReach(w,pid,item.bodyId??item.id);
           if(!strapPathClear(w,a.fromId,from,a.toId,to,item.id,c.bodyId))fail('STRAP_BLOCKED');return start(w,pid,{...a,itemId:item.id,kind},2,a.fromId);
         }
         if(kind==='deck'){
@@ -276,17 +296,20 @@ export function finishOperation(w:TyagaWorld,pid:string,operation:OperationRecor
       const item=itemWorld(w,a.itemId);checkReach(w,pid,'equipment-crate');checkReach(w,pid,a.itemId);if(length(w.body(a.itemId).linvel())>.1||heldBy(w,a.itemId).length||Object.values(s.links).some(l=>!l.broken&&(l.fromId===a.itemId||l.toId===a.itemId)))fail('MOVING');if(w.hasSupportedLoad(a.itemId))fail('SUPPORTED_LOAD');w.removeBody(item.bodyId??item.id);item.state='stored';delete item.bodyId;w.updateMasses();w.emit('packed',a.itemId,pid);
     }else if(a.type==='unfold'){
       const e=s.entities[a.itemId];if(!e?.active||!e.folded)fail('NOT_FOUND');checkReach(w,pid,a.itemId);const b=w.body(a.itemId),p=b.translation(),size=BODY.deck.size;const target=V(p.x,p.y-e.size.y/2+size.y/2,p.z);if(!clearAt(w,target,size,b.rotation(),a.itemId))fail('NO_SPACE');
-      b.setTranslation(target,true);w.physics.getCollider(e.colliders[0]).setShape(new RAPIER.Cuboid(size.x/2,size.y/2,size.z/2));e.size={...size};e.folded=false;e.sockets=socketsFor('deck',size);b.recomputeMassPropertiesFromColliders();for(const id of heldBy(w,a.itemId))s.characters[id].holding=null;w.emit('unfolded',a.itemId,pid);
+      b.setTranslation(target,true);w.unfoldDeckGeometry(a.itemId);e.size={...size};e.folded=false;e.sockets=socketsFor('deck',size);for(const id of heldBy(w,a.itemId))s.characters[id].holding=null;w.emit('unfolded',a.itemId,pid);
     }else if(a.type==='attach'){
       const from=w.socket(a.fromId,a.fromSocket),to=w.socket(a.toId,a.toSocket);if(!from||!to)fail('NOT_FOUND');const kind=a.kind??'strap';const existing=kind==='rope'?Object.values(s.links).find(l=>l.kind==='rope'&&l.fromId===a.fromId&&l.spoolMass):undefined;
-      if(existing?.detached&&existing.hookId){checkReach(w,pid,existing.hookId,'handle-0');checkReach(w,pid,a.toId,a.toSocket);}else checkReach(w,pid,a.fromId,a.fromSocket);
+      const item=kind==='strap'&&a.itemId?s.inventory[a.itemId]:undefined;
+      const consumedItemId=item?.kind==='strap'&&item.state==='world'?(item.bodyId??item.id):undefined;
+      if(existing?.detached&&existing.hookId){checkReach(w,pid,existing.hookId,'handle-0');checkReach(w,pid,a.toId,a.toSocket);}else checkReach(w,pid,a.fromId,a.fromSocket,undefined,consumedItemId);
       const d=distance(from.world,to.world);if(d>(kind==='rope'?18:kind==='strap'?2:.3))fail('ALIGN');
       if((kind==='deck'||kind==='ferry-lock')&&Object.values(s.links).some(l=>!l.broken&&((l.fromId===a.fromId&&l.fromSocket===a.fromSocket)||(l.toId===a.toId&&l.toSocket===a.toSocket))))fail('SOCKET_OCCUPIED');
       if(a.itemId){const i=s.inventory[a.itemId];if(!i||!['stored','world'].includes(i.state))fail('NO_ITEM');checkReach(w,pid,i.state==='stored'?'equipment-crate':i.bodyId??i.id);}
       if(kind==='strap'&&!strapPathClear(w,a.fromId,from,a.toId,to,a.itemId!,c.bodyId))fail('STRAP_BLOCKED');
+      if(kind==='rope'&&!existing&&!ropePathClear(w,a.fromId,from,a.toId,to))fail('ROPE_BLOCKED');
       if(existing)w.reattachRope(existing,a.toId,a.toSocket);else{const link=w.addLink(kind,a.fromId,a.fromSocket,a.toId,a.toSocket,a.itemId??null);if(kind==='rope')c.controlling=link.id;}
       w.emit('attached',a.fromId,pid);w.emit('attached',a.toId,pid);
-      if(w.map.id==='tutorial'&&s.tutorial.step===3&&a.itemId&&s.tutorial.flags[`removed:${a.itemId}`]&&(a.fromId==='cargo-2'||a.toId==='cargo-2'))s.tutorial.flags[`secured:${a.itemId}`]=1;
+      if(w.map.id==='tutorial'&&s.tutorial.step===3&&a.itemId&&s.tutorial.flags[`removed:${a.itemId}`]&&((a.fromId==='cargo-2'&&a.toId==='truck')||(a.toId==='cargo-2'&&a.fromId==='truck')))s.tutorial.flags[`secured:${a.itemId}`]=1;
     }else if(a.type==='detach'){
       const link=s.links[a.connectionId];if(!link||link.broken)fail('NOT_FOUND');const r=w.canReach(pid,link.fromId,link.fromSocket);if(!r.ok)checkReach(w,pid,link.toId,link.toSocket);w.detachLink(a.connectionId);
     }else if(a.type==='anchor'){
