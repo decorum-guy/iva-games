@@ -130,8 +130,22 @@
 
 @media (max-width: 620px) {
   .territory-map-first:has([data-large-board]) .territory-layout {
-    grid-template-rows: minmax(255px, 1.55fr) minmax(145px, 1fr);
+    grid-template-rows: minmax(235px, 3.2fr) minmax(145px, 1fr);
   }
-  .territorial-board[data-large-board] .tb-surface { height: calc(100% - 50px); }
-  .territorial-board[data-large-board] .tb-navigation { bottom: 0; right: 4px; padding: 2px; }
+}
+.territorial-board[data-large-board] .tb-surface { height: calc(100% - 50px); }
+.territorial-board[data-large-board] .tb-navigation { bottom: 0; right: 4px; padding: 2px; }
+
+.territorial-board[data-large-board] {
+  background: radial-gradient(ellipse at 35% 18%, #338d9f 0%, #237993 55%, #1c6583 100%);
+}
+
+@media (max-width: 620px) {
+  .territorial-board[data-large-board] .tb-surface { width: calc(100% - 50px); height: 100%; }
+  .territorial-board[data-large-board] .tb-navigation {
+    flex-direction: column;
+    right: 0;
+    bottom: 50%;
+    transform: translateY(50%);
+  }
 }

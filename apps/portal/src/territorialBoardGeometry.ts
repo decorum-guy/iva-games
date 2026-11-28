@@ -44,7 +44,7 @@ export function distanceToRoad(point: Point, line: RoadHitLine): number {
 }
 
 /** Coastlines from published geometry, including separate islands and inland holes. */
-export function territoryCoastlines(map: Pick<TerritoryMap, 'nodes' | 'tiles'>): string[] {
+export function territoryCoastLoops(map: Pick<TerritoryMap, 'nodes' | 'tiles'>): Point[][] {
   const nodes = new Map(map.nodes.map(node => [node.id, node]));
   const sides = new Map<string, { a: string; b: string }>();
   for (const tile of map.tiles) {
@@ -56,20 +56,28 @@ export function territoryCoastlines(map: Pick<TerritoryMap, 'nodes' | 'tiles'>):
   }
   const outgoing = new Map<string, string[]>();
   for (const { a, b } of sides.values()) outgoing.set(a, [...(outgoing.get(a) ?? []), b]);
-  const paths: string[] = [];
+  const paths: Point[][] = [];
   while (outgoing.size) {
     const start = outgoing.keys().next().value!;
     let current = start;
-    const points: string[] = [];
+    const points: Point[] = [];
     do {
       const point = nodes.get(current)!;
-      points.push(`${point.x},${point.y}`);
+      points.push(point);
       const destinations = outgoing.get(current)!;
       const next = destinations.shift()!;
       if (!destinations.length) outgoing.delete(current);
       current = next;
     } while (current !== start && outgoing.has(current));
-    paths.push(`M${points.join(' L')} Z`);
+    paths.push(points);
   }
   return paths;
+}
+
+export function coastPath(loop: Point[]) {
+  return 'M' + loop.map(point => point.x + ',' + point.y).join(' L') + ' Z';
+}
+
+export function territoryCoastlines(map: Pick<TerritoryMap, 'nodes' | 'tiles'>) {
+  return territoryCoastLoops(map).map(coastPath);
 }
