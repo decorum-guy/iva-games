@@ -10,6 +10,8 @@
   "scripts": {
     "dev": "vite --host 127.0.0.1 --port 5195 --strictPort",
     "build": "vite build",
+    "audio:build": "vite build --config vite.audio-review.config.ts",
+    "audio:preview": "vite preview --config vite.audio-review.config.ts --host 127.0.0.1 --port 5196 --strictPort",
     "preview": "vite preview --host 127.0.0.1 --strictPort",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",

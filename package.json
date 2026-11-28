@@ -64,6 +64,8 @@
     "district:simulate": "vite build --config games/district/vite.simulation.config.ts && node .qa/district-simulation-runner/simulate.mjs",
     "district:browser": "node scripts/district-browser-smoke.mjs",
     "colossus:dev": "npm run dev --workspace @chess-2/colossus --",
+    "colossus:audio:build": "npm run audio:build --workspace @chess-2/colossus --",
+    "colossus:audio:preview": "npm run audio:preview --workspace @chess-2/colossus --",
     "colossus:test": "npm run test --workspace @chess-2/colossus --",
     "colossus:balance": "node games/chess/colossus/scripts/colossus-balance.mjs",
     "colossus:e2e": "playwright test --config games/chess/colossus/playwright.config.ts",
