@@ -31,7 +31,7 @@ export function TestBenchHome({onCreateRoom,onExit,initialMode}:{onCreateRoom:()
   const [tutorialFastHealth,setTutorialFastHealth]=useState(100);const [tutorialAxle,setTutorialAxle]=useState(false);
   const t=(ru:string,en:string)=>copy(locale,ru,en);
   const leave=()=>{if(mode==='home')onExit();else {setDriving(false);setMode('home');}};
-  const updateBuild=(value:Blueprint)=>{sound.current?.event(crypto.randomUUID(),'attach');setBlueprint(value);if(mode==='practice'){try{localStorage.setItem('iva.test-bench.practice.build.v1',JSON.stringify(value));}catch{/* The current build remains usable without storage. */}}if(mode==='tutorial'&&value['front-axle']!==PRESETS.universal['front-axle'])setTutorialAxle(true);};
+  const updateBuild=(value:Blueprint)=>{sound.current?.event(crypto.randomUUID(),'attach');setBlueprint(value);if(mode==='practice'){try{localStorage.setItem('iva.test-bench.practice.build.v1',JSON.stringify(value));}catch{/* The current build remains usable without storage. */}}if(mode==='tutorial')setTutorialAxle(value['front-axle']!==PRESETS.universal['front-axle']);};
   const beginPractice=()=>{setBlueprint(readBuild());setMode('practice');setDriving(false);};
   const beginTutorial=()=>{setMode('tutorial');setDriving(false);setTutorialStep(0);setTutorialAxle(false);setBlueprint({...PRESETS.universal});setTrack('fragile');};
   const nextLesson=(lane?:LaneSnapshot)=>{

@@ -125,6 +125,7 @@ function compactFinalReport() {
     restartChecks: report.restartChecks,
     driveStages: report.driveStages.map(({ profiles, ...stage }) => ({ ...stage, profiles: profiles.map(({ firstObservations, trajectory, ...profile }) => ({ ...profile, firstObservationCount: firstObservations.length, retainedTrajectoryCount: trajectory.length })) })),
     localDriverTraces: report.localDriverTraces.map(({ observations, keyTransitions, ...trace }) => ({ ...trace, recordedObservations: observations.length, recordedKeyTransitions: keyTransitions.length })),
+    tutorialAxleChoice: report.tutorialAxleChoice ?? null,
     tutorialRetries: report.tutorialRetries,
     metrics: report.metrics,
     layouts: report.layouts.map(({ name, profile, width, height, scrollWidth, controls }) => ({ name, profile, width, height, scrollWidth, offscreen: controls.filter(control => control.visible && !control.inViewport) })),
@@ -1136,6 +1137,15 @@ async function tutorial(player) {
   await expect(page.getByRole('button', { name: /Проверить/ })).toBeDisabled();
   await selectPart(player, 'front-axle', 'terrain', false);
   await expect(page.getByRole('button', { name: /Проверить/ })).toBeEnabled();
+  await selectPart(player, 'front-axle', 'road', false);
+  await expect(page.getByRole('button', { name: /Проверить/ })).toBeDisabled();
+  await selectPart(player, 'front-axle', 'high', false);
+  await expect(page.getByRole('button', { name: /Проверить/ })).toBeEnabled();
+  await selectPart(player, 'front-axle', 'terrain', false);
+  await expect(page.getByRole('button', { name: /Проверить/ })).toBeEnabled();
+  const axleChoice = { profile: player.name, method: 'Actual part choices and Test drive enabled/disabled assertions before creating the physics lane', terrainEnables: true, returnToRoadDisables: true, highEnables: true, finalSelection: 'terrain' };
+  report.tutorialAxleChoice = axleChoice;
+  await emitEvidence('tutorial-axle-choice', axleChoice);
   await page.getByRole('button', { name: /Проверить/ }).click();
   await expect(page.locator('.tb-race')).toBeVisible();
   const next = () => page.locator('.tb-race-lesson .tb-primary');
@@ -1158,7 +1168,7 @@ async function tutorial(player) {
   await expect(next()).toBeVisible({ timeout: 5000 }); await keys(player); await next().click();
   await expect(next()).toContainText('В тренировку'); await next().click(); await expect(page.locator('.tb-builder')).toBeVisible();
   report.tutorial = 'completed through UI and real local physics';
-  return { completed: true, steps: 6, initialCrossing, fastIntegrity: fast.health, fastCargoStatus: fast.cargoStatus, slowIntegrity: slow.health, fastAttempts: fastComparison.attempts, slowAttempts: slowComparison.attempts, retryPolicy: 'At most one ordinary UI Restart per comparison, only after a verified frozen retry-fast/retry-slow status; identical driving policy on both attempts; no retry on errors or timeouts', milestonePauseMs: 400, baselineMatchesFastHud: true, slowCargoSecured: true, observation: 'Visible minimap, HUD and lesson controls', control: 'Keyboard and UI only' };
+  return { completed: true, steps: 6, axleChoice, initialCrossing, fastIntegrity: fast.health, fastCargoStatus: fast.cargoStatus, slowIntegrity: slow.health, fastAttempts: fastComparison.attempts, slowAttempts: slowComparison.attempts, retryPolicy: 'At most one ordinary UI Restart per comparison, only after a verified frozen retry-fast/retry-slow status; identical driving policy on both attempts; no retry on errors or timeouts', milestonePauseMs: 400, baselineMatchesFastHud: true, slowCargoSecured: true, observation: 'Visible minimap, HUD and lesson controls', control: 'Keyboard and UI only' };
 }
 
 async function createCup(alice, bob) {

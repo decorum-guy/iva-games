@@ -727,3 +727,73 @@ Source review подтвердил независимый продуктовый
 В уроке RU/EN подсказки показывают переназначенные throttle/reverse/interact keys. Slow step теперь сразу ставит **неуспешную** попытку на pause, если уже загруженная капсула имеет HP≤фактического fast baseline: HP в попытке не растёт, значит требуемое сравнение стало недостижимым. При at-dock такое решение не принимается. Next остаётся false, обычный Restart создаёт новую попытку; никакое здоровье автоматически не восстанавливается. Этот pause может произойти до13,5м и при ненулевой скорости, поэтому проверяется frozen state, а не утверждается физическое торможение. Успешный путь по-прежнему требует пересечь13,5м, остановиться на30 stable ticks и сохранить secured cargo с HP>baseline. Это исправление обратной связи для Direct11, **не доказательство проходимости slow exercise**.
 
 Повторный read-only performance review не установил конкретного устранимого hotspot, который объясняет canonical whole-pump p9514,833848/14,180900мс при gate12,525. Малые повторы SQL prepare/linvel по имеющимся данным не объясняют превышение. Поздние spans JSON21,51/SQLite26,15 и pump30,10мс без checkpoint относятся к другому instrumented run; причина исходного FAIL не установлена. Microcleanup, новые benchmarks и ослабление gate не выполнялись. Новый production/UI source требует свежего CI; личная/device/performance приёмка остаётся незавершённой.
+
+## Завершённые браузерные проверки кандидата12
+
+Candidate **`2313f695714d1936c11970421d2fa4760554fbdb`**, actual clean PR merge checkout **`9c0faa05f44fc4c0ce91340f43936b612f82a94d`**, exact tree **`8ffc9c9ff3759437b8dcc238a16d50432780fb12`**. Git commit API подтвердил родителей main7c2be21 + candidate12. Оба jobs использовали именно это дерево. Main/worker SHA-256 сохранились `7054ab173103096825bcb06e1dd4cbea617c997b4fb6839f9d54731f9e2855a3` / `5cf8fa2433a0cb7cd73ca3ae802852a1624433b03f4c41c620b070f3f2c00035`; новый frontend index **`b8fe493e4ee02b89796950a679eafeede8af1002cfcc1ec22834e8f7a6c7f10b`**, runner **`035a44252f76a8e75e16f69e6f7558e9c917e70d4bca2366931ec99e67e83185`**, QA helper `0c83f034428e9945564b87cdcbbd32bd054ea1cb5f3f4529e06fc0bc55c00acc`.
+
+Оба обычных2D кубка завершились: два независимых account/browser contexts RU/EN, два явных бота, все24 participant-stage результатов finished, по три доставленных груза. Direct также завершил отдельный tie. Через кандидата12: **8 нормальных автоматических кубков,6 отдельных targeted tie cups,0 личных циклов,0 выпусков**. Название «браузерная проверка» здесь означает автоматизацию, не личную партию.
+
+| Job / этап | Вариант | Alice: HP / зачётные ticks / R | Bob: HP / зачётные ticks / R |
+| --- | --- | --- | --- |
+| Direct / Fragile |обычный|300 /1881 /1|300 /1589 /0|
+| Direct / Precision |обычный|270 /2954 /2|300 /1634 /0|
+| Direct / Climb |обычный|300 /1150 /0|300 /1179 /0|
+| RTT / Fragile |зеркальный|300 /2090 /1|294 /1816 /0|
+| RTT / Precision |зеркальный|300 /1810 /0|300 /1812 /0|
+| RTT / Climb |обычный|300 /1184 /0|300 /1219 /0|
+
+### Direct12: кубок PASS, урок по-прежнему FAIL
+
+[Job141078106479](https://github.com/decorum-guy/iva-games/actions/runs/46177079185/job/141078106479) — **FAIL только tutorial**,13 required scopes PASS.49 NDJSON records,0 parse errors. Начальный пустой проезд, fast, settings/catalog/two builds/practice/touch/context loss, реальный R/+5, offline/reload, настоящий server restart, pickup, targeted tie, возврат к исходным итогам и startup реванша прошли. Полный реванш не сыгран. У Alice два Precision R завершились публичными resets и finish3/270; зачётные2954ticks включают600 штрафных.
+
+Fast1=48HP. Slow1=42HP, z12,411968, speedHUD0,1; один обычный Restart. Slow2=48HP, z12,413600, speedHUD0,2. Оба slow outcomes теперь **ранние retry-slow до13,5м** с пояснением, Nextfalse и неизменностью за400мс. Равенство48==48 правильно не прошло строгий критерий. Обратная связь исправлена, но сам медленный учебный проезд **не принят**. После второй явной неудачи runner завершил этот scope FAIL, без третьей попытки и без повторного запуска CI.
+
+Все шесть online погрузок получили ordinary Space перед E:208–258мс от реально наблюдённого brake frame, speed0,000041–0,037417м/с, ack≥firstBrakeSeq. Наблюдены6 interact responses без ошибок; последующий груз подтверждает принятый эффект. **Uncaught/console/assets/actions/transport0**. Не было отклонённых responses, поэтому новый error-code capture путь этим job не упражнялся. Предыдущие три400 остаются записанными с неизвестной точной причиной.
+
+### RTT12: все11 объявленных scopes PASS, урок после одного Restart
+
+[Job141078106735](https://github.com/decorum-guy/iva-games/actions/runs/46177079185/job/141078106735) — **SUCCESS всей объявленной автоматизации**,108 NDJSON envelopes→40 records,0 parse errors. Это online2D и отдельные Low3D local scopes; не личная/device/listening приёмка.
+
+Fast1=14HP secured, z15,407936. Slow1=0HP broken, z12,236324, максимумHUD2,6м/с: ранний retry-slow, Nextfalse, frozen400мс. Один обычный Restart остался на lesson5/6, создал новую капсулу на стойке и загрузил100HP. Slow2=68HP secured>14, z14,125337, максимумHUD2,3м/с. После успешного сравнения прошли доставка и завершение полного шестишагового урока. Policy прежняя, pulse80 отсутствует. Неудачная первая попытка сохранена; успех второй не стирает её и не объявляет все возможные загрузочные истории надёжными.
+
+Deliberate Fragile R740мс дал один POST200, receipt/public reset1 и +5с. Bob offline/reload/return: same match/build, новая epoch, ticks278→375. Настоящий Precision restart сохранил сборки и заряд, дал два новых epochs, countdown4, resume ticks462→476→480. Новые Precision stall recoveries не понадобились. Реванш создан и запущен, не разыгран целиком.
+
+| Погрузка | Реальное наблюдённое торможение | Brake seq→public ack | Speed | Возраст snapshot |
+| --- | --- | --- | --- | --- |
+| Alice1 |208мс|87→88|0,004689м/с|114мс|
+| Bob1 |209мс|88→90|0,001904м/с|77мс|
+| Alice2 |220мс|974→975|0,003297м/с|99мс|
+| Bob2 |228мс|793→794|0,011195м/с|105мс|
+| Alice3 |203мс|1867→1869|0,007443м/с|71мс|
+| Bob3 |219мс|1681→1682|0,022929м/с|105мс|
+
+Scope/input/ack checks всех6 записей прошли. Наблюдены6 interact responses, unexpectedActions0. Отдельные successful per-interact bodies/statuses не были выведены; принятие подтверждается actual loaded/delivered состоянием. Сбор error.code не упражнялся, поскольку отказов не было. Uncaught/assets/transport0. Три console events — session ERR_EMPTY_RESPONSE и два WS ERR_SOCKET_NOT_CONNECTED — сохранены внутри actual stop/ready интервала намеренного рестарта.
+
+Browser Resource Timing network/server/body median/p95121,3/121,9мс при relay60мс на сторону; input→ack p95 Alice160,5/Bob161,8мс. Это owned loopback, не публичный интернет. Все полные completed logs, reconstructed records, identities, lesson attempts и brake/ack arithmetic сохранены под ignored `.qa/test-bench-ci/candidate12-{direct-extended,rtt120}-*`. Эти результаты **не закрывают** personal0/2, canonical whole-pump FAIL,3D online failure, Safari/hardware/actual listening и независимую человеческую приёмку.
+
+### Остальной завершённый CI12
+
+[Ordinary check141078106666](https://github.com/decorum-guy/iva-games/actions/runs/46177079185/job/141078106666) — **SUCCESS**,109 test files /1339tests,28,97с. В том числе QA driver30, controls11, новые Race interaction12, platform26, District retry6. Канонический `tsc --noEmit -p tsconfig.platform.json`, все builds, Python49, chess-home8 и portal18 PASS. Test Bench built production smoke проверил2accounts/1bot, realWS/private snapshots/replay/restart/recovery/epoch/supersession и97asset hashes; это **fullCups0/browserfalse**, отдельно от двух полных browser cups выше.
+
+District compact6variants PASS; territorial21rounds/227commands/revision327/one winner/8news, restart+trade=true. [Overdrive141078106582](https://github.com/decorum-guy/iva-games/actions/runs/46177079185/job/141078106582):16PASS/2SKIP. [Colossus141078106323](https://github.com/decorum-guy/iva-games/actions/runs/46177079151/job/141078106323):138game/84server/36browserPASS/2SKIP. [Images46177079171](https://github.com/decorum-guy/iva-games/actions/runs/46177079171): platform/chess initial/restored health,HTML,JS/CSS/API и2/3SQLite PASS; publish141078489217/deploy141078489457 **SKIPPED**. Все проверенные completed logs показали checkout9c0faa05/tree8ffc9c9f. Общий platform run **FAIL из-за Direct12 lesson**, несмотря на RTT12 SUCCESS.
+
+Финальная API-проверка refs после CI: main7c2be21 неизменён, PR44 draft/open/unmerged, head2313f695. Точные excerpts и разделение mockedUI/realHTTP/SQLite, automated audio smoke/actual listening записаны в ignored `.qa/test-bench-ci/candidate12-ci-summary.json`, SHA-256 `9dc995c351f57dc23c64744ea52ec9b04c957d16349fa5b4644a8e0387f0ce5a`. Никакой source/CI rerun или merge/deploy не выполнялся наблюдателем этих jobs.
+
+### Отклонённая учебная сборка rear terrain
+
+После повторного Direct12 lesson FAIL проверена ровно одна альтернативная каталожная деталь: учебная rear terrain вместоroad, без изменения двигателя, батареи, платформы, карты, физики, урона или критериев.24 fresh headless worlds выполнены один раз по plan, сохранённому до запуска: frontterrain/high × HUD cadence300/450мс × coast после загрузки0/18/60ticks × fast/slow. У каждого мира настоящий старт, обычные W/S/Space и разрешённый E; поза/скорость/HP не устанавливались. Прежний held feedback0,85 сохранён, pulse80 отсутствует. Текущая ранняя failure pause учитывается. Ограничение45simsec от launch включает последующую обычную доставку, на доставку дополнительно не более25simsec. Это приближённая cadence-модель, не browser replay.
+
+Все24 загрузки и12 fast comparisons с реальным damage/30 stable ticks прошли. Полный strict slow+delivery прошёл лишь **4/12**: frontterrain1/6, fronthigh3/6. Шесть случаев не пересекли13,5м за45simsec: z11,6195–12,6294, живой груз и charge16,4–17,975. Их последние300ticks использовали полный W без тормоза, Δz−0,015610…+0,007872м. Два других случая вошли в early failure: terrain300/coast60 fast55→slow51,z11,104; high300/coast18 fast6→slow6,z12,304. Четыре успешных действительно доставили по одной капсуле с100/96/63/86HP за24,45/22,45/23,37/23,85simsec отlaunch.
+
+Итог **FAIL сохранён; rear terrain не включена в игру**. Все24 traces сохранены в ignored `.qa/test-bench/tutorial-rear-terrain-matrix/`; дополнительных миров, других деталей и повторов не было. Замена целой детали меняет штатные radius/mass/grip/cost вместе, поэтому отдельная причина контакта и влияние одного радиуса не установлены. Старые6 frontterrain/rearroad pairs только прочитаны; они не проверяли доставку и имели прежнюю failure semantics, поэтому сравнение не является статистической оценкой надёжности.
+
+SHA-256 plan `93203cf09709e45d5f27d7c50f981dff012e0e7f624addd021d34c8dd1a41daa`, report `4c08aee8c52de704cd1cd1e898f48e284eb1c3d83906b0ebbc644f5e45aaabf7`, summary `f47b07ed1dd841222cd74ab6553ba4ebe9f39ce1e8018033c658e22f40eba8d3`. Core source hashes до/после этого запуска совпали с12. Нельзя считать эту отклонённую гипотезу исправлением урока.
+
+### Узкая поправка первого выбора оси
+
+При read-only review найден отдельный существующий дефект первого шага: `tutorialAxle` устанавливался true после terrain/high, но не сбрасывался при возвращении к road. Последний выбранный чертёж мог снова иметь дорожную переднюю ось, а кнопка «Проверить» оставалась доступной. Это source-supported defect, не результат нового личного проезда.
+
+Исправление: каждый tutorial updateBuild вычисляет доступность из **текущей** передней оси, включаяfalse. Начальная сборка остаётся прежней Universal, кубок/каталог/физика/карта не меняются. Браузерный сценарий перед созданием физического мира теперь выполняет terrain→enabled, road→disabled, high→enabled, terrain→enabled; отдельная `tutorial-axle-choice` запись сохраняет этот результат даже при дальнейшей ошибке урока. Последняя выбранная сборка и старый slow driver не меняются. Эта небольшая UI правка и журнал требуют собственного CI; результаты12 относятся к прежнему SHA.
+
+**Решение о выпуске не изменилось: сборка не принята.** Личных полных циклов0/2; нет подтверждённого DEPLOYED Test Bench или публичного контрольного запуска новой игры. Открыты устойчивое медленное учебное прохождение, canonical whole-pump gate,3D online/device/Safari/actual listening и независимая человеческая приёмка. Подробные свежие CI статусы следующего опубликованного checkpoint также фиксируются в описании draft PR44; наличие PR/коммита/частичного CI PASS не является выпуском.
