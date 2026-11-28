@@ -34,10 +34,12 @@ async function account(page: Page, prefix: string) {
 }
 function observeView(page: Page) {
   let latest: WorldView | undefined
+  let serverOverloadObserved = false
   const bases = new Map<number, WorldView>()
   let epoch: number | undefined
   page.on('websocket', socket => socket.on('framereceived', event => {
     const packet = JSON.parse(String(event.payload))
+    if (packet.type === 'phaseChanged' && packet.phase === 'paused' && packet.reason === 'SERVER_BUSY') serverOverloadObserved = true
     if (packet.type === 'hello') { epoch = packet.epoch; bases.clear(); latest = undefined; return }
     if (packet.type === 'full') { if (epoch !== packet.epoch) bases.clear(); epoch = packet.epoch; latest = packet.view }
     else if (packet.type === 'delta') {
@@ -47,7 +49,13 @@ function observeView(page: Page) {
     } else return
     if (latest) { bases.set(packet.snapshotSeq, latest); while (bases.size > 64) bases.delete(bases.keys().next().value!) }
   }))
-  return () => latest
+  return () => {
+    // A real overload pause already violates this continuous-match scenario.
+    // Fail at the next observation instead of waiting out the 20-minute match
+    // budget. The original result/escort/privacy assertions remain mandatory.
+    expect(serverOverloadObserved, 'SERVER_BUSY observed in an actual phaseChanged message').toBe(false)
+    return latest
+  }
 }
 /** A result overlay can arrive between the last snapshot and a visible UI click. */
 async function clickWithinOperation(locator: Locator, latest: () => WorldView | undefined): Promise<boolean> {

@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import type { Locator, Page } from '@playwright/test'
+import type { CDPSession, Locator, Page, Route } from '@playwright/test'
 import type { World } from '../src/core/types'
 import { installDiagnostics, type TimingProbe } from './diagnostics'
 
@@ -141,8 +141,16 @@ test('settings trap focus, restore it and persist every control through reload',
 test('movement, aim, reload and modal neutral input complete the first lesson through controls', async ({ page }) => {
   await startLesson(page, 0)
   const objective = page.locator('.fp-lesson p')
-  // Restart leaves actual keyboard focus on a button; movement must still work.
-  await page.getByRole('button', { name: 'Повторить', exact: true }).click()
+  // Restart replaces the lesson while its Worker starts. Wait for the new
+  // playable view, then test movement with actual focus on its visible button.
+  const restart = page.getByRole('button', { name: 'Повторить', exact: true })
+  const previousButton = (await restart.elementHandle())!
+  await restart.click()
+  await expect.poll(() => previousButton.evaluate(node => node.isConnected)).toBe(false)
+  await expect(page.locator('.fp-network')).toContainText('На связи')
+  await expect(page.locator('.fp-mode-switch')).toBeEnabled()
+  await expect(restart).toBeVisible()
+  await restart.focus(); await expect(restart).toBeFocused()
   await holdUntil(page, 'KeyD', () => expect.poll(() => objective.innerText(), { timeout: 3000, intervals: [25, 40, 50] }).toContain('ко второй отметке'))
   await holdUntil(page, 'KeyS', () => expect.poll(() => objective.innerText(), { timeout: 3000, intervals: [25, 40, 50] }).toContain('Наведитесь'))
   const menuButton = page.getByRole('button', { name: 'Меню партии', exact: true })
@@ -294,21 +302,43 @@ test('final lesson reaches an operation result and starts a separate live practi
   expect(completed.phase).toBe('finished')
   expect(completed.operations).toHaveLength(1)
   await expect(page.locator('.fp-result')).toHaveCount(0)
-  let createdMatchId: string | null = null, primaryFailed = false, fixtureCleanupFailed = false
-  const created = page.waitForResponse(response => new URL(response.url()).pathname === '/api/realtime/v1/practice' && response.request().method() === 'POST', { timeout: 15_000 }).then(async response => {
-    const result = await response.json()
-    if (typeof result.matchId === 'string') createdMatchId = result.matchId
-    return response.status()
-  }).catch(() => null)
+  const practicePath = '/api/realtime/v1/practice'
+  expect(await page.evaluate(() => localStorage.getItem('iva.forpost.last-match.v1'))).toBeNull()
+  let createdMatchId: string | null = null, primaryFailed = false, fixtureCleanupFailed = false, captureFailed = false
+  let createStatus: number | null = null, captureCompletion: Promise<void> = Promise.resolve()
+  // A browser Response body can disappear during the immediate pinned-route
+  // navigation. Capture the real APIResponse before delivering it unchanged.
+  const capturePractice = (route: Route) => {
+    if (route.request().method() !== 'POST') return route.fallback()
+    captureCompletion = (async () => {
+      try {
+        const response = await route.fetch({ timeout: 15_000, maxRetries: 0 })
+        createStatus = response.status()
+        const result = await response.json().catch(() => null)
+        if (createStatus === 201 && typeof result?.matchId === 'string') createdMatchId = result.matchId
+        await route.fulfill({ response })
+      } catch {
+        captureFailed = true
+        await route.abort().catch(() => {})
+      }
+    })()
+    return captureCompletion
+  }
+  await page.route(`**${practicePath}`, capturePractice)
+  const created = page.waitForResponse(response => new URL(response.url()).pathname === practicePath && response.request().method() === 'POST', { timeout: 15_000 }).then(response => response.status()).catch(() => null)
   try {
     await page.getByRole('button', { name: 'Начать тренировку', exact: true }).click()
     expect(await created).toBe(201)
+    await captureCompletion
+    expect(captureFailed).toBe(false)
+    expect(createStatus).toBe(201)
     await expect(page.locator('.fp-game')).toBeVisible()
     await expect(page.locator('.fp-lesson')).toHaveCount(0)
     await expect(page.locator('.fp-network')).toContainText('На связи', { timeout: 30_000 })
     const ordinary = await page.evaluate(() => JSON.parse(localStorage.getItem('iva.forpost.last-match.v1') ?? 'null'))
     expect(ordinary?.matchId).toBeTruthy()
     expect(ordinary.matchId).not.toBe(completed.matchId)
+    expect(ordinary.matchId).toBe(createdMatchId)
     await page.getByRole('button', { name: 'Меню партии', exact: true }).click()
     await page.getByRole('button', { name: 'В главное меню', exact: true }).click()
     await expect(page.getByRole('button', { name: 'Продолжить партию', exact: true })).toBeVisible()
@@ -321,6 +351,17 @@ test('final lesson reaches an operation result and starts a separate live practi
     throw error
   } finally {
     await created
+    await captureCompletion
+    await page.unroute(`**${practicePath}`, capturePractice).catch(() => {})
+    if (!createdMatchId && createStatus === 201) {
+      // Only this fresh context's previously empty ordinary save can be a
+      // fallback identity. The wait survives an in-progress pinned navigation.
+      const savedId = await page.waitForFunction(() => {
+        const saved = JSON.parse(localStorage.getItem('iva.forpost.last-match.v1') ?? 'null')
+        return !saved?.roomId && typeof saved?.matchId === 'string' ? saved.matchId : null
+      }, undefined, { timeout: 3000 }).then(handle => handle.jsonValue()).catch(() => null)
+      if (typeof savedId === 'string' && savedId !== completed.matchId) createdMatchId = savedId
+    }
     // Release only this test's real fixture, after all persistence assertions.
     // The context's own HttpOnly cookie supplies ownership; capacity stays real.
     if (createdMatchId) {
@@ -329,18 +370,36 @@ test('final lesson reaches an operation result and starts a separate live practi
         fixtureCleanupFailed = true
         console.log(JSON.stringify({ automatedFixtureCleanup: 'final-lesson-practice', outcome: 'failed', httpStatus: cleanup?.status() ?? null, primaryFailed }))
       }
+    } else if (createStatus === 201) {
+      fixtureCleanupFailed = true
+      console.log(JSON.stringify({ automatedFixtureCleanup: 'final-lesson-practice', outcome: 'identity-unavailable', primaryFailed }))
     }
   }
   expect(fixtureCleanupFailed, 'OWN_PRACTICE_CLEANUP_FAILED').toBe(false)
 })
 
 test('switching browser tabs while firing releases input and does not resume old shots', async ({ page, context, browserName }) => {
-  await startLesson(page, 0)
-  await aimAtLessonPoint(page, 30, 5)
-  const ammo = page.locator('.fp-ammo strong')
-  await page.mouse.down()
+  let focusDriver: CDPSession | undefined
   let other: Page | undefined
   try {
+    if (browserName === 'chromium') {
+      focusDriver = await context.newCDPSession(page)
+      // Playwright enables this override by default. Removing it allows actual
+      // tab activation to determine focus; no focus/blur event is synthesized.
+      await focusDriver.send('Emulation.setFocusEmulationEnabled', { enabled: false })
+    }
+    await startLesson(page, 0)
+    await page.bringToFront()
+    try {
+      await expect.poll(() => page.evaluate(() => ({ hidden: document.hidden, hasFocus: document.hasFocus() })), { timeout: 3000, message: 'BROWSER_INITIAL_FOCUS_UNAVAILABLE: the lesson must really be visible and focused before firing.' }).toEqual({ hidden: false, hasFocus: true })
+    } catch (error) {
+      console.log(JSON.stringify({ automatedCapabilityFailure: 'BROWSER_INITIAL_FOCUS_UNAVAILABLE', browserName, chromiumFocusEmulationDisabled: !!focusDriver }))
+      throw error
+    }
+    console.log(JSON.stringify({ automatedFocusPrecondition: 'visible-and-focused', browserName, chromiumFocusEmulationDisabled: !!focusDriver }))
+    await aimAtLessonPoint(page, 30, 5)
+    const ammo = page.locator('.fp-ammo strong')
+    await page.mouse.down()
     await expect(ammo).not.toHaveText('24/24')
     const beforeFocus = await page.evaluate(() => ({ sequence: (window as Window & { __forpostQaTiming?: TimingProbe }).__forpostQaTiming?.focusEvents.at(-1)?.seq ?? 0, hidden: document.hidden, hasFocus: document.hasFocus() }))
     other = await context.newPage()
@@ -361,5 +420,5 @@ test('switching browser tabs while firing releases input and does not resume old
     expect(released).not.toBe('0/24')
     await page.waitForTimeout(850)
     await expect(ammo).toHaveText(released)
-  } finally { await page.mouse.up().catch(() => {}); await other?.close().catch(() => {}) }
+  } finally { await page.mouse.up().catch(() => {}); await other?.close().catch(() => {}); await focusDriver?.detach().catch(() => {}) }
 })

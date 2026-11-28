@@ -101,3 +101,20 @@ Build `d0e1833c75685ce51612b58bac3db2e555cdf1f5`, PR head `5cc963b84aa8401e24621
 | F02, S01 | Chromium tab-switch fire stayed stopped; map pauses showed saved state | WebKit case failed without a recorded focus-loss precondition. All online maps failed with SERVER_BUSY |
 
 Prepared additions — infrastructure rebuild/completion, explicit focus-loss precondition and separate 2D full-map passages — do not change these observations. A 2D pass is not 3D performance acceptance.
+
+## Observed automated subcases, CI round 4
+
+Actual build `51748ae944081b5a33a08a630b42b31310b09546`, head `19042c8…`; [exact completed evidence](qa/ci-round-4.json). Chromium 12 PASS/10 FAIL (22 executions), WebKit 8 PASS/2 FAIL (10). No inventory row is accepted across every applicable state; no full UI match or executor-operated passage occurred.
+
+| Rows | Newly observed/replayed behavior | Boundary |
+|---|---|---|
+| B01–B04, B07, U01–U02 | Original default-3D construction/queue/power/save-resume passed in 37.4s; 2D infrastructure cancel/refund/rebuild reached its completed predicate | Original tutorial-clock defect replayed successfully, but not a 3D FPS acceptance |
+| H06 | All 29 shipped WAVs natively decoded; fresh order/carbine voice, mute stopping voice, consumed muted shot and no old shot after saved-lesson reload | Audio not listened to; device/sound privacy matrix remains open |
+| M01–M06, M11, H01–H02, H05–H08 | Catalogue/map/settings cases passed again | Full-game translations, every visual state and all online compositions remain open |
+| T01–T03 | Native browser-emulated simultaneous touch actions, cancellation/release and landscape controls passed | No physical phone |
+| F01/U01 | Restart produced a new Worker while the scenario had already pressed movement; first objective failed in both browsers | Candidate waits actual new connected/enabled UI and focuses its visible Restart; replay pending |
+| U03/M07–M08 | WebKit final lesson → separate live practice passed; Chromium created practice but test lost its response body during pinned navigation | Candidate captures real response before unchanged delivery and cleans up only own room; replay pending |
+| F02/S01 | Explicit real focus-loss precondition failed in both drivers | Candidate public Chromium CDP removes forced focus; WebKit limitation remains. No simulated blur or accepted focus PASS |
+| L01/L05–L07, R01–R03 | All three maps, 2D/3D, reached their real pinned-client room; each received SERVER_BUSY | Six failures, no complete match/result/replay acceptance |
+
+The following lifecycle case received actual 503/ROOM_LIMIT after the uncleaned practice fixture. Its navigation behavior is not accepted or called a demonstrated product defect. Test cleanup/readiness fixes and numeric renderer phase diagnostics are prepared for the next build, not counted as executed UI successes.

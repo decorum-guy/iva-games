@@ -1,11 +1,10 @@
 import assert from 'node:assert/strict';
-import { createHash } from 'node:crypto';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { cpus, release } from 'node:os';
-import { createWorld, serializeWorld, setController, stepWorld } from '@iva-games/forpost/core';
+import { serializeWorld, stepWorld } from '@iva-games/forpost/core';
 import { RealtimeStore } from '../src/store';
-import type { StoredMatch } from '../src/store';
+import { writerFixture, writerHash as hash } from './writer-fixture';
 import { WorkerRpc } from '../src/worker-rpc';
 import { ResourceProbe } from '../src/capacity';
 import type { CheckpointStatus } from '../src/checkpoint';
@@ -13,7 +12,6 @@ import type { CheckpointStatus } from '../src/checkpoint';
 const directory = process.argv[2], samples = 600, warmup = 30, cases: unknown[] = [];
 assert.ok(directory);
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, Math.max(0, ms)));
-const hash = (value: string) => createHash('sha256').update(value).digest('hex');
 const order = process.env.WRITER_PROBE_ORDER === 'reverse' ? [true, false] : [false, true];
 for (const separateCheckpoint of order) {
   const mode = separateCheckpoint ? 'separate-passive-worker' : 'sqlite-auto-1000-pages';
@@ -27,18 +25,7 @@ for (const separateCheckpoint of order) {
       });
       checkpointStatus = await checkpoint.call<CheckpointStatus>('status');
     }
-    const participants = Array.from({ length: 6 }, (_, i) => ({ id: 'fixture-' + i, name: 'Explicit fixture ' + i,
-      team: i % 2 ? 'B' as const : 'A' as const, controller: i ? 'bot' as const : 'human' as const, botLevel: 'normal' as const }));
-    const world = createWorld({ matchId: 'writer-fixture', mapId: 'FP01', teamSize: 3, participants, seed: 5149, mode: 'training', idSalt: 'explicit-writer-fixture-only' });
-    setController(world, participants[0].id, 'bot');
-    for (let tick = 0; tick < 750; tick++) stepWorld(world);
-    const initialWorld = serializeWorld(world), now = Date.now();
-    const match: StoredMatch = { matchId: world.matchId, startId: 'writer-fixture-start', fingerprint: 'writer-fixture-fingerprint', roomId: 'writer-fixture-room',
-      kind: 'practice', ownerHash: 'writer-fixture-owner', roster: participants.map(p => ({ participantId: p.id, playerId: p.controller === 'human' ? p.id : null,
-        displayName: p.name, team: p.team, controller: p.controller })), rosterHash: 'writer-fixture-roster', rulesVersion: 'forpost-0.1', contentVersion: 'forpost-content-1',
-      manifest: { diagnostic: 'writer comparison only' }, world: initialWorld, worldHash: hash(initialWorld), tick: world.tick, epoch: 1, ownerEpoch: 1,
-      journalSeq: 0, controls: {}, phase: 'running', lastHumanAt: now, pausedAt: null, expiresAt: now + 3600_000,
-      pendingOutcome: null, outcome: null, countdownUntil: 0, createdAt: now };
+    const { world, match } = writerFixture();
     store.create(match, 'fixture-writer');
     const durations: number[] = [], checkpointCommits: number[] = [];
     const started = performance.now(), cpu = process.cpuUsage();

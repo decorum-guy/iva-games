@@ -18,6 +18,7 @@ test('a late real practice response leaves the newly selected lesson active and 
   await page.goto('/play/forpost/')
   const health = await (await page.request.get('/api/realtime/v1/health')).json()
   await expect(page.locator('[data-build]')).toHaveAttribute('data-build', health.buildRevision)
+  expect(await page.evaluate(() => localStorage.getItem('iva.forpost.last-match.v1'))).toBeNull()
   await page.getByRole('button', { name: 'Настройки', exact: true }).click()
   const settings = page.getByRole('dialog', { name: 'Настройки', exact: true })
   await settings.getByRole('combobox', { name: /^Отображение/ }).selectOption('2d')
@@ -32,17 +33,19 @@ test('a late real practice response leaves the newly selected lesson active and 
 
   let releaseDelivery = () => {}
   const delivery = new Promise<void>(resolve => { releaseDelivery = resolve })
-  let createdMatchId: string | null = null, createStatus: number | null = null, requestedAt = 0
+  let createdMatchId: string | null = null, createStatus: number | null = null, createErrorCode: string | null = null, requestedAt = 0
   let fetched = false, delivered = false, routeFailed = false, appCleanupConfirmed = false, primaryFailed = false, fixtureCleanupFailed = false
   let routeCompletion: Promise<void> = Promise.resolve()
   const routeHandler = (route: Route) => {
     requestedAt = performance.now()
     routeCompletion = (async () => {
       try {
-        const response = await route.fetch({ timeout: 15_000 })
+        const response = await route.fetch({ timeout: 15_000, maxRetries: 0 })
         createStatus = response.status()
         const result = await response.json()
-        if (typeof result.matchId === 'string') createdMatchId = result.matchId
+        if (createStatus === 201 && typeof result.matchId === 'string') createdMatchId = result.matchId
+        const code = result.error?.code ?? result.code
+        if (typeof code === 'string' && /^[A-Z_]{1,80}$/.test(code)) createErrorCode = code
         fetched = true
         await delivery
         await route.fulfill({ response })
@@ -59,6 +62,7 @@ test('a late real practice response leaves the newly selected lesson active and 
     await page.getByRole('button', { name: 'Начать тренировку', exact: true }).click()
     await expect.poll(() => fetched || routeFailed, { timeout: 10_000 }).toBe(true)
     expect(routeFailed, 'The real practice request must succeed before its reply is held.').toBe(false)
+    if (createStatus !== 201) console.log(JSON.stringify({ automatedLifecyclePrecondition: 'real-practice-create', status: createStatus, errorCode: createErrorCode }))
     expect(createStatus).toBe(201)
     expect(createdMatchId).toMatch(/^[\w-]+$/)
     await page.getByRole('button', { name: 'Все уроки', exact: true }).click()

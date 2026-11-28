@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Collect the actual deployed image's current and recursive retained bundle.
 
-Only public compatibility metadata is requested. A 404 creates an explicit
-bootstrap build input; it never exempts a candidate from host-store preflight.
+Only public metadata is requested. A recognized legacy portal may create an
+explicit bootstrap build input; it never exempts host-store preflight.
 """
 import argparse
 import hashlib
@@ -17,6 +17,21 @@ import urllib.request
 import uuid
 
 INVENTORY_URL = 'https://iva-games.pro/api/realtime/v1/compatibility'
+PORTAL_URL = 'https://iva-games.pro/'
+REALTIME_HEALTH_URL = 'https://iva-games.pro/api/realtime/v1/health'
+PLATFORM_HEALTH_URL = 'https://iva-games.pro/health/live'
+CATALOGUE_URL = 'https://iva-games.pro/api/platform/v1/games'
+# Independently observed public legacy shell on 2026-11-28. A future/different
+# HTML response must be reviewed, not guessed to mean an empty runtime store.
+LEGACY_PORTAL_SHA256 = 'b0af43f9cda37d8dc17f8613df907719e4f6b537fa92830c9410066df7e7e9b5'
+LEGACY_GAMES = {
+    'platform-lab': ('other', 'available', 'lab-1', 'lab-1'),
+    'district': ('other', 'available', 'district@0.4', 'district-territorial@1'),
+    'remorse': ('chess', 'unavailable', 'pending', 'pending'),
+    'overdrive': ('chess', 'unavailable', 'pending', 'pending'),
+    'colossus': ('chess', 'unavailable', 'pending', 'pending'),
+    'harbor': ('other', 'planned', 'pending', 'pending'),
+}
 REPOSITORY = 'ghcr.io/decorum-guy/iva-games-realtime'
 SOURCE = 'https://github.com/decorum-guy/iva-games'
 REVISION = re.compile(r'[0-9a-f]{40}')
@@ -62,22 +77,70 @@ def sanitize_inventory(value):
             'manifests': [unique[key] for key in sorted(unique)]}
 
 
+def fetch_public(url, opener=None):
+    request = urllib.request.Request(url, headers={'Accept': 'application/json', 'Cache-Control': 'no-cache', 'User-Agent': 'iva-realtime-retention/1'})
+    with (opener or OPENER).open(request, timeout=15) as response:
+        if response.geturl() != url or response.status != 200:
+            raise RuntimeError('Unexpected public response URL or status')
+        payload = response.read(1_048_577)
+        if len(payload) > 1_048_576:
+            raise RuntimeError('Public compatibility evidence is too large')
+        return response.headers.get_content_type(), payload
+
+
+def require_legacy_catalogue(value):
+    if not isinstance(value, dict) or set(value) != {'games'} or not isinstance(value['games'], list) or len(value['games']) != len(LEGACY_GAMES):
+        raise RuntimeError('Unrecognized legacy catalogue')
+    seen = set()
+    fields = {'gameId', 'collectionId', 'title', 'minPlayers', 'maxPlayers', 'supportsBots', 'rulesVersion', 'contentVersion', 'status'}
+    for game in value['games']:
+        if not isinstance(game, dict) or set(game) != fields or not isinstance(game['gameId'], str):
+            raise RuntimeError('Unrecognized legacy catalogue')
+        game_id = game['gameId']
+        expected = LEGACY_GAMES.get(game_id)
+        if expected is None or game_id in seen or tuple(game[key] for key in ('collectionId', 'status', 'rulesVersion', 'contentVersion')) != expected:
+            raise RuntimeError('Legacy catalogue does not prove absence of realtime registration')
+        if not isinstance(game['title'], str) or not game['title'] or type(game['supportsBots']) is not bool or any(type(game[key]) is not int for key in ('minPlayers', 'maxPlayers')) or not 1 <= game['minPlayers'] <= game['maxPlayers'] <= 64:
+            raise RuntimeError('Unrecognized legacy catalogue')
+        seen.add(game_id)
+
+
+def require_legacy_portal(compatibility_html, opener=None):
+    """Recognize public routing only; make no claim about physical saved data."""
+    media, portal = fetch_public(PORTAL_URL, opener)
+    if media != 'text/html' or hashlib.sha256(portal).hexdigest() != LEGACY_PORTAL_SHA256:
+        raise RuntimeError('Unrecognized legacy portal response')
+    if compatibility_html is not None and compatibility_html != portal:
+        raise RuntimeError('Compatibility response differs from the legacy portal')
+    media, realtime_health = fetch_public(REALTIME_HEALTH_URL, opener)
+    if media != 'text/html' or realtime_health != portal:
+        raise RuntimeError('Realtime route cannot be classified as legacy portal fallback')
+    media, health = fetch_public(PLATFORM_HEALTH_URL, opener)
+    value = json.loads(health) if media == 'application/json' else None
+    if not isinstance(value, dict) or set(value) != {'ok', 'service'} or value['ok'] is not True or value['service'] != 'iva-platform':
+        raise RuntimeError('Legacy platform health is not positively confirmed')
+    media, catalogue = fetch_public(CATALOGUE_URL, opener)
+    if media != 'application/json':
+        raise RuntimeError('Legacy catalogue is not positively confirmed')
+    require_legacy_catalogue(json.loads(catalogue))
+
+
 def fetch_inventory(opener=None):
-    request = urllib.request.Request(INVENTORY_URL, headers={'Accept': 'application/json', 'Cache-Control': 'no-cache', 'User-Agent': 'iva-realtime-retention/1'})
     try:
-        with (opener or OPENER).open(request, timeout=15) as response:
-            if response.geturl() != INVENTORY_URL or response.headers.get_content_type() != 'application/json':
-                raise RuntimeError('Unexpected compatibility response')
-            payload = response.read(1_048_577)
-            if len(payload) > 1_048_576:
-                raise RuntimeError('Compatibility inventory is too large')
-            return sanitize_inventory(json.loads(payload))
+        media, payload = fetch_public(INVENTORY_URL, opener)
     except urllib.error.HTTPError as error:
         status = error.code
         error.close()
         if status == 404:
+            require_legacy_portal(None, opener)
             return None
         raise RuntimeError(f'Compatibility inventory HTTP {status}') from None
+    if media == 'application/json':
+        return sanitize_inventory(json.loads(payload))
+    if media == 'text/html':
+        require_legacy_portal(payload, opener)
+        return None
+    raise RuntimeError('Unexpected compatibility response')
 
 
 def command(*args):
@@ -159,6 +222,7 @@ def prepare(output, opener=None, run=None):
         staging.rename(output)
         return {'ok': True, 'bootstrap': inventory is None, 'buildRevision': inventory['buildRevision'] if inventory else None,
                 'requiredManifests': len(inventory['manifests']) if inventory else 0,
+                'bootstrapEvidence': 'recognized-public-legacy-portal-v1' if inventory is None else None,
                 'hostPreflightRequired': True}
     finally:
         if created:

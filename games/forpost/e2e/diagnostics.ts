@@ -1,7 +1,9 @@
 import type { Page, test as PlaywrightTest } from '@playwright/test'
 
 const pageFailures = new WeakMap<Page, string[]>()
-export type TimingProbe = { start: number; frames: number; frameGaps: number[]; timerGaps: number[]; maxFrameGapMs: number; maxTimerGapMs: number; longTasks: number; longTaskMs: number; maxLongTaskMs: number; supportsLongTasks: boolean; focusEvents: { seq: number; type: string; elapsedMs: number; hidden: boolean; hasFocus: boolean }[] }
+type LongFrameSample = { durationMs: number; blockingMs: number | null; beforeRenderMs: number | null; renderPhaseMs: number | null; afterStyleLayoutStartMs: number | null; reportedScriptMs: number | null; forcedStyleLayoutMs: number | null }
+type LongFrameProbe = { supported: boolean; count: number; totalMs: number; maxMs: number; recent: LongFrameSample[] }
+export type TimingProbe = { start: number; frames: number; frameGaps: number[]; timerGaps: number[]; maxFrameGapMs: number; maxTimerGapMs: number; longTasks: number; longTaskMs: number; maxLongTaskMs: number; supportsLongTasks: boolean; longAnimationFrames: LongFrameProbe; focusEvents: { seq: number; type: string; elapsedMs: number; hidden: boolean; hasFocus: boolean }[] }
 async function boundedDiagnostic<T>(operation: Promise<T>, unavailable: string): Promise<T | string> {
   let timer: ReturnType<typeof setTimeout> | undefined
   try {
@@ -28,7 +30,7 @@ export function installDiagnostics(test: typeof PlaywrightTest): void {
     })
     // Observational instrumentation only: no game clock, input, world or storage mutation.
     await page.addInitScript(() => {
-      const probe: TimingProbe = { start: performance.now(), frames: 0, frameGaps: [], timerGaps: [], maxFrameGapMs: 0, maxTimerGapMs: 0, longTasks: 0, longTaskMs: 0, maxLongTaskMs: 0, supportsLongTasks: false, focusEvents: [] }
+      const probe: TimingProbe = { start: performance.now(), frames: 0, frameGaps: [], timerGaps: [], maxFrameGapMs: 0, maxTimerGapMs: 0, longTasks: 0, longTaskMs: 0, maxLongTaskMs: 0, supportsLongTasks: false, longAnimationFrames: { supported: false, count: 0, totalMs: 0, maxMs: 0, recent: [] }, focusEvents: [] }
       ;(window as Window & { __forpostQaTiming?: TimingProbe }).__forpostQaTiming = probe
       let focusSequence = 0
       const recordFocus = (type: string) => {
@@ -47,6 +49,39 @@ export function installDiagnostics(test: typeof PlaywrightTest): void {
         probe.supportsLongTasks = true
         new PerformanceObserver(list => { for (const entry of list.getEntries()) { probe.longTasks++; probe.longTaskMs += entry.duration; probe.maxLongTaskMs = Math.max(probe.maxLongTaskMs, entry.duration) } }).observe({ type: 'longtask', buffered: true })
       }
+      if (typeof PerformanceObserver !== 'undefined' && PerformanceObserver.supportedEntryTypes?.includes('long-animation-frame')) {
+        const finite = (value: unknown): number | null => typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : null
+        const observer = new PerformanceObserver(list => {
+          for (const entry of list.getEntries()) {
+            const frame = entry as PerformanceEntry & { blockingDuration?: number; renderStart?: number; styleAndLayoutStart?: number; scripts?: readonly { duration?: number; forcedStyleAndLayoutDuration?: number; forcedStyleDuration?: number; forcedLayoutDuration?: number }[] }
+            const end = frame.startTime + frame.duration, render = finite(frame.renderStart), styleLayout = finite(frame.styleAndLayoutStart)
+            let scriptMs: number | null = null, forcedMs: number | null = null
+            if (Array.isArray(frame.scripts)) {
+              scriptMs = 0
+              for (const script of frame.scripts) {
+                scriptMs += finite(script.duration) ?? 0
+                const combined = finite(script.forcedStyleAndLayoutDuration), style = finite(script.forcedStyleDuration), layout = finite(script.forcedLayoutDuration)
+                const forced = combined ?? (style !== null || layout !== null ? (style ?? 0) + (layout ?? 0) : null)
+                if (forced !== null) forcedMs = (forcedMs ?? 0) + forced
+              }
+            }
+            // Only numeric fields enter the bounded buffer. Script URLs, names,
+            // attribution objects and gameplay state are never retained.
+            const sample: LongFrameSample = {
+              durationMs: frame.duration, blockingMs: finite(frame.blockingDuration),
+              beforeRenderMs: render && render >= frame.startTime ? render - frame.startTime : null,
+              renderPhaseMs: render && end >= render ? end - render : null,
+              afterStyleLayoutStartMs: styleLayout && end >= styleLayout ? end - styleLayout : null,
+              reportedScriptMs: scriptMs, forcedStyleLayoutMs: forcedMs,
+            }
+            const frames = probe.longAnimationFrames
+            frames.recent[frames.count % 120] = sample
+            frames.count++; frames.totalMs += frame.duration; frames.maxMs = Math.max(frames.maxMs, frame.duration)
+          }
+        })
+        try { observer.observe({ type: 'long-animation-frame', buffered: true }); probe.longAnimationFrames.supported = true }
+        catch { observer.disconnect() /* Optional diagnostics must not alter the scenario. */ }
+      }
     })
   })
   test.afterEach(async ({ page, browser, browserName }, info) => {
@@ -57,9 +92,16 @@ export function installDiagnostics(test: typeof PlaywrightTest): void {
       boundedDiagnostic(page.evaluate(() => {
         const probe = (window as Window & { __forpostQaTiming?: TimingProbe }).__forpostQaTiming
         const summary = (samples: number[]) => { const sorted = [...samples].sort((a, b) => a - b); return { samples: sorted.length, p50Ms: sorted[Math.ceil(sorted.length * .5) - 1] ?? null, p95Ms: sorted[Math.ceil(sorted.length * .95) - 1] ?? null, maxMs: sorted.at(-1) ?? null } }
+        const longFrames = probe?.longAnimationFrames
+        const frameField = (key: keyof LongFrameSample) => summary(longFrames?.recent.flatMap(frame => { const value = frame[key]; return value === null ? [] : [value] }) ?? [])
+        const longAnimationFrames = longFrames?.supported ? {
+          count: longFrames.count, totalMs: longFrames.totalMs, maxMs: longFrames.maxMs, windowSize: 120,
+          recent: { durationMs: frameField('durationMs'), blockingMs: frameField('blockingMs'), beforeRenderMs: frameField('beforeRenderMs'), renderPhaseMs: frameField('renderPhaseMs'), afterStyleLayoutStartMs: frameField('afterStyleLayoutStartMs'), reportedScriptMs: frameField('reportedScriptMs'), forcedStyleLayoutMs: frameField('forcedStyleLayoutMs') },
+          coverage: 'reported script entries only; render/style intervals overlap and include browser work; GPU completion is not measured',
+        } : 'unsupported'
         const canvas = document.querySelector<HTMLCanvasElement>('.fp-stage canvas'), gl = canvas?.getContext('webgl2')
         const debug = gl?.getExtension('WEBGL_debug_renderer_info')
-        return { visible: !document.hidden, hasFocus: document.hasFocus(), viewport: [innerWidth, innerHeight], pixelRatio: devicePixelRatio, build: document.querySelector('[data-build]')?.getAttribute('data-build'), stageMetrics: JSON.parse(document.querySelector('.fp-stage')?.getAttribute('data-render-metrics') ?? 'null'), renderer: gl ? { version: gl.getParameter(gl.VERSION), vendor: gl.getParameter(debug?.UNMASKED_VENDOR_WEBGL ?? gl.VENDOR), renderer: gl.getParameter(debug?.UNMASKED_RENDERER_WEBGL ?? gl.RENDERER), width: canvas!.width, height: canvas!.height } : 'no WebGL2 stage context', ...(probe ? { elapsedMs: performance.now() - probe.start, frames: probe.frames, maxFrameGapMs: probe.maxFrameGapMs, maxTimerGapMs: probe.maxTimerGapMs, recentFrameGaps: summary(probe.frameGaps), recentTimerGaps: summary(probe.timerGaps), focusEvents: probe.focusEvents, longTasks: probe.supportsLongTasks ? { count: probe.longTasks, totalMs: probe.longTaskMs, maxMs: probe.maxLongTaskMs } : 'unsupported' } : {}) }
+        return { visible: !document.hidden, hasFocus: document.hasFocus(), viewport: [innerWidth, innerHeight], pixelRatio: devicePixelRatio, build: document.querySelector('[data-build]')?.getAttribute('data-build'), stageMetrics: JSON.parse(document.querySelector('.fp-stage')?.getAttribute('data-render-metrics') ?? 'null'), renderer: gl ? { version: gl.getParameter(gl.VERSION), vendor: gl.getParameter(debug?.UNMASKED_VENDOR_WEBGL ?? gl.VENDOR), renderer: gl.getParameter(debug?.UNMASKED_RENDERER_WEBGL ?? gl.RENDERER), width: canvas!.width, height: canvas!.height } : 'no WebGL2 stage context', ...(probe ? { elapsedMs: performance.now() - probe.start, frames: probe.frames, maxFrameGapMs: probe.maxFrameGapMs, maxTimerGapMs: probe.maxTimerGapMs, recentFrameGaps: summary(probe.frameGaps), recentTimerGaps: summary(probe.timerGaps), focusEvents: probe.focusEvents, longTasks: probe.supportsLongTasks ? { count: probe.longTasks, totalMs: probe.longTaskMs, maxMs: probe.maxLongTaskMs } : 'unsupported', longAnimationFrames } : {}) }
       }), '[timing unavailable within 3500 ms]'),
     ])
     console.log(JSON.stringify({ automatedUiFailure: info.title, path: new URL(page.url()).pathname, browserName, browserVersion: browser.version(), pageErrors: pageFailures.get(page) ?? [], timing, runtimeHealth, visibleText: body.slice(0, 12_000) }))

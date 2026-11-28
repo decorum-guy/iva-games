@@ -183,3 +183,48 @@ Observed functional-probe metrics: worker work p99 5.2 ms, worker RPC p99 11.7 m
 Remote commit `c678ac4fc581ef646df4512722964c54d20581ce` has the exact local checkpoint tree `9f281b5f954d326236841a6e10d3b2f289f92761`. [Workflow run 46171589955](https://github.com/decorum-guy/iva-games/actions/runs/46171589955) failed before creating any jobs. Source review found `runner.temp` in job-level `env`, where GitHub's [context availability table](https://docs.github.com/en/actions/reference/workflows-and-actions/contexts#context-availability) does not allow `runner`. The variable is moved to the actual measurement step's `env`, which does permit that context. Native job execution is still required to confirm the correction; YAML parsing alone did not catch the semantic error. This dispatch failure adds no browser round and no match.
 
 Accepted documentation PR53 advanced main to `7c2be21db5743b15b4a42d708ac959039c6b725e` during that dispatch. It is included by a normal merge. The AGENTS conflict preserves the new complete-cycle rule and both PR41 sections verbatim. No game/runtime source changed after the tested `e5f9106` build; new CI must nevertheless identify its own final checkout.
+
+## Repository CI round 4 — automated, not executor browser play
+
+PR head `19042c8ad92a9c638370f8db8411dec7df963d75`, tree `f1ad83d218111a6296b5f2b658fa78c7685d8129`; actual checkout/build `51748ae944081b5a33a08a630b42b31310b09546`. Runtime `sha256:e943da72ab09c23299e5649a6339a40dc02807a7cced95f98467a1f7c31abbb7`; CI client `sha256:a830bb0b9488e243f0ef16276daaf3a7d4ae838716a166e01d2a0cf9fbf26065`. The local client above is a separate build. [Completed evidence](qa/ci-round-4.json) preserves job IDs, log hashes and measurement boundaries.
+
+The corrected workflow created native jobs. [Platform run 46171988515](https://github.com/decorum-guy/iva-games/actions/runs/46171988515) finished with failures. Across 22 Chromium and 10 WebKit executions: **20 PASS / 12 FAIL**, no skips. There are now **four completed automated Forpost UI rounds**, all failed overall; **zero complete UI matches and zero executor-operated passages**.
+
+| Scope | Actual result | Boundary |
+|---|---|---|
+| Chromium interface, job 141062236049 | 12 PASS / 4 FAIL | Default-3D construction/queue/power/save-resume passed in 37.4 s, replaying the original R2/R3 defect after the Worker correction. This does not accept rendering FPS. |
+| Native audio in that job | All 29 WAVs decoded; fresh order/carbine voices, mute, consumed muted events and reload without old shots passed | Native APIs without audio mocks; no listening or physical-device claim. |
+| Lessons/settings/touch | Infrastructure now cancels/refunds, rebuilds and reaches completion; power/squad/cover/delivery, settings and native-emulated multitouch cases passed | First-lesson restart failed before its first movement objective. All seven lessons are not accepted together. |
+| WebKit 27.2, job 141062235876 | 8 PASS / 2 FAIL | Restart and actual focus-loss preconditions failed. Final lesson → separate real practice passed here. |
+| All three maps, each 2D and 3D | Six full-match failures after actual paused/SERVER_BUSY messages | FP01/FP02 stopped during preparation; FP03 reached battle. No full match result. |
+| General check, job 141062235578 | Types/lint/boundaries, 1440 tests / 120 files (+1 opt-in skip), 17 profile-harness and 74 infrastructure tests, full build and 14 real HTTP/WS cases passed | The subsequent District territorial browser helper failed; the overall job is not green. |
+| Existing-game browsers | Chess home, portal, avatar and preceding District suites passed; compact trade six variants/audio eleven checks. Overdrive 16 PASS/2 skips; Colossus 36 PASS/2 skips | Territorial cancellation remains separately recorded below. |
+| Images, run 46171988502 | Chess/platform passed; realtime failed before Docker build | Collector rejected the live portal HTML fallback. Publish/deploy skipped. |
+| Four-room hour, job 141062235867 | Same collector failure before Docker build | Workload never started; not an additional short load attempt or completed hour. |
+
+### Defects and original-scenario retests
+
+| ID | Observed scenario / failure | Correction or next discrimination | Actual retest |
+|---|---|---|---|
+| D22 | Default-3D lesson construction should complete and reopen its saved world; R3 clock stalled | Fixed-30Hz tutorial Worker and bounded view/input lifecycle, shipped before R4 | **Original R4 native scenario PASS**, including completion/save/resume. |
+| D23 | A real room on every map should reach its match result; six R4 scenarios instead paused with SERVER_BUSY | Separate PASSIVE checkpointer did not close the defect. Measure checkout filesystem, small-file fsync and existing FULL writer; no durability/overload relaxation | **OPEN**, zero complete matches in either renderer. |
+| D24 | Restart lesson 1, then move with the visible Restart button focused; the test pressed its key before the new Worker was ready | Wait for old button detachment, renewed connected/enabled view, then focus its new visible button | Source/types/lint passed; browser replay **pending**. |
+| D25 | Last lesson created a real Chromium practice, but pinned-client navigation invalidated the test response-body read and prevented fixture cleanup | Capture actual route.fetch response before unchanged fulfillment; require 201 and matching persisted ID; cleanup only that context's room | Static checks passed; browser replay **pending**. Following lifecycle case's actual 503/ROOM_LIMIT is not a confirmed product-navigation failure. |
+| D26 | Fire, then activate another tab; neither R4 driver produced required real blur/visibility loss | Chromium disables Playwright's forced focus through public CDP, then still requires actual initial focus/loss. WebKit unavailable capability stays explicit | R4 **FAIL** of capability precondition; no fake DOM event, skip or weaker ammo assertion. Chromium replay pending. |
+| D27 | Compatibility read returned HTTP 200 portal HTML instead of inventory JSON | Narrow proof of independently observed legacy shell, health and exact legacy catalogue; unknown responses fail and actual-volume preflight remains | 15 focused Python tests and actual public collector read passed. Docker/image/hour replay **pending**. |
+| D28 | District author withdraw: disabled button → detached → 30s click timeout | Accepted product owns stale retries while the old helper also clicks again. Narrow helper observes one click and actual 200 for same intent/actionId | Source-derived probable cause; failed log does not prove a particular 409. Static checks and six retry-policy tests passed; browser replay **pending**. |
+| D29 | Default 3D kept producing long frames after host pause | QA-only bounded RAF camera/layout/animation/effects/submit and synchronous Scene timings, optional numeric LoAF | Instrumentation, **not a performance correction**; GPU completion/React render and commit remain unmeasured. |
+
+The 2D FP01/FP02 runs had approximately 16.7 ms median frame intervals and zero observed long tasks, yet paused. Worker work p99 was 0.8 ms, commit RPC p99 138.9/176.4 ms, writer body p99 0.4 ms, transaction-minus-body p99 119.5/173.7 ms. The server failure also occurs without slow 3D frames. The latter timing includes transaction boundaries, locking and scheduling: **it is not exact fsync**. Storage/checkpointer errors were zero.
+
+FP03 failed its assertion roughly twenty minutes after the already observed pause. Its final cumulative latency includes later paused activity; 3D commit p99 23.4 ms does not negate the earlier overload (maximum 246.9 ms). The next scenario fails at its next observation of an actual overload message. Match-result, escort and privacy requirements remain mandatory.
+
+The unchanged 500-sample maximum-scene gate passed: smoke **4.980646 ms**, barriers **3.170490 ms**, mixed **3.185302 ms** p99 wall. Node 24.22.3, AMD EPYC 9V74, parallelism 4, reported RAM 16,759,435,264 bytes; explicit CPU/RAM quotas unavailable. This neither erases the local 17.939 ms failure nor accepts production capacity.
+
+### Prepared next candidate
+
+Precondition/cleanup/focus/collector/District-helper changes await a new immutable build. A separate storage diagnostic uses the actual checkout disk and existing RealtimeStore.commitBatch with FULL/WAL/PASSIVE unchanged. Optional tracing follows only its own child and is distinguished from baseline. CI supplies an outer timeout because internal metadata/cleanup awaits are not all abortable. Only sanitized stdout/summary is published; private report/source/raw files are not uploaded. Diagnostic completion is not a capacity PASS.
+
+### Local verification of the post-R4 candidate
+
+Clean local commit `4730994b95746b31ecf6e5c99415a814957c6e8c`, tree `d24ee6afd350d27267a6022681117040f3e750f1`, passed boundaries, global types/lint, 26 Node harness tests, 80 infrastructure tests and the Forpost client build. [Exact commands/exit codes/log hashes](qa/local-round-5.json). These are focused candidate checks, not another executed UI round, full unit-suite rerun, image build or deployment. New native CI must report its own checkout and client/runtime identities.

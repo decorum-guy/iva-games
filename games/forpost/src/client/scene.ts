@@ -32,6 +32,27 @@ export interface StageState {
 export interface StageMetrics {
   frames: number; elapsed: number; drawCalls: number; triangles: number
   renderWall?: { samples: number; p50Ms: number; p95Ms: number; maxMs: number }
+  qaPhases?: Record<QaPhaseName, QaTimingSummary> & {
+    windowSize: number
+    coverage: { samples: string; sceneUpdates: string; nestedPhase: string; scheduling: string; reactRenderAndCommit: 'not-measured'; asyncModelLoading: 'not-measured'; gpuCompletion: 'not-measured' }
+  }
+}
+type QaPhaseName = 'callbackWallMs' | 'timestampAgeMs' | 'cameraWallMs' | 'cameraLayoutReadMs' | 'entityAnimationWallMs' | 'effectsWallMs' | 'renderSubmitWallMs' | 'setViewSyncCallWallMs' | 'setStateSyncCallWallMs'
+type QaTimingSummary = { observations: number; samples: number; totalMs: number; p50Ms: number; p95Ms: number; maxMs: number }
+const QA_TIMING_WINDOW = 120
+/** Numeric presentation timings only. Enabled by the existing CI init-script marker. */
+class QaTimingRing {
+  private values = new Float64Array(QA_TIMING_WINDOW)
+  private observations = 0
+  record(value: number): void { this.values[this.observations++ % this.values.length] = Math.max(0, value) }
+  summary(): QaTimingSummary {
+    const sorted = Array.from(this.values.subarray(0, Math.min(this.observations, this.values.length))).sort((a, b) => a - b)
+    return { observations: this.observations, samples: sorted.length, totalMs: sorted.reduce((sum, value) => sum + value, 0), p50Ms: sorted[Math.ceil(sorted.length * .5) - 1] ?? 0, p95Ms: sorted[Math.ceil(sorted.length * .95) - 1] ?? 0, maxMs: sorted.at(-1) ?? 0 }
+  }
+}
+function qaTimingRings(): Record<QaPhaseName, QaTimingRing> | null {
+  if (typeof window === 'undefined' || !(window as Window & { __forpostQaTiming?: unknown }).__forpostQaTiming) return null
+  return { callbackWallMs: new QaTimingRing(), timestampAgeMs: new QaTimingRing(), cameraWallMs: new QaTimingRing(), cameraLayoutReadMs: new QaTimingRing(), entityAnimationWallMs: new QaTimingRing(), effectsWallMs: new QaTimingRing(), renderSubmitWallMs: new QaTimingRing(), setViewSyncCallWallMs: new QaTimingRing(), setStateSyncCallWallMs: new QaTimingRing() }
 }
 export interface Stage {
   setView(view: WorldView): void
@@ -200,6 +221,8 @@ export class ThreeStage implements Stage {
   private hazardKey = ''
   private frames = 0
   private renderWallTimes = new Float64Array(120)
+  private qaTiming = qaTimingRings()
+  private qaCameraLayoutReadMs = 0
   private started = performance.now()
   private previousTime = performance.now()
   private lastViewAt = 0
@@ -430,6 +453,7 @@ export class ThreeStage implements Stage {
     }
     for (const event of recent) this.event(event, now)
     this.updateStations(); this.updateFog(); this.updateControls(); this.updateNetwork(); this.updateHazards(); this.updateAim()
+    if (this.qaTiming) this.qaTiming.setViewSyncCallWallMs.record(performance.now() - now)
   }
   private damageAnimation(entity: SceneEntity, hp: number, now: number): void {
     if (entity.lastHp !== undefined && hp < entity.lastHp) entity.group.userData.hitAt = now
@@ -563,8 +587,12 @@ export class ThreeStage implements Stage {
     this.aimMarker.position.set(this.state.aim.x, 0, this.state.aim.z)
   }
   private updateCamera(dt: number): void {
+    if (this.qaTiming) this.qaCameraLayoutReadMs = 0
     if (!this.map) return
-    const rect = this.host.getBoundingClientRect(), aspect = Math.max(.3, rect.width / Math.max(1, rect.height)), own = this.view?.participants.find(p => p.id === this.view!.you), tactics = own?.mode === 'tactics'
+    const layoutReadStart = this.qaTiming ? performance.now() : 0
+    const rect = this.host.getBoundingClientRect()
+    if (this.qaTiming) this.qaCameraLayoutReadMs = performance.now() - layoutReadStart
+    const aspect = Math.max(.3, rect.width / Math.max(1, rect.height)), own = this.view?.participants.find(p => p.id === this.view!.you), tactics = own?.mode === 'tactics'
     const fighter = this.view?.units.find(u => u.ownerId === this.view!.you && u.kind === 'fighter'), target = tactics ? this.state.target ?? { x: this.map.width / 2, z: this.map.height / 2 } : this.prediction ?? fighter ?? this.map.bases[this.view?.teams[this.view.yourTeam].side ?? 'L']
     const width = tactics ? Math.max(this.map.width + 5, (this.map.height * SQRT3_2 + 5) * aspect) / this.state.zoom : (rect.width < 600 ? 24 : 38) / this.state.zoom
     const halfH = width / aspect / 2; this.camera.left = -width / 2; this.camera.right = width / 2; this.camera.top = halfH; this.camera.bottom = -halfH; this.camera.updateProjectionMatrix()
@@ -594,11 +622,14 @@ export class ThreeStage implements Stage {
   }
   private frame = (time: number): void => {
     if (this.destroyed) return
+    const qa = this.qaTiming, callbackStart = qa ? performance.now() : 0
     const dt = Math.min(.1, (time - this.previousTime) / 1000); this.previousTime = time
     const own = this.view?.participants.find(p => p.id === this.view!.you), fighter = this.view?.units.find(u => u.ownerId === this.view!.you && u.kind === 'fighter')
     const prediction = own?.mode === 'fighter' && fighter ? this.options.getPrediction?.() ?? null : null
     this.prediction = prediction && prediction.id === fighter?.id && Number.isFinite(prediction.x + prediction.z + prediction.angle) ? prediction : null
+    const cameraStart = qa ? performance.now() : 0
     this.updateCamera(dt)
+    const entitiesStart = qa ? performance.now() : 0
     const fresh = time - this.lastViewAt < 250
     for (const [id, entity] of this.entities) {
       const predicted = this.prediction?.id === id ? this.prediction : null, targetX = predicted?.x ?? entity.lastX, targetZ = predicted?.z ?? entity.lastZ
@@ -608,6 +639,7 @@ export class ThreeStage implements Stage {
       this.inverseRotation.copy(entity.group.quaternion).invert(); entity.hp.quaternion.copy(this.camera.quaternion).premultiply(this.inverseRotation); entity.progress.quaternion.copy(entity.hp.quaternion)
       if (entity.object) animateForpostModel(entity.object, { ...entity.animation, time: (this.view?.tick ?? 0) / 30 + Math.min(.1, Math.max(0, time - this.lastViewAt) / 1000), moving: fresh && (predicted ? Math.hypot(entity.group.position.x - x, entity.group.position.z - z) > .001 : !!entity.animation.moving), working: fresh && !!entity.animation.working, distance: entity.distance, sinceHit: typeof entity.group.userData.hitAt === 'number' ? (time - entity.group.userData.hitAt) / 1000 : undefined, sinceShot: typeof entity.group.userData.shotAt === 'number' ? (time - entity.group.userData.shotAt) / 1000 : undefined, reducedMotion: this.settings.reducedMotion })
     }
+    const effectsStart = qa ? performance.now() : 0
     this.fadeOccluders(); this.updateAim()
     for (const effect of this.effects) if (time >= effect.until) { this.disposeObject(effect.object); this.effectGroup.remove(effect.object) }
     this.effects = this.effects.filter(e => time < e.until)
@@ -627,22 +659,44 @@ export class ThreeStage implements Stage {
     this.retiring = this.retiring.filter(r => time - r.start < r.duration)
     const renderStart = performance.now()
     this.renderer.render(this.scene, this.camera)
-    this.renderWallTimes[this.frames % this.renderWallTimes.length] = performance.now() - renderStart
+    const renderEnd = performance.now()
+    this.renderWallTimes[this.frames % this.renderWallTimes.length] = renderEnd - renderStart
     this.frames++; this.raf = requestAnimationFrame(this.frame)
+    if (qa) {
+      qa.timestampAgeMs.record(callbackStart - time)
+      qa.cameraWallMs.record(entitiesStart - cameraStart)
+      qa.cameraLayoutReadMs.record(this.qaCameraLayoutReadMs)
+      qa.entityAnimationWallMs.record(effectsStart - entitiesStart)
+      qa.effectsWallMs.record(renderStart - effectsStart)
+      qa.renderSubmitWallMs.record(renderEnd - renderStart)
+      // Stops at the end of the callback body, before this final ring write.
+      // It never waits for GPU completion or includes a subsequent browser paint.
+      qa.callbackWallMs.record(performance.now() - callbackStart)
+    }
   }
   setSettings(settings: Settings): void {
     const qualityChanged = settings.quality !== this.settings.quality
     this.settings = settings; this.renderer.shadowMap.enabled = settings.quality !== 'low'; this.renderer.setPixelRatio(Math.min(devicePixelRatio, settings.quality === 'low' ? 1 : 1.75))
     if (qualityChanged && this.view) { this.mapKey = ''; this.setView(this.view) }
   }
-  setState(state: StageState): void { this.state = { ...state, focus: state.focus ?? [] }; this.updateControls(); this.updateNetwork(); this.updateAim() }
+  setState(state: StageState): void {
+    const start = this.qaTiming ? performance.now() : 0
+    this.state = { ...state, focus: state.focus ?? [] }; this.updateControls(); this.updateNetwork(); this.updateAim()
+    if (this.qaTiming) this.qaTiming.setStateSyncCallWallMs.record(performance.now() - start)
+  }
   worldPoint(clientX: number, clientY: number): Point {
     const rect = this.host.getBoundingClientRect(); this.raycaster.setFromCamera(new THREE.Vector2((clientX - rect.left) / rect.width * 2 - 1, -(clientY - rect.top) / rect.height * 2 + 1), this.camera)
     const target = new THREE.Vector3(); this.raycaster.ray.intersectPlane(this.plane, target); return { x: target.x, z: target.z }
   }
   metrics(): StageMetrics {
     const times = Array.from(this.renderWallTimes.subarray(0, Math.min(this.frames, this.renderWallTimes.length))).sort((a, b) => a - b)
-    return { frames: this.frames, elapsed: performance.now() - this.started, drawCalls: this.renderer.info.render.calls, triangles: this.renderer.info.render.triangles, renderWall: { samples: times.length, p50Ms: times[Math.ceil(times.length * .5) - 1] ?? 0, p95Ms: times[Math.ceil(times.length * .95) - 1] ?? 0, maxMs: times.at(-1) ?? 0 } }
+    const result: StageMetrics = { frames: this.frames, elapsed: performance.now() - this.started, drawCalls: this.renderer.info.render.calls, triangles: this.renderer.info.render.triangles, renderWall: { samples: times.length, p50Ms: times[Math.ceil(times.length * .5) - 1] ?? 0, p95Ms: times[Math.ceil(times.length * .95) - 1] ?? 0, maxMs: times.at(-1) ?? 0 } }
+    if (this.qaTiming) result.qaPhases = {
+      ...Object.fromEntries(Object.entries(this.qaTiming).map(([key, ring]) => [key, ring.summary()])) as Record<QaPhaseName, QaTimingSummary>,
+      windowSize: QA_TIMING_WINDOW,
+      coverage: { samples: 'totalMs and percentiles cover the retained window; observations counts all calls', sceneUpdates: 'completed synchronous Scene calls only; excludes React render/commit and async model completion', nestedPhase: 'cameraLayoutReadMs is included in cameraWallMs', scheduling: 'timestampAgeMs and frame gaps overlap scheduling; do not add them to callback phases', reactRenderAndCommit: 'not-measured', asyncModelLoading: 'not-measured', gpuCompletion: 'not-measured' },
+    }
+    return result
   }
   private disposeObject(object: THREE.Object3D): void {
     object.traverse(child => {

@@ -77,3 +77,27 @@ Worker проверяет состояние каждые 250 мс; незаве
 Финальный focused suite: **18/18 PASS** (`.qa/writer-checkpoint-tests-r2.log`), общий TypeScript и focused ESLint exit 0 (`.qa/writer-checkpoint-types-r2.log`, `.qa/writer-checkpoint-eslint-r2.log`). Проверены настоящий второй SQLite connection, FULL=2, отсутствие autocheckpoint у выделенного writer, блокирующий прогресс reader с последующим возобновлением checkpoint, отказ при stale/failure/размере WAL, FIFO async-барьер закрытия, а также прежние durable-publication/FIFO tests. Физическое отключение диска не имитировалось; size guard проверен отдельным sparse-файлом.
 
 Следующие доказательства ещё нужны: окончательный общий build, настоящий network/recovery smoke на новом artifact, повтор исходных браузерных FP01/FP02 сценариев, допустимая нагрузка и public host delivery. Старые два четырёхкомнатных FAIL остаются действительными результатами своих сборок. Здесь не заявлены исправление всех перегрузок, принятая четырёхкомнатная ёмкость или публичный выпуск.
+
+## R4 remote evidence and bounded local storage diagnosis
+
+The actual R4 build `51748ae944081b5a33a08a630b42b31310b09546` still paused all six 2D/3D map passages with SERVER_BUSY. On FP01/FP02 2D, worker work p99 was 0.8 ms; commit RPC p99 138.9/176.4 ms; writer body p99 0.4 ms; transaction-minus-body p99 119.5/173.7 ms. Their approximately 16.7 ms median frame intervals and zero observed long tasks show that the server failure also occurs without slow 3D frames. The independent real HTTP/WS smoke passed its 14 correctness cases but recorded commit p99 121 ms. Neither correctness PASS nor the final FP03 latency after twenty minutes of paused activity closes the performance defect. [Exact completed R4 data](../../games/forpost/qa/ci-round-4.json).
+
+The new [bounded diagnostic](../../apps/realtime-server/scripts/STORAGE_DIAGNOSTIC.md) measures the actual checkout mount, a 16 KiB append/fsync fixture and the existing RealtimeStore.commitBatch with FULL/WAL/PASSIVE unchanged. Its first local invocation stopped during native-addon identification, after 0.990 s and **before any measured case**. The harness now hashes the actual loaded addon, including the prebuilt dependency layout.
+
+One complete local diagnostic then recorded 14.686 s, 64 measured file syncs after 8 warmup and 300 SQLite commits after 30 warmup. [Sanitized summary](evidence/realtime-storage-local-2026-11-28.json):
+
+| Observation | Actual value / scope |
+|---|---|
+| Source | Dirty checkpoint `0513dad…`, 251-file aggregate `501fd67a34ddb1d5de62207bd75971d092a6d36256819d0ac7bde724d2721aff`; exact bytes verified before/after |
+| Diagnostic executable | `9deb4d721edf1ab7aa946aa2ad56ff364960bb9e47228b9adae2f43566cabfbd`, three compiled files; not the production runtime identity |
+| Actual mount | ext4, /dev/vdb, major:minor 254:16; no alternate disk selected |
+| File fsync p99 / max | 3.334038 / 3.334038 ms, 64 measured samples |
+| SQLite commit p99 / max | 2.397083 / 2.733913 ms, 300 measured samples; no sample above 50 ms |
+| Writer timing | FULL=2, WAL, autocheckpoint=0; total 330 batches including warmup; cumulative transaction p99 2.7 ms |
+| Case | FP01 1×1 preparation, ordinary core ticks 0→330, one inactive human seat and one explicit bot; final stored hash/journal verified |
+| Checkpoint | 11 runs, max 2.610984 ms, zero failures |
+| Trace | Own-child ptrace unavailable; no syscall trace and no privilege workaround |
+| Environment limits | CPU/I/O pressure, cgroup allocation and block-device listing unavailable; not invented |
+| Cleanup / completion evidence | Summary complete=true, failures empty, raw directory removed. The separate shell exit-code receipt was not retained; exit 0 is inferred from the successful code path, not independently asserted |
+
+The local result did not reproduce the CI delay and is not production storage/capacity acceptance. Finalize still includes locking/transaction/scheduling and is **not fsync**. CI will run this same diagnostic with an outer timeout and optional own-child tracing; only sanitized stdout enters its logs, never the private report/source/raw files.
