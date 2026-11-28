@@ -179,6 +179,34 @@ describe('the six complete abilities', () => {
     }
     expect(() => ability(pos([p('wr', 'white', 'rook', 'c3'), p('target', 'black', 'knight', 'c8')], { energy: { white: 5 } }), 'wr', 'target')).toThrow('illegalMovement')
   })
+  it('v3 shifts a continuous mixed chain atomically with one Ram in any power mode', () => {
+    const line = ['b4', 'c4', 'd4', 'e4', 'f4', 'g4'].map((square, index) =>
+      p('p' + index, index % 2 ? 'black' : 'white', index % 2 ? 'knight' : 'pawn', square))
+    const pieces = [p('wr', 'white', 'rook', 'a4'), ...line]
+    for (const mode of ['impulse', 'activate', 'form'] as const) {
+      const state = pos(pieces, {
+        rulesVersion: RULES_VERSION,
+        energy: { white: mode === 'form' ? 0 : mode === 'activate' ? 6 : 3 },
+        forms: mode === 'form' ? { white: { pieceId: 'wr', remainingTurns: 2 } } : {},
+      })
+      const { state: next, events } = ability(state, 'wr', 'p0', undefined, mode)
+      expect(next.pieces).toHaveLength(state.pieces.length)
+      expect(pieceAt(next, 'b4')?.id).toBe('wr')
+      expect(pieceAt(next, 'h4')?.id).toBe('p5')
+      expect(events.filter(event => event.type === 'move' && event.forced)).toHaveLength(6)
+      expect(events.some(event => event.type === 'capture')).toBe(false)
+      expect(next.energy.white).toBe(0)
+      expect(next.forms.white?.remainingTurns ?? 0).toBe(mode === 'form' ? 1 : mode === 'activate' ? 2 : 0)
+      expect(validateState(next)).toBe(true)
+      expect(() => ability({ ...state, rulesVersion: 'overdrive-v2' }, 'wr', 'p0', undefined, mode)).toThrow('illegalMovement')
+    }
+    const energy = { white: 3 }
+    const full = pos([...pieces, p('edge', 'black', 'bishop', 'h4')], { rulesVersion: RULES_VERSION, energy })
+    expect(() => ability(full, 'wr', 'p0')).toThrow('illegalMovement')
+    expect(full.energy.white).toBe(3)
+    const king = pos([p('wr', 'white', 'rook', 'a4'), ...line.slice(0, 2), p('bk', 'black', 'king', 'd4')], { rulesVersion: RULES_VERSION, energy })
+    expect(() => ability(king, 'wr', 'p0')).toThrow('illegalMovement')
+  })
   it('rotation exchanges only the nearest friendly piece on a queen ray', () => {
     const state = pos([p('wq', 'white', 'queen', 'c3'), p('wr', 'white', 'rook', 'f6')], { energy: { white: 5 } })
     const next = ability(state, 'wq', 'wr').state

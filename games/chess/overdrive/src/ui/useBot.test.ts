@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { createInitialState } from '../core'
+import { createInitialState, RULES_VERSION } from '../core'
 import type { Command } from '../core'
 import type { SearchRequest, SearchResponse } from '../engine/protocol'
 import { BotController } from './useBot'
@@ -49,7 +49,7 @@ describe('Overdrive Worker lifecycle and visible thinking delay', () => {
     controller.start(source)
     expect(workers).toHaveLength(1)
     expect(workers[0].request).toMatchObject({ publicState: source.state, gameId: 'test-game',
-      gameRevision: 0, presetId: 4, rulesVersion: 'overdrive-v2' })
+      gameRevision: 0, presetId: 4, rulesVersion: RULES_VERSION })
     expect(callbacks.onThinking).toHaveBeenLastCalledWith(true)
     workers[0].result()
     expect(workers[0].terminated).toBe(true)

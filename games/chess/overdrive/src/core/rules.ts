@@ -1,4 +1,4 @@
-import { ABILITIES, PROMOTIONS, LEGACY_RULES_VERSION, energyBankSize, RuleError } from './types'
+import { ABILITIES, PROMOTIONS, LEGACY_RULES_VERSION, RULES_VERSION, energyBankSize, RuleError } from './types'
 import type { Action, Command, EnPassant, EventData, GameOutcome, GameState, Piece, Side, Square, Transition } from './types'
 import { adjacent, DIAGONAL, file, homeRank, KING_STEPS, KNIGHT_STEPS, offset, opposite, ORTHOGONAL, pawnDirection, pawnStartRank, promotionRank, raidMiddles, rank, squareAt, validSquare } from './geometry'
 
@@ -8,10 +8,10 @@ export const pieceAt = at
 export const hasAbility = (state: GameState, piece: Piece): boolean => state.energy[piece.side] >= energyBankSize(state.rulesVersion) || state.forms[piece.side]?.pieceId === piece.id
 
 /** Non-recursive geometric attack map. Pins do not suppress attacks. */
-export function attackMap(state: GameState, side: Side): ReadonlySet<Square> {
+export function attackMap(state: GameState, side: Side, attackerId?: string): ReadonlySet<Square> {
   const attacked = new Set<Square>(), board = new Map(state.pieces.map(p => [p.square, p]))
   for (const piece of state.pieces) {
-    if (piece.side !== side) continue
+    if (piece.side !== side || (attackerId !== undefined && piece.id !== attackerId)) continue
     if (piece.type === 'pawn') {
       for (const dx of [-1, 1]) { const to = offset(piece.square, dx, pawnDirection(side)); if (to) attacked.add(to) }
       continue
@@ -188,9 +188,20 @@ export function resolveCandidate(state: GameState, command: Action): Transition 
       if (command.to || !target) return reject('illegalMovement')
       const path = ray(original.square, target.square, false, true)
       if (!path || path.some(s => currentAt(s))) return reject('illegalMovement')
-      const beyond = offset(target.square, Math.sign(file(target.square) - file(original.square)), Math.sign(rank(target.square) - rank(original.square)))
-      if (!beyond || currentAt(beyond)) return reject('illegalMovement')
-      movePiece(target, beyond, true)
+      const dx = Math.sign(file(target.square) - file(original.square))
+      const dy = Math.sign(rank(target.square) - rank(original.square))
+      const push: { piece: Piece; to: Square }[] = []
+      let current: Piece | undefined = target
+      while (current) {
+        const to = offset(current.square, dx, dy)
+        if (!to || current.type === 'king') return reject('illegalMovement')
+        push.push({ piece: current, to })
+        current = currentAt(to)
+        if (current && state.rulesVersion !== RULES_VERSION) return reject('illegalMovement')
+      }
+      // Resolve the complete chain before moving any piece. Shifting from the
+      // far end keeps every destination unique and preserves the move events.
+      for (const step of push.reverse()) movePiece(step.piece, step.to, true)
       landing = target.square
       movePiece(original, landing, false)
     } else if (original.type === 'queen') {

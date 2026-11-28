@@ -19,7 +19,7 @@ const report = { browser: false, sourceState: 'working tree', status: 'running',
 const games = ['remorse', 'overdrive', 'colossus']
 const healthEndpoints = [
   ['/api/health', 'remorse-online-v1', 'remorse-digital-v1'],
-  ['/api/overdrive/health', 'overdrive-online-v2', 'overdrive-v2'],
+  ['/api/overdrive/health', 'overdrive-online-v2', 'overdrive-v3'],
   ['/api/colossus/health', 'colossus-online-v1', 'colossus-v1'],
 ]
 const ownedAssets = {

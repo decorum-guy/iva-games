@@ -207,7 +207,9 @@ describe('Overdrive real HTTP and independent WebSocket guests', () => {
     { name: 'sweep', pieces: [{ id: 'focus-piece', type: 'pawn', side: 'white', square: 'e4' }, { id: 'target-piece', type: 'knight', side: 'black', square: 'f5' }] },
     { name: 'raid', landing: 'e4', pieces: [{ id: 'focus-piece', type: 'knight', side: 'white', square: 'c3' }, { id: 'target-piece', type: 'rook', side: 'black', square: 'd4' }] },
     { name: 'battery', pieces: [{ id: 'focus-piece', type: 'bishop', side: 'white', square: 'c1' }, { type: 'pawn', side: 'white', square: 'd2' }, { id: 'target-piece', type: 'rook', side: 'black', square: 'h6' }] },
-    { name: 'ram', pieces: [{ id: 'focus-piece', type: 'rook', side: 'white', square: 'b1' }, { id: 'target-piece', type: 'knight', side: 'black', square: 'd1' }] },
+    { name: 'ram', pieces: [{ id: 'focus-piece', type: 'rook', side: 'white', square: 'b1' },
+      { id: 'target-piece', type: 'knight', side: 'black', square: 'd1' },
+      { id: 'second-piece', type: 'bishop', side: 'white', square: 'e1' }] },
     { name: 'rotation', pieces: [{ id: 'focus-piece', type: 'queen', side: 'white', square: 'd4' }, { id: 'target-piece', type: 'rook', side: 'white', square: 'a4' }] },
     { name: 'cover', landing: 'd1', pieces: [{ id: 'focus-piece', type: 'king', side: 'white', square: 'c1' }, { id: 'target-piece', type: 'knight', side: 'white', square: 'd2' }, { type: 'rook', side: 'black', square: 'a1' }] },
   ]
@@ -227,11 +229,21 @@ describe('Overdrive real HTTP and independent WebSocket guests', () => {
     expect(white.snapshot.game.actions[0].events).toContainEqual(expect.objectContaining({ type: 'ability', ability: name }))
     expect(white.snapshot.game.actions[0].events).toContainEqual(expect.objectContaining({ type: 'energy', spent: 3 }))
     expect(white.snapshot.game.state.energy.white).toBeLessThanOrEqual(3)
+    if (name === 'ram') {
+      expect(white.snapshot.game.state.pieces).toEqual(expect.arrayContaining([
+        expect.objectContaining({ id: 'focus-piece', square: 'd1' }),
+        expect.objectContaining({ id: 'target-piece', square: 'e1' }),
+        expect.objectContaining({ id: 'second-piece', square: 'f1' }),
+      ]))
+    }
   })
 
-  it('replays an existing v1 room with its original capture value after reconnecting', async () => {
+  it.each([
+    { rulesVersion: 'overdrive-v1' as const, reward: 1 },
+    { rulesVersion: 'overdrive-v2' as const, reward: 4 },
+  ])('replays an existing $rulesVersion room with its original capture value after reconnecting', async ({ rulesVersion, reward }) => {
     const { white, black, created, whiteCookie } = await room()
-    const state = createPosition({ rulesVersion: 'overdrive-v1', pieces: [
+    const state = createPosition({ rulesVersion, pieces: [
       { id: 'wk', side: 'white', type: 'king', square: 'h1' },
       { id: 'bk', side: 'black', type: 'king', square: 'h8' },
       { id: 'wr', side: 'white', type: 'rook', square: 'a2' },
@@ -240,12 +252,12 @@ describe('Overdrive real HTTP and independent WebSocket guests', () => {
     await installRoot(created.snapshot.id, state, white, black)
     expect((await white.command({ type: 'move', mode: 'normal', pieceId: 'wr', to: 'a7' })).result.type).toBe('ack')
     await black.wait(message => message.type === 'update' && message.snapshot.game.revision === 1)
-    expect(black.snapshot.game.state.energy.white).toBe(1)
+    expect(black.snapshot.game.state.energy.white).toBe(reward)
     await white.close()
     const resumed = new Peer(whiteCookie)
     await resumed.open(created.snapshot.id)
-    expect(resumed.snapshot.game.state.rulesVersion).toBe('overdrive-v1')
-    expect(resumed.snapshot.game.state.energy.white).toBe(1)
+    expect(resumed.snapshot.game.state.rulesVersion).toBe(rulesVersion)
+    expect(resumed.snapshot.game.state.energy.white).toBe(reward)
   })
 
   it('keeps form activation and duration authoritative when a client reconnects', async () => {

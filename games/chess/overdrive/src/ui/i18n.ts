@@ -1,4 +1,4 @@
-import type { Ability, GameOutcome, PieceType, Side } from '../core'
+import { RULES_VERSION, type Ability, type GameOutcome, type PieceType, type RulesVersion, type Side } from '../core'
 export type Language = 'ru' | 'en'
 export const tr = (language: Language, ru: string, en: string) => language === 'ru' ? ru : en
 export const pieceName = (type: PieceType, language: Language) => ({
@@ -10,10 +10,15 @@ export const abilityName = (ability: Ability, language: Language) => ({
   sweep: ['Подсечка', 'Sweep'], raid: ['Налёт', 'Raid'], battery: ['Батарея', 'Battery'],
   ram: ['Таран', 'Ram'], rotation: ['Ротация', 'Rotation'], cover: ['Под прикрытием', 'Covered retreat'],
 }[ability][language === 'ru' ? 0 : 1])
-export const abilityDescription = (ability: Ability, language: Language) => ({
+export const abilityDescription = (ability: Ability, language: Language, rulesVersion: RulesVersion) =>
+  ability === 'ram' && rulesVersion === RULES_VERSION
+    ? tr(language, 'Толкните фигуру или цепочку на клетку по прямой. За последней фигурой нужна пустая клетка. Королей толкать нельзя.',
+      'Push one piece or a continuous line one square straight ahead. There must be an empty square behind the last piece. Kings cannot be pushed.')
+    : ({
   sweep: ['Перетяните врага с передней диагонали на свободную клетку перед пешкой. Пешка остаётся на месте.', 'Pull an enemy from a forward diagonal onto the empty square ahead. Your pawn stays put.'],
   raid: ['Прыгните на пустую клетку и возьмите одного врага на пролёте. Сначала выберите приземление, затем цель.', 'Land on an empty knight square and capture one enemy along the jump. Choose the landing, then the target.'],
-  battery: ['Возьмите врага по диагонали через ровно одну фигуру. Заслон остаётся на месте.', 'Capture diagonally across exactly one intervening piece. The screen stays in place.'],
+  battery: ['Возьмите врага по диагонали через одну фигуру. Пока приём доступен, слон уже может дать шах через этот заслон.',
+    'Capture diagonally across one intervening piece. While Battery is available, the bishop can give check through that piece.'],
   ram: ['Сдвиньте первую фигуру по прямой на одну свободную клетку дальше. Ладья занимает её место. Взятия нет.', 'Push the first piece on a straight line one square into empty space. The rook takes its place. No capture.'],
   rotation: ['Поменяйте ферзя местами с первым союзником по его линии. Король не участвует.', 'Swap the queen with the first friendly piece on a queen line. The king cannot be swapped.'],
   cover: ['Король шагает на пустую соседнюю клетку. Соседний союзный офицер занимает его прежнее место.', 'Step the king onto an empty adjacent square. An adjacent friendly officer fills the king’s old square.'],

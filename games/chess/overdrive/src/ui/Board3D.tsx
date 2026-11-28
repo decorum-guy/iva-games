@@ -7,6 +7,10 @@ import { fallAngles, planKingFall, rimPose, stepFall, type FallPlayback, type Ki
 import { activationPulseAt, effectStrengthAt, motionTrails, piecePoseAt, progressAt, sceneTiming, squarePoint, type BoardMotion, type MotionTrail } from './motion'
 
 const WHITE = new Color('#eef1eb'), BLUE = new Color('#245b86'), ORANGE = new Color('#f56b30'), BLACK = new Color('#000000')
+const FRAME_WIDTH = 9.12
+const CAMERA_POSITION = new Vector3(1.2, 17, 8.4)
+const projectedWidth = FRAME_WIDTH * (CAMERA_POSITION.x + CAMERA_POSITION.z) / Math.hypot(CAMERA_POSITION.x, CAMERA_POSITION.z)
+const projectedHeight = projectedWidth * CAMERA_POSITION.y / CAMERA_POSITION.length() + .45
 const xy = (square: string): [number,number,number] => { const point=squarePoint(square); return [point.x,.07,point.z] }
 export interface Board3DProps {
   playback: FallPlayback | null; onArenaMounted(ready: boolean): void
@@ -14,8 +18,10 @@ export interface Board3DProps {
   onSquare(square: string): void; flipped: boolean; motion: BoardMotion | null; reduced: boolean
 }
 function ArenaCamera() {
-  const size=useThree(s=>s.size)
-  return <OrthographicCamera makeDefault position={[0,11,8.8]} zoom={Math.min(size.width,size.height)/10.8} near={.1} far={70} onUpdate={camera=>camera.lookAt(0,0,0)} />
+  const { width, height } = useThree(state => state.size)
+  // Keep the rotated frame in view on both wide and tall canvases.
+  const zoom = .97 * Math.min(width / projectedWidth, height / projectedHeight)
+  return <OrthographicCamera makeDefault position={CAMERA_POSITION} zoom={zoom} near={.1} far={70} onUpdate={camera=>camera.lookAt(0,0,0)} />
 }
 interface FigureProps { piece:Piece;selected:boolean;active:boolean;checked?:boolean;defeated?:boolean;motion:BoardMotion|null;reduced:boolean;onSquare:(s:string)=>void }
 function FigureBody({piece,modelType,selected,active,checked=false,defeated=false,motion,reduced}:FigureProps & {modelType:PieceType}) {
@@ -210,13 +216,13 @@ function Arena(props:Board3DProps) {
   const pieces=[...props.state.pieces,...(props.motion?.before.pieces.filter(piece=>!props.state.pieces.some(current=>current.id===piece.id))??[])]
   const checked=isInCheck(props.state,props.state.side)
   return <group ref={rotation}>
-    <mesh position={[0,-.20,0]} receiveShadow castShadow><boxGeometry args={[9.12,.30,9.12]}/><meshStandardMaterial color="#8eacbb" metalness={.62} roughness={.29}/></mesh>
+    <mesh position={[0,-.20,0]} receiveShadow castShadow><boxGeometry args={[FRAME_WIDTH,.30,FRAME_WIDTH]}/><meshStandardMaterial color="#8eacbb" metalness={.62} roughness={.29}/></mesh>
     <mesh position={[0,-.06,0]} receiveShadow><boxGeometry args={[8.25,.08,8.25]}/><meshStandardMaterial color="#17374b" metalness={.55} roughness={.38}/></mesh>
     {Array.from({length:64},(_,i)=>{
       const x=i%8,y=Math.floor(i/8),square=String.fromCharCode(97+x)+(y+1),p=xy(square)
       const chosen=props.state.pieces.find(q=>q.square===square)?.id===props.selected
       const kingInCheck=checked&&props.state.pieces.some(piece=>piece.square===square&&piece.side===props.state.side&&piece.type==='king')
-      const color=kingInCheck?'#cf3f39':chosen?'#c88753':(x+y)%2===0?'#3f6880':'#c2d2d9'
+      const color=kingInCheck?'#cf3f39':chosen?'#c88753':(x+y)%2===0?'#456578':'#b4c7ce'
       return <group key={square} position={[p[0],0,p[2]]}>
         <mesh receiveShadow onClick={e=>{e.stopPropagation();props.onSquare(square)}}><boxGeometry args={[.982,.10,.982]}/><meshStandardMaterial color={color} metalness={.25} roughness={.33}/></mesh>
         {(targets.has(square)||focus.has(square))&&<mesh position={[0,.057,0]} rotation={[-Math.PI/2,0,0]}>

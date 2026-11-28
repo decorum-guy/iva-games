@@ -54,7 +54,7 @@
         "health": {
           "path": "/api/overdrive/health",
           "protocol": "overdrive-online-v2",
-          "rulesVersion": "overdrive-v2"
+          "rulesVersion": "overdrive-v3"
         },
         "database": {
           "file": "overdrive.sqlite",

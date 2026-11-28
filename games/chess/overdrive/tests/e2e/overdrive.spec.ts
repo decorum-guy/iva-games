@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test'
 import type { BrowserContext, Page } from '@playwright/test'
-import { transition } from '../../src/core'
+import { RULES_VERSION, transition } from '../../src/core'
 import type { Language } from '../../src/ui/i18n'
 import type { LocalSessionRecord } from '../../src/ui/session'
 
@@ -58,6 +58,13 @@ test('local launch, repeat-click/tap and Escape deselection, keyboard, save and 
   await expect(app(page)).toHaveAttribute('data-turn', '2')
   await ready(page)
   const before = await saved(page)
+  const newGame = page.getByRole('button', { name: 'New game', exact: true })
+  await expect(newGame).toBeInViewport({ ratio: 1 })
+  await newGame.click()
+  await expect(page.getByRole('dialog', { name: 'New game' })).toBeVisible()
+  await page.getByRole('button', { name: 'Close', exact: true }).click()
+  expect(await saved(page)).toEqual(before)
+  await expect(app(page)).toHaveAttribute('data-rules-version', RULES_VERSION)
   await page.reload()
   await expect(app(page)).toHaveAttribute('data-mode', 'local')
   await expect(app(page)).toHaveAttribute('data-turn', '2')
