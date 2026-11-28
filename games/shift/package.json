@@ -13,7 +13,7 @@
   },
   "scripts": {
     "test": "vitest run --config vitest.config.ts",
-    "assets": "node scripts/generate-assets.mjs"
+    "assets": "python3 scripts/generate-assets.py"
   },
   "dependencies": {
     "@iva-games/session-kit": "0.1.0",

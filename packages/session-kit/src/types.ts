@@ -26,12 +26,26 @@ export interface ActionEnvelope {
   payload: unknown;
 }
 
+/** A single authenticated controller lease. Implementations never expose server state. */
+export interface LiveGameSession {
+  readonly controllerEpoch: number;
+  readonly wireVersion: string;
+  input(payload: unknown): void;
+  command(actionId: string, payload: unknown): Promise<unknown>;
+  snapshot(): { tick: number; view: unknown };
+  isCurrent(): boolean;
+  close(): void;
+}
+
 /** The platform authenticates accounts; the runtime rechecks the frozen roster. */
 export interface GameRuntime {
   createMatch(input: StartMatchRequest): Promise<{ matchId: string }>;
   viewForPlayer(matchId: string, playerId: string): Promise<unknown>;
   applyAction(matchId: string, playerId: string, command: ActionEnvelope): Promise<unknown>;
   status(matchId: string): Promise<{ finished: boolean; outcome?: unknown }>;
+  /** Opt-in real-time channel sharing platform authentication and room membership. */
+  wireVersion?: string;
+  openLiveSession?(matchId: string, playerId: string): LiveGameSession;
 }
 
 export interface GameRegistration {
@@ -46,6 +60,10 @@ export interface GameRegistration {
   status: 'available' | 'unavailable' | 'planned';
   /** Validate and freeze game-owned room settings before players confirm readiness. */
   normalizeSettings?: (input: unknown) => Record<string, unknown>;
+  /** Game-owned capacity and roster invariants are checked before a lobby is frozen. */
+  validateRoom?: (settings: Record<string, unknown>, capacity: number, participants?: Participant[]) => void;
+  /** Keep game-owned team/role selections consistent after membership changes. */
+  reconcileRoster?: (settings: Record<string, unknown>, participants: Participant[]) => Record<string, unknown>;
   /** Resolve settings and bot policy against a persisted room's version pair. */
   resolveRoomVersion?: (rulesVersion: string, contentVersion: string) => {
     normalizeSettings: (input: unknown) => Record<string, unknown>;
