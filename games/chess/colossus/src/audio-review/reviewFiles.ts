@@ -1,10 +1,10 @@
-import { SOUND_NAMES } from '../ui/audio';
+import { SOUND_BANK_VERSION, SOUND_NAMES } from '../ui/audio';
 import type { SoundName } from '../ui/audio';
 
 export interface BankManifest { version: number; sounds: Record<SoundName, { sha256: string }> }
 
 export async function loadSoundBank(signal: AbortSignal): Promise<BankManifest> {
-  const response = await fetch('/assets/colossus/audio/manifest.json', { signal });
+  const response = await fetch('/assets/colossus/audio/manifest.json?v=' + SOUND_BANK_VERSION, { signal });
   if (!response.ok) throw new Error('Missing sound bank');
   const bank = await response.json() as BankManifest;
   if (!SOUND_NAMES.every(name => /^[0-9a-f]{64}$/.test(bank.sounds?.[name]?.sha256))) throw new Error('Incomplete sound bank');

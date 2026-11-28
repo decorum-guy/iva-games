@@ -9,7 +9,7 @@ const active = new Set<MockAudio>();
 class MockAudio {
   volume = 0; preload = ''; onended: (() => void) | null = null; onerror: (() => void) | null = null;
   constructor(readonly src: string) {}
-  play() { played.push(this.src.split('/').at(-1)!); active.add(this); return Promise.resolve(); }
+  play() { played.push(new URL(this.src, 'http://localhost').pathname.split('/').at(-1)!); active.add(this); return Promise.resolve(); }
   pause() { active.delete(this); }
 }
 beforeEach(() => {
