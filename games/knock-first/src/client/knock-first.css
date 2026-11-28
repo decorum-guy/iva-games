@@ -24,6 +24,9 @@
 .kf-landing .kf-lead{color:var(--kf-ink);text-shadow:0 2px 18px #061015}
 .kf-expedition-footer>label{flex-shrink:0;white-space:nowrap}
 .kf-expedition-footer>label>select{width:auto;min-width:64px;flex:none}
+.kf-lobby-edit>label>select{width:auto;min-width:64px;flex:none}
+.kf-lobby-rules p{color:inherit}
+.kf-friend-list p,.kf-loading p{color:#aabcc0}
 @media(max-width:760px){
   .kf-landing .kf-topline{flex-direction:column;align-items:flex-start;gap:0;padding-right:5vw}
   .kf-landing .kf-topline>.kf-text-button{padding-right:96px}

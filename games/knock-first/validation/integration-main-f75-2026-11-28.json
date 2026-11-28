@@ -1,0 +1,90 @@
+{
+  "method": "Local verification of the merge with current main; no browser mission or production delivery implied",
+  "featureParent": "881c33df2cc2b202f3d0a70df33968b092e926c7",
+  "mainParent": "f75e28339b80e4dc370ba0ff242d742121fe14c6",
+  "preservedMainFiles": 14,
+  "workflow": "New District compact-trade step and existing Knock First steps retained",
+  "checks": {
+    "npmRunCheck": {
+      "passed": true,
+      "tests": 1363,
+      "files": 110,
+      "scope": "Merged TypeScript source; the subsequent three scoped CSS declarations do not participate in this command"
+    },
+    "buildAll": {
+      "passed": true
+    },
+    "finalPortalBuild": {
+      "passed": true
+    },
+    "finalBuiltHttpSmoke": {
+      "builtHttpSmoke": "passed",
+      "browser": false,
+      "independentClients": 2,
+      "botSeats": 1,
+      "rounds": 3,
+      "staticAssets": "byte-matched",
+      "persistentRestart": "passed",
+      "replayAfterRestart": "passed",
+      "districtStaleFlagRoom": "started-and-played",
+      "knockFirst": {
+        "room": "started",
+        "privateView": "checked",
+        "persistentRestart": "same-match",
+        "gameplay": false,
+        "assets": {
+          "representativeFiles": 9,
+          "verification": "mime-byte-sha256",
+          "manifestSha256": "6489c9fbd2a1632d7945e7e0ebb022f6d85cd46ffab5b8540eadb20a0ebdba09"
+        }
+      },
+      "telegram": "disabled",
+      "telegramAuth": "disabled",
+      "externalMessages": 0
+    }
+  },
+  "gameSourceFiles": [
+    {
+      "path": "games/knock-first/src/core/acoustics.ts",
+      "bytes": 12109,
+      "sha256": "e426a5b771d1ae7f4c328ae44cdcdc1dd5f1b533ce5c2860068e27dfd893eb1c"
+    },
+    {
+      "path": "games/knock-first/src/core/mission.ts",
+      "bytes": 54043,
+      "sha256": "ff64c70e65d329f2961131d2f4a924694d12c176b0ad75c070ae05858ed02331"
+    },
+    {
+      "path": "games/knock-first/src/client/Lobby.tsx",
+      "bytes": 17157,
+      "sha256": "b04365d96977135885efb7ef835c8e9d76fa718bba9e7f729ebe8bf15f4bed49"
+    },
+    {
+      "path": "games/knock-first/src/client/knock-first.css",
+      "bytes": 34545,
+      "sha256": "89ea768d15bb2838088cfc56aa07172f7a6d04a148825b0dc8c028eca423abdc"
+    }
+  ],
+  "files": [
+    {
+      "path": "dist-platform/main.js",
+      "bytes": 551898,
+      "sha256": "fc1d795cf9b0b29423976822678e93248c9b5c8277165f43a8dcdf01ae2ab40e"
+    },
+    {
+      "path": "apps/portal/dist/index.html",
+      "bytes": 598,
+      "sha256": "3ddd71f93a03e0eb08e28ef904ab1b1cd539ebe988252d275bf79cae90d6cc8b"
+    },
+    {
+      "path": "apps/portal/dist/assets/KnockFirst-DQjK0ycU.js",
+      "bytes": 725317,
+      "sha256": "b94374f0c2a7a9108b7e83c4a9da9f6dd9e6d98436a0bc7e5f82cd61bda39a6e"
+    },
+    {
+      "path": "apps/portal/dist/assets/index-BMWV-ydd.css",
+      "bytes": 127420,
+      "sha256": "07633682b8ce938e4127a1f13dc9881bec4ca66d86b9dc802d8331ab4cc4ad3c"
+    }
+  ]
+}
