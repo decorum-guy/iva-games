@@ -9,8 +9,8 @@ import { getTerritoryMap, territoryMaps, validateTerritoryMap } from '../src/ter
 describe('district@0.4 territorial geography', () => {
   it('pins separate room-compatible IDs and map versions', () => {
     expect(territoryMaps.map(map => [map.id, map.version, map.landmasses, map.tiles.length])).toEqual([
-      ['azure-bay', '2', 1, 20], ['longwater', '1', 1, 43], ['lantern-strait', '1', 2, 45],
-      ['two-shores', '2', 2, 22], ['kite-isles', '1', 3, 43], ['four-islands', '2', 4, 20],
+      ['azure-bay', '2', 1, 20], ['longwater', '1', 1, 48], ['lantern-strait', '1', 2, 49],
+      ['two-shores', '2', 2, 22], ['kite-isles', '1', 3, 48], ['four-islands', '2', 4, 20],
     ]);
     expect(() => getTerritoryMap('azure-bay', '1')).toThrow();
     const snapshot = getTerritoryMap('azure-bay', '2');

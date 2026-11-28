@@ -17,10 +17,14 @@
         "en": "Northern Pines"
       },
       "tiles": [
-        [-2, 0, "brick", 9, []],
-        [-3, 1, "grain", 5, []],
-        [-2, 1, "wood", 6, ["woodland"]],
-        [-3, 2, "wool", 9, []]
+        [2, 5, "wood", 4, ["woodland"]],
+        [1, 6, "brick", 5, []],
+        [2, 6, "brick", 8, []],
+        [3, 6, "grain", 11, ["floodplain"]],
+        [2, 7, "wood", 2, ["woodland"]],
+        [3, 7, "ore", 8, []],
+        [4, 7, "ore", 10, []],
+        [3, 8, "wood", 9, ["woodland"]]
       ]
     },
     {
@@ -30,13 +34,16 @@
         "en": "Chalk Coast"
       },
       "tiles": [
-        [-5, 3, "wood", 4, ["woodland"]],
-        [-4, 3, "ore", 5, []],
-        [-5, 4, "grain", 10, []],
-        [-4, 4, "grain", 12, ["floodplain"]],
-        [-5, 5, "brick", 3, ["floodplain"]],
-        [-6, 6, "grain", 9, ["floodplain"]],
-        [-5, 6, "wool", 3, []]
+        [0, 6, "wood", 9, ["woodland"]],
+        [-1, 7, "ore", 6, ["floodplain"]],
+        [0, 7, "wood", 10, ["woodland"]],
+        [-2, 8, "grain", 5, ["floodplain"]],
+        [-1, 8, "ore", 3, []],
+        [-3, 9, "wool", 9, ["floodplain"]],
+        [-2, 9, "wool", 3, []],
+        [-1, 9, null, null, []],
+        [-3, 10, "wool", 5, []],
+        [-2, 10, "brick", 11, []]
       ]
     },
     {
@@ -46,11 +53,12 @@
         "en": "Gull Cove"
       },
       "tiles": [
-        [-6, 7, "brick", 9, []],
-        [-5, 7, "grain", 6, []],
-        [-6, 8, "brick", 11, []],
-        [-6, 9, "ore", 8, ["floodplain"]],
-        [-6, 10, "wood", 4, ["woodland"]]
+        [0, 9, "wood", 3, ["woodland"]],
+        [1, 9, "ore", 6, []],
+        [1, 10, "grain", 4, []],
+        [-2, 11, "wool", 11, ["floodplain"]],
+        [-1, 11, "brick", 3, []],
+        [0, 11, "grain", 3, []]
       ]
     },
     {
@@ -60,11 +68,10 @@
         "en": "The Rookery"
       },
       "tiles": [
-        [2, 3, "brick", 5, []],
-        [1, 4, "ore", 3, []],
-        [0, 5, "grain", 11, []],
-        [1, 5, "wool", 6, ["floodplain"]],
-        [0, 6, null, null, ["floodplain"]]
+        [6, 0, "brick", 2, ["floodplain"]],
+        [7, 0, "wood", 12, ["woodland"]],
+        [6, 1, "wool", 5, []],
+        [7, 1, "brick", 6, []]
       ]
     },
     {
@@ -74,12 +81,11 @@
         "en": "The Spire"
       },
       "tiles": [
-        [-3, 5, "wool", 8, []],
-        [-3, 6, "wood", 2, ["woodland"]],
-        [-2, 6, "wood", 9, ["woodland"]],
-        [-3, 7, "grain", 4, []],
-        [-2, 7, "wood", 5, ["woodland"]],
-        [-4, 8, "brick", 4, []]
+        [5, 1, "wood", 4, ["woodland"]],
+        [4, 2, "grain", 6, ["floodplain"]],
+        [5, 2, "wool", 5, []],
+        [4, 3, "wool", 4, []],
+        [4, 4, "brick", 8, []]
       ]
     },
     {
@@ -89,11 +95,11 @@
         "en": "Green Haven"
       },
       "tiles": [
-        [-1, 7, "wool", 8, ["floodplain"]],
-        [-2, 8, "brick", 10, ["floodplain"]],
-        [-4, 9, "wood", 11, ["woodland"]],
-        [-3, 9, "wool", 12, ["floodplain"]],
-        [-4, 10, "wood", 5, ["woodland"]]
+        [6, 2, "ore", 9, []],
+        [5, 3, "grain", 9, []],
+        [6, 3, "grain", 8, ["floodplain"]],
+        [7, 3, "ore", 11, []],
+        [5, 4, "wood", 10, ["woodland"]]
       ]
     },
     {
@@ -103,11 +109,11 @@
         "en": "Copper Hills"
       },
       "tiles": [
-        [0, 0, "grain", 8, ["floodplain"]],
-        [2, 0, "ore", 8, []],
-        [0, 1, "ore", 2, []],
+        [2, 0, "wool", 10, []],
+        [3, 0, "grain", 12, ["floodplain"]],
         [1, 1, "wool", 10, []],
-        [-1, 2, "ore", 10, []]
+        [2, 1, "grain", 4, ["floodplain"]],
+        [0, 2, null, null, []]
       ]
     },
     {
@@ -117,76 +123,71 @@
         "en": "The Scree"
       },
       "tiles": [
-        [2, 1, "wood", 11, ["woodland"]],
-        [1, 2, "ore", 6, ["floodplain"]],
-        [-2, 3, "ore", 4, []],
-        [-1, 3, "brick", 6, []],
-        [0, 3, "wool", 3, ["floodplain"]],
-        [-1, 4, null, null, ["floodplain"]]
+        [0, 3, "brick", 6, ["floodplain"]],
+        [1, 3, "ore", 11, []],
+        [2, 3, "brick", 2, []],
+        [0, 4, "ore", 12, []],
+        [-1, 5, "wood", 8, ["woodland"]]
       ]
     }
   ],
   "ferries": [
     {
-      "a": [-5, 5, 1],
-      "b": [-3, 5, 5],
+      "a": [2, 5, 0],
+      "b": [4, 3, 4],
+      "eventSectorId": "pines"
+    },
+    {
+      "a": [-1, 7, 5],
+      "b": [-1, 5, 3],
       "eventSectorId": "chalk"
     },
     {
-      "a": [-4, 3, 1],
-      "b": [-2, 3, 5],
-      "eventSectorId": "chalk"
-    },
-    {
-      "a": [-3, 5, 1],
-      "b": [-2, 3, 3],
+      "a": [4, 2, 5],
+      "b": [2, 3, 1],
       "eventSectorId": "spire"
     }
   ],
   "ports": [
     {
-      "at": [-6, 8, 5],
+      "at": [0, 11, 0],
       "resource": null
     },
     {
-      "at": [-2, 0, 0],
+      "at": [2, 5, 0],
       "resource": "grain"
     },
     {
-      "at": [-5, 3, 4],
+      "at": [-3, 9, 5],
       "resource": "wood"
     },
     {
-      "at": [-6, 10, 2],
+      "at": [4, 7, 1],
       "resource": null
     },
     {
-      "at": [-3, 9, 0],
+      "at": [-2, 11, 4],
       "resource": "brick"
     },
     {
-      "at": [2, 3, 0],
+      "at": [4, 3, 4],
       "resource": "ore"
     },
     {
-      "at": [-3, 5, 5],
+      "at": [7, 0, 1],
       "resource": null
     },
     {
-      "at": [0, 6, 1],
+      "at": [7, 3, 2],
       "resource": "wool"
     },
     {
-      "at": [0, 3, 0],
+      "at": [3, 0, 5],
       "resource": null
     },
     {
-      "at": [0, 0, 5],
+      "at": [-1, 5, 3],
       "resource": "wood"
-    },
-    {
-      "at": [-2, 3, 4],
-      "resource": "grain"
     }
   ],
   "projection": "regular-hex"
