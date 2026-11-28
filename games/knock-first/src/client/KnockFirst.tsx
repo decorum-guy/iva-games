@@ -2,7 +2,7 @@ import { forwardRef, useCallback, useEffect, useRef, useState } from 'react';
 import type { CSSProperties, PointerEvent as ReactPointerEvent, ReactNode, RefObject } from 'react';
 import type { CommandPayload, Locale, PlayerView } from '../core/types';
 import { getLevel } from '../core/level';
-import { KnockScene } from './Scene';
+import { KnockScene } from './KnockScene';
 import { KnockAudio } from './audio';
 import { KnockConnection } from './network';
 import type { ConnectionState } from './network';
