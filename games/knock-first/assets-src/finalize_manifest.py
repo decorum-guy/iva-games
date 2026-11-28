@@ -29,6 +29,7 @@ def main():
         relative=path.relative_to(OUT).as_posix()
         source='assets-src/generate_media.py'
         if path.suffix=='.glb'or path.name=='model-contract.json':source='assets-src/generate_models.py'
+        if relative.startswith('textures/') and any(path.name.startswith(k+'-') for k in ('concrete','metal','floor','archive','glove-leather','glove-fabric')) and '-atlas' not in path.name:source='assets-src/generate_surfaces.py'
         if relative=='cover.webp':source='assets-src/generate_models.py'
         entry={'id':relative.rsplit('.',1)[0].replace('/','.'),'file':'public/knock-first/'+relative,'url':'/knock-first/'+relative,
                'bytes':path.stat().st_size,'sha256':digest(path),'author':'Iva Games, original procedural production with AI assistance',
@@ -50,6 +51,13 @@ def main():
         if path.suffix=='.glb':
             item=models[path.stem]
             entry.update({key:item[key]for key in ('triangles','meshPrimitives','dimensionsXYZ','bodyDimensionsXYZ','collision','animations','skinCount','anchors')})
+        if path.name=='arms.glb':
+            entry.update({'author':'MakeHuman community (CC0 anatomical data); Iva Games (derived gloves, sleeves, rig and animation)',
+                          'license':'CC0-1.0 anatomical foundation; Original-project-asset additions','licenseVersion':'1.0',
+                          'sourceFile':'assets-src/anatomical_glove.py','sourceSha256':digest(ROOT/'assets-src/anatomical_glove.py'),
+                          'sourceUrl':'https://github.com/makehumancommunity/makehuman/tree/a8bc2d54ff0ac92e78ff71431b1023eda42bf482',
+                          'licenseFile':'assets-src/vendor/makehuman/LICENSE.ASSETS.md',
+                          'changes':'Derived from pinned base.obj and default_weights.mhw CC0 data: extracted continuous hand, mirrored, glove surface and seams, remapped skin weights, original sleeves and animation. See vendor/makehuman/SOURCE.md.'})
         if path.name in audio_files:
             item=audio_files[path.name]
             entry.update({key:item[key]for key in ('sampleRate','channels','durationSeconds','samplePeakDbfs','rmsDbfs')})

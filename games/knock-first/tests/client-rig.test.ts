@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import * as THREE from 'three';
-import { restoreRigPose, solveArmGrip, solveCarryStance } from '../src/client/rig';
+import { restoreRigPose, solveArmGrip, solveCarryStance, solvePalmGrip } from '../src/client/rig';
 
 interface GltfNode { name?: string; children?: number[]; matrix?: number[]; translation?: number[]; rotation?: number[]; scale?: number[] }
 interface GltfAccessor { bufferView: number; byteOffset?: number; count: number; type: string; componentType: number }
@@ -62,8 +62,14 @@ describe('actual GLB handle reach (CPU joint transforms)', () => {
       const crossbar = new THREE.Vector3(Math.sin(angle), 0, Math.cos(angle)).multiplyScalar(handle === 0 ? 0.11 : -0.11);
       for (const arm of ['left', 'right'] as const) {
         const target = center.clone().addScaledVector(crossbar, arm === 'left' ? -1 : 1);
-        solveArmGrip(root, arm, target); root.updateWorldMatrix(true, true);
-        const wrist = root.getObjectByName(`${arm}_hand`)!.getWorldPosition(new THREE.Vector3());
+        const orientation=parent.getWorldQuaternion(new THREE.Quaternion());
+        const chain=['upper_arm','forearm','hand'].map(bone=>root.getObjectByName(`${arm}_${bone}`)!);
+        const lengths=[chain[0].getWorldPosition(new THREE.Vector3()).distanceTo(chain[1].getWorldPosition(new THREE.Vector3())),chain[1].getWorldPosition(new THREE.Vector3()).distanceTo(chain[2].getWorldPosition(new THREE.Vector3()))];
+        if(name==='arms')expect(solvePalmGrip(root,arm,target,orientation)).toBe(true);else solveArmGrip(root, arm, target);
+        root.updateWorldMatrix(true, true);
+        for(const i of [0,1])expect(chain[i].getWorldPosition(new THREE.Vector3()).distanceTo(chain[i+1].getWorldPosition(new THREE.Vector3()))).toBeCloseTo(lengths[i],6);
+        if(name==='arms')expect(root.getObjectByName(arm==='left'?'PalmGrip_L':'PalmGrip_R')!.getWorldQuaternion(new THREE.Quaternion()).angleTo(orientation)).toBeLessThan(.00001);
+        const wrist = root.getObjectByName(name==='arms'?(arm==='left'?'PalmGrip_L':'PalmGrip_R'):`${arm}_hand`)!.getWorldPosition(new THREE.Vector3());
         expect(wrist.distanceTo(target), `${name} ${arm}, yaw=${angle}, handle=${handle}, floorDelta=${uphill}`).toBeLessThan(0.005);
       }
       if (name === 'operative') for (const leg of ['left', 'right']) expect(root.getObjectByName(`${leg}_foot`)!.getWorldPosition(new THREE.Vector3()).y).toBeCloseTo(feet.y + 0.105, 3);

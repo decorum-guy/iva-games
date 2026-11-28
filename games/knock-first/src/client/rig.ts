@@ -40,9 +40,24 @@ function solveTwoBone(root: THREE.Object3D, upper: THREE.Object3D, fore: THREE.O
 }
 
 /** Rotate the authored shoulder/elbow chain, preserving segment lengths and hand skinning. */
-export function solveArmGrip(root: THREE.Object3D, side: 'left' | 'right', target: THREE.Vector3): void {
+export function solveArmGrip(root: THREE.Object3D, side: 'left' | 'right', target: THREE.Vector3, orientation?: THREE.Quaternion): void {
   const upper = root.getObjectByName(`${side}_upper_arm`), fore = root.getObjectByName(`${side}_forearm`), hand = root.getObjectByName(`${side}_hand`);
-  if (upper && fore && hand) solveTwoBone(root, upper, fore, hand, target, new THREE.Vector3(side === 'left' ? -0.5 : 0.5, -1, 0));
+  if (upper && fore && hand) {
+    if(orientation) remember(root,[hand]);
+    solveTwoBone(root, upper, fore, hand, target, new THREE.Vector3(side === 'left' ? -0.5 : 0.5, -1, 0));
+    if(orientation && hand.parent){root.updateWorldMatrix(true,true);hand.quaternion.copy(hand.parent.getWorldQuaternion(new THREE.Quaternion()).invert().multiply(orientation));}
+  }
+}
+
+/** Match a physical palm contact frame, not merely the wrist joint. */
+export function solvePalmGrip(root: THREE.Object3D, side: 'left'|'right', target: THREE.Vector3, orientation: THREE.Quaternion): boolean {
+  const grip=root.getObjectByName(side==='left'?'PalmGrip_L':'PalmGrip_R');
+  const hand=root.getObjectByName(`${side}_hand`);
+  if(!grip || !hand || grip.parent!==hand) return false;
+  const handOrientation=orientation.clone().multiply(grip.quaternion.clone().invert());
+  const wrist=target.clone().sub(grip.position.clone().applyQuaternion(handOrientation));
+  solveArmGrip(root,side,wrist,handOrientation);root.updateWorldMatrix(true,true);
+  return true;
 }
 
 /** The uphill carrier crouches to the level handles; knees bend while boots stay on the floor. */
