@@ -24,7 +24,7 @@ export function navigate(href: string, replace = false): void {
 }
 
 export function go(page: Page, roomId?: string, replace = false): void {
-  navigate(page === "home" ? "/" : `/${page}${roomId ? `/${encodeURIComponent(roomId)}` : ""}`, replace);
+  navigate(page === "home" ? "/" : page === "knock-first" ? "/games/knock-first" : `/${page}${roomId ? `/${encodeURIComponent(roomId)}` : ""}`, replace);
 }
 
 export function PortalLink({ href = "/", onClick, ...props }: AnchorHTMLAttributes<HTMLAnchorElement>) {
