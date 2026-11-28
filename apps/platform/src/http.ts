@@ -218,7 +218,7 @@ export function createPlatformHttpServer(service: PlatformService, options: Http
         service.rateLimit(`read:${session.sessionHash}`, 300);
         if (route === '/friends') { send(response, 200, service.social(actor)); return; }
         if (route === '/players') { send(response, 200, { players: service.searchPlayers(actor, url.searchParams.get('handle')) }); return; }
-        if (route === '/rooms') { send(response, 200, { rooms: service.listRooms(actor) }); return; }
+        if (route === '/rooms') { send(response, 200, { rooms: service.listRooms(actor), hiddenRoomCount: service.hiddenRoomCount(actor) }); return; }
         if (route === '/invitations') { send(response, 200, { invitations: service.listInvitations(actor) }); return; }
         if (route === '/telegram') { send(response, 200, options.telegram?.getStatus(actor) ?? { available: false, linked: false, reason: 'not_configured' }); return; }
         let groups: RegExpMatchArray | null;
@@ -282,7 +282,9 @@ export function createPlatformHttpServer(service: PlatformService, options: Http
       } else if (route === '/blocks') result = mutate(['playerId'], () => { service.blockPlayer(actor, body.playerId); return { ok: true }; });
       else if ((groups = match(/^\/blocks\/([\w-]+)\/remove$/))) {
         const id = groups[1]; result = mutate([], () => { service.unblockPlayer(actor, id); return { ok: true }; });
-      } else if (route === '/rooms') result = mutate(['gameId', 'capacity', 'title', 'settings'], () => ({ room: service.createRoom(actor, body) }));
+      } else if (route === '/rooms/history/clear') result = mutate([], () => { service.clearRoomHistory(actor); return { ok: true }; });
+      else if (route === '/rooms/history/restore') result = mutate([], () => { service.restoreRoomHistory(actor); return { ok: true }; });
+      else if (route === '/rooms') result = mutate(['gameId', 'capacity', 'title', 'settings'], () => ({ room: service.createRoom(actor, body) }));
       else if ((groups = match(/^\/rooms\/([\w-]+)\/(ready|settings|transfer-host|leave|cancel|kick|bots|join|start|invitations|actions)$/))) {
         const [, id, action] = groups;
         if (action === 'ready') result = mutate(['ready', 'expectedRevision'], () => ({ room: service.setReady(actor, id, body) }));
