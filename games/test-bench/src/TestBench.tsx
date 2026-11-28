@@ -6,7 +6,7 @@ import type { LanePhysics } from './physics';
 import { getTrack, TRACK_ORDER, CARGO_PROFILES } from './tracks';
 import type { BenchView, Blueprint, DriveInput, LaneSnapshot, Locale, TrackDefinition, TrackId } from './types';
 import { BenchHeader, Builder, CupResults, Race, TrackCards, TrackMap, copy, errorText } from './components';
-import { BenchSettings, useBenchPreferences } from './preferences';
+import { BenchSettings, keyLabel, useBenchPreferences } from './preferences';
 import type { BenchPreferences } from './preferences';
 import { useBenchLive } from './live-client';
 import type { Request } from './live-client';
@@ -53,7 +53,7 @@ export function TestBenchHome({onCreateRoom,onExit,initialMode}:{onCreateRoom:()
 export function LocalDrive({blueprint,track,preferences,onBack,externalPause=false,tutorialStep,tutorialFastHealth=100,onNextLesson,onCompleteTutorial,workshop=false,audio,seatIndex=0}:{blueprint:Blueprint;track:TrackDefinition;preferences:BenchPreferences;onBack:()=>void;externalPause?:boolean;tutorialStep?:number;tutorialFastHealth?:number;onNextLesson?:(lane?:LaneSnapshot)=>void;onCompleteTutorial?:()=>void;workshop?:boolean;audio?:BenchAudio|null;seatIndex?:number}) {
   const [lane,setLane]=useState<LaneSnapshot|null>(null);const [error,setError]=useState(false);const [paused,setPaused]=useState(false);const [serial,setSerial]=useState(0);
   const [lessonStopped,setLessonStopped]=useState(false);const lessonHold=useRef<number|undefined>(undefined);const settledSteps=useRef(0);
-  const lesson=useRef({step:tutorialStep});lesson.current={step:tutorialStep};
+  const lesson=useRef({step:tutorialStep,fastHealth:tutorialFastHealth});lesson.current={step:tutorialStep,fastHealth:tutorialFastHealth};
   const physics=useRef<LanePhysics|null>(null);const input=useRef<DriveInput>({throttle:0,steering:0,brake:false});
   const pause=useRef(false);pause.current=paused||externalPause||lessonStopped;const locale=preferences.locale;
   const t=(ru:string,en:string)=>copy(locale,ru,en);
@@ -73,6 +73,12 @@ export function LocalDrive({blueprint,track,preferences,onBack,externalPause=fal
             const driving=step===3&&before.car.position.z>=13.5?{throttle:0,steering:0,brake:true}:input.current;
             world.advance(driving);accumulator-=1/60;
             const current=world.observe();
+            // Integrity cannot be repaired within an attempt. Once the one
+            // loaded capsule can no longer beat the recorded fast run, let
+            // the learner restart instead of driving an impossible comparison
+            // to the end. This is a failure pause, never successful progress.
+            const failedSlowComparison=step===4&&current.cargo.some(cargo=>cargo.status!=='at-dock'&&cargo.health<=lesson.current.fastHealth);
+            if(failedSlowComparison){lessonHold.current=step;setLessonStopped(true);accumulator=0;break;}
             const stopped=current.car.position.z>=13.5&&Math.abs(current.car.speed)<.25&&Math.abs(current.car.velocity.y)<.2;
             // Freeze both comparison attempts after settling. A no-impact fast
             // run or an unsuccessful slow run explains its retry; neither can
@@ -93,7 +99,7 @@ export function LocalDrive({blueprint,track,preferences,onBack,externalPause=fal
   if(error)return <div className="tb-empty"><h2>{t('Не удалось открыть полигон','Could not open the test lane')}</h2><button onClick={()=>setSerial(value=>value+1)}>{t('Повторить','Retry')}</button><button onClick={onBack}>{t('В мастерскую','Workshop')}</button></div>;
   if(!lane)return <div className="tb-empty"><span className="tb-loader"/><p>{t('Готовим полигон…','Preparing the test lane…')}</p><button onClick={onBack}>{t('В мастерскую','Workshop')}</button></div>;
   const titles=[['',''],['Проедь через рёбра','Drive over the ribs'],['Остановись у стойки и загрузи капсулу','Stop at the dock and load a capsule'],['Почувствуй удар','Feel the impact'],['Теперь пройди медленнее','Now take it slowly'],['Доставь уцелевший груз','Deliver the surviving cargo'],['Теперь ты готов к кубку','Ready for the cup']];
-  const descriptions=[['',''],['W — газ, S — тормоз. Проедь до отметки 13 м.','W to accelerate, S to brake. Reach the 13 m mark.'],['Подъедь к отметке загрузки и нажми E, когда машина остановится.','Approach the loading mark and press E when the car stops.'],['Разгонись через рёбра. За ними машина остановится для разбора удара.','Accelerate over the ribs. The vehicle will stop afterwards to review the impact.'],['Загрузи капсулу. Переедь рёбра медленнее и остановись за отметкой 13,5 м. Сохрани больше целостности.','Load a capsule. Cross the ribs slowly and stop beyond 13.5 m. Keep more integrity.'],['Пройди ворота и остановись в зелёной зоне на полсекунды.','Pass the gate and stop in the green zone for half a second.'],['Груз важнее скорости. Между этапами кубка можно менять только два крепления.','Cargo matters more than speed. Change only two mounts between cup stages.']];
+  const descriptions=[['',''],[`${keyLabel(preferences.keys.throttle)} — газ, ${keyLabel(preferences.keys.reverse)} — тормоз и задний ход. Проедь до отметки 13 м.`,`${keyLabel(preferences.keys.throttle)} to accelerate, ${keyLabel(preferences.keys.reverse)} to brake and reverse. Reach the 13 m mark.`],[`Подъедь к отметке загрузки и нажми ${keyLabel(preferences.keys.interact)}, когда машина остановится.`,`Approach the loading mark and press ${keyLabel(preferences.keys.interact)} when the car stops.`],['Разгонись через рёбра. За ними машина остановится для разбора удара.','Accelerate over the ribs. The vehicle will stop afterwards to review the impact.'],['Загрузи капсулу. Переедь рёбра медленнее и остановись за отметкой 13,5 м. Сохрани больше целостности.','Load a capsule. Cross the ribs slowly and stop beyond 13.5 m. Keep more integrity.'],['Пройди ворота и остановись в зелёной зоне на полсекунды.','Pass the gate and stop in the green zone for half a second.'],['Груз важнее скорости. Между этапами кубка можно менять только два крепления.','Cargo matters more than speed. Change only two mounts between cup stages.']];
   const goal=tutorialStep===1?lane.car.position.z>=13:tutorialStep===2?lane.cargo.some(c=>c.status==='secured'):tutorialStep===3?lessonStopped&&lessonHold.current===3&&lane.events.some(event=>event.kind==='damaged'):tutorialStep===4?lessonStopped&&lessonHold.current===4&&lane.cargo.some(cargo=>cargo.status==='secured'&&cargo.health>tutorialFastHealth):tutorialStep===5?lane.finished&&!!lane.result?.delivered:tutorialStep===6;
   const retryFast=tutorialStep===3&&lessonStopped&&lessonHold.current===3&&!goal;
   const retryComparison=tutorialStep===4&&lessonStopped&&lessonHold.current===4&&!goal;

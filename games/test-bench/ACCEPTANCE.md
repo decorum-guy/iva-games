@@ -657,3 +657,73 @@ Standalone `tsc --noEmit -p apps/platform/tsconfig.json` получил **FAIL**
 Замороженные SHA-256: QA helper **`0c83f034428e9945564b87cdcbbd32bd054ea1cb5f3f4529e06fc0bc55c00acc`**, targeted tests **`0fb1cc1c13287d44d0796daa9367d6bf99f4d2e0b9aca85ceb52fdb761533732`**. Методы, исходный FAIL и последующие конкретные static PASS сохранены в ignored `.qa/test-bench/candidate11-qa-driver-validation.json`. Дополнительных физических/браузерных прогонов или performance benchmarks в этой поправке не было; будущий полный кубок требует свежего браузерного подтверждения.
 
 Независимый read-only review проверил runner/helper/test на этих exact hashes: блокирующих source-дефектов не обнаружено, все четыре выбранные точки Alice сверены с Direct10 record26/profile0, production rules и строгие finish assertions сохранены. Это не дополнительный test run и не подтверждение будущей непрерывной eligibility или финиша. Новая контрольная точка объединяет обе QA-поправки и журнал завершённого CI10; источник игры остаётся кандидатом10, а сценарии приёмки требуют нового запуска.
+
+## Завершённый CI11: оба обычных кубка пройдены, обучение и три interact400 остаются FAIL
+
+Прямые источники: полные завершённые GitHub Actions logs и их NDJSON, сохранённые под ignored `.qa/test-bench-ci/candidate11-*`; исходники текущей игры и ТЗ. Это автоматизация Chromium, не личная игра, не физическое устройство и не прослушивание. Candidate **`3db274c3e842074c93294cd244c99c4b7d44d5de`**, clean actual PR merge checkout **`5bab57c07ac320a351bbd5110aa3eb805f663702`**, exact tree **`5ade26d75d5d9b54360cbfc74a1a691147ff7abc`**. Commit API подтвердил родителей main **`7c2be21db5743b15b4a42d708ac959039c6b725e`** + candidate11. Browser Chromium159.0.8154.6.
+
+Production hashes обоих jobs совпали с кандидатом10: main `7054ab173103096825bcb06e1dd4cbea617c997b4fb6839f9d54731f9e2855a3`, worker `5cf8fa2433a0cb7cd73ca3ae802852a1624433b03f4c41c620b070f3f2c00035`, index `166e0c75a4271de8d87a86dbb8895a6264400275e040756936ff35ca295fee89`. Изменения11 были только QA/helper/tests/journal; совпадение проверено, а не предположено.
+
+### Direct11
+
+[Завершённый job141069981347](https://github.com/decorum-guy/iva-games/actions/runs/46174482570/job/141069981347): **FAIL**, 116 envelopes→48 records,0 parse errors.13 required scopes PASS, один FAIL — tutorial. Один полный обычный2D кубок: два независимых профиля RU/EN и два явно обозначенных бота; все12 participant-stage результатов finished. Одинаковый протокол подтверждён обоими профилями.
+
+| Этап / вариант | Alice: доставлено / HP / зачётные ticks / R | Bob: доставлено / HP / зачётные ticks / R |
+| --- | --- | --- |
+| Fragile, обычный |3 /300 /1805 /1|3 /285 /1577 /0|
+| Precision, зеркальный |3 /273 /2918 /2|3 /300 /1629 /0|
+| Climb, обычный |3 /300 /1093 /0|3 /300 /1139 /0|
+
+Новый creep detector действительно сработал у Alice перед gates3/4: скорости0,1327896/0,1350629м/с, ΔXZ0,2022113/0,1990962м за93/92ticks. Реальные R766/761мс, каждый один POST200 и независимый новый public reset counter. Alice завершила Precision за2318 физических ticks +600 штрафных. Это наблюдение новой ветви QA-управления; более ранние неудачные заезды не заменяются успешным11.
+
+Первый пустой урок с обычным W прошёл: z13,915562, Next=true, капсула at-dock. Fast50HP, complete. Slow1 вышел за45с на z12,616042, speed0,3, charge16,2, secured44HP; status running, Next=false. Ошибка не была retry-slow, поэтому обычный Restart не запускался и timeout не повторялся. Видимая максимальная скорость2,0м/с при цели0,85; median/p95 decision intervals191/242мс. Конкретный контакт, удержавший машину, в browser trace не измерен.
+
+Настройки, весь каталог, два загруженных образца, pause, WebGL-loss→2D, короткий touch viewport, реальный R/+5, обрыв/возврат, настоящий server restart/durable recovery, подбор выпавшего уцелевшего груза, отдельный трёхэтапный zero-score tie и возврат к исходному результату прошли. Реванш **создан и запущен**, полностью не разыгран. Uncaught/assets/actions/transport0; одна console network error сохранена отдельно. Full normal cups1 и targeted tie cups1.
+
+### RTT11
+
+[Завершённый job141069981361](https://github.com/decorum-guy/iva-games/actions/runs/46174482570/job/141069981361): **FAIL**,121 envelopes→53 records,0 parse errors. Один полный обычный2D кубок с двумя независимыми профилями и двумя ботами; все12 результатов finished, все три трассы зеркальные.
+
+| Этап | Alice: доставлено / HP / зачётные ticks / R | Bob: доставлено / HP / зачётные ticks / R |
+| --- | --- | --- |
+| Fragile |3 /291 /2053 /1|3 /300 /1734 /0|
+| Precision |3 /300 /1772 /0|3 /261 /2504 /1|
+| Climb |3 /300 /1215 /0|3 /300 /1178 /0|
+
+У Bob новый detector перед gate4:92ticks, speed0,1131644м/с, ΔXZ0,1711856м, limits0,20/0,30/90; реальный R773мс дал один POST200, receipt/public reset1, затем3/261 finish за2204 физических ticks +300 штрафных. Намеренный Fragile R740мс также подтверждён один раз. Bob offline/reload/return сохранил match/build, ticks293→388 и новая epoch. Настоящий Precision restart сохранил сборки/заряд, дал новые epochs обоим и resume ticks428→441→444; recovery countdown показал5 Alice и4 Bob. Реванш только запущен, не пройден целиком.
+
+Первый пустой урок теперь прошёл, z13,490854/Nexttrue. Fast1=91HP complete. Slow1=0HP broken; один обычный Restart оставил lesson5/6, вернул новую капсулу на стойку и загрузил100HP. Slow2=70HP secured. Обе попытки закончились явным retry-slow с Nextfalse; строгая проверка slow>fast завершилась FAIL. Видимые maxima2,3/2,1м/с и median/p95 decision intervals393/449 и396/481мс показывают, что QA feedback target0,85 не обеспечивал такой фактический предел. Это локальный урок; задержка relay сама по себе не является объяснением.
+
+Отдельный observedErrors FAIL: три interact HTTP400 — Bob один, Alice два. Старые records содержат лишь profile/type/status; точного error.code, request pose и action identity нет. Ближайшие retained drive observations отстоят от ошибок на секунды, поэтому дубликат, скорость или server eligibility **не объявлены установленной причиной**. Uncaught/assets/transport0. Все6 console records сохранены, включая эти400 и три сетевых события в интервале restart-проверки; временная связь не равна полному causal trace.
+
+Локальный relay60мс на сторону: Node path median/p95121,9/122,6мс; browser Resource Timing121,6/123,6мс (network/server/body interval, не точный чистый RTT). Input→ack median/p95 Alice142,8/161,6мс, Bob143,7/160,4мс. Low3D cap повторно наблюдался: buffers459×500 и636×361, оба<230400pixels. RTT11 home frame p95330,2мс, practice54,9/55,9мс; целевую производительность это не подтверждает. Полные cold-transfer estimates4 773 709/4 773 703B ниже6MB с прежней оговоркой о300B header allowance, не точные wire bytes.
+
+### Остальной CI11 и доступ к личной приёмке
+
+[Ordinary check141069981063](https://github.com/decorum-guy/iva-games/actions/runs/46174482570/job/141069981063) — **SUCCESS**:108 test files /1327 tests,25,00с; helper30,controls11,platform26,District retry6. Канонический root `tsc --noEmit -p tsconfig.platform.json` прошёл; это закрывает прежнюю проверку именно package-config, не скрывает отдельный неканонический tsc FAIL. Deploy Python49, chess-home8, portal18 PASS. Test Bench production HTTP/WS smoke:2accounts,1bot,97asset hashes, replay/restart/recovery/epoch/supersession PASS; smoke сам не играл полный кубок и не был браузерной игрой. District compact6variants PASS; territorial28rounds,272commands,revision421,one winner,17news,restart/trade=true.
+
+[Overdrive141069981435](https://github.com/decorum-guy/iva-games/actions/runs/46174482570/job/141069981435):16 PASS/2 SKIPPED. [Colossus46174482601](https://github.com/decorum-guy/iva-games/actions/runs/46174482601):138game units,84server,36browser PASS/2 SKIPPED. [Images46174482622](https://github.com/decorum-guy/iva-games/actions/runs/46174482622): platform/chess SUCCESS, initial/restored health/HTML/JS/CSS/API sessions,2/3SQLite. Publish141070355436 и deploy141070356578 **SKIPPED**. Весь platform run **FAIL** из-за двух целевых browser jobs.
+
+Дополнительная проверка обычного native desktop launcher через документированный Sky API не создала видимого окна Chromium: после `launch_app(chromium.desktop)` повторный список окон содержал только два Terminal. С ними не взаимодействовали, shell через UI не запускали. Это ещё один отрицательный результат доступа; личный проезд не состоялся. Ранее зафиксированные отсутствие connected-browser context, cloud localhost connection refusal и автоматическое отклонение escalated Chromium остаются в журнале. Обходов через tunnel/proxy/security changes и повторной эскалации не было.
+
+Итог через кандидата11: **6 завершённых нормальных автоматических2D кубков,5 отдельных targeted zero-score tie cups,0 личных полных циклов,0 релизов Test Bench**. Это не два требуемых пользователем личных цикла. Исходный whole-pump performance FAIL,3D online failure и непроверенные hardware/Safari/listening требования остаются открытыми.
+
+### Ограниченная диагностика slow-контроллера после CI11
+
+До запуска записан plan: ровно18 независимых headless worlds, две приближённые HUD cadence300/450мс × coast после погрузки0/18/60ticks × paired fast, прежний held feedback и один pulse80 feedback. Текущие geometry/physics/catalog/types hashes совпали с11; та же учебная машина с front terrain, один груз, настоящий spawn→обычные W/S/Space→разрешённый E. Без установки поз, скоростей, HP и других state injections. Slow цель0,85м/с, максимум45 simulation seconds, строгие условия capture/secured/slow>pairedFast не менялись. Pulse80 квантуется в5 физических ticks, то есть83,333мс; остальная часть cadence — coast. Это **приближение cadence ввода**, не точный browser replay.
+
+Все18 загрузок прошли. Fast6/6 зафиксировались после30 stable ticks с реальными повреждениями, HP0/0/81/17/0/22. Прежний held feedback дошёл до сравнения в2/6 случаях; остальные4 остались до цели. **Pulse80 —0/6**: груз сохранился secured100, но машина не пересекла нужный участок (итог z9,06–12,62). За последние5simsec pulse продолжал обычный рисунок5ticks W +13/22ticks coast, продвижение−0,018…+0,061м, оставшийся заряд36,8–40,2. Comparison-only peak speed1,04–1,28м/с отделён от peak всего запуска, включавшего подход к стойке. У четырёх неудачных held runs последние300ticks — непрерывный W при |Δz|<0,009м. Конкретный contact manifold не измерен.
+
+Итог всей проверки **FAIL** сохранён. Pulse80 **не включён** в runner или игру; повторов и подбора следующего числа не было. Plan/report/summary и все18 per-tick traces находятся в ignored `.qa/test-bench/tutorial-pulse-matrix/`. SHA-256 plan `dc887c50590b0113faa4dd2ce12899c34664b03e1abd6354352f7600c5c5f95f`, report `b2eba1f06675ff1ab9296a8acc9158d4064ba7f6d9f551813e560b010d97ec28`, summary `3bf4e3597bc3c0cd6eea864e6409f9f2e43d91a2e39216efb1cc7f65a2896e09`.
+
+### Следующая ограниченная правка: доступность E и объяснение неуспешного урока
+
+Source review подтвердил независимый продуктовый дефект: `Race` передавал в keyboard handler исходный `onInteract`, хотя контекстная кнопка могла быть disabled. Теперь кнопка и клавиатура используют один guard: активное управление, не pause/finished/spectator и фактическое interaction load/pickup. R, core physics и серверный порог0,7м/с не меняются.12 новых unit проверяют настоящий Race callback и keyboard handler с заменёнными React/DOM scheduling; вместе с11 прежними controls/R — **23/23 PASS**. Это не браузер и не воспроизведение старых трёх400. ESLint и canonical platform/portal TypeScript PASS; первоначальный TS2352 в timer stub нового теста исправлен и сохранён в validation log.
+
+Новый external QA stop перед E удерживает обычный Space с нейтральным рулём. Требует свежий same-connection/match/epoch/phase snapshot, скорость≤0,3м/с, публичный ack реально отправленного brake seq и≥200мс от наблюдения этого brake frame после Space acknowledgement. После async проверки enabled UI eligibility проверяется заново. Один E блокируется latch до изменения scope/interaction либо подтверждения нового secured cargo ID/реального loaded/picked-up event. Последний случай позволяет подобрать два близких предмета при неизменном label pickup; одно изменение HP или таймер не повторяет неизвестную команду. Никаких прямых gameplay API calls/state mutations или изменения серверных правил.
+
+Отказы теперь записывают allowlisted error.code, времена request/response receipt и собственное публичное состояние. Не записываются headers/cookies/tokens/arbitrary response messages. Все HTTP ошибки по-прежнему дают FAIL; сбор диагностических кодов их не подавляет. Независимый read-only review нашёл и устранил перед публикацией три ошибки первого черновика QA stop: повтор по450мс таймеру, начало отсчёта до фактического тормоза и отсутствие повторного scope check после async UI observation. Затем устранён случай второго pickup при том же label. Это source review, не исполненный browser verdict.
+
+В уроке RU/EN подсказки показывают переназначенные throttle/reverse/interact keys. Slow step теперь сразу ставит **неуспешную** попытку на pause, если уже загруженная капсула имеет HP≤фактического fast baseline: HP в попытке не растёт, значит требуемое сравнение стало недостижимым. При at-dock такое решение не принимается. Next остаётся false, обычный Restart создаёт новую попытку; никакое здоровье автоматически не восстанавливается. Этот pause может произойти до13,5м и при ненулевой скорости, поэтому проверяется frozen state, а не утверждается физическое торможение. Успешный путь по-прежнему требует пересечь13,5м, остановиться на30 stable ticks и сохранить secured cargo с HP>baseline. Это исправление обратной связи для Direct11, **не доказательство проходимости slow exercise**.
+
+Повторный read-only performance review не установил конкретного устранимого hotspot, который объясняет canonical whole-pump p9514,833848/14,180900мс при gate12,525. Малые повторы SQL prepare/linvel по имеющимся данным не объясняют превышение. Поздние spans JSON21,51/SQLite26,15 и pump30,10мс без checkpoint относятся к другому instrumented run; причина исходного FAIL не установлена. Microcleanup, новые benchmarks и ослабление gate не выполнялись. Новый production/UI source требует свежего CI; личная/device/performance приёмка остаётся незавершённой.

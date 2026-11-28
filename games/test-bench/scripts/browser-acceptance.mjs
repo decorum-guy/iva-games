@@ -55,7 +55,7 @@ const report = {
   workingTreeDirty: !!execFileSync('git', ['status', '--porcelain'], { cwd: root, encoding: 'utf8' }).trim(),
   scopes: [], requiredScopeFailures: [], scenarios: [], cups: [], metrics: [], coldTransfers: [], layouts: [], browserErrors: [], consoleErrors: [], consoleErrorsDropped: 0, failedAssets: [], expectedOfflineAssetFailures: [], actionErrors: [], observedGameActions: {},
   controls: { keyboardEvents: 0, touchGestures: 0, acceptedUiActions: 0 },
-  roomResponses: [], roomKeyboardActivations: [], restoreChecks: [], restoreCommands: [], uprightStallRecoveries: [], restartChecks: [], driveStages: [], localDriverTraces: [], tutorialRetries: [],
+  roomResponses: [], roomKeyboardActivations: [], restoreChecks: [], restoreCommands: [], uprightStallRecoveries: [], interactionStops: [], restartChecks: [], driveStages: [], localDriverTraces: [], tutorialRetries: [],
   controller: {
     method: 'Real keyboard W/A/D/Space/E/R, with normal bot decisions and wheel-angle feedback from received own-lane snapshots',
     uprightStall: { track: 'precision', method: 'QA-only public-snapshot stall detector; an accepted trigger requests real R with brake and neutral steering', requestedHoldMs: 750, holdTiming: '750 ms after keyboard-down acknowledgement; actual dispatch/release times are recorded', gameStateMutation: false },
@@ -121,6 +121,7 @@ function compactFinalReport() {
     restoreChecks: report.restoreChecks.map(({ snapshots, inputFrames, ...check }) => ({ ...check, recordedSnapshots: snapshots.length, recordedInputFrames: inputFrames.length })),
     restoreCommands: report.restoreCommands,
     uprightStallRecoveries: report.uprightStallRecoveries,
+    interactionStops: report.interactionStops,
     restartChecks: report.restartChecks,
     driveStages: report.driveStages.map(({ profiles, ...stage }) => ({ ...stage, profiles: profiles.map(({ firstObservations, trajectory, ...profile }) => ({ ...profile, firstObservationCount: firstObservations.length, retainedTrajectoryCount: trajectory.length })) })),
     localDriverTraces: report.localDriverTraces.map(({ observations, keyTransitions, ...trace }) => ({ ...trace, recordedObservations: observations.length, recordedKeyTransitions: keyTransitions.length })),
@@ -309,6 +310,7 @@ function observe(player, page) {
     if (request.method() !== 'POST' || !new URL(request.url()).pathname.endsWith('/actions')) return;
     try {
       const body = request.postDataJSON();
+      player.actionByRequest.set(request, { observedRequestAtMs: Date.now(), actionId: body?.actionId ?? null, expectedRevision: body?.expectedRevision ?? null, phaseId: body?.payload?.phaseId ?? null, observation: observedDriveState(player) });
       if (body?.payload?.type !== 'restore') return;
       const command = { profile: player.name, path: new URL(request.url()).pathname, observedRequestAtMs: Date.now(), actionId: body.actionId, expectedRevision: body.expectedRevision, phaseId: body.payload.phaseId, status: null };
       const recovery = player.uprightRecovery;
@@ -323,7 +325,18 @@ function observe(player, page) {
     if (response.request().method() === 'POST' && new URL(response.url()).pathname.endsWith('/actions')) {
       const type = response.request().postDataJSON()?.payload?.type ?? 'unknown';
       report.observedGameActions[type] = (report.observedGameActions[type] ?? 0) + 1;
-      if (response.status() >= 400) report.actionErrors.push({ profile: player.name, type, status: response.status() });
+      if (response.status() >= 400) {
+        const record = { profile: player.name, type, status: response.status(), observedResponseAtMs: Date.now(), request: player.actionByRequest.get(response.request()) ?? null, responseObservation: observedDriveState(player), errorCode: null };
+        report.actionErrors.push(record);
+        // Only the structured public error code is emitted, never arbitrary
+        // response messages, headers, cookies or authentication data.
+        const reading = response.json().then(body => {
+          const code = body?.error?.code;
+          record.errorCode = typeof code === 'string' && /^[A-Z][A-Z0-9_]{0,79}$/.test(code) ? code : null;
+          record.errorCodeAvailable = record.errorCode !== null;
+        }).catch(() => { record.errorCodeAvailable = false; }).finally(() => player.actionReceiptReads.delete(reading));
+        player.actionReceiptReads.add(reading);
+      }
       const restore = player.restoreByRequest.get(response.request());
       if (restore) {
         restore.status = response.status(); restore.observedResponseAtMs = Date.now();
@@ -331,8 +344,8 @@ function observe(player, page) {
           restore.receipt = { error: body.error?.code ?? null, matchId: body.view?.matchId ?? null, phase: body.view?.phase ?? null, phaseId: body.view?.phaseId ?? null, revision: body.view?.revision ?? null, tick: body.view?.tick ?? null, resets: body.view?.you?.lane?.resets ?? null };
           const recovery = report.uprightStallRecoveries.find(value => value.id === restore.uprightRecoveryId);
           if (response.status() === 200 && !body.error) observeUprightReset(recovery, 'restore response receipt', { ...restore.receipt, actionId: restore.actionId });
-        }).catch(error => { restore.receiptReadError = error.message; }).finally(() => player.restoreReceiptReads.delete(reading));
-        player.restoreReceiptReads.add(reading);
+        }).catch(error => { restore.receiptReadError = error.message; }).finally(() => player.actionReceiptReads.delete(reading));
+        player.actionReceiptReads.add(reading);
       }
     }
   });
@@ -368,7 +381,7 @@ function observe(player, page) {
       try {
         const frame = JSON.parse(String(event.payload));
         if (frame.type === 'input') {
-          player.sentInputs++; player.lastSent = frame;
+          player.sentInputs++; player.lastSent = frame; player.lastSentAtMs = Date.now();
           if (player.activeRestoreCheck) {
             const check = player.activeRestoreCheck;
             const observed = { observedAtMs: Date.now(), seq: frame.seq, epoch: frame.epoch, phaseId: frame.payload?.phaseId, throttle: frame.payload?.throttle, steering: frame.payload?.steering, brake: frame.payload?.brake };
@@ -407,7 +420,7 @@ async function makePlayer(account, name, locale, hasTouch = false) {
   await context.addInitScript(() => performance.setResourceTimingBufferSize(2000));
   const separator = account.cookie.indexOf('=');
   await context.addCookies([{ name: account.cookie.slice(0, separator), value: account.cookie.slice(separator + 1), url: origin }]);
-  const player = { account, name, locale, context, held: new Set(), loadedAssets: new Set(), pendingInputs: new Map(), ackTimings: [], socketConnections: 0, socketCloses: 0, receivedFrames: 0, sentInputs: 0, transportErrors: [], snapshot: null, lastInteract: 0, lastRestore: 0, driveRemainder: { throttle: 0, steering: 0 }, steeringHistory: [], predictionScope: null, precisionStall: null, uprightRecovery: null, uprightHoldUntil: 0, uprightKeyRecord: null, predictionStats: { calls: 0, historyFrames: 0, resets: 0, resetObservations: [], horizons: [], samples: [] }, restoreByRequest: new WeakMap(), restoreReceiptReads: new Set() };
+  const player = { account, name, locale, context, held: new Set(), loadedAssets: new Set(), pendingInputs: new Map(), ackTimings: [], socketConnections: 0, socketCloses: 0, receivedFrames: 0, sentInputs: 0, transportErrors: [], snapshot: null, lastInteract: 0, lastRestore: 0, interactionStop: null, driveRemainder: { throttle: 0, steering: 0 }, steeringHistory: [], predictionScope: null, precisionStall: null, uprightRecovery: null, uprightHoldUntil: 0, uprightKeyRecord: null, predictionStats: { calls: 0, historyFrames: 0, resets: 0, resetObservations: [], horizons: [], samples: [] }, restoreByRequest: new WeakMap(), actionByRequest: new WeakMap(), actionReceiptReads: new Set() };
   observe(player, await context.newPage()); players.push(player); return player;
 }
 const label = (player, ru, en) => player.locale === 'ru' ? ru : en;
@@ -751,7 +764,7 @@ async function stableLessonMilestone(player, name, expectedStatus = 'complete') 
   await delay(400);
   const after = await localHud(player);
   const state = hud => ({ x: hud.x, z: hud.z, speed: hud.speed, charge: hud.charge, timer: hud.timer, health: hud.health, cargoStatus: hud.cargoStatus, next: hud.next, attemptStatus: hud.attemptStatus, lessonStep: hud.lessonStep, lessonFeedback: hud.lessonFeedback });
-  assert.deepEqual(state(after), state(before), `${name}: the settled comparison must preserve its clock, cargo and physics`);
+  assert.deepEqual(state(after), state(before), `${name}: the frozen comparison must preserve its clock, cargo and physics`);
   return after;
 }
 async function localDriveTo(player, target, speed = 2.2, extra = () => false, timeout = 30000, trace) {
@@ -1270,7 +1283,7 @@ async function buildStage(alice, bob, stage) {
 
 async function keyboardDrive(player) {
   const snapshot = player.snapshot;
-  if (!fresh(player) || player.snapshotConnection !== player.socketConnections || !player.predictionScope || snapshot.view.phase !== 'racing' || !snapshot.view.you.lane || snapshot.view.you.lane.finished) { clearPrecisionProgress(player, 'Driver has no fresh active racing lane'); await keys(player); return; }
+  if (!fresh(player) || player.snapshotConnection !== player.socketConnections || !player.predictionScope || snapshot.view.phase !== 'racing' || !snapshot.view.you.lane || snapshot.view.you.lane.finished) { clearPrecisionProgress(player, 'Driver has no fresh active racing lane'); player.interactionStop = null; await keys(player); return; }
   const lane = snapshot.view.you.lane, track = snapshot.view.track;
   const { decision, steering, prediction } = policy.chooseBrowserKeyboardInput(lane, track, { snapshotTimeMs: snapshot.serverTime, nowMs: Date.now(), delayMs: latencyMs, sentSteering: player.steeringHistory });
   if (prediction) {
@@ -1291,6 +1304,38 @@ async function keyboardDrive(player) {
   }
   if (player.uprightRecovery && Date.now() < player.uprightHoldUntil) { await keys(player, ['Space', 'KeyR']); return; }
   player.uprightHoldUntil = 0;
+  const interactionScope = JSON.stringify(player.predictionScope);
+  const securedCargoIds = lane.cargo.filter(cargo => cargo.status === 'secured').map(cargo => cargo.id);
+  const lastInteractionEventId = lane.events.findLast(event => event.kind === 'loaded' || event.kind === 'picked-up')?.id ?? null;
+  const confirmedInteraction = player.interactionStop?.issued && (securedCargoIds.some(id => !player.interactionStop.securedCargoIds.includes(id)) || lastInteractionEventId !== null && lastInteractionEventId !== player.interactionStop.lastInteractionEventId);
+  const keepBrakingForInteraction = player.interactionStop?.scope === interactionScope && lane.interaction === 'slow-down';
+  if (decision.interact || keepBrakingForInteraction) {
+    // The 0.7 m/s availability boundary can be crossed during an HTTP trip.
+    // Stop through ordinary keyboard input before E, and require a snapshot
+    // that acknowledges an actually transmitted brake input. This is QA
+    // driving behavior, not a relaxed interaction rule or a gameplay RPC.
+    // A pickup secures one item. A second nearby loose item may keep the same
+    // public label. A newly secured item or actual loaded/picked-up event
+    // confirms that action and can arm another E. Damage cannot re-arm it.
+    if (!keepBrakingForInteraction && (player.interactionStop?.scope !== interactionScope || player.interactionStop?.interaction !== lane.interaction || confirmedInteraction)) player.interactionStop = { scope: interactionScope, interaction: lane.interaction, securedCargoIds, lastInteractionEventId, brakeAcknowledgedAtMs: null, firstBrakeSeq: null, firstBrakeSentAtMs: null, issued: false };
+    const stop = player.interactionStop;
+    await keys(player, ['Space']);
+    stop.brakeAcknowledgedAtMs ??= Date.now();
+    const brakeFrame = player.lastSent;
+    if (stop.firstBrakeSeq === null && player.lastSentAtMs >= stop.brakeAcknowledgedAtMs && brakeFrame?.matchId === snapshot.matchId && brakeFrame.epoch === snapshot.epoch && brakeFrame.payload?.phaseId === snapshot.view.phaseId && brakeFrame.payload.brake === true && brakeFrame.payload.throttle === 0 && brakeFrame.payload.steering === 0) { stop.firstBrakeSeq = brakeFrame.seq; stop.firstBrakeSentAtMs = player.lastSentAtMs; }
+    const eligible = () => {
+      const current = player.snapshot, currentLane = current?.view.you.lane;
+      return !stop.issued && player.interactionStop === stop && JSON.stringify(player.predictionScope) === interactionScope && player.snapshotConnection === player.socketConnections && fresh(player) && Date.now() - current.serverTime <= 300 && current?.matchId === snapshot.matchId && current.epoch === snapshot.epoch && current.view.phaseId === snapshot.view.phaseId && current.view.phase === 'racing' && currentLane && !currentLane.finished && currentLane.interaction === stop.interaction && currentLane.car.speed <= .3 && stop.firstBrakeSeq !== null && current.lastAcceptedSeq >= stop.firstBrakeSeq && Date.now() - stop.firstBrakeSentAtMs >= 200;
+    };
+    if (eligible() && await player.page.locator('.tb-interact').isEnabled() && eligible()) {
+      const record = { profile: player.name, interaction: stop.interaction, minimumBrakeMs: 200, observedBrakeMs: Date.now() - stop.firstBrakeSentAtMs, brakeAcknowledgedAtMs: stop.brakeAcknowledgedAtMs, firstBrakeSentAtMs: stop.firstBrakeSentAtMs, firstBrakeSeq: stop.firstBrakeSeq, observation: observedDriveState(player), keyDispatchedAtMs: Date.now() };
+      stop.issued = true; report.interactionStops.push(record);
+      await player.page.keyboard.press('KeyE'); report.controls.keyboardEvents += 2; player.lastInteract = Date.now();
+      record.keyAcknowledgedAtMs = player.lastInteract;
+    }
+    return;
+  }
+  player.interactionStop = null;
   const wanted = [];
   if (decision.input.brake) wanted.push('Space');
   else if (decision.input.throttle > .05) wanted.push('KeyW');
@@ -1298,7 +1343,6 @@ async function keyboardDrive(player) {
   if (decision.restore && Date.now() - player.lastRestore > 2400) { player.restoreUntil = Date.now() + 750; player.lastRestore = Date.now(); }
   if (player.restoreUntil > Date.now()) wanted.push('KeyR');
   await keys(player, wanted);
-  if (decision.interact && Date.now() - player.lastInteract > 450) { await player.page.keyboard.press('KeyE'); report.controls.keyboardEvents += 2; player.lastInteract = Date.now(); }
 }
 
 function observedDriveState(player) {
@@ -1401,7 +1445,7 @@ async function driveStage(alice, bob, roomId, stage) {
     captureDriveStage(trace, [alice, bob], true); trace.finishedAtMs = Date.now();
     const recoveryKeyReleases = await Promise.allSettled([alice, bob].filter(player => player.uprightKeyRecord).map(player => keys(player)));
     trace.recoveryKeyReleaseErrors = recoveryKeyReleases.flatMap(result => result.status === 'rejected' ? [String(result.reason)] : []);
-    await Promise.allSettled([alice, bob].flatMap(player => [...player.restoreReceiptReads]));
+    await Promise.allSettled([alice, bob].flatMap(player => [...player.actionReceiptReads]));
     for (const recovery of report.uprightStallRecoveries.filter(value => value.matchId === trace.matchId && value.stage === stage)) {
       recovery.finalObservation = observedDriveState(recovery.profile === alice.name ? alice : bob);
       recovery.outcome = recovery.resetObserved ? 'Reset observed; subsequent course completion is checked separately' : 'No reset observed';
@@ -1447,7 +1491,7 @@ async function exerciseDriveStage(alice, bob, roomId, stage, saved, trace) {
       saved.reset = { resets: view(alice).you.lane.resets, shownPenaltyText: await alice.page.locator('.tb-race-timer small').textContent() };
     } catch (error) { check.status = 'failed'; check.error = error.message; throw error; }
     finally {
-      await keys(alice); await Promise.allSettled([...alice.restoreReceiptReads]);
+      await keys(alice); await Promise.allSettled([...alice.actionReceiptReads]);
       check.uiAfter = await restoreUi().catch(error => ({ unavailable: error.message }));
       check.commands = report.restoreCommands.filter(command => command.profile === alice.name && command.observedRequestAtMs >= check.startedAtMs);
       delete alice.activeRestoreCheck;
@@ -1823,7 +1867,7 @@ try {
     const { horizons, ...stats } = player.predictionStats;
     return { profile: player.name, ...stats, predictionHorizonMs: timing(horizons) };
   });
-  await Promise.allSettled(players.flatMap(player => [...player.restoreReceiptReads]));
+  await Promise.allSettled(players.flatMap(player => [...player.actionReceiptReads]));
   try { await cleanup(); } catch (error) { failure ??= error; report.status = 'failed'; report.cleanupError = error.message; }
   await mkdir(output, { recursive: true }); await writeFile(join(output, 'report.json'), JSON.stringify(report, null, 2) + '\n');
   await emitEvidence('summary', compactFinalReport());
