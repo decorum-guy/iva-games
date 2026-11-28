@@ -55,7 +55,7 @@ const report = {
   workingTreeDirty: !!execFileSync('git', ['status', '--porcelain'], { cwd: root, encoding: 'utf8' }).trim(),
   scopes: [], requiredScopeFailures: [], scenarios: [], cups: [], metrics: [], coldTransfers: [], layouts: [], browserErrors: [], consoleErrors: [], consoleErrorsDropped: 0, failedAssets: [], expectedOfflineAssetFailures: [], actionErrors: [], observedGameActions: {},
   controls: { keyboardEvents: 0, touchGestures: 0, acceptedUiActions: 0 },
-  roomResponses: [], roomKeyboardActivations: [], restoreChecks: [], restoreCommands: [], uprightStallRecoveries: [], restartChecks: [], driveStages: [], localDriverTraces: [],
+  roomResponses: [], roomKeyboardActivations: [], restoreChecks: [], restoreCommands: [], uprightStallRecoveries: [], restartChecks: [], driveStages: [], localDriverTraces: [], tutorialRetries: [],
   controller: {
     method: 'Real keyboard W/A/D/Space/E/R, with normal bot decisions and wheel-angle feedback from received own-lane snapshots',
     uprightStall: { track: 'precision', method: 'QA-only public-snapshot stall detector; an accepted trigger requests real R with brake and neutral steering', requestedHoldMs: 750, holdTiming: '750 ms after keyboard-down acknowledgement; actual dispatch/release times are recorded', gameStateMutation: false },
@@ -124,6 +124,7 @@ function compactFinalReport() {
     restartChecks: report.restartChecks,
     driveStages: report.driveStages.map(({ profiles, ...stage }) => ({ ...stage, profiles: profiles.map(({ firstObservations, trajectory, ...profile }) => ({ ...profile, firstObservationCount: firstObservations.length, retainedTrajectoryCount: trajectory.length })) })),
     localDriverTraces: report.localDriverTraces.map(({ observations, keyTransitions, ...trace }) => ({ ...trace, recordedObservations: observations.length, recordedKeyTransitions: keyTransitions.length })),
+    tutorialRetries: report.tutorialRetries,
     metrics: report.metrics,
     layouts: report.layouts.map(({ name, profile, width, height, scrollWidth, controls }) => ({ name, profile, width, height, scrollWidth, offscreen: controls.filter(control => control.visible && !control.inViewport) })),
     assetLoads: report.assetLoads ?? players.map(player => ({ profile: player.name, files: player.loadedAssets.size, receivedSnapshots: player.receivedFrames, sentInputFrames: player.sentInputs, socketConnections: player.socketConnections, socketCloses: player.socketCloses })),
@@ -520,10 +521,18 @@ async function inspect(player, name, { race = false, low = false } = {}) {
   const canvas = page.locator('.tb-scene-canvas').first();
   if (await canvas.count()) {
     if (await canvas.getAttribute('data-renderer') === '3d') await page.waitForFunction(() => Number(document.querySelector('.tb-scene-canvas')?.getAttribute('data-draw-calls')) > 0);
-    const metrics = await canvas.evaluate(node => ({ renderer: node.dataset.renderer, engine: node.dataset.engine, participantPaint: node.closest('.tb-scene')?.getAttribute('data-participant-paint'), drawCalls: Number(node.dataset.drawCalls || 0), frameP95Ms: Number(node.dataset.frameP95 || 0), width: node.clientWidth, height: node.clientHeight }));
+    const metrics = await canvas.evaluate(node => {
+      const box = node.getBoundingClientRect();
+      const bufferWidth = Number(node.dataset.bufferWidth), bufferHeight = Number(node.dataset.bufferHeight);
+      return { renderer: node.dataset.renderer, quality: node.dataset.quality, engine: node.dataset.engine, participantPaint: node.closest('.tb-scene')?.getAttribute('data-participant-paint'), drawCalls: Number(node.dataset.drawCalls || 0), frameP95Ms: Number(node.dataset.frameP95 || 0), cssWidth: box.width, cssHeight: box.height, bufferWidth, bufferHeight, bufferPixels: bufferWidth * bufferHeight, pixelRatio: Number(node.dataset.pixelRatio), bufferPixelLimit: node.dataset.bufferPixelLimit === 'none' ? null : Number(node.dataset.bufferPixelLimit), canvasWidth: node.width, canvasHeight: node.height, sizeMethod: 'CSS bounding rectangle; actual WebGL drawing buffer or Canvas2D backing buffer; renderer pixel ratio' };
+    });
     report.metrics.push({ profile: player.name, name, ...metrics });
-    assert.ok(metrics.width >= 100 && metrics.height >= 100, `${name}: collapsed scene`);
-    if (low && metrics.renderer === '3d') assert.ok(metrics.drawCalls <= 150, `${name}: ${metrics.drawCalls} low-quality draw calls exceeds target`);
+    assert.ok(metrics.cssWidth >= 100 && metrics.cssHeight >= 100, `${name}: collapsed scene`);
+    assert.ok(metrics.bufferWidth > 0 && metrics.bufferHeight > 0 && metrics.pixelRatio > 0, `${name}: actual render buffer metrics must be available`);
+    if (low && metrics.renderer === '3d') {
+      assert.ok(metrics.drawCalls <= 150, `${name}: ${metrics.drawCalls} low-quality draw calls exceeds target`);
+      assert.ok(metrics.bufferPixels <= 230400 && metrics.pixelRatio <= 1.25, `${name}: low-quality drawing buffer exceeds the controlled 230400-pixel / 1.25-DPR cap`);
+    }
   }
   await page.screenshot({ path: join(output, `${player.name}-${name}.png`), fullPage: false });
 }
@@ -732,16 +741,17 @@ async function localHud(player) {
         : /^\d+(\.\d+)?$/.test(healthText) ? Number(healthText) : null;
       return { index, status, health, className: capsule.className };
     });
-    return { x: match ? (Number(match[1]) - 50) / 9 : null, z: match ? (250 - Number(match[2])) / 4.8 : null, speed: Number(node.querySelector('.tb-speed b')?.textContent), charge: Number(node.querySelector('.tb-energy b')?.textContent), timer: node.querySelector('.tb-race-timer strong')?.textContent, health: cargo[0]?.health ?? null, cargoStatus: cargo[0]?.className, cargo, interaction: node.querySelector('.tb-interact')?.textContent, canInteract: !node.querySelector('.tb-interact')?.hasAttribute('disabled'), next: !!node.querySelector('.tb-race-lesson .tb-primary'), lessonTitle: node.querySelector('.tb-race-lesson h2')?.textContent, result: !!node.querySelector('.tb-run-result') };
+    return { x: match ? (Number(match[1]) - 50) / 9 : null, z: match ? (250 - Number(match[2])) / 4.8 : null, speed: Number(node.querySelector('.tb-speed b')?.textContent), charge: Number(node.querySelector('.tb-energy b')?.textContent), timer: node.querySelector('.tb-race-timer strong')?.textContent, health: cargo[0]?.health ?? null, cargoStatus: cargo[0]?.className, cargo, interaction: node.querySelector('.tb-interact')?.textContent, canInteract: !node.querySelector('.tb-interact')?.hasAttribute('disabled'), next: !!node.querySelector('.tb-race-lesson .tb-primary'), lessonTitle: node.querySelector('.tb-race-lesson h2')?.textContent, lessonStep: node.querySelector('.tb-race-lesson .tb-eyebrow')?.textContent, attemptStatus: node.querySelector('.tb-race-lesson')?.getAttribute('data-attempt-status') ?? null, lessonFeedback: node.querySelector('.tb-race-lesson [role=status]')?.textContent ?? null, result: !!node.querySelector('.tb-run-result') };
   });
 }
-async function stableLessonMilestone(player, name) {
+async function stableLessonMilestone(player, name, expectedStatus = 'complete') {
   const before = await localHud(player);
-  assert.equal(before.next, true, `${name}: the lesson goal must expose Continue`);
+  assert.equal(before.attemptStatus, expectedStatus, `${name}: the visible lesson outcome must match`);
+  assert.equal(before.next, expectedStatus === 'complete', `${name}: only a successful comparison exposes Continue`);
   await delay(400);
   const after = await localHud(player);
-  const state = hud => ({ x: hud.x, z: hud.z, speed: hud.speed, charge: hud.charge, timer: hud.timer, health: hud.health, cargoStatus: hud.cargoStatus, next: hud.next });
-  assert.deepEqual(state(after), state(before), `${name}: the reached lesson goal must preserve its clock, cargo and physics while waiting for Continue`);
+  const state = hud => ({ x: hud.x, z: hud.z, speed: hud.speed, charge: hud.charge, timer: hud.timer, health: hud.health, cargoStatus: hud.cargoStatus, next: hud.next, attemptStatus: hud.attemptStatus, lessonStep: hud.lessonStep, lessonFeedback: hud.lessonFeedback });
+  assert.deepEqual(state(after), state(before), `${name}: the settled comparison must preserve its clock, cargo and physics`);
   return after;
 }
 async function localDriveTo(player, target, speed = 2.2, extra = () => false, timeout = 30000, trace) {
@@ -750,7 +760,7 @@ async function localDriveTo(player, target, speed = 2.2, extra = () => false, ti
   const observeDecision = (hud, wanted, done) => {
     if (!trace) return;
     const atMs = Date.now(); trace.observationCount++;
-    if (trace.observations.length < 1000) trace.observations.push({ atMs, intervalMs: priorDecisionAt === null ? null : atMs - priorDecisionAt, x: hud.x, z: hud.z, speed: hud.speed, health: hud.health, cargoStatus: hud.cargoStatus, timer: hud.timer, next: hud.next, wanted, done });
+    if (trace.observations.length < 1000) trace.observations.push({ atMs, intervalMs: priorDecisionAt === null ? null : atMs - priorDecisionAt, x: hud.x, z: hud.z, speed: hud.speed, health: hud.health, cargoStatus: hud.cargoStatus, timer: hud.timer, next: hud.next, attemptStatus: hud.attemptStatus, wanted, done });
     else trace.droppedObservations++;
     priorDecisionAt = atMs;
   };
@@ -966,6 +976,107 @@ async function survivingLoosePickup(player) {
   return { profile: player.name, renderer: '2d', track: 'climb', mirrored: false, preset: 'gentle', loadPresses, pickupPresses: 1, restored: false, observation: 'Visible minimap, all cargo cards, speed, timer and interaction button only', control: 'Real keyboard W/D/Space/E', loaded: sample(loaded), released: sample(released), eligible: sample(eligible), collected: sample(collected), settled: sample(settled), stabilitySamples, brakingWallMs, simulatedStabilityLowerBoundMs: (Number(collected.timer) - Number(settled.timer) - 1) * 1000 };
 }
 
+async function tutorialComparisonAttempt(player, kind, attempt, fastHealth) {
+  const trace = { profile: player.name, name: `${kind === 'fast' ? 'Fast' : 'Slow'} tutorial attempt ${attempt}`, comparison: kind, attempt, status: 'running', controlPolicy: kind === 'fast' ? 'Hold W until the visible comparison stops' : 'Existing visible-HUD speed feedback', requestedTargetSpeed: kind === 'slow' ? .85 : null, targetIsHardCap: false, fastBaselineIntegrity: fastHealth ?? null, timingMethod: 'Runner times of actual keyboard command dispatch/acknowledgement and visible-HUD observations, not DOM event timestamps', observationCount: 0, observations: [], droppedObservations: 0, keyTransitionCount: 0, keyTransitions: [], droppedKeyTransitions: 0 };
+  report.localDriverTraces.push(trace); player.localKeyTrace = trace;
+  const retryStatus = 'retry-' + kind;
+  const terminal = hud => hud.attemptStatus === 'complete' || hud.attemptStatus === retryStatus;
+  let result, failure;
+  try {
+    trace.initialHud = await localHud(player);
+    assert.equal(trace.initialHud.attemptStatus, 'running', 'A crossing attempt must start in its current running lesson step');
+    assert.equal(trace.initialHud.cargo.length, 1); assert.equal(trace.initialHud.cargo[0].status, 'secured');
+    if (kind === 'fast') {
+      await focusLane(player); await keys(player, ['KeyW']);
+      let priorAt = null;
+      await until(async () => {
+        const hud = await localHud(player), atMs = Date.now();
+        assert.ok(['running', 'complete', retryStatus].includes(hud.attemptStatus), 'Fast comparison must stay in the same public lesson state');
+        trace.observationCount++;
+        if (trace.observations.length < 1000) trace.observations.push({ atMs, intervalMs: priorAt === null ? null : atMs - priorAt, x: hud.x, z: hud.z, speed: hud.speed, health: hud.health, cargoStatus: hud.cargoStatus, timer: hud.timer, next: hud.next, attemptStatus: hud.attemptStatus, wanted: ['KeyW'], done: terminal(hud) }); else trace.droppedObservations++;
+        priorAt = atMs; return terminal(hud) && hud;
+      }, 'fast comparison reaches an explicit completed or unsuccessful frozen outcome', 20000, 40);
+    } else {
+      await localDriveTo(player, 14, .85, terminal, 45000, trace);
+      await until(async () => terminal(await localHud(player)), 'slow comparison reaches an explicit completed or unsuccessful frozen outcome', 10000, 40);
+    }
+    await keys(player);
+    const observed = await localHud(player);
+    const hud = await stableLessonMilestone(player, `${kind} attempt ${attempt}`, observed.attemptStatus);
+    trace.outcomeHud = hud;
+    if (hud.attemptStatus === retryStatus) {
+      const prefix = kind === 'fast' ? label(player, 'В этом проезде груз не получил повреждений.', 'This run did not damage the cargo.') : label(player, 'Больше целостности сохранить не удалось.', 'This attempt did not preserve more integrity.');
+      assert.ok(hud.lessonFeedback?.startsWith(prefix), 'A retry requires the explicit visible unsuccessful-comparison message');
+      assert.equal(hud.next, false); trace.status = 'unsuccessful comparison';
+    } else {
+      assert.equal(hud.attemptStatus, 'complete');
+      if (kind === 'fast') {
+        assert.equal(hud.lessonTitle, label(player, 'Почувствуй удар', 'Feel the impact'));
+        assert.match(hud.cargoStatus ?? '', /\b(secured|loose|broken)\b/);
+        assert.ok(Number.isFinite(hud.health) && hud.health >= 0 && hud.health < 100, `Fast milestone must show real damage, received ${hud.health}`);
+      } else {
+        assert.equal(hud.lessonTitle, label(player, 'Теперь пройди медленнее', 'Now take it slowly'));
+        assert.match(hud.cargoStatus ?? '', /\bsecured\b/, 'Slow comparison must keep the capsule secured');
+        assert.ok(hud.z >= 13.5, `Slow comparison must cross the ribs, received z=${hud.z}`);
+        assert.ok(Number.isFinite(hud.health) && hud.health > fastHealth && hud.health <= 100, `Slow integrity ${hud.health} must exceed fast ${fastHealth}`);
+      }
+      trace.status = 'passed';
+    }
+    result = { hud, status: trace.status, attempt };
+  } catch (error) { trace.status = 'failed'; trace.error = error.message; failure = error; }
+  finally {
+    try { await keys(player); } catch (error) { failure ??= error; trace.status = 'failed'; trace.inputReleaseError = error.message; }
+    delete player.localKeyTrace;
+    trace.lastHud = await localHud(player).catch(error => ({ unavailable: error.message }));
+    trace.decisionIntervalsMs = timing(trace.observations.map(value => value.intervalMs).filter(Number.isFinite));
+    const speeds = trace.observations.map(value => value.speed).filter(Number.isFinite);
+    trace.maximumObservedSpeed = speeds.length ? Math.max(...speeds) : null;
+    await emitEvidence('local-driver-trace', compactLocalTrace(trace));
+  }
+  if (failure) throw failure;
+  return result;
+}
+
+async function restartTutorialComparison(player, kind, previous) {
+  const record = { profile: player.name, comparison: kind, fromAttempt: 1, toAttempt: 2, status: 'running', method: 'One ordinary Restart button, then ordinary dock approach and loading UI', before: previous };
+  report.tutorialRetries.push(record);
+  try {
+    const before = await localHud(player);
+    assert.equal(before.attemptStatus, 'retry-' + kind); assert.equal(before.next, false);
+    assert.equal(before.lessonStep, previous.lessonStep); assert.equal(before.lessonTitle, previous.lessonTitle);
+    await keys(player);
+    await player.page.locator('.tb-local-footer').getByRole('button', { name: new RegExp(label(player, 'Начать заново', 'Restart')) }).click();
+    const after = await until(async () => {
+      const hud = await localHud(player);
+      return hud.attemptStatus === 'running' && Number.isFinite(hud.z) && hud.z < 1 && hud.speed <= .1 && hud.cargo.length === 1 && hud.cargo[0].status === 'at-dock' && hud;
+    }, 'Restart keeps the current comparison and creates one docked capsule');
+    record.afterRestart = after;
+    assert.equal(after.lessonStep, previous.lessonStep); assert.equal(after.lessonTitle, previous.lessonTitle);
+    await approachLoadingDock(player); await keys(player);
+    await expect(player.page.locator('.tb-interact')).toBeEnabled(); await player.page.locator('.tb-interact').click();
+    await expect(player.page.locator('.tb-cargo-slot')).toHaveClass(/secured/);
+    record.afterLoad = await localHud(player);
+    assert.equal(record.afterLoad.lessonStep, previous.lessonStep); assert.equal(record.afterLoad.attemptStatus, 'running');
+    assert.equal(record.afterLoad.cargo.length, 1); assert.equal(record.afterLoad.health, 100);
+    record.status = 'passed';
+  } catch (error) { record.status = 'failed'; record.error = error.message; throw error; }
+  finally { await emitEvidence('tutorial-retry', record); }
+}
+
+async function tutorialComparison(player, kind, fastHealth) {
+  const attempts = [];
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    // An error or timeout propagates immediately. Only the verified public
+    // retry outcome can reach the ordinary Restart action below.
+    const result = await tutorialComparisonAttempt(player, kind, attempt, fastHealth);
+    attempts.push(result);
+    if (result.status === 'passed') return { hud: result.hud, attempts };
+    assert.equal(attempt, 1, `${kind}: both allowed comparison attempts were explicitly unsuccessful`);
+    await restartTutorialComparison(player, kind, result.hud);
+  }
+  throw new Error('Comparison did not produce a completed outcome');
+}
+
 async function tutorial(player) {
   report.tutorial = 'running'; const page = player.page;
   await page.goto(origin + '/games/test-bench');
@@ -982,43 +1093,21 @@ async function tutorial(player) {
   await approachLoadingDock(player);
   await keys(player); const load = page.locator('.tb-interact'); await expect(load).toBeEnabled(); await load.focus(); await load.press('Space');
   await expect(page.locator('.tb-cargo-slot')).toHaveClass(/secured/); await next().click();
-  await focusLane(player); await keys(player, ['KeyW']);
-  await until(async () => (await localHud(player)).next, 'tutorial captures and pauses the completed fast impact comparison', 20000, 40);
-  const fast = await stableLessonMilestone(player, 'fast impact'); await keys(player);
-  assert.equal(fast.lessonTitle, 'Почувствуй удар');
-  assert.match(fast.cargoStatus ?? '', /\b(secured|loose|broken)\b/, 'The fast comparison must show the actually damaged capsule');
-  assert.ok(Number.isFinite(fast.health) && fast.health >= 0 && fast.health < 100, `Fast milestone must show real damage, received ${fast.health}`);
+  const fastComparison = await tutorialComparison(player, 'fast');
+  const fast = fastComparison.hud;
   await next().click();
   await until(async () => (await localHud(player)).z < 1, 'tutorial restarts for the slow comparison');
   await expect(page.locator('.tb-race-lesson p b')).toHaveText(String(fast.health));
   await approachLoadingDock(player);
   await keys(player); await page.locator('.tb-interact').click(); await expect(page.locator('.tb-cargo-slot')).toHaveClass(/secured/);
-  const trace = { profile: player.name, name: 'First slow tutorial attempt', status: 'running', requestedTargetSpeed: .85, targetIsHardCap: false, fastBaselineIntegrity: fast.health, timingMethod: 'Runner times of actual keyboard command dispatch/acknowledgement and visible-HUD decisions, not DOM event timestamps', observationCount: 0, observations: [], droppedObservations: 0, keyTransitionCount: 0, keyTransitions: [], droppedKeyTransitions: 0 };
-  report.localDriverTraces.push(trace); player.localKeyTrace = trace;
-  let slow;
-  try {
-    await localDriveTo(player, 14, .85, hud => hud.next, 45000, trace);
-    await until(async () => (await localHud(player)).next, 'tutorial holds its slow goal through the required settling period', 10000, 40);
-    slow = await stableLessonMilestone(player, 'slow crossing'); await keys(player);
-    assert.equal(slow.lessonTitle, 'Теперь пройди медленнее');
-    assert.match(slow.cargoStatus ?? '', /\bsecured\b/, 'The slow comparison must keep the capsule secured');
-    assert.ok(slow.z >= 13.5, `The slow comparison must cross the ribs, received z=${slow.z}`);
-    assert.ok(Number.isFinite(slow.health) && slow.health > fast.health && slow.health <= 100, `Slow comparison integrity ${slow.health} must exceed fast ${fast.health}`);
-    trace.status = 'passed';
-  } catch (error) { trace.status = 'failed'; trace.error = error.message; throw error; }
-  finally {
-    delete player.localKeyTrace;
-    trace.lastHud = await localHud(player).catch(error => ({ unavailable: error.message }));
-    trace.decisionIntervalsMs = timing(trace.observations.map(value => value.intervalMs).filter(Number.isFinite));
-    trace.maximumObservedSpeed = Math.max(0, ...trace.observations.map(value => value.speed));
-    await emitEvidence('local-driver-trace', compactLocalTrace(trace));
-  }
+  const slowComparison = await tutorialComparison(player, 'slow', fast.health);
+  const slow = slowComparison.hud;
   await expect(next()).toBeVisible(); await inspect(player, 'tutorial-slow-comparison', { race: true, low: true }); await next().click();
   await localDriveTo(player, 22.5, 1.8, hud => hud.next, 25000); await keys(player, ['Space']);
   await expect(next()).toBeVisible({ timeout: 5000 }); await keys(player); await next().click();
   await expect(next()).toContainText('В тренировку'); await next().click(); await expect(page.locator('.tb-builder')).toBeVisible();
   report.tutorial = 'completed through UI and real local physics';
-  return { completed: true, steps: 6, fastIntegrity: fast.health, fastCargoStatus: fast.cargoStatus, slowIntegrity: slow.health, milestonePauseMs: 400, baselineMatchesFastHud: true, slowCargoSecured: true, observation: 'Visible minimap, HUD and lesson controls', control: 'Keyboard and UI only' };
+  return { completed: true, steps: 6, fastIntegrity: fast.health, fastCargoStatus: fast.cargoStatus, slowIntegrity: slow.health, fastAttempts: fastComparison.attempts, slowAttempts: slowComparison.attempts, retryPolicy: 'At most one ordinary UI Restart per comparison, only after a verified frozen retry-fast/retry-slow status; identical driving policy on both attempts; no retry on errors or timeouts', milestonePauseMs: 400, baselineMatchesFastHud: true, slowCargoSecured: true, observation: 'Visible minimap, HUD and lesson controls', control: 'Keyboard and UI only' };
 }
 
 async function createCup(alice, bob) {

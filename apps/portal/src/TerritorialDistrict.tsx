@@ -3,6 +3,7 @@ import type { CSSProperties, FormEvent } from "react";
 import { advanceTutorial, createTutorial, startTutorialThreat, tutorialFrame } from "@iva-games/district/territorial";
 import type { Resource, Stock, TerritoryAction, TerritoryView } from "@iva-games/district/territorial";
 import { PlatformError, request } from "./api";
+import { retryTradeCommand } from "./territorialTradeRetry";
 import { go } from "./navigation";
 import { practiceLink } from "./TerritorialLobby";
 import { districtBotName } from "./districtCopy";
@@ -103,16 +104,33 @@ export function TerritorialMatch({ room, refresh }: { room: Room; refresh: () =>
   async function submit(command: Pending): Promise<boolean> {
     if (sending.current) return false;
     sending.current = true; setBusy(true); setStatus(null);
+    const original = latest.current;
+    let current = command;
     try {
-      const result = await request<{ view: TerritoryView }>(`/rooms/${room.roomId}/actions`, command);
-      accept(result.view); setPending(null);
-      if (command.payload.type === "leave") { go("rooms"); return true; }
-      if (result.view.outcome) void refresh().catch(() => {}); else void load();
-      return true;
+      for (let attempt = 0; attempt < 5; attempt++) {
+        try {
+          const result = await request<{ view: TerritoryView }>(`/rooms/${room.roomId}/actions`, current);
+          accept(result.view); setPending(null);
+          if (current.payload.type === "leave") { go("rooms"); return true; }
+          if (result.view.outcome) void refresh().catch(() => {}); else void load();
+          return true;
+        } catch (error) {
+          if (error instanceof PlatformError && error.status === 409 && error.code === "STALE_REVISION" && original && attempt < 4) {
+            // Only an explicit rejection permits a refreshed command. Unknown results
+            // keep their exact pending bytes and action ID for the ordinary retry.
+            const next = (await request<{ view: TerritoryView }>(`/rooms/${room.roomId}/match`)).view;
+            accept(next);
+            const retry = retryTradeCommand(original, current, latest.current ?? next);
+            if (retry) { current = retry; continue; }
+          }
+          throw error;
+        }
+      }
+      return false;
     } catch (error) {
       if (error instanceof PlatformError && error.status > 0 && error.status < 500) {
         setPending(null); setStatus(error.status === 409 ? "changed" : "invalid"); void load();
-      } else { setPending(command); setStatus("retry"); }
+      } else { setPending(current); setStatus("retry"); }
       return false;
     } finally { sending.current = false; setBusy(false); }
   }

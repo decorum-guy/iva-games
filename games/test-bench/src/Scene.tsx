@@ -33,6 +33,9 @@ export interface TestBenchSceneProps {
 }
 
 const ASSET_ROOT = '/test-bench/';
+export function lowQualityPixelRatio(cssWidth: number, cssHeight: number, devicePixelRatio: number): number {
+  return Math.min(devicePixelRatio || 1, 1.25, Math.sqrt(230400 / (Math.max(1, cssWidth) * Math.max(1, cssHeight))));
+}
 export const PARTICIPANT_PALETTE = ['#efae48', '#35a58c', '#db6e60', '#6d93c4', '#a38ac2', '#9eaa52'] as const;
 export function participantPaint(seatIndex?: number, participantId?: string): string {
   let index = 0;
@@ -246,7 +249,7 @@ function ThreeScene({ onFailure, ...props }: TestBenchSceneProps & { onFailure: 
     let alive = true; let renderer: T.WebGLRenderer;
     try { renderer = new T.WebGLRenderer({ canvas, antialias: props.quality !== 'low', alpha: false, powerPreference: 'high-performance' }); }
     catch { canvas.remove(); callback.current(); return; }
-    const dpr = Math.min(window.devicePixelRatio || 1, props.quality === 'low' ? 1.25 : 2);
+    const initialDpr = Math.min(window.devicePixelRatio || 1, props.quality === 'low' ? 1.25 : 2); let dpr = initialDpr;
     renderer.setPixelRatio(dpr);
     renderer.outputColorSpace = T.SRGBColorSpace; renderer.toneMapping = T.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.20;
     renderer.shadowMap.enabled = props.quality !== 'low'; renderer.shadowMap.type = T.PCFSoftShadowMap;
@@ -269,11 +272,32 @@ function ThreeScene({ onFailure, ...props }: TestBenchSceneProps & { onFailure: 
     let width = 1, height = 1; let currentVehicle: Vehicle | null = null; let blueprintKey = ''; let carBuild = 0;
     let gates: T.Mesh[] = []; let slotTargets: T.Mesh[] = []; const cargo = new Map<string, { key: string; model: T.Group }>(); const cargoLoading = new Set<string>();
     const frames: number[] = []; let lastTime = 0; let metricTime = 0; let spin = 0;
+    const recordBufferSize = () => {
+      const context = renderer.getContext();
+      canvas.dataset.quality = props.quality === 'low' ? 'low' : 'high';
+      canvas.dataset.cssWidth = String(width); canvas.dataset.cssHeight = String(height);
+      canvas.dataset.bufferWidth = String(context.drawingBufferWidth); canvas.dataset.bufferHeight = String(context.drawingBufferHeight);
+      canvas.dataset.pixelRatio = String(renderer.getPixelRatio()); canvas.dataset.bufferPixelLimit = props.quality === 'low' ? '230400' : 'none';
+    };
     const resize = () => {
       const box = surface.getBoundingClientRect(); width = Math.max(1, box.width); height = Math.max(1, box.height);
-      if (fiberStore) fiberStore.getState().setSize(width, height, box.top, box.left); else renderer.setSize(width, height, false);
+      dpr = props.quality === 'low' ? lowQualityPixelRatio(width, height, window.devicePixelRatio || 1) : initialDpr;
+      const previousDpr = renderer.getPixelRatio();
+      // Apply a shrinking ratio before enlarging the CSS size, and a growing
+      // ratio after shrinking it, so resize does not allocate an oversized buffer.
+      if (fiberStore) {
+        const state = fiberStore.getState();
+        if (dpr < previousDpr) state.setDpr(dpr);
+        state.setSize(width, height, box.top, box.left);
+        if (dpr > previousDpr) state.setDpr(dpr);
+      } else {
+        if (dpr < previousDpr) renderer.setPixelRatio(dpr);
+        renderer.setSize(width, height, false);
+        if (dpr > previousDpr) renderer.setPixelRatio(dpr);
+      }
       // R3F synchronizes the backing buffer; the CSS canvas continues to fill its container.
       canvas.style.width = '100%'; canvas.style.height = '100%';
+      recordBufferSize();
     };
     const observer = new ResizeObserver(resize); observer.observe(surface); resize();
     const onContextLost = (event: Event) => { event.preventDefault(); callback.current(); };
@@ -387,6 +411,7 @@ function ThreeScene({ onFailure, ...props }: TestBenchSceneProps & { onFailure: 
         if (currentVehicle) { const point = slots[ring.userData.slot as SlotId]; ring.position.set(point[0], .52, point[2]).applyQuaternion(currentVehicle.group.quaternion).add(currentVehicle.group.position); ring.rotation.x = -Math.PI / 2 + currentVehicle.group.rotation.x; }
       });
       if (time - metricTime > 2000 && frames.length > 30) {
+        recordBufferSize();
         metricTime = time; const sorted = [...frames].sort((a, b) => a - b); const metrics = { drawCalls: renderer.info.render.calls, triangles: renderer.info.render.triangles, frameP95Ms: sorted[Math.floor(sorted.length * .95)], renderer: '3d' as const };
         canvas.dataset.drawCalls = String(metrics.drawCalls); canvas.dataset.frameP95 = metrics.frameP95Ms.toFixed(2); state.onMetrics?.(metrics);
       }
@@ -414,7 +439,7 @@ function CanvasScene(props: TestBenchSceneProps) {
     const canvas = canvasRef.current; if (!canvas) return;
     const context = canvas.getContext('2d'); if (!context) return;
     let frame = 0; let width = 1; let height = 1; let currentScale = 1; let centerZ = 0;
-    const resize = () => { const box = canvas.getBoundingClientRect(); width = box.width; height = box.height; const ratio = Math.min(window.devicePixelRatio || 1, 2); canvas.width = Math.max(1, Math.round(width * ratio)); canvas.height = Math.max(1, Math.round(height * ratio)); context.setTransform(ratio, 0, 0, ratio, 0, 0); };
+    const resize = () => { const box = canvas.getBoundingClientRect(); width = box.width; height = box.height; const ratio = Math.min(window.devicePixelRatio || 1, 2); canvas.width = Math.max(1, Math.round(width * ratio)); canvas.height = Math.max(1, Math.round(height * ratio)); context.setTransform(ratio, 0, 0, ratio, 0, 0); canvas.dataset.cssWidth = String(width); canvas.dataset.cssHeight = String(height); canvas.dataset.bufferWidth = String(canvas.width); canvas.dataset.bufferHeight = String(canvas.height); canvas.dataset.pixelRatio = String(ratio); canvas.dataset.bufferPixelLimit = 'none'; canvas.dataset.quality = 'not-applicable'; };
     const observer = new ResizeObserver(resize); observer.observe(canvas); resize();
     const pos = (x: number, z: number): [number, number] => [width / 2 + x * currentScale, height * .66 - (z - centerZ) * currentScale];
     const slotPoint = (slot: SlotId): [number, number] => { const [x, , z] = slots[slot]; const angle = latest.current.rotation ?? 0; return pos(x * Math.cos(angle) + z * Math.sin(angle), z * Math.cos(angle) - x * Math.sin(angle)); };

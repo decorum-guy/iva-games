@@ -513,8 +513,17 @@ export class PlatformService {
   listRooms(actor: string): Room[] {
     // A history cap must never hide a room the player can still return to.
     const active = this.rows("SELECT r.room_id FROM rooms r JOIN room_members m ON m.room_id=r.room_id WHERE m.player_id=? AND r.state IN ('lobby','starting','playing') ORDER BY r.created_at DESC,r.room_id DESC", actor);
-    const history = this.rows("SELECT r.room_id FROM rooms r JOIN room_members m ON m.room_id=r.room_id WHERE m.player_id=? AND r.state IN ('finished','cancelled') ORDER BY r.created_at DESC,r.room_id DESC LIMIT 50", actor);
+    const history = this.rows("SELECT r.room_id FROM rooms r JOIN room_members m ON m.room_id=r.room_id WHERE m.player_id=? AND r.state IN ('finished','cancelled') AND NOT EXISTS (SELECT 1 FROM room_list_hidden h WHERE h.player_id=m.player_id AND h.room_id=r.room_id) ORDER BY r.created_at DESC,r.room_id DESC LIMIT 50", actor);
     return [...active, ...history].map(row => this.roomView(String(row.room_id)));
+  }
+  hiddenRoomCount(actor: string): number {
+    return Number(this.row("SELECT COUNT(*) AS count FROM room_list_hidden h JOIN rooms r ON r.room_id=h.room_id JOIN room_members m ON m.room_id=r.room_id AND m.player_id=h.player_id WHERE h.player_id=? AND r.state IN ('finished','cancelled')", actor)?.count ?? 0);
+  }
+  clearRoomHistory(actor: string): void {
+    this.run("INSERT OR IGNORE INTO room_list_hidden (player_id,room_id) SELECT ?,r.room_id FROM rooms r JOIN room_members m ON m.room_id=r.room_id WHERE m.player_id=? AND r.state IN ('finished','cancelled')", actor, actor);
+  }
+  restoreRoomHistory(actor: string): void {
+    this.run('DELETE FROM room_list_hidden WHERE player_id=?', actor);
   }
   private gameSettings(game: GameRegistration, input: unknown): Record<string, unknown> {
     if (game.normalizeSettings) return game.normalizeSettings(input);
