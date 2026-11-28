@@ -51,6 +51,17 @@ const report = {
 };
 const http = (url, options = {}) => fetch(url, { ...options, signal: AbortSignal.timeout(8000), redirect: 'error' });
 
+function omitDataUrls(value) {
+  const omitted = [];
+  const text = value.replace(/data:[^\s"'<>]+/gi, url => {
+    const comma = url.indexOf(',');
+    const type = comma < 0 ? 'unspecified' : url.slice(5, comma).slice(0, 100);
+    omitted.push({ type, characters: url.length });
+    return `[data URL omitted: ${type}; ${url.length} characters]`;
+  });
+  return { text, omitted };
+}
+
 async function until(predicate, label, timeout = 10000, interval = 30) {
   const deadline = Date.now() + timeout;
   while (Date.now() < deadline) { const value = await predicate(); if (value) return value; await delay(interval); }
@@ -139,14 +150,18 @@ function observe(player, page) {
   page.on('console', message => {
     if (message.type() !== 'error') return;
     const location = message.location();
-    const text = message.text().slice(0, 1400);
+    // Redact embedded font payloads before bounding the message, so the CSP
+    // reason after a long data URL remains in the diagnostic output.
+    const sanitized = omitDataUrls(message.text());
+    const text = sanitized.text.slice(0, 1400);
     const scenario = report.scenarios.at(-1)?.name ?? 'setup';
     const previous = report.consoleErrors.find(value => value.profile === player.name && value.message === text && value.scenario === scenario);
     if (previous) { previous.occurrences++; return; }
     if (report.consoleErrors.length >= 30) { report.consoleErrorsDropped++; return; }
     // These are evidence for review, separate from uncaught exceptions: this
     // suite deliberately loses a WebGL context and disconnects a profile.
-    report.consoleErrors.push({ profile: player.name, scenario, message: text, textTruncated: message.text().length > 1400, source: location.url ? new URL(location.url, origin).pathname : null, line: location.lineNumber, column: location.columnNumber, occurrences: 1 });
+    const source = location.url ? location.url.startsWith('data:') ? '[data URL omitted from source]' : new URL(location.url, origin).pathname : null;
+    report.consoleErrors.push({ profile: player.name, scenario, message: text, textTruncated: sanitized.text.length > 1400, ...(sanitized.omitted.length ? { omittedDataUrls: sanitized.omitted } : {}), source, line: location.lineNumber, column: location.columnNumber, occurrences: 1 });
   });
   const assetPath = url => { const p = new URL(url).pathname; return !p.startsWith('/api/') && (p.startsWith('/test-bench/') || p.startsWith('/assets/')); };
   page.on('requestfailed', request => {
@@ -319,8 +334,22 @@ async function localHud(player) {
     const transform = node.querySelector('.tb-track-map g[transform]')?.getAttribute('transform') ?? '';
     const match = /translate\(([-\d.e+]+)[,\s]+([-\d.e+]+)\)/.exec(transform);
     const capsule = node.querySelector('.tb-cargo-slot');
-    return { x: match ? (Number(match[1]) - 50) / 9 : null, z: match ? (250 - Number(match[2])) / 4.8 : null, speed: Number(node.querySelector('.tb-speed b')?.textContent), charge: Number(node.querySelector('.tb-energy b')?.textContent), timer: node.querySelector('.tb-race-timer strong')?.textContent, health: Number(capsule?.querySelector('strong')?.textContent), cargoStatus: capsule?.className, interaction: node.querySelector('.tb-interact')?.textContent, canInteract: !node.querySelector('.tb-interact')?.hasAttribute('disabled'), next: !!node.querySelector('.tb-race-lesson .tb-primary'), result: !!node.querySelector('.tb-run-result') };
+    const healthText = capsule?.querySelector('strong')?.textContent?.trim() ?? '';
+    const cargoStatus = capsule?.className;
+    const health = capsule?.classList.contains('broken') || healthText === '×' ? 0
+      : capsule?.classList.contains('at-dock') || capsule?.classList.contains('deposited') ? null
+      : /^\d+(\.\d+)?$/.test(healthText) ? Number(healthText) : null;
+    return { x: match ? (Number(match[1]) - 50) / 9 : null, z: match ? (250 - Number(match[2])) / 4.8 : null, speed: Number(node.querySelector('.tb-speed b')?.textContent), charge: Number(node.querySelector('.tb-energy b')?.textContent), timer: node.querySelector('.tb-race-timer strong')?.textContent, health, cargoStatus, interaction: node.querySelector('.tb-interact')?.textContent, canInteract: !node.querySelector('.tb-interact')?.hasAttribute('disabled'), next: !!node.querySelector('.tb-race-lesson .tb-primary'), lessonTitle: node.querySelector('.tb-race-lesson h2')?.textContent, result: !!node.querySelector('.tb-run-result') };
   });
+}
+async function stableLessonMilestone(player, name) {
+  const before = await localHud(player);
+  assert.equal(before.next, true, `${name}: the lesson goal must expose Continue`);
+  await delay(400);
+  const after = await localHud(player);
+  const state = hud => ({ x: hud.x, z: hud.z, speed: hud.speed, charge: hud.charge, timer: hud.timer, health: hud.health, cargoStatus: hud.cargoStatus, next: hud.next });
+  assert.deepEqual(state(after), state(before), `${name}: the reached lesson goal must preserve its clock, cargo and physics while waiting for Continue`);
+  return after;
 }
 async function localDriveTo(player, target, speed = 2.2, extra = () => false, timeout = 30000) {
   await focusLane(player); const deadline = Date.now() + timeout;
@@ -440,19 +469,29 @@ async function tutorial(player) {
   await keys(player); const load = page.locator('.tb-interact'); await expect(load).toBeEnabled(); await load.focus(); await load.press('Space');
   await expect(page.locator('.tb-cargo-slot')).toHaveClass(/secured/); await next().click();
   await focusLane(player); await keys(player, ['KeyW']);
-  await until(async () => (await localHud(player)).next, 'tutorial fast crossing produces a real damage event', 20000, 40);
-  await keys(player); const fast = await localHud(player); await next().click();
+  await until(async () => (await localHud(player)).next, 'tutorial captures and pauses the completed fast impact comparison', 20000, 40);
+  const fast = await stableLessonMilestone(player, 'fast impact'); await keys(player);
+  assert.equal(fast.lessonTitle, 'Почувствуй удар');
+  assert.match(fast.cargoStatus ?? '', /\b(secured|loose|broken)\b/, 'The fast comparison must show the actually damaged capsule');
+  assert.ok(Number.isFinite(fast.health) && fast.health >= 0 && fast.health < 100, `Fast milestone must show real damage, received ${fast.health}`);
+  await next().click();
   await until(async () => (await localHud(player)).z < 1, 'tutorial restarts for the slow comparison');
+  await expect(page.locator('.tb-race-lesson p b')).toHaveText(String(fast.health));
   await localDriveTo(player, 3.1, 1.7, hud => hud.canInteract && hud.speed <= .35);
   await keys(player); await page.locator('.tb-interact').click(); await expect(page.locator('.tb-cargo-slot')).toHaveClass(/secured/);
   await localDriveTo(player, 14, .85, hud => hud.next, 45000);
-  await keys(player); const slow = await localHud(player); assert.ok(slow.health > fast.health, `Slow comparison integrity ${slow.health} must exceed fast ${fast.health}`);
+  await until(async () => (await localHud(player)).next, 'tutorial holds its slow goal through the required settling period', 10000, 40);
+  const slow = await stableLessonMilestone(player, 'slow crossing'); await keys(player);
+  assert.equal(slow.lessonTitle, 'Теперь пройди медленнее');
+  assert.match(slow.cargoStatus ?? '', /\bsecured\b/, 'The slow comparison must keep the capsule secured');
+  assert.ok(slow.z >= 13.5, `The slow comparison must cross the ribs, received z=${slow.z}`);
+  assert.ok(Number.isFinite(slow.health) && slow.health > fast.health && slow.health <= 100, `Slow comparison integrity ${slow.health} must exceed fast ${fast.health}`);
   await expect(next()).toBeVisible(); await inspect(player, 'tutorial-slow-comparison', { race: true, low: true }); await next().click();
   await localDriveTo(player, 22.5, 1.8, hud => hud.next, 25000); await keys(player, ['Space']);
   await expect(next()).toBeVisible({ timeout: 5000 }); await keys(player); await next().click();
   await expect(next()).toContainText('В тренировку'); await next().click(); await expect(page.locator('.tb-builder')).toBeVisible();
   report.tutorial = 'completed through UI and real local physics';
-  return { completed: true, steps: 6, fastIntegrity: fast.health, slowIntegrity: slow.health, observation: 'Visible minimap, HUD and lesson controls', control: 'Keyboard and UI only' };
+  return { completed: true, steps: 6, fastIntegrity: fast.health, fastCargoStatus: fast.cargoStatus, slowIntegrity: slow.health, milestonePauseMs: 400, baselineMatchesFastHud: true, slowCargoSecured: true, observation: 'Visible minimap, HUD and lesson controls', control: 'Keyboard and UI only' };
 }
 
 async function createCup(alice, bob) {

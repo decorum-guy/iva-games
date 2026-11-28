@@ -16,5 +16,9 @@ export default defineConfig({
     },
   },
   preview: { port: 5175, strictPort: true },
-  build: { outDir: "dist", emptyOutDir: true },
+  build: {
+    outDir: "dist", emptyOutDir: true,
+    // Font subsets must keep same-origin URLs under the portal's font-src policy.
+    assetsInlineLimit: filePath => /\.(woff2?|ttf|otf)$/i.test(filePath) ? false : undefined,
+  },
 });
