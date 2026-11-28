@@ -513,7 +513,7 @@ describe('Territory player views and turn order at news boundaries', () => {
 });
 
 describe('Territorial news geography and eligibility', () => {
-  it.each(['azure-bay','two-shores','four-islands'])('%s supplies eligible sector targets for a full news catalog', mapId => {
+  it.each(['azure-bay','two-shores','four-islands','longwater','lantern-strait','kite-isles'])('%s supplies eligible sector targets for a full news catalog', mapId => {
     const s = fresh();
     s.map = territoryMaps.find(map => map.id === mapId)!;
     for (const template of s.news.catalog) {

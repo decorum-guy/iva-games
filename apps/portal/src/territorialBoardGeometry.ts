@@ -1,5 +1,17 @@
 import type { TerritoryMap } from '@iva-games/district/territorial';
 
+const firstHeathForm: Record<string, number> = { longwater: 1, 'lantern-strait': 2, 'kite-isles': 3 };
+
+/** Vary only the landscape illustration. Stable tile IDs survive snapshot reordering. */
+export function coastalHeathForms(map: TerritoryMap) {
+  const forms = new Map<string, number>();
+  const first = firstHeathForm[map.id];
+  if (map.projection !== 'regular-hex' || !first) return forms;
+  const ids = map.tiles.filter(tile => tile.resource === null).map(tile => tile.id).sort();
+  ids.forEach((id, index) => forms.set(id, 1 + (first - 1 + index) % 3));
+  return forms;
+}
+
 type Point = { x: number; y: number };
 export type RoadHitLine = { x1: number; y1: number; x2: number; y2: number };
 
@@ -44,7 +56,7 @@ export function distanceToRoad(point: Point, line: RoadHitLine): number {
 }
 
 /** Coastlines from published geometry, including separate islands and inland holes. */
-export function territoryCoastlines(map: Pick<TerritoryMap, 'nodes' | 'tiles'>): string[] {
+export function territoryCoastLoops(map: Pick<TerritoryMap, 'nodes' | 'tiles'>): Point[][] {
   const nodes = new Map(map.nodes.map(node => [node.id, node]));
   const sides = new Map<string, { a: string; b: string }>();
   for (const tile of map.tiles) {
@@ -56,20 +68,28 @@ export function territoryCoastlines(map: Pick<TerritoryMap, 'nodes' | 'tiles'>):
   }
   const outgoing = new Map<string, string[]>();
   for (const { a, b } of sides.values()) outgoing.set(a, [...(outgoing.get(a) ?? []), b]);
-  const paths: string[] = [];
+  const paths: Point[][] = [];
   while (outgoing.size) {
     const start = outgoing.keys().next().value!;
     let current = start;
-    const points: string[] = [];
+    const points: Point[] = [];
     do {
       const point = nodes.get(current)!;
-      points.push(`${point.x},${point.y}`);
+      points.push(point);
       const destinations = outgoing.get(current)!;
       const next = destinations.shift()!;
       if (!destinations.length) outgoing.delete(current);
       current = next;
     } while (current !== start && outgoing.has(current));
-    paths.push(`M${points.join(' L')} Z`);
+    paths.push(points);
   }
   return paths;
+}
+
+export function coastPath(loop: Point[]) {
+  return 'M' + loop.map(point => point.x + ',' + point.y).join(' L') + ' Z';
+}
+
+export function territoryCoastlines(map: Pick<TerritoryMap, 'nodes' | 'tiles'>) {
+  return territoryCoastLoops(map).map(coastPath);
 }

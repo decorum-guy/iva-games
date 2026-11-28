@@ -15,7 +15,7 @@ export function TerritorialSettingsFields({ map, setMap, preset, setPreset }: {
   return <>
     <label>{t("Карта района", "District map")}
       <select value={map.id} onChange={event => setMap(territoryMaps.find(item => item.id === event.target.value)!)}>
-        {territoryMaps.map(item => <option key={item.id} value={item.id}>{item.name[lang]}</option>)}
+        {territoryMaps.map(item => <option key={item.id} value={item.id}>{item.name[lang]} · {t("Гексы", "Hexes")} — {item.tiles.length}</option>)}
       </select>
     </label>
     <label>{t("Новости района", "District news")}
