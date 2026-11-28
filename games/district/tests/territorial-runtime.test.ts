@@ -68,7 +68,7 @@ describe('Territorial SQLite registration and compatibility', () => {
     expect(f.registration.resolveRoomVersion?.('district@0.5', TERRITORY_CONTENT)).toBeUndefined();
   });
 
-  it('reads real v0.2/v0.3 records and saved receipts before and after v0.4 activity in the same database', async () => {
+  it('continues real v0.2/v0.3 records and saved receipts after v0.4 activity in the same database', async () => {
     const f = registrationFixture();
     const legacy = new DistrictRuntime({ databasePath: f.databasePath, now: () => f.clock.now });
     const old: { id: string; command: ActionEnvelope; snapshot: string; receipt: unknown }[] = [];
@@ -98,11 +98,26 @@ describe('Territorial SQLite registration and compatibility', () => {
     f.reopen(false);
     expect(f.registration.rulesVersion).toBe('district@0.3');
     expect((await f.view(matchId)).phase).toBe('setup-route');
+    f.reopen();
     for (const saved of old) {
       expect(await f.runtime.applyAction(saved.id, 'owner', saved.command)).toEqual(saved.receipt);
       const view = await f.runtime.viewForPlayer(saved.id, 'owner') as DistrictView;
       expect(view.you.participantId).toBe('seat-0');
       expect(f.db.prepare('SELECT state FROM district_matches WHERE match_id=?').pluck().get(saved.id)).toBe(saved.snapshot);
+
+      // Continue each already-started legacy match through the current reader,
+      // then replay the new receipt after reopening without a second effect.
+      const guest = await f.runtime.viewForPlayer(saved.id, 'guest') as DistrictView;
+      expect(guest.legal.chooseGoal).toBe(true);
+      const next = envelope(guest, 'continued-choice-legacy', { type: 'choose-goal', goal: guest.you.goalOptions[0] });
+      const continued = await f.runtime.applyAction(saved.id, 'guest', next) as DistrictView;
+      expect(continued).toMatchObject({ rulesVersion: guest.rulesVersion, contentVersion: guest.contentVersion,
+        phase: 'negotiation', you: { goal: guest.you.goalOptions[0] } });
+      expect(continued.revision).toBeGreaterThan(guest.revision);
+      const continuedSnapshot = f.db.prepare('SELECT state FROM district_matches WHERE match_id=?').pluck().get(saved.id);
+      f.reopen();
+      expect(await f.runtime.applyAction(saved.id, 'guest', next)).toEqual(continued);
+      expect(f.db.prepare('SELECT state FROM district_matches WHERE match_id=?').pluck().get(saved.id)).toBe(continuedSnapshot);
     }
   });
 

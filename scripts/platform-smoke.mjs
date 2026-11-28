@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { setTimeout as delay } from 'node:timers/promises';
-import { checkLiveCatalogue } from './check-live-catalogue.mjs';
+import { checkLiveCatalogue, expectedDistrictProfile } from './check-live-catalogue.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 for (const path of ['dist-platform/main.js', 'apps/portal/dist/index.html']) {
@@ -172,6 +172,29 @@ try {
   const catalogue = await alice.request('/games');
   assert.equal(catalogue.games.find(game => game.gameId === 'platform-lab').maxPlayers, 6);
   assert.equal((await alice.request('/telegram')).available, false);
+
+  // Exercise a new District room through the built server with the retired
+  // host flag still set to false, rather than only checking the catalogue.
+  let districtRoom = (await alice.request('/rooms', { gameId: 'district', capacity: 2,
+    settings: { mapId: 'two-shores', newsPreset: 'hard' } }, 'smoke-current-district')).room;
+  assert.equal(districtRoom.rulesVersion, expectedDistrictProfile.rulesVersion);
+  assert.equal(districtRoom.contentVersion, expectedDistrictProfile.contentVersion);
+  assert.deepEqual(districtRoom.settings, { mapId: 'two-shores', mapVersion: '2', newsPreset: 'hard' });
+  districtRoom = (await alice.request(`/rooms/${districtRoom.roomId}/bots`,
+    { difficulty: 'normal', expectedRevision: districtRoom.revision }, 'smoke-district-bot')).room;
+  districtRoom = (await alice.request(`/rooms/${districtRoom.roomId}/ready`,
+    { ready: true, expectedRevision: districtRoom.revision }, 'smoke-district-ready')).room;
+  districtRoom = (await alice.request(`/rooms/${districtRoom.roomId}/start`,
+    { expectedRevision: districtRoom.revision }, 'smoke-district-start')).room;
+  assert.equal(districtRoom.state, 'playing');
+  const districtView = (await alice.request(`/rooms/${districtRoom.roomId}/match`)).view;
+  const districtAction = {
+    actionId: 'smoke-district-placement', expectedRevision: districtView.revision,
+    payload: { phaseId: districtView.phaseId, type: 'place', nodeId: districtView.legal.options[0].id },
+  };
+  const placement = (await alice.request(`/rooms/${districtRoom.roomId}/actions`, districtAction)).view;
+  assert.equal(placement.phase, 'setup-route');
+
   const friendship = await alice.request('/friend-requests', { playerId: b.playerId }, 'smoke-friend-request');
   await bob.request(`/friend-requests/${friendship.requestId}/accept`, {}, 'smoke-accept-friend');
   assert.equal((await alice.request('/friends')).friends[0].playerId, b.playerId);
@@ -201,6 +224,10 @@ try {
       await start();
       assert.equal((await alice.request(`/rooms/${roomId}`)).room.matchId, matchId);
       assert.deepEqual(await alice.request(`/rooms/${roomId}/actions`, action), accepted);
+      const restoredDistrict = (await alice.request(`/rooms/${districtRoom.roomId}/match`)).view;
+      assert.equal(restoredDistrict.phase, placement.phase);
+      assert.equal(restoredDistrict.revision, placement.revision);
+      assert.deepEqual((await alice.request(`/rooms/${districtRoom.roomId}/actions`, districtAction)).view, placement);
     }
     const peer = (await bob.request(`/rooms/${roomId}/match`)).view;
     assert.equal(peer.you.choice, null);
@@ -225,7 +252,7 @@ try {
   assert.equal((await alice.request('/session')).user, null);
   console.log(JSON.stringify({ builtHttpSmoke: 'passed', browser: false, independentClients: 2,
     botSeats: 1, rounds: 3, staticAssets: 'byte-matched', persistentRestart: 'passed',
-    replayAfterRestart: 'passed', telegram: 'disabled', externalMessages: 0 }));
+    replayAfterRestart: 'passed', districtStaleFlagRoom: 'started-and-played', telegram: 'disabled', externalMessages: 0 }));
 } finally {
   await cleanup();
 }
