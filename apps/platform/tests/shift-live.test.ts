@@ -76,6 +76,17 @@ async function fixture() {
       request.on('error', reject); request.end(JSON.stringify(body));
     });
   }
+  async function get<T>(player: Player, path: string): Promise<{ status: number; body: T }> {
+    return new Promise((resolve, reject) => {
+      const request = httpRequest({ hostname: '127.0.0.1', port: (server.address() as AddressInfo).port,
+        path: `/api/platform/v1${path}`, headers: { Host: 'shift.test', Cookie: `iva_dev_session=${player.token}` },
+      }, response => {
+        let raw = ''; response.setEncoding('utf8'); response.on('data', chunk => { raw += String(chunk); });
+        response.on('end', () => { try { resolve({ status: response.statusCode!, body: JSON.parse(raw) as T }); } catch (error) { reject(error); } });
+      });
+      request.on('error', reject); request.end();
+    });
+  }
   async function room(host: Player, other: Player, size: 2 | 3 = 2, humanPilots = false) {
     const friends = platform.requestFriend(host.id, other.id); platform.respondFriend(other.id, friends.requestId, 'accept');
     let room = platform.createRoom(host.id, { gameId: 'shift', capacity: size * 2, settings: { teamSize: size } });
@@ -92,7 +103,7 @@ async function fixture() {
     platform.startRoom(host.id, room.roomId, { expectedRevision: room.revision }); await platform.reconcile();
     return platform.getRoom(host.id, room.roomId);
   }
-  return { platform, shift, server, stop, signup, connect, room, post };
+  return { platform, shift, server, stop, signup, connect, room, post, get };
 }
 
 describe('shared authenticated live gateway with Shift', () => {
@@ -312,12 +323,12 @@ describe('shared authenticated live gateway with Shift', () => {
     expect(Object.values(room.settings.teams as object).filter(team => team === 'teal')).toHaveLength(2);
   });
 
-  it('reopens the same finished room for a host rematch and revokes its previous live channel', async () => {
+  it('reopens a hidden finished room, preserves direct access, and lists its new rematch result without restoring unrelated history', async () => {
     const f = await fixture(), a = await f.signup('rematch_a'), b = await f.signup('rematch_b');
     const room = await f.room(a, b);
     const client = f.connect(a, room); await client.wait(frame => frame.type === 'snapshot');
     f.shift.runtime.advanceTicks(16_000);
-    await client.wait(frame => frame.view?.phase === 'finished');
+    const finalFrame = await client.wait(frame => frame.view?.phase === 'finished');
     // The live runtime finishes before the platform's periodic reconciliation.
     // A visible final frame alone must not imply that rematch is ready yet.
     const pending = f.platform.getRoom(a.id, room.roomId);
@@ -341,22 +352,58 @@ describe('shared authenticated live gateway with Shift', () => {
     await f.platform.reconcile();
     const finished = f.platform.getRoom(a.id, room.roomId);
     expect(finished.state).toBe('finished');
+    const unrelated = f.platform.createRoom(a.id, { gameId: 'shift', capacity: 4, settings: { teamSize: 2 } });
+    f.platform.cancelRoom(a.id, unrelated.roomId);
+    expect(await f.post(a, 'history', 'clear', {})).toEqual({ status: 200, body: { ok: true } });
+    expect(await f.post(b, 'history', 'clear', {})).toEqual({ status: 200, body: { ok: true } });
+    type RoomList = { rooms: Room[]; hiddenRoomCount: number };
+    for (const [player, count] of [[a, 2], [b, 1]] as const) {
+      expect(await f.get<RoomList>(player, '/rooms')).toEqual({ status: 200, body: { rooms: [], hiddenRoomCount: count } });
+      const directRoom = await f.get<{ room: Room }>(player, `/rooms/${room.roomId}`);
+      expect(directRoom.status).toBe(200); expect(directRoom.body.room).toEqual(finished);
+      const directMatch = await f.get<{ view: ShiftView }>(player, `/rooms/${room.roomId}/match`);
+      expect(directMatch.status).toBe(200); expect(directMatch.body.view.phase).toBe('finished');
+      expect(directMatch.body.view.score).toEqual(finalFrame.view!.score);
+    }
+    // Hiding a list entry changes neither the current lease nor future admission.
+    const afterClear = await client.wait(frame => frame.type === 'snapshot', client.frames.length);
+    expect(afterClear.epoch).toBe(finalFrame.epoch); expect(afterClear.view!.phase).toBe('finished');
+    const replaced = new Promise<number>(resolve => client.socket.once('close', resolve));
+    const reconnect = f.connect(a, finished), replay = await reconnect.wait(frame => frame.type === 'snapshot');
+    expect(replay.view!.phase).toBe('finished'); expect(replay.view!.score).toEqual(finalFrame.view!.score);
+    expect(replay.epoch).not.toBe(finalFrame.epoch); expect(await replaced).toBe(4001);
     expect(() => f.platform.rematch(b.id, room.roomId, { expectedRevision: finished.revision })).toThrow();
     const disconnected = new Promise<number>((resolve, reject) => {
-      const timeout = setTimeout(() => reject(new Error(`Old rematch channel stayed open: ${client.frames.slice(-4).map(frame => frame.code ?? frame.type).join(',')}`)), 2000);
-      client.socket.once('close', code => { clearTimeout(timeout); resolve(code); });
+      const timeout = setTimeout(() => reject(new Error(`Old rematch channel stayed open: ${reconnect.frames.slice(-4).map(frame => frame.code ?? frame.type).join(',')}`)), 2000);
+      reconnect.socket.once('close', code => { clearTimeout(timeout); resolve(code); });
     });
-    const again = f.platform.rematch(a.id, room.roomId, { expectedRevision: finished.revision });
+    const rematch = await f.post(a, room.roomId, 'rematch', { expectedRevision: finished.revision });
+    expect(rematch.status).toBe(200);
+    const again = (rematch.body as { room: Room }).room;
     expect(again.state).toBe('lobby'); expect(again.matchId).toBeNull();
     expect(again.members.map(p => p.participantId)).toEqual(room.members.map(p => p.participantId));
     expect(again.members.filter(p => p.playerId).every(p => !p.ready)).toBe(true);
     expect(await disconnected).toBe(4003);
     await expect(f.platform.matchView(a.id, room.roomId)).rejects.toMatchObject({ code: 'MATCH_NOT_STARTED' });
+    for (const [player, count] of [[a, 1], [b, 0]] as const) {
+      const listed = await f.get<RoomList>(player, '/rooms');
+      expect(listed).toEqual({ status: 200, body: { rooms: [again], hiddenRoomCount: count } });
+    }
     f.platform.setReady(a.id, again.roomId, { expectedRevision: again.revision, ready: true });
     f.platform.setReady(b.id, again.roomId, { expectedRevision: again.revision, ready: true });
     f.platform.startRoom(a.id, again.roomId, { expectedRevision: again.revision }); await f.platform.reconcile();
     const restarted = f.platform.getRoom(a.id, again.roomId);
     expect(restarted.state).toBe('playing'); expect(restarted.matchId).not.toBe(room.matchId);
     expect((await f.shift.runtime.status(room.matchId!)).finished).toBe(true);
+    f.shift.runtime.advanceTicks(16_000); await f.platform.reconcile();
+    const nextResult = f.platform.getRoom(a.id, room.roomId);
+    expect(nextResult.state).toBe('finished'); expect(nextResult.matchId).toBe(restarted.matchId);
+    const hostList = await f.get<RoomList>(a, '/rooms'), guestList = await f.get<RoomList>(b, '/rooms');
+    expect({ host: hostList, guest: guestList }).toEqual({
+      host: { status: 200, body: { rooms: [nextResult], hiddenRoomCount: 1 } },
+      guest: { status: 200, body: { rooms: [nextResult], hiddenRoomCount: 0 } },
+    });
+    // The other cancelled room remains hidden and directly accessible.
+    expect((await f.get<{ room: Room }>(a, `/rooms/${unrelated.roomId}`)).body.room.state).toBe('cancelled');
   }, 30_000);
 });

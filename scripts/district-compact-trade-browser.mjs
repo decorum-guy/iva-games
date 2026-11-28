@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import {mkdir,writeFile} from 'node:fs/promises';
 import {join} from 'node:path';
-import {randomUUID} from 'node:crypto';
+import {randomUUID,createHash} from 'node:crypto';
 import Database from 'better-sqlite3';
 import {chromium,expect} from '@playwright/test';
 import {createFeedbackHarness} from './district-feedback-fixtures.mjs';
@@ -49,13 +49,17 @@ try {
     s.players[owner].hand=stock({wood:1,brick:1,ore:1});
     s.players[other].hand=stock({brick:1});if(!noneAgree) s.players[bots[0].participantId].hand=stock({brick:1});
     for(const key of Object.keys(s.bank)) s.bank[key]=24-Object.values(s.players).reduce((n,p)=>n+p.hand[key],0);
-    db=new Database(database);db.prepare('UPDATE district_territorial_matches SET state_json=? WHERE match_id=?').run(JSON.stringify(s),room.matchId);db.close();
+    // Stable wide gap between the two bot replies makes the delayed-POST regression deterministic.
+    let seed=0;
+    const draw=(offer,id)=>parseInt(createHash('sha256').update(JSON.stringify([String(seed),offer,id])).digest('hex').slice(0,8),16)%401;
+    while(draw('offer-5',bots[0].participantId)>20 || draw('offer-6',bots[1].participantId)<380)seed++;
+    db=new Database(database);db.prepare('UPDATE district_territorial_matches SET state_json=?,bot_seed=? WHERE match_id=?').run(JSON.stringify(s),String(seed),room.matchId);db.close();
     await h.start();
     return s;
   }
   browser=await chromium.launch({headless:true,args:['--mute-audio'],...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE?{executablePath:process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE}:{})});
-  const cases=['en','ru'].flatMap(lang=>[1280,390].map(width=>({lang,width,noneAgree:false}))); cases.push({lang:'en',width:1280,noneAgree:true});
-  for(const {lang,width,noneAgree} of process.env.COMPACT_ACCESSIBILITY_ONLY==='1'?[]:cases) {
+  const cases=['en','ru'].flatMap(lang=>[1280,390].map(width=>({lang,width,noneAgree:false}))); cases.push({lang:'en',width:1280,noneAgree:true},{lang:'en',width:1280,noneAgree:false,conflictCancel:true});
+  for(const {lang,width,noneAgree,conflictCancel=false} of process.env.COMPACT_ACCESSIBILITY_ONLY==='1'?[]:cases) {
     const before=await reset(noneAgree);
     const context=await browser.newContext({storageState:h.manifest.accounts[0].storageState,viewport:{width,height:width===390?844:800},hasTouch:width===390});
     await context.addInitScript(language=>localStorage.setItem('iva.portal.language',language),lang);
@@ -84,7 +88,7 @@ try {
     assert.ok(layout.terms.every(row=>row.width>=layout.panel.width*.6),'Terms use the full available column');
     assert.ok(!/awaiting|agreed|declined|You →|\d+\s?s\b/.test(layout.text));
     assert.deepEqual(await geometry(),boardBefore);
-    await page.screenshot({path:join(artifacts,`compact-${lang}-${width}${noneAgree?'-all-expire':''}.png`)});
+    await page.screenshot({path:join(artifacts,`compact-${lang}-${width}${noneAgree?'-all-expire':conflictCancel?'-conflict-cancel':''}.png`)});
     const humanOffer=sent.offers.find(o=>o.targetId===other);
     const positions=layout.cells.map(c=>c.box);
     await expect.poll(async()=>{const v=await current(a);return v.offerHistory?.some(o=>o.id===humanOffer.id&&o.responseExpired);},{timeout:12_000}).toBe(true);
@@ -102,20 +106,65 @@ try {
       await page.getByRole('button',{name:'Send offer',exact:true}).click();
       const next=(await (await reply).json()).view;
       const quote=next.offers.find(o=>o.targetId===other);
+      let frozen, releaseView;
+      const viewReady=new Promise(resolve=>{releaseView=resolve;});
+      const matchRoute=async route=>{await viewReady;await route.fulfill({json:{view:frozen}});};
+      await page.route('**/match',matchRoute);
       await post(b,{type:'accept',offerId:quote.id});
+      await expect.poll(async()=>{frozen=await current(a);return frozen.offers.filter(o=>o.groupId===quote.groupId&&o.agreedAt!==undefined).length;},{intervals:[10],timeout:5000}).toBe(2);
+      assert.ok(frozen.offers.some(o=>o.groupId===quote.groupId&&o.targetId===bots[1].participantId&&o.agreedAt===undefined),'Third bot is still deciding at the rendered snapshot');
+      releaseView();
+
       const nextPanel=page.locator(`[data-group-id="${quote.groupId}"]`);
       await expect(nextPanel.getByRole('button',{name:/^Trade with/})).toHaveCount(2);
-      await nextPanel.getByRole('button',{name:'Trade with '+baseline.participants.find(p=>p.participantId===other).displayName,exact:true}).click();
+      const attempts=[];
+      let delayed=false;
+      const actionType=conflictCancel?'cancel':'accept';
+      const delayDecision=async route=>{
+        const command=route.request().postDataJSON();
+        if(command.payload.type===actionType&&!delayed) {
+          delayed=true;
+          await expect.poll(async()=>{const v=await current(a);return v.offerHistory?.some(o=>o.groupId===quote.groupId&&o.targetId===bots[1].participantId);},{intervals:[20],timeout:5000}).toBe(true);
+          await page.unroute('**/match',matchRoute);
+        }
+        if(command.payload.type===actionType&&delayed) {
+          assert.deepEqual((await current(a)).you.hand,before.players[owner].hand,'No resources move before a successful author decision');
+          assert.deepEqual((await current(b)).you.hand,before.players[other].hand);
+        }
+        await route.continue();
+      };
+      await page.route('**/actions',delayDecision);
+      page.on('response',async response=>{
+        if(response.request().method()==='POST'&&response.url().endsWith('/actions')&&response.request().postDataJSON().payload.type===actionType) {
+          const data=await response.json();
+          attempts.push({command:response.request().postDataJSON(),status:response.status(),data});
+        }
+      });
+      const button=conflictCancel?nextPanel.getByRole('button',{name:'Withdraw offer for everyone',exact:true}):nextPanel.getByRole('button',{name:'Trade with '+baseline.participants.find(p=>p.participantId===other).displayName,exact:true});
+      await button.click(); // Exactly one player click; the UI owns the safe stale retry.
       await expect(nextPanel).toHaveCount(0);
-      assert.deepEqual((await current(a)).you.hand,stock({brick:2}));
-      assert.deepEqual((await current(b)).you.hand,stock({wood:1,ore:1}));
+      await expect.poll(()=>attempts.length).toBe(2);
+      assert.equal(attempts[0].status,409);assert.equal(attempts[0].data.error.code,'STALE_REVISION');
+      assert.equal(attempts[1].status,200);
+      assert.equal(attempts[0].command.actionId,attempts[1].command.actionId,'Explicitly rejected attempt preserves action identity');
+      if(!conflictCancel) assert.deepEqual(attempts[0].command.payload,attempts[1].command.payload);
+      else assert.ok(frozen.offers.some(o=>o.id===attempts[1].command.payload.offerId&&o.groupId===quote.groupId),'Cancellation stays within its original group');
+      assert.ok(attempts[1].command.expectedRevision>attempts[0].command.expectedRevision);
+      assert.deepEqual((await current(a)).you.hand,conflictCancel?before.players[owner].hand:stock({brick:2}));
+      assert.deepEqual((await current(b)).you.hand,conflictCancel?before.players[other].hand:stock({wood:1,ore:1}));
+      // Replay a committed command through the authoritative idempotency receipt.
+      const replay=(await a.request(`/rooms/${room.roomId}/actions`,attempts[1].command)).view;
+      assert.deepEqual(replay.you.hand,attempts[1].data.view.you.hand);
+      assert.deepEqual((await current(a)).you.hand,replay.you.hand);
+      await page.unroute('**/actions',delayDecision);
+
     }
     } else {
       const rect=await panel.boundingBox();
       assert.equal(rect.height,layout.panel.height,'A fully expired group retains its dimensions');
       assert.deepEqual(await geometry(),boardBefore);
     }
-    results.push({lang,width,noneAgree,layout,board:boardBefore,expiryStable:true,cancelNoPayment:true,twoConsentsSelected:lang==='en'&&width===1280&&!noneAgree});
+    results.push({lang,width,noneAgree,layout,board:boardBefore,expiryStable:true,cancelNoPayment:true,twoConsentsSelected:lang==='en'&&width===1280&&!noneAgree&&!conflictCancel,conflictCancel});
     await context.close();
   }
   const accessibleBefore=await reset();

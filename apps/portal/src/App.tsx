@@ -297,6 +297,7 @@ export default function App() {
   const [games, setGames] = useState<Game[]>([]);
   const [social, setSocial] = useState<Social>(emptySocial);
   const [rooms, setRooms] = useState<Room[]>([]);
+  const [hiddenRoomCount, setHiddenRoomCount] = useState(0);
   const [selectedRoom, setSelectedRoom] = useState<Room | null>(null);
   const [invitations, setInvitations] = useState<Invitation[]>([]);
   const [telegram, setTelegram] = useState<TelegramStatus | null>(null);
@@ -351,7 +352,7 @@ export default function App() {
       const nextSession = await getSession();
       const gameData = await request<{ games: Game[] }>("/games");
       let friendData: Social = emptySocial;
-      let roomData: { rooms: Room[] } = { rooms: [] };
+      let roomData: { rooms: Room[]; hiddenRoomCount?: number } = { rooms: [] };
       let invitationData: { invitations: Invitation[] } = { invitations: [] };
       let telegramData: TelegramStatus | null = null;
       let nextRoom: Room | null = null;
@@ -359,7 +360,7 @@ export default function App() {
         [friendData, roomData, invitationData, telegramData] =
           await Promise.all([
             request<Social>("/friends"),
-            request<{ rooms: Room[] }>("/rooms"),
+            request<{ rooms: Room[]; hiddenRoomCount?: number }>("/rooms"),
             request<{ invitations: Invitation[] }>("/invitations"),
             request<TelegramStatus>("/telegram"),
           ]);
@@ -413,6 +414,7 @@ export default function App() {
       setGames(gameData.games);
       setSocial(friendData);
       setRooms(roomData.rooms);
+      setHiddenRoomCount(roomData.hiddenRoomCount ?? 0);
       setInvitations(invitationData.invitations);
       setTelegram(telegramData);
       setSelectedRoom(nextRoom);
@@ -1107,6 +1109,20 @@ export default function App() {
                   )
                 ) : (
                   <section className="rooms-section">
+                    {(rooms.some((room) => room.state === "finished" || room.state === "cancelled") || hiddenRoomCount > 0) && (
+                      <div className="room-list-tools">
+                        {rooms.some((room) => room.state === "finished" || room.state === "cancelled") && (
+                          <button className="button secondary small" disabled={busy} onClick={() => void mutate("/rooms/history/clear", {})}>
+                            {t("Очистить завершённые", "Clear finished rooms")}
+                          </button>
+                        )}
+                        {hiddenRoomCount > 0 && (
+                          <button className="button secondary small" disabled={busy} onClick={() => void mutate("/rooms/history/restore", {})}>
+                            {t("Показать завершённые", "Show finished rooms")}
+                          </button>
+                        )}
+                      </div>
+                    )}
                     {rooms.length ? (
                       <div className="room-list">
                         {rooms.map((room) => (

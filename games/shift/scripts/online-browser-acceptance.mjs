@@ -105,7 +105,7 @@ function instrumentBrowser(options = {}) {
   const NativeWebSocket = window.WebSocket;
   const NativeAudioContext = window.AudioContext;
   const latency = options.oneWayDelayMs || 0;
-  const state = { sockets: [], active: null, scope: null, automated: false, sent: 0, oneWayDelayMs: latency,
+  const state = { sockets: [], socketLifecycles: [], active: null, scope: null, automated: false, sent: 0, oneWayDelayMs: latency,
     inputMetrics: { ui: 0, policy: 0, peakPerSecond: 0, recent: [] }, audioContexts: [], activeGesture: null, gestures: { pointers: 0, keys: 0, trustedKeys: 0 } };
   window.addEventListener('pointerdown', () => { state.gestures.pointers++; }, true);
   window.addEventListener('keydown', event => {
@@ -140,6 +140,7 @@ function instrumentBrowser(options = {}) {
       super(url, protocols);
       if (/\/api\/platform\/v1\/rooms\/[^/]+\/live$/.test(new URL(String(url), location.href).pathname)) {
         state.sockets.push(this); state.active = this; state.scope = null;
+        const lifecycle = { matchId: null, epoch: null, phase: null, closed: false, closeCode: null }; state.socketLifecycles.push(lifecycle);
         if (latency) {
           const delayed = new WeakSet();
           this.addEventListener('message', event => {
@@ -150,16 +151,16 @@ function instrumentBrowser(options = {}) {
           }, true);
         }
         this.addEventListener('message', event => {
-          if (state.active !== this) return;
           try {
             const frame = JSON.parse(String(event.data));
             if (frame.type === 'snapshot' && frame.protocol === 'iva-live@1' && frame.wireVersion === 'shift-wire@1') {
               const { protocol, wireVersion, roomId, matchId, epoch } = frame;
-              state.scope = { protocol, wireVersion, roomId, matchId, epoch };
+              lifecycle.matchId = matchId; lifecycle.epoch = epoch; lifecycle.phase = frame.view?.phase;
+              if (state.active === this) state.scope = { protocol, wireVersion, roomId, matchId, epoch };
             }
           } catch { /* The Node-side observer rejects malformed or wrongly scoped frames. */ }
         });
-        this.addEventListener('close', () => { if (state.active === this) state.scope = null; });
+        this.addEventListener('close', event => { lifecycle.closed = true; lifecycle.closeCode = event.code; if (state.active === this) state.scope = null; });
       }
     }
     send(data) {
@@ -223,7 +224,7 @@ function auditView(view, peer) {
 }
 
 function watchPage(page, name, game) {
-  const peer = { page, name, game, view: null, frames: 0, sockets: 0, errors: [], http: [], receipts: new Map(), receiptCounts: new Map(), commandsSentAt: new Map(), receiptLatencyMs: [], closes: [], roles: new Set(), motions: new Set(), samples: [], recent: new Map(), commandEnvelopes: new Map(), wireCommandEnvelopes: new Map(), scopeChecks: 0, staleSocketFramesIgnored: 0, memory: { seq: 0, counter: 0, nextDecisionTick: 0, recentRooms: [] }, lastDriveTick: -1, failure: null };
+  const peer = { page, name, game, view: null, frames: 0, sockets: 0, errors: [], http: [], receipts: new Map(), receiptCounts: new Map(), commandsSentAt: new Map(), receiptLatencyMs: [], closes: [], roles: new Set(), motions: new Set(), samples: [], recent: new Map(), commandEnvelopes: new Map(), wireCommandEnvelopes: new Map(), wireErrors: [], expectedLifecycleEvents: [], scopeChecks: 0, staleSocketFramesIgnored: 0, memory: { seq: 0, counter: 0, nextDecisionTick: 0, recentRooms: [] }, lastDriveTick: -1, failure: null };
   observedPeers.push(peer);
   page.on('pageerror', error => { peer.errors.push(error.message); });
   page.on('response', response => {
@@ -245,16 +246,22 @@ function watchPage(page, name, game) {
       assert.equal(url.search, ''); assert.equal(url.hash, ''); assert.equal(url.username, ''); assert.equal(url.password, '');
     } catch (error) { peer.failure ||= error; return; }
     peer.sockets++; peer.activeSocket = ws; peer.recent.clear();
-    let connectionScope = null, wireScope = null;
+    let connectionScope = null, wireScope = null, connectionPhase = null;
     const receive = ({ payload }) => {
       try {
-        // A newer socket owns this observer. Buffered old messages never replace
-        // its personalized view or random shared epoch, even during delayed delivery.
-        if (peer.activeSocket !== ws) { peer.staleSocketFramesIgnored++; return; }
         const frame = JSON.parse(String(payload));
         const scope = auditServerFrame(frame, game.roomId, connectionScope);
         if (!connectionScope) assert.equal(frame.type, 'snapshot', 'The first server frame is a complete personalized snapshot');
         connectionScope = scope; peer.scopeChecks++;
+        if (frame.type === 'snapshot') connectionPhase = frame.view.phase;
+        if (frame.type === 'error') {
+          const message = `wire:${frame.code}`; peer.errors.push(message);
+          peer.wireErrors.push({ code: frame.code, scope, phase: connectionPhase, at: performance.now(), message });
+          return;
+        }
+        // A newer socket owns this observer. Buffered old messages never replace
+        // its personalized view or random shared epoch, even during delayed delivery.
+        if (peer.activeSocket !== ws) { peer.staleSocketFramesIgnored++; return; }
         if (frame.type === 'snapshot') {
           peer.liveScope = scope;
           immutableJson(frame.view);
@@ -272,7 +279,6 @@ function watchPage(page, name, game) {
           peer.receipts.set(frame.actionId, immutableJson(frame.result)); peer.receiptCounts.set(frame.actionId, (peer.receiptCounts.get(frame.actionId) || 0) + 1);
           if (peer.commandsSentAt.has(frame.actionId)) peer.receiptLatencyMs.push(performance.now() - peer.commandsSentAt.get(frame.actionId));
         }
-        else if (frame.type === 'error') { peer.errors.push(`wire:${frame.code}`); }
       } catch (error) { peer.failure ||= error; }
     };
     ws.on('framereceived', frame => {
@@ -584,7 +590,16 @@ async function drive(game) {
 
 async function rematch(game) {
   const [host, guest] = game.peers, oldId = (await game.demo.pilot.request(`/rooms/${game.roomId}`)).room.matchId;
+  const priorScopes = game.peers.map(peer => { assert.equal(peer.view.phase, 'finished'); assert.equal(peer.liveScope.matchId, oldId); return { ...peer.liveScope }; });
+  const rematchPath = `/api/platform/v1/rooms/${game.roomId}/rematch`;
+  const priorResponses = host.http.filter(item => item.method === 'POST' && item.path === rematchPath).length;
+  const requestedAt = performance.now();
   await host.page.getByRole('button', { name: /Реванш|Rematch/ }).click();
+  const responses = await until(() => {
+    const matching = host.http.filter(item => item.method === 'POST' && item.path === rematchPath);
+    return matching.length > priorResponses && matching.slice(priorResponses);
+  }, 'Actual rematch HTTP response');
+  assert.deepEqual(responses.map(response => response.status), [200], 'One successful ordinary rematch POST');
   await host.page.getByRole('button', { name: /Начать матч|Start match/ }).waitFor();
   await guest.page.getByRole('button', { name: /I’m ready/ }).waitFor();
   const room = (await game.demo.pilot.request(`/rooms/${game.roomId}`)).room;
@@ -595,8 +610,29 @@ async function rematch(game) {
   await host.page.getByRole('button', { name: /Начать матч/ }).click();
   await until(async () => { const latest = (await game.demo.pilot.request(`/rooms/${game.roomId}`)).room; return latest.matchId && latest.matchId !== oldId && latest.state === 'playing'; }, 'Distinct rematch starts');
   const latest = (await game.demo.pilot.request(`/rooms/${game.roomId}`)).room;
+  await until(() => game.peers.every(peer => peer.liveScope?.matchId === latest.matchId && peer.view.phase === 'active'), 'Both clients receive the new active match', 15000);
   await guest.page.locator('.shift-match-tools').getByRole('button', { name: 'RU', exact: true }).waitFor();
-  check('Visible result → rematch → readiness → fresh authoritative match', { game: game.label, oldMatchId: oldId, newMatchId: latest.matchId });
+  const lifecycleEvents = [];
+  // A shared gateway revokes a completed match's scope when rematch returns
+  // the room to its lobby. The error may precede the HTTP response callback.
+  // Classify it only after the entire real POST200 -> lobby -> new-active proof.
+  for (const [index, peer] of game.peers.entries()) {
+    const prior = priorScopes[index];
+    for (const event of peer.wireErrors) {
+      if (event.expectedLifecycle || event.code !== 'LIVE_SCOPE_MISMATCH' || event.at < requestedAt || event.phase !== 'finished'
+        || event.scope.matchId !== oldId || event.scope.epoch !== prior.epoch) continue;
+      const closed = await until(() => peer.page.evaluate(({ matchId, epoch }) => window.__shiftAcceptance.socketLifecycles.find(item => item.matchId === matchId && item.epoch === epoch && item.closed), prior), 'Old finished rematch socket actually closes');
+      assert.equal(closed.closeCode, 4003, 'Scope retirement is confirmed by the old socket CloseEvent');
+      assert.equal(closed.phase, 'finished');
+      const errorIndex = peer.errors.indexOf(event.message); assert.ok(errorIndex >= 0); peer.errors.splice(errorIndex, 1);
+      event.expectedLifecycle = true;
+      const observation = { code: event.code, closeCode: closed.closeCode, previousPhase: event.phase, postStatus: 200, newMatchActive: true };
+      lifecycleEvents.push(observation); peer.expectedLifecycleEvents.push(observation);
+    }
+    assert.deepEqual(peer.errors, [], 'Every other browser/wire error remains fatal during rematch');
+  }
+  check('Visible result → rematch → readiness → fresh authoritative match', { game: game.label, oldMatchId: oldId, newMatchId: latest.matchId, rematchStatus: 200,
+    expectedLifecycleEvents: lifecycleEvents, expectedLifecycleEventCount: lifecycleEvents.length });
   // Keep the real rematch independent; it may finish with substitute bots after these pages close.
 }
 

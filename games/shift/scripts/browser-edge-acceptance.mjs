@@ -188,9 +188,19 @@ async function openPeer(browser,client,room,language,errors){
   const context=await browser.newContext({viewport:{width:1366,height:950},storageState:client.storageState()});
   await context.addInitScript(({language})=>{
     localStorage.setItem('iva-shift.preferences.v1',JSON.stringify({lang:language,mode:'2d',quality:'low',reducedMotion:false,effects:true,volume:0,ambience:0}));
+    const NativeWebSocket=window.WebSocket;window.__shiftEdgeSocketLifecycles=[];
+    window.WebSocket=class extends NativeWebSocket{
+      constructor(url,protocols){
+        super(url,protocols);
+        if(!/\/api\/platform\/v1\/rooms\/[^/]+\/live$/.test(new URL(String(url),location.href).pathname))return;
+        const lifecycle={matchId:null,epoch:null,phase:null,closed:false,closeCode:null};window.__shiftEdgeSocketLifecycles.push(lifecycle);
+        this.addEventListener('message',event=>{try{const frame=JSON.parse(String(event.data));if(frame.type==='snapshot'&&frame.protocol==='iva-live@1'){lifecycle.matchId=frame.matchId;lifecycle.epoch=frame.epoch;lifecycle.phase=frame.view?.phase;}}catch{/* The wire observer validates payloads. */}});
+        this.addEventListener('close',event=>{lifecycle.closed=true;lifecycle.closeCode=event.code;});
+      }
+    };
   },{language});
   const page=await context.newPage();page.setDefaultTimeout(12000);
-  const peer={context,page,view:null,frames:0,commands:[],inputs:[],receipts:[],errors:[],language,scopeChecks:0,staleSocketFramesIgnored:0,wireCommandEnvelopes:new Map()};
+  const peer={context,page,view:null,frames:0,commands:[],inputs:[],receipts:[],errors:[],language,scopeChecks:0,staleSocketFramesIgnored:0,wireCommandEnvelopes:new Map(),wireErrors:[],expectedLifecycleEvents:[]};
   page.on('pageerror',error=>{peer.errors.push(safeError(error));errors.push(safeError(error));});
   page.on('websocket',socket=>{
     const url=new URL(socket.url());
@@ -200,15 +210,19 @@ async function openPeer(browser,client,room,language,errors){
       assert.equal(url.pathname,`/api/platform/v1/rooms/${encodeURIComponent(room.roomId)}/live`);
       assert.equal(url.search,'');assert.equal(url.hash,'');assert.equal(url.username,'');assert.equal(url.password,'');
     }catch(error){fail(error);return;}
-    peer.activeSocket=socket;let connectionScope=null;
+    peer.activeSocket=socket;let connectionScope=null,connectionPhase=null;
     socket.on('framereceived',({payload})=>{try{
-      if(peer.activeSocket!==socket){peer.staleSocketFramesIgnored++;return;}
       const f=JSON.parse(String(payload)),scope=auditServerFrame(f,room.roomId,connectionScope);
       if(!connectionScope)assert.equal(f.type,'snapshot','First shared frame is a full personalized snapshot');
       connectionScope=scope;peer.scopeChecks++;
+      if(f.type==='snapshot')connectionPhase=f.view.phase;
+      if(f.type==='error'){
+        const message='wire:'+f.code;peer.errors.push(message);errors.push(message);
+        peer.wireErrors.push({code:f.code,scope,phase:connectionPhase,at:performance.now(),message});return;
+      }
+      if(peer.activeSocket!==socket){peer.staleSocketFramesIgnored++;return;}
       if(f.type==='snapshot'){peer.liveScope=scope;peer.view=immutableJson(f.view);peer.frames++;}
       else if(f.type==='receipt'){assert.equal(f.result.seatId,peer.view.self.seatId);peer.receipts.push(immutableJson(f));}
-      else if(f.type==='error'){peer.errors.push('wire:'+f.code);errors.push('wire:'+f.code);}
     }catch(error){fail(error);}});
     socket.on('framesent',({payload})=>{try{
       assert.ok(connectionScope,'Client waits for its shared scope');
@@ -370,6 +384,8 @@ async function runCase(kind){
       // The existing portal polling must propagate readiness without a forced refresh.
       await until(()=>enButton.isEnabled(),'Ordinary room polling enables reconciled rematch');
       assert.equal(await hostPeer.page.locator('.shift-result > [role="status"]').count(),0);
+      const priorScopes=peers.map(peer=>{assert.equal(peer.view.phase,'finished');assert.equal(peer.liveScope.matchId,room.matchId);return {...peer.liveScope};});
+      const requestedAt=performance.now();
       await enButton.click();
       await until(()=>rematchStatuses.length===1,'Actual rematch POST response');
       assert.deepEqual(rematchStatuses,[200]);assert.equal(rematchPosts.length,1);
@@ -393,6 +409,25 @@ async function runCase(kind){
       assert.ok(peers.every(peer=>peer.view.phase==='active'&&peer.view.round===1));
       assert.deepEqual(hostPeer.view.score,{teal:0,amber:0});
       result.after={tick:hostPeer.view.tick,phase:hostPeer.view.phase,round:hostPeer.view.round,score:hostPeer.view.score,distinctMatch:true,sameRoom:nextRoom.roomId===room.roomId};
+      assert.ok(peers.every(peer=>peer.liveScope.matchId===nextRoom.matchId),'Both active views have the new authenticated match scope');
+      result.expectedLifecycleEvents=[];
+      // Classify after the complete real POST200 -> lobby -> new-active proof,
+      // independently of whether WS error/close precedes the HTTP callback.
+      for(const [index,peer] of peers.entries()){
+        const prior=priorScopes[index];
+        for(const event of peer.wireErrors){
+          if(event.expectedLifecycle||event.code!=='LIVE_SCOPE_MISMATCH'||event.at<requestedAt||event.phase!=='finished'
+            ||event.scope.matchId!==room.matchId||event.scope.epoch!==prior.epoch)continue;
+          const closed=await until(()=>peer.page.evaluate(({matchId,epoch})=>window.__shiftEdgeSocketLifecycles.find(item=>item.matchId===matchId&&item.epoch===epoch&&item.closed),prior),'Old finished rematch socket actually closes');
+          assert.equal(closed.closeCode,4003,'Scope retirement requires the actual old socket CloseEvent');assert.equal(closed.phase,'finished');
+          const peerIndex=peer.errors.indexOf(event.message),sharedIndex=errors.indexOf(event.message);assert.ok(peerIndex>=0&&sharedIndex>=0);
+          peer.errors.splice(peerIndex,1);errors.splice(sharedIndex,1);event.expectedLifecycle=true;
+          const observation={code:event.code,closeCode:closed.closeCode,previousPhase:event.phase,postStatus:200,newMatchActive:true};
+          peer.expectedLifecycleEvents.push(observation);result.expectedLifecycleEvents.push(observation);
+        }
+        assert.deepEqual(peer.errors,[],'Every other browser/wire error remains fatal during rematch');
+      }
+      result.expectedLifecycleEventCount=result.expectedLifecycleEvents.length;
       result.captures.push(await capture(hostPeer,directory,'rematch-active-en'));
     }else{
       assert.equal(first.view.round,6);assert.equal(first.view.phaseEndsAtTick-first.view.tick,1);assert.deepEqual(first.view.score,{teal:0,amber:0});
