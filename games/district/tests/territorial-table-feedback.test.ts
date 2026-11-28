@@ -397,6 +397,25 @@ describe('SQLite replay and paced bots', () => {
     expect(f.read(matchId).history!.filter(entry => entry.kind === 'accept' && entry.offerStatus === 'accepted')).toHaveLength(1);
   });
 
+  it('withdraws a stale consent for an inactive bot author without starving the active turn', async () => {
+    const f = runtimeFixture();
+    const {matchId} = await f.runtime.createMatch(start([human('a',0),bot('owner',1),human('c',2)]));
+    let s=f.read(matchId); s.phase='play'; s.turn=1;
+    s.players.owner.hand=stock({wood:1}); s.players.a.hand=stock({brick:1});
+    s=applyTerritory(s,'owner',{type:'offer',targetId:'a',give:stock({wood:1}),receive:stock({brick:1})},f.clock.now);
+    s=applyTerritory(s,'a',{type:'accept',offerId:s.offers[0].id},f.clock.now);
+    s.players.a.hand=emptyStock();
+    const before=structuredClone(s.players); f.write(s);
+    const scheduled=await f.runtime.viewForPlayer(matchId,'a');
+    expect(scheduled.botParticipantId).toBe('owner');
+    f.clock.now=scheduled.botActionAt!;
+    const recovered=await f.runtime.viewForPlayer(matchId,'a');
+    expect(recovered.activeParticipantId).toBe('a');
+    expect(f.read(matchId).players).toEqual(before);
+    expect(f.read(matchId).offers).toEqual([]);
+    expect(f.read(matchId).offerHistory!.every(offer=>offer.status==='withdrawn')).toBe(true);
+  });
+
   it('declines an unaffordable bot offer once and preserves the next scheduled action', async () => {
     const f = runtimeFixture();
     const { matchId } = await f.runtime.createMatch(start([bot('active', 0), bot('recipient', 1), human('a', 2)]));

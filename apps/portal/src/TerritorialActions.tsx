@@ -481,7 +481,7 @@ function PlayerTrade({ view, lang, busy, onAction, handPick }: Props) {
           <strong>{word(lang,'Ваше предложение игрокам','Your offer to players')}</strong>
           <OfferTerms give={terms.give} receive={terms.receive} lang={lang}/>
           {items.map(render)}
-          {(view.offerHistory ?? []).filter(offer => offer.groupId === key && offer.status === 'declined').map(offer => <div key={offer.id} className="ta-declined">✕ {nameOf(view, offer.targetId)} · {word(lang, 'Отказ', 'Declined')}</div>)}
+          {(view.offerHistory ?? []).filter(offer => offer.groupId === key && offer.status === 'declined').map(offer => <div key={offer.id} className="ta-declined"><span className="ta-player-dot" style={{background: ['#ca4e37','#2867a8','#79498f','#2c7954'][view.players.find(player => player.participantId === offer.targetId)?.seatIndex ?? 0]}} aria-hidden="true"/>✕ {nameOf(view, offer.targetId)} · {word(lang, 'Отказ', 'Declined')}</div>)}
         </section>;
       })}
     </div>

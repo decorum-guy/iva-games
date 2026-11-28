@@ -151,3 +151,4 @@
 .territory-trade-dock .ta-offer { animation:none; }
 .ta-player-dot { display:inline-block;width:12px;height:12px;border-radius:50%;margin-right:5px; }
 .ta-declined { padding:7px;color:#8a453c;font-size:12px; }
+.territory-map-first .territory-player-trade { min-height:1.3em;line-height:1.3; }

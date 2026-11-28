@@ -171,8 +171,14 @@ export class TerritoryRuntime implements GameRuntime {
           try { this.write(applyTerritory(current, id, action, this.now())); }
           catch (error) {
             if (!(error instanceof DistrictError)) throw error;
-            if (!safe) return 'none';
-            this.write(applyTerritory(current, id, safe, this.now()));
+            // Consent may become unaffordable before the author chooses it. A bot
+            // withdraws its stale group through the same public action rather than
+            // repeatedly replacing another participant's scheduled timer.
+            const recovery = action.type === 'accept' && current.offers.some(offer =>
+              offer.id === action.offerId && offer.authorId === id && offer.agreedAt !== undefined)
+              ? { type: 'cancel' as const, offerId: action.offerId } : safe;
+            if (!recovery) return 'none';
+            this.write(applyTerritory(current, id, recovery, this.now()));
           }
           return 'changed';
         }).immediate();

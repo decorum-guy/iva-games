@@ -540,7 +540,7 @@ try {
               .filter({ hasText: nameOfHuman(view) })
               .getByRole('button', { name: 'Accept', exact: true }),
           );
-          await expect(page.locator('.ta-offer[data-offer-status=agreed]')).toBeVisible();
+          await expect(page.locator('.ta-offer[data-offer-status=agreed]').first()).toBeVisible();
           const consentView = await current(client);
           assert.deepEqual(consentView.you.hand, view.you.hand, 'Consent cannot transfer the author hand');
           for (const [i,p] of pages.entries()) assert.deepEqual(await geometry(p), beforeGeometry[i], 'Offer appearance/consent keeps board and page geometry');
@@ -555,11 +555,13 @@ try {
       played = true;
       break;
     }
+    if (process.env.DISTRICT_TRADE_ONLY === '1' && result.trade) { done = await current(alice); break; }
     // Bots now publish a real, persistent scheduled action. Wait for that
     // action instead of hammering two match endpoints every 8 ms.
     if (!played) await delay(Math.min(1200, Math.max(500,
       (snapshot.botActionAt ?? snapshot.serverNow + 900) - snapshot.serverNow + 50)));
   }
+  if (process.env.DISTRICT_TRADE_ONLY !== '1') {
   assert.ok(done?.outcome?.winnerParticipantIds.length, 'Match did not finish with a winner');
   for (const [index, client] of clients.entries()) {
     const final = await current(client);
@@ -570,15 +572,16 @@ try {
   }
   await checkCoastalMap(bob, pages[1], origin);
   await newsFixtures(clients, pages, guest);
+  }
   assert.deepEqual(errors, []);
-  assert.ok(result.restarted && result.trade);
+  assert.ok(result.trade && (process.env.DISTRICT_TRADE_ONLY === '1' || result.restarted));
   console.log(
     JSON.stringify(
       {
         ...result,
         rounds: done.round,
         revision: done.revision,
-        winners: done.outcome.winnerParticipantIds.length,
+        winners: done.outcome?.winnerParticipantIds.length ?? 0,
         newsMessages: done.news.length,
       },
       null,
