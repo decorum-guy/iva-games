@@ -32,3 +32,13 @@
   .kf-landing .kf-topline>.kf-text-button{padding-right:96px}
   .kf-landing .kf-topline>span{max-width:none;text-align:left;padding-top:4px}
 }
+
+/* Keep the lesson beside the view; sound captions have their own lane. */
+.kf-tutorial{left:auto;right:28px;top:76px;transform:none;width:250px;max-width:calc(100vw - 24px);padding:10px 12px;gap:9px;pointer-events:none}
+.kf-tutorial h2{font-size:13px;line-height:1.25}.kf-tutorial p{font-size:11px;line-height:1.35;margin-top:4px}.kf-tutorial>span{font-size:10px;padding-top:1px}
+.kf-captions{top:210px}
+@media(max-width:760px){.kf-tutorial{left:auto;right:12px;top:64px;width:230px;max-width:60vw}.kf-captions{top:190px}}
+@media(max-width:450px){.kf-tutorial{left:auto;right:12px;top:115px;width:220px;max-width:58vw}.kf-captions{top:238px;max-width:38vw}}
+@media(max-height:500px) and (orientation:landscape){.kf-tutorial{left:auto;right:12px;top:56px;width:220px;max-width:30vw;padding:7px 9px}.kf-tutorial p{font-size:10px;line-height:1.2}.kf-captions{right:auto;left:12px;top:145px;width:150px;max-width:20vw}.kf-caption{padding:4px;font-size:10px}.kf-caption>b{font-size:16px}}
+
+@media(max-height:500px) and (orientation:landscape){.kf-reserve{width:130px;min-width:130px;padding:6px 10px}.kf-reserve small,.kf-reserve strong{display:block}.kf-reserve strong{font-size:22px;line-height:1.1}.kf-objective{margin-left:8px}}

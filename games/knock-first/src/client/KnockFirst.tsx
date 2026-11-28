@@ -81,7 +81,7 @@ function PreferencesPanel({ settings, update, language, audio }: { settings: Pre
   </fieldset><fieldset><legend>{t('Звук', 'Audio')}</legend><label>{t('Громкость', 'Volume')}<input type="range" min="0" max="1" step="0.05" value={settings.volume} onChange={e => update({ ...settings, volume: Number(e.target.value) })} /></label><HearingPanel settings={settings} setSettings={update} language={language} audio={audio} /></fieldset></div>;
 }
 
-const TouchControls = forwardRef<HTMLDivElement, { scene: RefObject<SceneHandle | null>; language: Locale; view: PlayerView; onKnock: () => void; onTimer: () => void; onMark: () => void }>(function TouchControls({ scene, language, view, onKnock, onTimer, onMark }, ref) {
+const TouchControls = forwardRef<HTMLDivElement, { scene: RefObject<SceneHandle | null>; language: Locale; view: PlayerView; onKnock: () => void; onTimer: () => void; onMark: () => void; onMenu: () => void }>(function TouchControls({ scene, language, view, onKnock, onTimer, onMark, onMenu }, ref) {
   const [stick, setStick] = useState({ x: 0, y: 0 }), [run, setRun] = useState(false), [quiet, setQuiet] = useState(false);
   const origin = useRef<{ x: number; y: number; id: number } | null>(null), look = useRef<{ x: number; y: number; id: number } | null>(null);
   const joystick = (e: ReactPointerEvent<HTMLDivElement>) => {
@@ -93,8 +93,8 @@ const TouchControls = forwardRef<HTMLDivElement, { scene: RefObject<SceneHandle 
   return <div className="kf-touch" ref={ref}>
     <div className="kf-look-pad" aria-label={copy(language, 'Обзор', 'Look around')} onPointerDown={e => { e.currentTarget.setPointerCapture(e.pointerId); look.current = { x: e.clientX, y: e.clientY, id: e.pointerId }; }} onPointerMove={e => { if (look.current?.id === e.pointerId) { scene.current?.look(e.clientX - look.current.x, e.clientY - look.current.y); look.current = { x: e.clientX, y: e.clientY, id: e.pointerId }; } }} onPointerUp={() => { look.current = null; }} onPointerCancel={() => { look.current = null; }} />
     <div className="kf-stick" aria-label={copy(language, 'Движение', 'Move')} onPointerDown={e => { e.currentTarget.setPointerCapture(e.pointerId); origin.current = { x: e.clientX, y: e.clientY, id: e.pointerId }; joystick(e); }} onPointerMove={joystick} onPointerUp={stop} onPointerCancel={stop}><span style={{ transform: `translate(${stick.x}px,${stick.y}px)` }} /></div>
-    <div className="kf-touch-modes"><button aria-pressed={run} onClick={() => { setRun(!run); scene.current?.setRun(!run); }}>{copy(language, 'Бег', 'Run')}</button><button aria-pressed={quiet} onClick={() => { setQuiet(!quiet); scene.current?.setQuiet(!quiet); }}>{copy(language, 'Тихо', 'Quiet')}</button></div>
-    <div className="kf-touch-actions"><button className="kf-touch-knock" onClick={onKnock} disabled={view.self.knockReadyIn > 0}>{label(KNOCK_ACTION_COPY[view.knockKind], language)}</button><button className={`kf-touch-hand ${view.prompt.duration ? 'hold' : ''}`} onPointerDown={e => { e.currentTarget.setPointerCapture(e.pointerId); scene.current?.setInteract(true); }} onPointerUp={() => scene.current?.setInteract(false)} onPointerCancel={() => scene.current?.setInteract(false)}>{label(PROMPTS[view.prompt.type], language)}{view.prompt.duration ? <small>{copy(language, 'удерживать', 'hold')}</small> : null}</button><button onClick={onTimer} disabled={!view.self.timer}>{copy(language, 'Таймер', 'Timer')} {view.self.timer ? '1' : '0'}</button><button onClick={onMark}>{copy(language, 'Метка', 'Mark')}</button></div>
+    <div className="kf-touch-modes"><button aria-pressed={run} onClick={() => { setRun(!run); scene.current?.setRun(!run); }}>{copy(language, 'Бег', 'Run')}</button><button aria-pressed={quiet} onClick={() => { setQuiet(!quiet); scene.current?.setQuiet(!quiet); }}>{copy(language, 'Тихо', 'Quiet')}</button><button onClick={onMenu}>{copy(language, 'Меню', 'Menu')}</button></div>
+    <div className="kf-touch-actions"><button className="kf-touch-knock" onClick={onKnock} disabled={view.self.knockReadyIn > 0}>{label(KNOCK_ACTION_COPY[view.knockKind], language)}</button><button className={`kf-touch-hand ${view.prompt.duration ? 'hold' : ''}`} disabled={view.prompt.type === 'none'} onPointerDown={e => { e.currentTarget.setPointerCapture(e.pointerId); scene.current?.setInteract(true); }} onPointerUp={() => scene.current?.setInteract(false)} onPointerCancel={() => scene.current?.setInteract(false)}>{view.prompt.type === 'none' ? copy(language, 'Действие', 'Action') : label(PROMPTS[view.prompt.type], language)}{view.prompt.duration ? <small>{copy(language, 'удерживать', 'hold')}</small> : null}</button><button onClick={onTimer} disabled={!view.self.timer}>{copy(language, 'Таймер', 'Timer')} {view.self.timer ? '1' : '0'}</button><button onClick={onMark}>{copy(language, 'Метка', 'Mark')}</button></div>
   </div>;
 });
 
@@ -152,7 +152,7 @@ export function KnockFirst({ room, userId, friends = [], language, request, refr
     else if (kind === 'timer') command({ type: 'placeTimer' });
     else if (kind === 'map') setMenu(previous => previous === 'map' ? 'none' : 'map');
     else if (kind === 'mark') setMenu(previous => previous === 'marks' ? 'none' : 'marks');
-    else if (kind === 'pause') setControlled(false);
+    else if (kind === 'pause') { setControlled(false); scene.current?.releaseControl(); }
   }, [command]);
   const enter = () => {
     void audio.current?.unlock(); void scene.current?.unlockAudio();
@@ -168,7 +168,7 @@ export function KnockFirst({ room, userId, friends = [], language, request, refr
     } else if (state === 'ready' && contextWasLost.current) { contextWasLost.current = false; net.current?.resume(); }
   }, []);
   const toggleLocale = () => setSettings(previous => ({ ...previous, language: previous.language === 'ru' ? 'en' : 'ru' }));
-  const caption = useCallback((value: SoundCaption) => setCaptions(previous => [...previous.filter(c => c.id !== value.id).slice(-3), value]), []);
+  const caption = useCallback((value: SoundCaption) => setCaptions(previous => [...previous.filter(c => c.id !== value.id && !(c.label === value.label && c.direction === value.direction && c.vertical === value.vertical && c.occluded === value.occluded && c.strength === value.strength)).slice(-3), value]), []);
   const pointer = useCallback((locked: boolean) => { if (!locked && settingsRef.current.pointerLock && !settingsRef.current.touch) setControlled(false); }, []);
   const result = view?.outcome;
   const lessonResult = result?.reason === 'tutorialSkipped' ? 'skipped' : result?.reason === 'tutorialComplete' ? 'complete' : null;
@@ -178,6 +178,18 @@ export function KnockFirst({ room, userId, friends = [], language, request, refr
   const carryFeedback = heldBattery?.obstruction ? label(CARRY_FEEDBACK[heldBattery.obstruction], lang)
     : heldBattery ? otherHolder ? `${t('Вторая рукоять: ', 'Other handle: ')}${otherCarrier?.name ?? t('Напарник', 'Partner')}` : t('Свободна дальняя рукоять', 'Far handle is free') : '';
   const tutorialSenses = view?.tutorial?.step === 0;
+  const touchLesson: [string, string][] = [
+    ['Включите звук или подписи.', 'Enable sound or captions.'],
+    ['Включите «Тихо» и пройдите несколько шагов.', 'Enable Quiet and take a few steps.'],
+    ['Подойдите к трубе и нажмите «Ударить по трубе».', 'Approach the pipe and tap Strike the pipe.'],
+    ['Найдите дверь и нажмите «Открыть».', 'Find the door and tap Open.'],
+    ['Пройдите через проём. Справа — обзор.', 'Walk through. Look with the right side.'],
+    ['Возьмите рукоять. Метка → «Возьми ручку».', 'Take a handle. Mark → Take the handle.'],
+    ['Нажмите «Отпустить рукоять».', 'Tap Release handle.'],
+    ['Подойдите к боту и удерживайте «Помочь».', 'Approach the bot and hold Help.'],
+    ['Постучите по стене и посмотрите на эхо.', 'Knock on a wall and watch the echo.'],
+    ['Подойдите к трубе и ударьте ещё раз.', 'Approach the pipe and strike again.'],
+  ];
   const sensesAvailable = settings.captions || (!settings.muted && settings.volume > 0);
   const onRematch = async () => {
     if (rematchPending.current) return;
@@ -198,14 +210,14 @@ export function KnockFirst({ room, userId, friends = [], language, request, refr
         {view.self.status === 'downed' && <div className="kf-downed"><span>＋</span><strong>{t('Вам нужна помощь', 'You need help')}</strong><b>{Math.ceil(view.self.downedRemaining)} {t('с', 's')}</b><p>{t('Можно отползти и поставить метку помощи', 'You can crawl and place a help mark')}</p><button className="kf-button" onClick={() => command({ type: 'mark', kind: 'help' })}>{t('Позвать на помощь', 'Call for help')}</button></div>}
         {view.self.status === 'returning' && <div className="kf-returning"><strong>{t('Маяк возвращает вас в лифт', 'Your beacon is returning you to the lift')}</strong><p>{t('Груз остался на месте', 'Your cargo stayed where it fell')}</p></div>}
         <div className="kf-crosshair" aria-hidden="true">+</div>
-        <div className="kf-action-prompt"><span className="kf-key">E</span><div><strong>{label(PROMPTS[view.prompt.type], lang)}</strong>{view.prompt.duration && <small>{t('Удерживайте', 'Hold')} {view.prompt.duration} {t('с', 's')}</small>}{carryFeedback && <small className={`kf-carry-feedback ${heldBattery?.obstruction ? 'obstructed' : ''}`} role="status">{carryFeedback}</small>}</div>{view.self.hold && <div className="kf-hold-progress"><i style={{ width: `${view.self.hold.progress / view.self.hold.duration * 100}%` }} /></div>}</div>
+        {(view.prompt.type !== 'none' || carryFeedback || view.self.hold) && <div className="kf-action-prompt">{view.prompt.type !== 'none' && <span className="kf-key">E</span>}<div>{view.prompt.type !== 'none' && <strong>{label(PROMPTS[view.prompt.type], lang)}</strong>}{view.prompt.duration && <small>{t('Удерживайте', 'Hold')} {view.prompt.duration} {t('с', 's')}</small>}{carryFeedback && <small className={`kf-carry-feedback ${heldBattery?.obstruction ? 'obstructed' : ''}`} role="status">{carryFeedback}</small>}</div>{view.self.hold && <div className="kf-hold-progress"><i style={{ width: `${view.self.hold.progress / view.self.hold.duration * 100}%` }} /></div>}</div>}
         {view.self.notice && <div className="kf-world-notice" role="status">{noticeText(view.self.notice, lang)}</div>}
         <div className="kf-hud-bottom"><div className="kf-body-status"><span>{view.self.carrying ? t('Рукоять занята', 'Holding a handle') : t('Руки свободны', 'Hands free')}</span><div className="kf-stamina"><i style={{ width: `${view.self.stamina / 5.5 * 100}%` }} /></div><small>{t('Бег', 'Sprint')} · {view.charges} {t('аварийных возврата', 'emergency returns')}</small></div>
-          {!settings.touch && <div className="kf-keyboard-hints"><span><kbd>Q</kbd>{label(KNOCK_ACTION_COPY[view.knockKind], lang)}{view.self.knockReadyIn > 0 && ` · ${view.self.knockReadyIn.toFixed(1)}`}</span><span><kbd>F</kbd>{t('Таймер', 'Timer')} {view.self.timer ? '1' : '0'}</span><button onClick={() => setMenu('marks')}><kbd>G</kbd>{t('Метка', 'Mark')}</button><button onClick={() => setControlled(false)}><kbd>Esc</kbd>{t('Пауза / меню', 'Menu')}</button></div>}
+          {!settings.touch && <div className="kf-keyboard-hints"><span><kbd>Q</kbd>{label(KNOCK_ACTION_COPY[view.knockKind], lang)}{view.self.knockReadyIn > 0 && ` · ${view.self.knockReadyIn.toFixed(1)}`}</span><span><kbd>F</kbd>{t('Таймер', 'Timer')} {view.self.timer ? '1' : '0'}</span><button onClick={() => setMenu('marks')}><kbd>G</kbd>{t('Метка', 'Mark')}</button><button onClick={() => { setControlled(false); scene.current?.releaseControl(); }}><kbd>Esc</kbd>{t('Пауза / меню', 'Menu')}</button></div>}
         </div>
         {settings.captions && <div className="kf-captions" aria-live="polite">{captions.map(c => <div key={c.id} className={`kf-caption ${c.strength}`}><b>{({ left: '←', right: '→', front: '↑', behind: '↓', near: '◉' })[c.direction]}</b><span>{c.label}<small>{c.occluded ? t('за преградой · ', 'behind an obstacle · ') : ''}{c.vertical === 'above' ? t('выше · ', 'above · ') : c.vertical === 'below' ? t('ниже · ', 'below · ') : ''}{c.strength === 'loud' ? t('громко', 'loud') : c.strength === 'clear' ? t('отчётливо', 'clear') : t('тихо', 'faint')}</small></span></div>)}</div>}
-        {settings.touch && controlled && menu === 'none' && <TouchControls scene={scene} language={lang} view={view} onKnock={() => action('knock')} onTimer={() => action('timer')} onMark={() => setMenu('marks')} />}
-        {view.tutorial && !view.tutorial.completed && <section className="kf-tutorial"><span>{String(view.tutorial.step + 1).padStart(2, '0')} / 10</span><div><h2>{TUTORIAL_COPY[Math.min(view.tutorial.step, 9)][lang === 'ru' ? 0 : 1]}</h2><p>{TUTORIAL_COPY[Math.min(view.tutorial.step, 9)][lang === 'ru' ? 2 : 3]}</p></div>{controlled && (settings.touch || !settings.pointerLock) && <button className="kf-text-button" onClick={() => command({ type: 'tutorial', action: 'skip' })}>{t('Пропустить', 'Skip')}</button>}</section>}
+        {settings.touch && controlled && menu === 'none' && <TouchControls scene={scene} language={lang} view={view} onKnock={() => action('knock')} onTimer={() => action('timer')} onMark={() => setMenu('marks')} onMenu={() => { setControlled(false); scene.current?.releaseControl(); }} />}
+        {view.tutorial && !view.tutorial.completed && <section className="kf-tutorial"><span>{String(view.tutorial.step + 1).padStart(2, '0')} / 10</span><div><h2>{TUTORIAL_COPY[Math.min(view.tutorial.step, 9)][lang === 'ru' ? 0 : 1]}</h2><p>{settings.touch ? touchLesson[Math.min(view.tutorial.step, 9)][lang === 'ru' ? 0 : 1] : TUTORIAL_COPY[Math.min(view.tutorial.step, 9)][lang === 'ru' ? 2 : 3]}</p></div></section>}
         {view.phase === 'preparation' && controlled && <div className="kf-preparation"><strong>{t('Готовы к спуску: ', 'Ready to descend: ')}{view.team.filter(member => member.ready).length}/{view.team.length}</strong><p>{t('В шкафу два шумовых таймера. Они сработают через 4 секунды после установки.', 'There are two noise timers in the cabinet. Each sounds 4 seconds after placement.')}</p><small>{settings.touch ? t('Готовность можно подтвердить в меню.', 'Confirm readiness in the menu.') : t('Esc — подтвердить готовность в меню.', 'Esc — confirm readiness in the menu.')}</small></div>}
         {view.resumeRemaining > 0 && <div className="kf-recovery"><strong>{t('Вылазка восстановлена', 'Mission restored')}</strong><b>{Math.ceil(view.resumeRemaining)}</b><span>{t('Продолжаем с того же места', 'Continuing where you left off')}</span></div>}
         {!controlled && !result && menu === 'none' && context === 'ready' && connection === 'connected' && <div className="kf-return-panel">
