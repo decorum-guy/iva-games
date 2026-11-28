@@ -102,19 +102,47 @@ describe('Independent PR26 transactional and provenance audit', () => {
     expect((await f.view('b')).offerHistory?.some(offer=>offer.id===forC.id)).toBe(false);
   });
 
-  it('broadcasts an inactive author but forbids consent or transfer between two inactive seats', async () => {
-    const f=await fixture(); const before=f.read().players;
+  it('records every recipient consent but forbids transfer between two inactive seats', async () => {
+    const f=await fixture();
     await f.action('b','inactive-author-offer',{type:'offer',targetId:'a',give:stock({brick:1}),receive:stock({wood:1})});
     const [active,other]=f.read().offers;
-    expect((await f.view('c')).offers[0]).toMatchObject({canAccept:false,unavailableReason:'inactive-pair'});
-    await expect(f.action('c','invalid-inactive-consent',{type:'accept',offerId:other.id})).rejects.toMatchObject({code:'INVALID_ACTION'});
-    expect(f.read().players).toEqual(before);
+    expect((await f.view('c')).offers[0].canAccept).toBe(false);
+    // This recipient lacks wood; a funded inactive recipient may consent.
+    const dbState=f.read(); dbState.players.c.hand=stock({wood:1});
+    const db=new Database(f.path); db.prepare('UPDATE district_territorial_matches SET state_json=? WHERE match_id=?').run(JSON.stringify(dbState),f.matchId); db.close();
+    const funded=f.read().players;
+    await f.action('c','inactive-seat-consent',{type:'accept',offerId:other.id});
+    expect((await f.view('b')).offers.find(offer=>offer.id===other.id)).toMatchObject({canAccept:false,unavailableReason:'inactive-pair'});
+    await expect(f.action('b','invalid-inactive-choice',{type:'accept',offerId:other.id})).rejects.toMatchObject({code:'INVALID_ACTION'});
+    expect(f.read().players).toEqual(funded);
     await f.action('a','active-seat-consent',{type:'accept',offerId:active.id});
-    expect(f.read().players).toEqual(before);
+    expect(f.read().players).toEqual(funded);
     expect((await f.view('b')).offers.find(offer=>offer.id===active.id)?.canAccept).toBe(true);
     await f.action('b','author-choose-active',{type:'accept',offerId:active.id});
     expect(f.read().players.b.hand).toEqual(stock({wood:1}));
-    expect(f.read().players.c).toEqual(before.c);
+    expect(f.read().players.c).toEqual(funded.c);
+  });
+
+  it('collects both inactive recipients in a four-seat game without executing their pair', () => {
+    const members=[...participants,{...participants[0],participantId:'d',playerId:'d',displayName:'d',seatIndex:3,controller:{kind:'human' as const,playerId:'d'}}];
+    let state=createTerritory({matchId:'four-consents',roomId:'four-consents',map:territoryMaps[0],participants:members,preset:'medium',seed:'four',now:0});
+    state.phase='play'; state.players.b.hand=stock({brick:1});
+    for(const id of ['a','c','d']) state.players[id].hand=stock({wood:1});
+    state=applyTerritory(state,'b',{type:'offer',targetId:'a',give:stock({brick:1}),receive:stock({wood:1})},1);
+    const before=structuredClone(state.players);
+    for(const id of ['c','d']) {
+      const offer=state.offers.find(item=>item.targetId===id)!;
+      expect(viewTerritory(state,id,2).offers[0].canAccept).toBe(true);
+      state=applyTerritory(state,id,{type:'accept',offerId:offer.id},2);
+      expect(viewTerritory(state,'b',2).offers.find(item=>item.id===offer.id)).toMatchObject({canAccept:false,unavailableReason:'inactive-pair'});
+      expect(()=>applyTerritory(state,'b',{type:'accept',offerId:offer.id},3)).toThrow();
+    }
+    expect(state.players).toEqual(before);
+    const active=state.offers.find(item=>item.targetId==='a')!;
+    state=applyTerritory(state,'a',{type:'accept',offerId:active.id},4);
+    state=applyTerritory(state,'b',{type:'accept',offerId:active.id},5);
+    expect(state.players.c).toEqual(before.c); expect(state.players.d).toEqual(before.d);
+    expect(state.players.b.hand).toEqual(stock({wood:1})); expect(state.offers).toEqual([]);
   });
 
   it('serializes competing author choices after restart and preserves the exact receipt without another transfer', async () => {

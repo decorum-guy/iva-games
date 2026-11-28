@@ -288,7 +288,7 @@ function deal(s: TerritoryState, id: string, action: Extract<TerritoryAction, { 
   const confirming = action.type === 'accept' && offer?.authorId === id && !!offer.groupId && offer.agreedAt !== undefined;
   requireAction(offer && (action.type === 'cancel' ? offer.authorId === id : offer.targetId === id || confirming));
   if (action.type === 'accept') {
-    requireAction(offer.authorId === currentId(s) || offer.targetId === currentId(s));
+    if (!offer.groupId || confirming) requireAction(offer.authorId === currentId(s) || offer.targetId === currentId(s));
     const author = s.players[offer.authorId], recipient = s.players[offer.targetId];
     requireAction(covers(author.hand, offer.give) && covers(recipient.hand, offer.receive) && !s.left.includes(offer.targetId));
     if (offer.groupId && !confirming) {
@@ -618,10 +618,10 @@ export function viewTerritory(s: TerritoryState, id: string, now: number, clone 
       ...(offer.parentId ? { parentId: offer.parentId } : {}),
       ...(offer.offeredAt !== undefined ? { offeredAt: offer.offeredAt } : {}),
       ...(offer.groupId ? { groupId: offer.groupId } : {}), ...(offer.agreedAt !== undefined ? { agreedAt: offer.agreedAt } : {}),
-      canAccept: phase === 'play' && !s.left.includes(id) && (offer.authorId === currentId(s) || offer.targetId === currentId(s)) &&
+      canAccept: phase === 'play' && !s.left.includes(id) &&
         (offer.targetId === id && offer.agreedAt === undefined && covers(s.players[offer.authorId].hand, offer.give) && covers(s.players[id].hand, offer.receive) ||
-          offer.authorId === id && !!offer.groupId && offer.agreedAt !== undefined && covers(s.players[id].hand, offer.give)),
-      ...(offer.authorId !== currentId(s) && offer.targetId !== currentId(s) ? { unavailableReason: 'inactive-pair' as const } : !covers(s.players[offer.authorId].hand, offer.give) ? { unavailableReason: 'author-resources' as const } :
+          offer.authorId === id && !!offer.groupId && offer.agreedAt !== undefined && (offer.authorId === currentId(s) || offer.targetId === currentId(s)) && covers(s.players[id].hand, offer.give)),
+      ...(offer.authorId === id && offer.agreedAt !== undefined && offer.authorId !== currentId(s) && offer.targetId !== currentId(s) ? { unavailableReason: 'inactive-pair' as const } : !covers(s.players[offer.authorId].hand, offer.give) ? { unavailableReason: 'author-resources' as const } :
         // Only the recipient can inspect their own shortage. Publishing it to the
         // sender would turn unanswered proposals into probes of a hidden hand.
         offer.targetId === id && !covers(s.players[id].hand, offer.receive) ? { unavailableReason: 'target-resources' as const } : {}),
