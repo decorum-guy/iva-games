@@ -20,8 +20,9 @@ const cycle = argument('--cycle', '1'), smoke = args.includes('--smoke');
 const selectedCase = argument('--case', null);
 const port = Number(argument('--port', process.env.SHIFT_QA_PORT || '4408'));
 const timeoutMs = Number(argument('--match-timeout-ms', '600000'));
-const concurrency = Math.max(1, Math.min(3, Number(process.env.SHIFT_QA_CONCURRENCY || '2')));
+const concurrency = Math.max(1, Math.min(3, Number(process.env.SHIFT_QA_CONCURRENCY || '1')));
 const observedPeers = [];
+let stopping = false;
 const qaRoot = join(ROOT, '.qa', 'shift-online'); await mkdir(qaRoot, { recursive: true, mode: 0o700 });
 const directory = await mkdtemp(join(qaRoot, `cycle-${cycle}-`));
 const buildSnapshot = join(directory, 'build');
@@ -433,7 +434,7 @@ async function crashAndTakeover(game) {
 
 async function drive(game) {
   const started = Date.now(), end = started + timeoutMs; let announcedRound = 0;
-  while (Date.now() < end) {
+  while (!stopping && Date.now() < end) {
     for (const peer of game.peers) if (peer.failure) throw peer.failure;
     if (game.peers.every(p => p.view?.phase === 'finished')) break;
     await Promise.all(game.peers.map(async peer => {
@@ -446,6 +447,10 @@ async function drive(game) {
     if (view && view.round !== announcedRound) { announcedRound = view.round; log({ game: game.label, phase: view.phase, round: view.round, score: view.score }); }
     await delay(67);
   }
+  // A later setup failure can interrupt another live match when concurrency is
+  // explicitly raised. Its unfinished driver must release timers without
+  // inventing a result or keeping a failed run alive until the match deadline.
+  if (stopping) return;
   assert.ok(game.peers.every(p => p.view?.phase === 'finished'), `${game.label} did not finish within the real-time deadline`);
   const final = game.peers[0].view;
   assert.ok(final.rounds.some(r => r.reason === 'delivery'), `${game.label}: ordinary match must include a real delivered battery`);
@@ -531,6 +536,7 @@ try {
   else { assert.equal(report.matches.length, 6); report.fullMatrix = true; }
   report.passed = true;
 } catch (error) {
+  stopping = true;
   report.passed = false; report.failures.push({ message: error.message, stack: error.stack });
   report.browserErrors = observedPeers.flatMap(p => p.errors.map(error => ({ game: p.game.label, peer: p.name, error })));
   await writeFile(join(directory, 'failure-http.json'), JSON.stringify(observedPeers.map(p => ({ name: p.name, game: p.game.label, requests: p.http }))), { mode: 0o600 });
@@ -542,6 +548,7 @@ try {
   await writeFile(join(directory, 'failure-views.json'), JSON.stringify(observedPeers.map(p => ({ name: p.name, game: p.game.label, view: p.view, failure: p.failure?.message }))), { mode: 0o600 });
   log({ failure: error.message }); process.exitCode = 1;
 } finally {
+  stopping = true;
   await demo?.stop().catch(error => { report.failures.push({ message: error.message }); report.passed = false; process.exitCode = 1; });
   await closeBrowser();
   report.finishedAt = new Date().toISOString(); await writeFile(join(directory, 'report.json'), JSON.stringify(report, null, 2), { mode: 0o600 });

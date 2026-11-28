@@ -99,7 +99,7 @@ function MatchShell({ session, preferences: p, change, exit, rematch, local = fa
   }, []);
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
-      if ((e.target as HTMLElement).closest('input,select,textarea,[role="dialog"]')) return;
+      if ((e.target as HTMLElement).closest('input,select,textarea,summary,[role="dialog"]')) return;
       const { view: v, blocked, p: prefs } = latest.current; if (!v || blocked) return;
       if (v.self.role === 'navigator') {
         const shaft = v.board.indexOf(null); let index = -1;
