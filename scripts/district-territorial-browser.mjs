@@ -546,6 +546,12 @@ try {
           await page.getByRole('button', { name: 'Offer a trade', exact: true }).click();
           const geometry = async p => p.locator('.tb-surface').evaluate(el => { const r=el.getBoundingClientRect(); return {x:r.x,y:r.y,width:r.width,height:r.height,scrollY:window.scrollY}; });
           await Promise.all(pages.map(p => p.evaluate(() => document.fonts.ready)));
+          const headerLayout=async p=>p.evaluate(()=>Object.fromEntries(['.territory-top','.territory-phase','.territory-phase-heading','.territory-phase p','.territory-phase>small','.territory-roll','.territory-roll-copy','.territory-roll-copy>strong','.territory-roll-copy>small','.territory-roll-income'].map(selector=>{const el=document.querySelector(selector);const r=el?.getBoundingClientRect();return[selector,{text:el?.textContent,display:el?getComputedStyle(el).display:null,y:r?.y,height:r?.height,width:r?.width}]})));
+          const unsynchronizedHeaders=await Promise.all(pages.map(headerLayout));
+          if(view.latestRoll) for(const p of pages) {
+            await expect(p.locator('.territory-roll-copy>small')).toHaveText(`Round ${view.latestRoll.round+1} \u00b7 turn ${view.latestRoll.turn}`);
+          }
+          const beforeHeaders=await Promise.all(pages.map(headerLayout));
           const beforeGeometry = await Promise.all(pages.map(geometry));
           const resourceName = (r) => r.charAt(0).toUpperCase() + r.slice(1);
           await page.getByRole('button', { name: 'I give + ' + resourceName(give), exact: true }).click();
@@ -563,7 +569,7 @@ try {
           await expect(page.locator('.ta-offer[data-offer-status=agreed]').first()).toBeVisible();
           const consentView = await current(client);
           assert.deepEqual(consentView.you.hand, view.you.hand, 'Consent cannot transfer the author hand');
-          for (const [i,p] of pages.entries()) assert.deepEqual(await geometry(p), beforeGeometry[i], 'Offer appearance/consent keeps board and page geometry');
+          for (const [i,p] of pages.entries()) assert.deepEqual(await geometry(p), beforeGeometry[i], 'Offer appearance/consent keeps board and page geometry '+JSON.stringify({before:beforeHeaders[i],after:await headerLayout(p)}));
           await mkdir(artifacts, {recursive:true});
           for (const [i,p] of pages.entries()) await p.screenshot({path:join(artifacts,i ? 'trade-mobile.png' : 'trade-desktop.png')});
           await clickAction(page, page.getByRole('button', {name: new RegExp('^Trade with '+other.players.find(p=>p.participantId===other.you.participantId).displayName)}));
@@ -590,6 +596,7 @@ try {
           for (const [i,p] of pages.entries()) assert.deepEqual(await geometry(p),beforeGeometry[i],'Group cancellation keeps geometry');
           result.groupCancel=true;
           result.tradeGeometry = beforeGeometry;
+          result.tradeHeaderLayout={unsynchronized:unsynchronizedHeaders,before:beforeHeaders,after:await Promise.all(pages.map(headerLayout))};
           result.trade = true;
         } else await post(client, view, action);
       } else await post(client, view, action);

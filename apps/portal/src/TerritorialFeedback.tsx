@@ -54,14 +54,15 @@ export function TerritorialTurn({ view, lang }: { view: TerritoryView; lang: Lan
   const mine = view.activeParticipantId === view.you.participantId;
   const seconds = Math.max(0, Math.ceil(((view.deadlineAt ?? view.serverNow) - view.serverNow) / 1000));
   const clock = `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
-  const actor = playerName(view, view.botParticipantId ?? view.activeParticipantId);
+  const actor = playerName(view, view.activeParticipantId);
+  const activeBotThinking = view.botActionAt && view.botParticipantId === view.activeParticipantId;
   return <div className={'territory-phase' + (mine ? ' is-yours' : '')}>
     <div className="territory-phase-heading"><strong>{view.outcome ? (ru ? 'Итог' : 'Result') : mine ? (ru ? 'Ваш ход' : 'Your turn') : actor}</strong>
       <span>{view.turn === 0 ? (ru ? 'Расстановка' : 'Setup') : `${ru ? 'Круг' : 'Round'} ${view.round + 1}`}</span>
       {!view.outcome && <time className="territory-clock" aria-label={(ru ? 'На действие осталось ' : 'Time left ') + clock}>{clock}</time>}
     </div>
     <p>{view.outcome ? (view.outcome.winnerParticipantIds.length ? (ru ? 'Победитель: ' : 'Winner: ') + view.outcome.winnerParticipantIds.map(id=>playerName(view,id)).join(', ') : phaseText(view,lang)) : phaseText(view, lang)}</p>
-    <small>{view.botActionAt && !view.outcome ? `${actor} ${ru ? 'обдумывает действие' : 'is considering a move'}`
+    <small>{activeBotThinking && !view.outcome ? (ru ? 'Бот выбирает ход' : 'Bot is choosing a move')
       : view.legal.end ? (ru ? 'Можно завершить ход' : 'You can end your turn')
         : view.phase === 'finished' ? (ru ? 'Карта и журналы доступны' : 'The map and journals remain available')
           : !mine && !view.you.discard ? (ru ? 'Ход другого игрока' : 'Another player is taking their turn')
